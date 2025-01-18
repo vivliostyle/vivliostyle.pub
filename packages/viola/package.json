@@ -1,5 +1,5 @@
 {
-  "name": "@/viola",
+  "name": "@v/viola",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,9 +9,14 @@
     "preview": "vite preview"
   },
   "imports": {
-    "#config": "@/config"
+    "#config/*": "@v/config/*",
+    "#ui/*": "@v/ui/*"
   },
   "devDependencies": {
-    "@/config": "workspace:*"
+    "@tanstack/react-router": "1.97.1",
+    "@tanstack/router-devtools": "1.97.1",
+    "@tanstack/router-plugin": "1.97.1",
+    "@v/config": "workspace:*",
+    "@v/ui": "workspace:*"
   }
 }
