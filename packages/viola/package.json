@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "imports": {
+    "#cli-bundle/*": "@v/config/*",
     "#config/*": "@v/config/*",
     "#ui/*": "@v/ui/*"
   },
@@ -16,7 +17,10 @@
     "@tanstack/react-router": "1.97.1",
     "@tanstack/router-devtools": "1.97.1",
     "@tanstack/router-plugin": "1.97.1",
+    "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
-    "@v/ui": "workspace:*"
+    "@v/ui": "workspace:*",
+    "comlink": "^4.4.2",
+    "vite-plugin-pwa": "^0.21.1"
   }
 }
