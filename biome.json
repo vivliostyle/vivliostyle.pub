@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "ignore": []
+    "ignore": ["packages/cli-bundle/src/stubs/**/*"]
   },
   "formatter": {
     "enabled": true,

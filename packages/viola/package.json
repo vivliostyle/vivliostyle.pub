@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host"
   },
   "imports": {
     "#cli-bundle/*": "@v/config/*",
@@ -21,6 +21,7 @@
     "@v/config": "workspace:*",
     "@v/ui": "workspace:*",
     "comlink": "^4.4.2",
+    "sirv": "^3.0.0",
     "vite-plugin-pwa": "^0.21.1"
   }
 }

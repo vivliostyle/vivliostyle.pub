@@ -1,0 +1,8 @@
+{
+  "extends": "@v/config/tsconfig.app.json",
+  "include": ["src"],
+  "exclude": ["src/stubs/rollup"],
+  "compilerOptions": {
+    "noEmit": true
+  }
+}

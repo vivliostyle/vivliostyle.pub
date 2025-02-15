@@ -1,6 +1,12 @@
 /// <reference lib="webworker" />
 import * as Comlink from 'comlink';
 
+type WorkerInterface = {
+  serve: (
+    ...req: ConstructorParameters<typeof Request>
+  ) => Promise<ConstructorParameters<typeof Response>>;
+};
+
 const self = globalThis as unknown as ServiceWorkerGlobalScope;
 
 self.addEventListener('install', (event: ExtendableEvent) => {
@@ -11,13 +17,6 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
   event.waitUntil(self.clients.claim());
 });
 
-let cli:
-  | Comlink.Remote<{
-      handle: (
-        ...req: ConstructorParameters<typeof Request>
-      ) => Promise<ConstructorParameters<typeof Response>>;
-    }>
-  | undefined;
 let workerReady = false;
 const workerReadyHandler = new Set<() => void>();
 
@@ -25,7 +24,6 @@ self.addEventListener('message', async (event) => {
   if (event.data.command === 'connect') {
     workerReady = false;
     const port = event.ports[0];
-    cli = Comlink.wrap(port);
     Comlink.expose(
       {
         ready: () => {
@@ -69,15 +67,12 @@ const indexHtml = `<!DOCTYPE html>
   <meta charset="UTF-8">
 </head>
 <body>
-  <script type="module" src="/test.js"></script>
+  <script type="module" src="/src/test.ts"></script>
 </body>
 `;
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (!cli) {
-    return;
-  }
   const url = new URL(request.url);
   if (location.origin !== url.origin) {
     return;
@@ -93,37 +88,52 @@ self.addEventListener('fetch', (event) => {
     workerReady = false;
   }
 
-  event.respondWith(
-    (async () => {
-      if (request.mode === 'navigate') {
-        return new Response(indexHtml, {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/html',
-            'Content-Length': `${indexHtml.length}`,
-            'Cross-Origin-Embedder-Policy': 'credentialless',
-            'Cross-Origin-Opener-Policy': 'same-origin',
-            'Cross-Origin-Resource-Policy': 'cross-origin',
-          },
-        });
-      }
-
-      const requestInit = { ...request } as RequestInit;
-      if (
-        request.method === 'POST' ||
-        request.method === 'PUT' ||
-        request.method === 'PATCH'
-      ) {
-        requestInit.body = await request.arrayBuffer();
-      }
-
-      try {
-        await waitWorkerConnection();
-        const ret = await cli.handle(request.url, requestInit);
-        return new Response(...ret);
-      } catch {
-        return new Response('', { status: 500 });
-      }
-    })(),
-  );
+  event.respondWith(handleRequest(event));
 });
+
+function createChannel() {
+  return new BroadcastChannel('vs-cli');
+}
+
+async function handleRequest(event: FetchEvent) {
+  const { request } = event;
+  if (request.mode === 'navigate') {
+    return new Response(indexHtml, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html',
+        'Content-Length': `${indexHtml.length}`,
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+      },
+    });
+  }
+
+  const requestInit: RequestInit = {
+    headers: Object.fromEntries(request.headers.entries()),
+    method: request.method,
+  };
+  if (
+    request.method === 'POST' ||
+    request.method === 'PUT' ||
+    request.method === 'PATCH'
+  ) {
+    requestInit.body = await request.arrayBuffer();
+  }
+
+  const channel = createChannel();
+  try {
+    await waitWorkerConnection();
+    const ret = await Promise.race([
+      Comlink.wrap<WorkerInterface>(channel).serve(request.url, requestInit),
+      new Promise<never>((_, reject) =>
+        setTimeout(reject, 5000, new Error('Request timeout')),
+      ),
+    ]);
+    return new Response(...ret);
+  } catch (error) {
+    console.error(error);
+    return new Response('', { status: 500 });
+  }
+}

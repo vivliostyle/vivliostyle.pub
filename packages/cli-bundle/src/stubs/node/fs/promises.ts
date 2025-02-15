@@ -1,0 +1,38 @@
+import { fs } from 'memfs';
+
+export default fs.promises;
+
+export const {
+  FileHandle,
+  constants,
+  cp,
+  opendir,
+  statfs,
+  lutimes,
+  access,
+  chmod,
+  chown,
+  copyFile,
+  lchmod,
+  lchown,
+  link,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readlink,
+  realpath,
+  rename,
+  rmdir,
+  rm,
+  stat,
+  symlink,
+  truncate,
+  unlink,
+  utimes,
+  readFile,
+  appendFile,
+  open,
+  writeFile,
+  watch,
+} = fs.promises;

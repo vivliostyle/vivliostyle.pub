@@ -3,11 +3,20 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build:rollup-wasm"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "dist/**"]
     },
+    "build:rollup-wasm": {
+      "inputs": [
+        "src/stubs/rollup/rust/**",
+        "!src/stubs/rollup/rust/target/**",
+        "src/stubs/rollup/src/**"
+      ],
+      "outputs": ["src/stubs/rollup/wasm/**"]
+    },
     "dev": {
+      "dependsOn": ["build:rollup-wasm"],
       "cache": false,
       "persistent": true
     }
