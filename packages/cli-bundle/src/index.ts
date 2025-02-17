@@ -1,11 +1,13 @@
 import './volume';
 
 import { EventEmitter } from 'node:events';
+import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
 import * as Comlink from 'comlink';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
 import { fs } from 'memfs';
+import { toTreeSync } from 'memfs/lib/print';
 import { toSnapshotSync } from 'memfs/lib/snapshot';
 import {
   type MockResponse,
@@ -36,7 +38,50 @@ async function setupServer() {
     server: {
       middlewareMode: true,
     },
+    plugins: [
+      createVitePlugin({
+        cwd: '/workdir',
+        logLevel: 'info',
+      }),
+    ],
   });
+  console.log(toTreeSync(fs));
+}
+
+function zipDirectory(pwd: string) {
+  const out = toSnapshotSync({ fs, path: pwd });
+  function toZippable(
+    snapshot: typeof out,
+    path = '.',
+  ): ZippableFile | undefined {
+    if (!snapshot) {
+      return;
+    }
+    switch (snapshot[0]) {
+      case 0 /* Folder */: {
+        const [, , entries] = snapshot;
+        return Object.fromEntries(
+          Object.entries(entries).flatMap(([name, entry]) => {
+            const value = toZippable(
+              entry,
+              [path, name].filter(Boolean).join('/'),
+            );
+            return value ? [[name, value]] : [];
+          }),
+        );
+      }
+      case 1 /* File */: {
+        const [, , data] = snapshot;
+        return data;
+      }
+    }
+  }
+  const files = toZippable(out);
+  if (!files) {
+    return;
+  }
+  const zip = zipSync(files as Zippable);
+  return zip;
 }
 
 async function serve(
@@ -99,52 +144,16 @@ async function build() {
   if (!server) {
     throw new Error('Server is not ready');
   }
-  await viteBuild({
-    root: '/workdir',
-    build: {
-      outDir: 'dist',
-    },
+  await vivliostyleBuild({
+    cwd: '/workdir',
+    logLevel: 'info',
+    output: 'dist',
   });
-  const out = toSnapshotSync({ fs, path: '/workdir/dist' });
-  function toZippable(
-    snapshot: typeof out,
-    path = '.',
-  ): ZippableFile | undefined {
-    if (!snapshot) {
-      return;
-    }
-    switch (snapshot[0]) {
-      case 0 /* Folder */: {
-        const [, , entries] = snapshot;
-        return Object.fromEntries(
-          Object.entries(entries).flatMap(([name, entry]) => {
-            const value = toZippable(
-              entry,
-              [path, name].filter(Boolean).join('/'),
-            );
-            return value ? [[name, value]] : [];
-          }),
-        );
-      }
-      case 1 /* File */: {
-        const [, , data] = snapshot;
-        return data;
-      }
-    }
-  }
-  const files = toZippable(out);
-  if (!files) {
-    return;
-  }
-  const zip = zipSync(files as Zippable);
-  return zip;
+  return zipDirectory('/workdir/dist');
 }
 
 async function debug() {
-  fs.writeFileSync(
-    '/workdir/src/debug.ts',
-    `export const debug = ${Date.now()};`,
-  );
+  return zipDirectory('/');
 }
 
 self.addEventListener('message', async (event) => {

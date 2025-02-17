@@ -1,4 +1,5 @@
-import { vol } from 'memfs';
+import { fs, vol } from 'memfs';
+import { toTreeSync } from 'memfs/lib/print';
 
 vol.fromJSON(__volume__);
 
@@ -75,10 +76,27 @@ document.body.appendChild(debugForm);
 debugForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const channel = new BroadcastChannel('vs-cli');
-  Comlink.wrap(channel).debug();
+  const zip = await Comlink.wrap(channel).debug();
+  const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'debug.zip';
+  a.click();
 });
 `,
       'debug.ts': 'export const debug = 1;',
     },
+    'content.md': '# Hello, World!',
+    'vivliostyle.config.json': JSON.stringify({
+      title: 'Example of Table of Contents',
+      entry: ['./content.md'],
+      theme: '@vivliostyle/theme-techbook',
+    }),
+    '.gitignore': `node_modules
+dist
+.vivliostyle
+`,
   },
 });
+
+console.log(toTreeSync(fs));

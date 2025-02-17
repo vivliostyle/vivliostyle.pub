@@ -8,4 +8,4 @@ export default {
   exec,
   execFile,
   execSync,
-}
+};

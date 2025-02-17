@@ -9,8 +9,10 @@ import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 import typescript from '@rollup/plugin-typescript';
+import { nodeExternalModules } from '@vivliostyle/cli/node-modules';
 import stdLibBrowser from 'node-stdlib-browser';
 import { packageDirectorySync } from 'pkg-dir';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 const require = createRequire(import.meta.url);
 
@@ -42,7 +44,13 @@ export default {
     file: 'dist/cli.js',
     inlineDynamicImports: true,
   },
-  external: ['fsevents', /^tsx\//],
+  external: [
+    ...nodeExternalModules,
+    'fsevents',
+    /^tsx\//,
+    'lightningcss',
+    'jiti',
+  ],
   plugins: [
     alias({
       entries: [
@@ -55,6 +63,7 @@ export default {
               'fs',
               'http',
               'module',
+              'os',
               'path',
               'perf_hooks',
               'process',
@@ -81,13 +90,31 @@ export default {
           find: 'esbuild',
           replacement: 'esbuild-wasm/lib/browser.js',
         },
+        {
+          find: 'upath',
+          replacement: stdLibBrowser.path,
+        },
+        {
+          find: 'graceful-fs',
+          replacement: path.resolve(
+            fileURLToPath(import.meta.url),
+            '../src/stubs/node/fs',
+          ),
+        },
+        {
+          find: '@npmcli/arborist',
+          replacement: path.resolve(
+            fileURLToPath(import.meta.url),
+            '../src/stubs/@npmcli/arborist',
+          ),
+        },
       ],
     }),
+    commonjs(),
     nodeResolve({
       browser: true,
       preferBuiltins: false,
     }),
-    commonjs(),
     json(),
     inject({
       process: path.resolve(
@@ -98,17 +125,43 @@ export default {
     }),
     replace({
       values: {
+        'require.resolve': 'null',
         __volume__: (() => {
-          const root = path.dirname(require.resolve('vite/package.json'));
           const volume = Object.fromEntries(
-            [
-              'package.json',
-              'dist/client/client.mjs',
-              'dist/client/env.mjs',
-            ].map((file) => [
-              `/workdir/node_modules/vite/${file}`,
-              fs.readFileSync(path.join(root, file), 'utf8'),
-            ]),
+            Object.entries({
+              vite: {
+                files: [
+                  'package.json',
+                  'dist/client/client.mjs',
+                  'dist/client/env.mjs',
+                ],
+              },
+              '@vivliostyle/cli': {
+                files: ['package.json'],
+              },
+              '@vivliostyle/viewer': {
+                files: [
+                  'package.json',
+                  'lib/index.html',
+                  'lib/css/ui.arrows.css',
+                  'lib/css/ui.loading-overlay.css',
+                  'lib/css/ui.menu-bar.css',
+                  'lib/css/ui.message-dialog.css',
+                  'lib/css/ui.text-selection-menu.css',
+                  'lib/css/vivliostyle-viewer.css',
+                  'lib/js/vivliostyle-viewer.js',
+                  'lib/js/vivliostyle-viewer.js.map',
+                ],
+              },
+            }).flatMap(([name, { files }]) => {
+              const root = path.dirname(
+                require.resolve(`${name}/package.json`),
+              );
+              return files.map((file) => [
+                `/workdir/node_modules/${name}/${file}`,
+                fs.readFileSync(path.join(root, file), 'utf8'),
+              ]);
+            }),
           );
           return JSON.stringify(volume);
         })(),
@@ -117,6 +170,7 @@ export default {
       preventAssignment: true,
     }),
     typescript(),
+    visualizer(),
     {
       name: 'resolve-import-meta',
       resolveImportMeta(property, { moduleId }) {
@@ -134,6 +188,9 @@ export default {
               ),
             ).href,
           );
+        }
+        if (property === 'env') {
+          return JSON.stringify({});
         }
         // https://github.com/vitejs/vite/blob/0b17ab3727202b8c87cb0e747c192e3527a5e1ee/packages/vite/src/node/server/ws.ts#L27
         if (property === 'require') {

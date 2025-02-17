@@ -46,7 +46,7 @@ const waitWorkerConnection = async () => {
   return await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error('Request timeout'));
-    }, 5000);
+    }, 30000);
     workerReadyHandler.add(() => {
       clearTimeout(timer);
       resolve();
