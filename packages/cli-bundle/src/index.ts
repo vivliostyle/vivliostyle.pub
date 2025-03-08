@@ -15,7 +15,7 @@ import {
   createRequest,
   createResponse,
 } from 'node-mocks-http';
-import { type ViteDevServer, createServer, build as viteBuild } from 'vite';
+import { type ViteDevServer, createServer } from 'vite';
 import initRollup from '#rollup-wasm-bindings';
 
 const commonHeaders = {
@@ -37,6 +37,7 @@ async function setupServer() {
     appType: 'custom',
     server: {
       middlewareMode: true,
+      allowedHosts: true,
     },
     plugins: [
       createVitePlugin({

@@ -59,6 +59,7 @@ export default {
           ...Object.fromEntries(
             [
               'child_process',
+              'crypto',
               'dns',
               'fs',
               'http',
