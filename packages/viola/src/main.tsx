@@ -4,15 +4,12 @@ import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from '#ui/theme-provider';
 import { Preview } from './components/Preview';
 import { routeTree } from './routeTree.gen';
-
-/*
-import '#ui/index.css';
+import './main.css';
 
 const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
 });
-*/
 
 declare module '@tanstack/react-router' {
   interface Register {
@@ -25,9 +22,9 @@ if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <StrictMode>
-      <ThemeProvider defaultTheme="system">
-        {/*<RouterProvider router={router} />*/}
-        <Preview />
+      <ThemeProvider defaultTheme="light">
+        <RouterProvider router={router} />
+        {/* <Preview /> */}
       </ThemeProvider>
     </StrictMode>,
   );

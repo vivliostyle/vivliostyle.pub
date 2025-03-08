@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
 import sirv from 'sirv';
@@ -19,6 +20,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       TanStackRouterVite(),
       react(),
+      tailwindcss(),
       VitePWA({
         strategies: 'injectManifest',
         srcDir: 'src/client',
