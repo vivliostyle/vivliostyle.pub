@@ -1,6 +1,5 @@
 import './volume';
 
-import { EventEmitter } from 'node:events';
 import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
 import * as Comlink from 'comlink';
 import connect from 'connect';
@@ -9,14 +8,10 @@ import { type Zippable, type ZippableFile, zipSync } from 'fflate';
 import { fs } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
 import { toSnapshotSync } from 'memfs/lib/snapshot';
-import {
-  type MockResponse,
-  type RequestMethod,
-  createRequest,
-  createResponse,
-} from 'node-mocks-http';
+import type { MockResponse, RequestMethod } from 'node-mocks-http';
 import { type ViteDevServer, createServer } from 'vite';
 import initRollup from '#rollup-wasm-bindings';
+import { createMocks } from './http';
 
 const commonHeaders = {
   'cache-control': 'no-store',
@@ -98,20 +93,18 @@ async function serve(
 
   return await new Promise<ConstructorParameters<typeof Response>>(
     (resolve, reject) => {
-      const req = createRequest({
+      const { req, res } = createMocks({
         url: new URL(url).pathname,
         headers: Array.isArray(headers) ? Object.fromEntries(headers) : headers,
         method: method as RequestMethod,
         // body, // TODO
       });
-      const res = createResponse({
-        eventEmitter: EventEmitter,
-        writableStream: globalThis.WritableStream,
-      });
       res.on('end', () => {
         const response: MockResponse<Response> = res;
+        const buffer = response._getBuffer();
+        const body = buffer.length ? buffer : response._getData();
         resolve([
-          response._getData(),
+          body,
           {
             headers: {
               ...(response._getHeaders() as Record<string, string>),

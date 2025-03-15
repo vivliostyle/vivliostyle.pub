@@ -6,6 +6,7 @@
   "scripts": {
     "build": "rollup -c",
     "build:rollup-wasm": "cd src/stubs/rollup && npm install --ignore-scripts && npm run build:wasm",
+    "build:viewer-html": "tsx scripts/build-viewer-html.ts",
     "dev": "rollup -c -w --no-watch.clearScreen"
   },
   "imports": {
@@ -26,7 +27,6 @@
     "@types/npmcli__arborist": "^6.3.0",
     "@types/semver": "^7.5.8",
     "@v/config": "workspace:*",
-    "@vivliostyle/cli": "9.0.0-next.4",
     "comlink": "^4.4.2",
     "connect": "^3.7.0",
     "crypto-browserify": "^3.12.1",

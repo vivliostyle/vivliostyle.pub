@@ -141,18 +141,7 @@ export default {
                 files: ['package.json'],
               },
               '@vivliostyle/viewer': {
-                files: [
-                  'package.json',
-                  'lib/index.html',
-                  'lib/css/ui.arrows.css',
-                  'lib/css/ui.loading-overlay.css',
-                  'lib/css/ui.menu-bar.css',
-                  'lib/css/ui.message-dialog.css',
-                  'lib/css/ui.text-selection-menu.css',
-                  'lib/css/vivliostyle-viewer.css',
-                  'lib/js/vivliostyle-viewer.js',
-                  'lib/js/vivliostyle-viewer.js.map',
-                ],
+                files: ['package.json', 'lib/index.html'],
               },
             }).flatMap(([name, { files }]) => {
               const root = path.dirname(

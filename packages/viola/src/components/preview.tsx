@@ -22,10 +22,17 @@ export const Preview = () => {
 
   useEffect(() => {
     const { port } = window.location;
+    const origin = `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${port ? `:${port}` : ''}`;
     setUrl(
-      `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${port ? `:${port}` : ''}`,
+      `${origin}/__vivliostyle-viewer/index.html#src=${origin}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`,
     );
   }, []);
 
-  return <>{!failed && url && <iframe title="Preview" src={url} />}</>;
+  return (
+    <>
+      {!failed && url && (
+        <iframe title="Preview" src={url} className="size-full" />
+      )}
+    </>
+  );
 };

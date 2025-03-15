@@ -55,6 +55,33 @@ export default defineConfig(({ mode }) => {
           );
         },
       },
+      {
+        name: 'serve-vivliostyle-viewer',
+        configureServer(server) {
+          const dir = path.join(
+            require.resolve('@vivliostyle/viewer/package.json'),
+            '../lib',
+          );
+
+          server.middlewares.use(
+            '/__vivliostyle-viewer',
+            sirv(dir, {
+              dev: true,
+              etag: false,
+              setHeaders: (res) => {
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.setHeader(
+                  'Access-Control-Allow-Headers',
+                  'Origin, Content-Type, Accept, Range',
+                );
+                res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+                res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+                res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+              },
+            }),
+          );
+        },
+      },
     ],
     server: {
       https: {
@@ -70,6 +97,16 @@ export default defineConfig(({ mode }) => {
         // Leading dot allows any subdomains
         `.${env.VITE_APP_HOSTNAME}`,
       ],
+      cors: {
+        origin: [
+          new RegExp(
+            `^https?://${env.VITE_APP_HOSTNAME.replace('.', '\\.')}(?::\\d+)$`,
+          ),
+          new RegExp(
+            `^https?://${env.VITE_SANDBOX_HOSTNAME.replace('.', '\\.')}(?::\\d+)$`,
+          ),
+        ],
+      },
     },
   };
 });

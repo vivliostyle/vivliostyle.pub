@@ -14,14 +14,18 @@
     "#ui/*": "@v/ui/*"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.0.12",
     "@tanstack/react-router": "1.97.1",
     "@tanstack/router-devtools": "1.97.1",
     "@tanstack/router-plugin": "1.97.1",
+    "@tiptap/pm": "^2.11.5",
+    "@tiptap/react": "^2.11.5",
+    "@tiptap/starter-kit": "^2.11.5",
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
     "@v/ui": "workspace:*",
+    "@vivliostyle/theme-base": "^2.0.0",
     "comlink": "^4.4.2",
+    "react-use": "^17.6.0",
     "sirv": "^3.0.0",
     "vite-plugin-pwa": "^0.21.1"
   }

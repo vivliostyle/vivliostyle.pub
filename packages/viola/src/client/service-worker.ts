@@ -1,4 +1,6 @@
 /// <reference lib="webworker" />
+
+// import viewerHtml from '@v/cli-bundle/dist/viewer.html?raw';
 import * as Comlink from 'comlink';
 
 type WorkerInterface = {
@@ -54,22 +56,22 @@ const waitWorkerConnection = async () => {
   });
 };
 
-const indexHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <script type="module">
-    const cliWorker = new Worker('/@worker/cli.js');
-    const channel = new MessageChannel();
-    navigator.serviceWorker.controller?.postMessage({ command: 'connect' }, [channel.port2]);
-    cliWorker.postMessage({ command: 'connect' }, [channel.port1]);
-  </script>
-  <title></title>
-  <meta charset="UTF-8">
-</head>
-<body>
-  <script type="module" src="/src/test.ts"></script>
-</body>
-`;
+// const viewerHtml = `<!DOCTYPE html>
+// <html lang="en">
+// <head>
+//   <script type="module">
+//     const cliWorker = new Worker('/@worker/cli.js');
+//     const channel = new MessageChannel();
+//     navigator.serviceWorker.controller?.postMessage({ command: 'connect' }, [channel.port2]);
+//     cliWorker.postMessage({ command: 'connect' }, [channel.port1]);
+//   </script>
+//   <title></title>
+//   <meta charset="UTF-8">
+// </head>
+// <body>
+//   <script type="module" src="/src/test.ts"></script>
+// </body>
+// `;
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
@@ -77,7 +79,7 @@ self.addEventListener('fetch', (event) => {
   if (location.origin !== url.origin) {
     return;
   }
-  if (!/^sandbox\.*/.test(url.host)) {
+  if (!/^sandbox\./.test(url.host)) {
     return;
   }
   if ([/\/@worker\/.*/].some((re) => re.test(url.pathname))) {
@@ -88,6 +90,14 @@ self.addEventListener('fetch', (event) => {
     workerReady = false;
   }
 
+  if (
+    request.mode !== 'navigate' &&
+    url.pathname.startsWith('/__vivliostyle-viewer/')
+  ) {
+    url.host = url.host.slice('sandbox.'.length);
+    return fetch(url, { mode: 'no-cors' });
+  }
+
   event.respondWith(handleRequest(event));
 });
 
@@ -95,14 +105,34 @@ function createChannel() {
   return new BroadcastChannel('vs-cli');
 }
 
+const headStartTagRe = /<head[^>]*>/i;
+const prependToHead = (html: string, content: string) =>
+  html.replace(headStartTagRe, (match) => `${match}\n${content}`);
+
 async function handleRequest(event: FetchEvent) {
   const { request } = event;
   if (request.mode === 'navigate') {
-    return new Response(indexHtml, {
+    const url = new URL(request.url);
+    url.host = url.host.slice('sandbox.'.length);
+    url.pathname = '/__vivliostyle-viewer/index.html';
+    let viewerHtml = await fetch(url, { mode: 'cors' }).then((res) =>
+      res.text(),
+    );
+    viewerHtml = prependToHead(
+      viewerHtml,
+      `<script type="module">
+      const cliWorker = new Worker('/@worker/cli.js');
+      const channel = new MessageChannel();
+      navigator.serviceWorker.controller?.postMessage({ command: 'connect' }, [channel.port2]);
+      cliWorker.postMessage({ command: 'connect' }, [channel.port1]);
+    </script>
+    <script type="module" src="/@vivliostyle:viewer:client"></script>`,
+    );
+    return new Response(viewerHtml, {
       status: 200,
       headers: {
         'Content-Type': 'text/html',
-        'Content-Length': `${indexHtml.length}`,
+        'Content-Length': `${viewerHtml.length}`,
         'Cross-Origin-Embedder-Policy': 'credentialless',
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Cross-Origin-Resource-Policy': 'cross-origin',
