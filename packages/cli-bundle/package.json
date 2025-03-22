@@ -6,7 +6,7 @@
   "scripts": {
     "build": "rollup -c",
     "build:rollup-wasm": "cd src/stubs/rollup && npm install --ignore-scripts && npm run build:wasm",
-    "build:viewer-html": "tsx scripts/build-viewer-html.ts",
+    "build:viewer-resource": "tsx scripts/build-viewer-resource.ts",
     "dev": "rollup -c -w --no-watch.clearScreen"
   },
   "imports": {

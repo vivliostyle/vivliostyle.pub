@@ -23,7 +23,24 @@ const html = prependToHead(
   </script>
   <script type="module" src="/@vivliostyle:viewer:client"></script>`,
 );
+fs.mkdirSync(path.join(fileURLToPath(import.meta.url), '../../dist/viewer'), {
+  recursive: true,
+});
 fs.writeFileSync(
-  path.join(fileURLToPath(import.meta.url), '../../dist/viewer.html'),
+  path.join(fileURLToPath(import.meta.url), '../../dist/viewer/index.html'),
   html,
 );
+
+for (const file of ['css', 'fonts', 'js', 'resources'].flatMap((dir) =>
+  fs
+    .readdirSync(path.join(viewerRoot, 'lib', dir))
+    .map((file) => path.join(dir, file)),
+)) {
+  const dest = path.join(
+    fileURLToPath(import.meta.url),
+    '../../dist/viewer',
+    file,
+  );
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(path.join(path.join(viewerRoot, 'lib', file)), dest);
+}

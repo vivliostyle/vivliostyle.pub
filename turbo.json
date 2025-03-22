@@ -3,7 +3,7 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build", "build:rollup-wasm", "build:viewer-html"],
+      "dependsOn": ["^build", "build:rollup-wasm", "build:viewer-resource"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "dist/**"]
     },
@@ -15,12 +15,12 @@
       ],
       "outputs": ["src/stubs/rollup/wasm/**"]
     },
-    "build:viewer-html": {
+    "build:viewer-resource": {
       "inputs": [],
       "outputs": ["dist/viewer.html"]
     },
     "dev": {
-      "dependsOn": ["build:rollup-wasm", "build:viewer-html"],
+      "dependsOn": ["build:rollup-wasm", "build:viewer-resource"],
       "cache": false,
       "persistent": true
     }

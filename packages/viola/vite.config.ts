@@ -58,13 +58,11 @@ export default defineConfig(({ mode }) => {
       {
         name: 'serve-vivliostyle-viewer',
         configureServer(server) {
-          const dir = path.join(
-            require.resolve('@vivliostyle/viewer/package.json'),
-            '../lib',
+          const dir = path.dirname(
+            require.resolve('@v/cli-bundle/dist/viewer/index.html'),
           );
-
           server.middlewares.use(
-            '/__vivliostyle-viewer',
+            '/@viewer',
             sirv(dir, {
               dev: true,
               etag: false,
