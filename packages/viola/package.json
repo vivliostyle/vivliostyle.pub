@@ -20,6 +20,7 @@
     "@tiptap/pm": "^2.11.5",
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
+    "@tiptap/extension-placeholder": "^2.11.5",
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
     "@v/ui": "workspace:*",

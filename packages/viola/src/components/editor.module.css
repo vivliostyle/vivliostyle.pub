@@ -1,9 +1,21 @@
 @import "@vivliostyle/theme-base/css/common/meta-properties.css" layer(vs-theme);
 
 :root {
+  --vs-columns: auto;
   --vs-font-family: var(--font-sans);
   --vs-spacing-rlh: 0;
   --vs--monospace-font-family: var(--font-mono);
+}
+
+.editor {
+  :global(.tiptap:not(.ProseMirror-focused))
+    p:global(.is-editor-empty):first-child::before {
+    color: #adb5bd;
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
 }
 
 @layer vs-theme {
