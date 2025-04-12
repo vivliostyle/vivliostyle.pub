@@ -1,6 +1,5 @@
 /// <reference lib="webworker" />
 
-// import viewerHtml from '@v/cli-bundle/dist/viewer.html?raw';
 import * as Comlink from 'comlink';
 
 type WorkerInterface = {
@@ -19,60 +18,6 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
   event.waitUntil(self.clients.claim());
 });
 
-let workerReady = false;
-const workerReadyHandler = new Set<() => void>();
-
-self.addEventListener('message', async (event) => {
-  if (event.data.command === 'connect') {
-    workerReady = false;
-    const port = event.ports[0];
-    Comlink.expose(
-      {
-        ready: () => {
-          workerReady = true;
-          for (const handler of workerReadyHandler) {
-            handler();
-          }
-          workerReadyHandler.clear();
-        },
-      },
-      port,
-    );
-  }
-});
-
-const waitWorkerConnection = async () => {
-  if (workerReady) {
-    return;
-  }
-  return await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error('Request timeout'));
-    }, 30000);
-    workerReadyHandler.add(() => {
-      clearTimeout(timer);
-      resolve();
-    });
-  });
-};
-
-// const viewerHtml = `<!DOCTYPE html>
-// <html lang="en">
-// <head>
-//   <script type="module">
-//     const cliWorker = new Worker('/@worker/cli.js');
-//     const channel = new MessageChannel();
-//     navigator.serviceWorker.controller?.postMessage({ command: 'connect' }, [channel.port2]);
-//     cliWorker.postMessage({ command: 'connect' }, [channel.port1]);
-//   </script>
-//   <title></title>
-//   <meta charset="UTF-8">
-// </head>
-// <body>
-//   <script type="module" src="/src/test.ts"></script>
-// </body>
-// `;
-
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -82,50 +27,50 @@ self.addEventListener('fetch', (event) => {
   if (!/^sandbox\./.test(url.host)) {
     return;
   }
-  if ([/^\/@worker\//, /^\/@viewer\//].some((re) => re.test(url.pathname))) {
+  if (
+    ['/@worker/', '/@viewer/'].some((base) => url.pathname.startsWith(base))
+  ) {
     return;
   }
   if (request.mode === 'navigate') {
-    // Reset the worker's state as the message channel has been closed due to a reload
-    workerReady = false;
+    return event.respondWith(handleNavigate(event));
   }
 
-  event.respondWith(handleRequest(event));
+  if (
+    ['/__vivliostyle-viewer/', '/vivliostyle/'].some((base) =>
+      url.pathname.startsWith(base),
+    )
+  ) {
+    return event.respondWith(handleRequest(event));
+  }
 });
 
-const channel = new BroadcastChannel('vs-cli');
+const channel = new BroadcastChannel('worker:cli');
 
-const headStartTagRe = /<head[^>]*>/i;
-const prependToHead = (html: string, content: string) =>
-  html.replace(headStartTagRe, (match) => `${match}\n${content}`);
-
-const registerScript = `
-await navigator.serviceWorker.register(
-  '${import.meta.env.MODE === 'production' ? '/sw.js' : '/dev-sw.js?dev-sw'}',
-  { type: '${import.meta.env.MODE === 'production' ? 'classic' : 'module'}' },
-);
-
-const cliWorker = new Worker('/@worker/cli.js');
-const channel = new MessageChannel();
-navigator.serviceWorker.controller?.postMessage({ command: 'connect' }, [
-  channel.port2,
-]);
-cliWorker.postMessage({ command: 'connect' }, [channel.port1]);
-`;
-
-async function handleRequest(event: FetchEvent) {
+async function handleNavigate(event: FetchEvent) {
   const { request } = event;
   const url = new URL(request.url);
-  if (request.mode === 'navigate') {
+
+  if (url.pathname === '/iframe') {
+    const iframeHtml =
+      '<!doctype html><html><head><script src="/src/iframe/setup.ts" type="module"></script><meta charset="UTF-8" /></head><body></body></html>';
+    return new Response(iframeHtml, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html',
+        'Content-Length': `${iframeHtml.length}`,
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+      },
+    });
+  }
+
+  if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
     url.host = url.host.slice('sandbox.'.length);
     url.pathname = '/@viewer/index.html';
-    let viewerHtml = await fetch(url, { mode: 'cors' }).then((res) =>
+    const viewerHtml = await fetch(url, { mode: 'cors' }).then((res) =>
       res.text(),
-    );
-    viewerHtml = prependToHead(
-      viewerHtml,
-      `<script type="module">${registerScript}</script>
-    <script type="module" src="/@vivliostyle:viewer:client"></script>`,
     );
     return new Response(viewerHtml, {
       status: 200,
@@ -138,6 +83,13 @@ async function handleRequest(event: FetchEvent) {
       },
     });
   }
+
+  return new Response(null, { status: 404 });
+}
+
+async function handleRequest(event: FetchEvent) {
+  const { request } = event;
+  const url = new URL(request.url);
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
     url.host = url.host.slice('sandbox.'.length);
@@ -158,7 +110,6 @@ async function handleRequest(event: FetchEvent) {
   }
 
   try {
-    await waitWorkerConnection();
     const ret = await Promise.race([
       Comlink.wrap<WorkerInterface>(channel).serve(request.url, requestInit),
       new Promise<never>((_, reject) =>

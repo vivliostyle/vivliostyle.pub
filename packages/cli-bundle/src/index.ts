@@ -1,3 +1,5 @@
+/// <reference lib="webworker" />
+
 import './volume';
 
 import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
@@ -5,7 +7,7 @@ import * as Comlink from 'comlink';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
-import { fs } from 'memfs';
+import { fs, vol } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
 import { toSnapshotSync } from 'memfs/lib/snapshot';
 import type { MockResponse, RequestMethod } from 'node-mocks-http';
@@ -146,18 +148,21 @@ async function build() {
   return zipDirectory('/workdir/dist');
 }
 
-async function debug() {
-  return zipDirectory('/');
-}
+const read = (...args: Parameters<typeof fs.promises.readFile>) =>
+  fs.promises.readFile(...args);
+const write = (...args: Parameters<typeof fs.promises.writeFile>) =>
+  fs.promises.writeFile(...args);
+const fromJSON = (...args: Parameters<typeof vol.fromJSON>) =>
+  vol.fromJSON(...args);
+const toJSON = (...args: Parameters<typeof vol.toJSON>) => vol.toJSON(...args);
 
 self.addEventListener('message', async (event) => {
-  if (event.data.command === 'connect') {
-    const port = event.ports[0];
-    const channel = new BroadcastChannel('vs-cli');
-    Comlink.expose({ serve, build, debug }, channel);
-    await setupServer();
-
-    const sw = Comlink.wrap<{ ready: () => void }>(port);
-    sw.ready();
+  if (event.data.command === 'init') {
+    const channel = new BroadcastChannel('worker:cli');
+    Comlink.expose(
+      { serve, setupServer, build, read, write, fromJSON, toJSON },
+      channel,
+    );
+    self.postMessage({ command: 'init' });
   }
 });

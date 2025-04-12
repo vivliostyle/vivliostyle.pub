@@ -1,3 +1,4 @@
+import Collaboration from '@tiptap/extension-collaboration';
 import Placeholder from '@tiptap/extension-placeholder';
 import {
   BubbleMenu,
@@ -8,13 +9,22 @@ import {
 import StarterKit from '@tiptap/starter-kit';
 import { useCallback, useState } from 'react';
 import { useDebounce } from 'react-use';
+import { IndexeddbPersistence } from 'y-indexeddb';
+import * as Y from 'yjs';
 import { cn } from '#ui/lib/utils';
+import { cli } from '../stores/cli';
 import editorStyle from './editor.module.css';
+
+const ydoc = new Y.Doc();
+new IndexeddbPersistence('viola', ydoc);
 
 const extensions = [
   StarterKit,
   Placeholder.configure({
     placeholder: 'Start typing...',
+  }),
+  Collaboration.configure({
+    document: ydoc,
   }),
 ];
 
@@ -25,7 +35,7 @@ export function Editor() {
   }, []);
   useDebounce(
     () => {
-      console.log(contentHtml);
+      cli.files['manuscript.html'] = contentHtml;
     },
     1000,
     [contentHtml],

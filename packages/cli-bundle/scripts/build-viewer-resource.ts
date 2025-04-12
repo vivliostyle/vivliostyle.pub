@@ -15,13 +15,7 @@ export const prependToHead = (html: string, content: string) =>
 
 const html = prependToHead(
   fs.readFileSync(path.join(viewerRoot, 'lib/index.html'), 'utf-8'),
-  `<script type="module">
-    const cliWorker = new Worker('/@worker/cli.js');
-    const channel = new MessageChannel();
-    navigator.serviceWorker.controller?.postMessage({ command: 'connect' }, [channel.port2]);
-    cliWorker.postMessage({ command: 'connect' }, [channel.port1]);
-  </script>
-  <script type="module" src="/@vivliostyle:viewer:client"></script>`,
+  `<script type="module" src="/@vivliostyle:viewer:client"></script>`,
 );
 fs.mkdirSync(path.join(fileURLToPath(import.meta.url), '../../dist/viewer'), {
   recursive: true,

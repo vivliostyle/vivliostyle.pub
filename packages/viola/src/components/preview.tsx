@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-export const Preview = () => {
+export const Preview = ({ origin }: { origin: string }) => {
   const retry = useRef(0);
   const [failed, setFailed] = useState(false);
   const [url, setUrl] = useState<string>();
@@ -21,17 +21,20 @@ export const Preview = () => {
   }, []);
 
   useEffect(() => {
-    const { port } = window.location;
-    const origin = `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${port ? `:${port}` : ''}`;
     setUrl(
       `${origin}/__vivliostyle-viewer/index.html#src=${origin}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`,
     );
-  }, []);
+  }, [origin]);
 
   return (
     <>
       {!failed && url && (
-        <iframe title="Preview" src={url} className="size-full" />
+        <iframe
+          title="Preview"
+          src={url}
+          className="size-full"
+          sandbox="allow-same-origin allow-scripts"
+        />
       )}
     </>
   );
