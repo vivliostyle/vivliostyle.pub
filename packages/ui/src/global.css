@@ -2,7 +2,6 @@
   scrollbar-color: color-mix(in oklab, var(--color-primary) 30%, transparent)
     transparent;
   scrollbar-width: thin;
-  scrollbar-gutter: stable;
 }
 
 html,

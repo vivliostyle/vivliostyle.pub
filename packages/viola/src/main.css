@@ -2,3 +2,8 @@
 @import "#ui/global.css" layer(base);
 
 @source "../../ui/src";
+
+html,
+body {
+  overflow: hidden;
+}

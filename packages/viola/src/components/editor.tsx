@@ -1,49 +1,40 @@
-import Collaboration from '@tiptap/extension-collaboration';
-import Placeholder from '@tiptap/extension-placeholder';
 import {
   BubbleMenu,
   type EditorEvents,
   EditorProvider,
   FloatingMenu,
 } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
 import { useCallback, useState } from 'react';
 import { useDebounce } from 'react-use';
-import { IndexeddbPersistence } from 'y-indexeddb';
-import * as Y from 'yjs';
+import { useSnapshot } from 'valtio';
 import { cn } from '#ui/lib/utils';
-import { cli } from '../stores/cli';
+import { type ContentId, content } from '../stores/content';
+import { sandbox } from '../stores/sandbox';
 import editorStyle from './editor.module.css';
 
-const ydoc = new Y.Doc();
-new IndexeddbPersistence('viola', ydoc);
-
-const extensions = [
-  StarterKit,
-  Placeholder.configure({
-    placeholder: 'Start typing...',
-  }),
-  Collaboration.configure({
-    document: ydoc,
-  }),
-];
-
-export function Editor() {
+export function Editor({ contentId }: { contentId: ContentId }) {
+  const contentSnapshot = useSnapshot(content);
+  const editor = contentSnapshot.editor[contentId];
   const [contentHtml, setContentHtml] = useState('');
   const handleUpdate = useCallback(({ editor }: EditorEvents['update']) => {
     setContentHtml(editor.getHTML());
   }, []);
   useDebounce(
     () => {
-      cli.files['manuscript.html'] = contentHtml;
+      sandbox.files['manuscript.html'] = contentHtml;
     },
     1000,
     [contentHtml],
   );
 
+  if (!editor) {
+    return null;
+  }
+
   return (
     <EditorProvider
-      extensions={extensions}
+      key={contentId}
+      extensions={editor.extensions}
       editorContainerProps={{
         className: cn(editorStyle.editor, 'h-full'),
       }}

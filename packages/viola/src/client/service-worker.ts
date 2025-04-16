@@ -39,7 +39,8 @@ self.addEventListener('fetch', (event) => {
   if (
     ['/__vivliostyle-viewer/', '/vivliostyle/'].some((base) =>
       url.pathname.startsWith(base),
-    )
+    ) ||
+    url.pathname === '/@vivliostyle:viewer:client'
   ) {
     return event.respondWith(handleRequest(event));
   }

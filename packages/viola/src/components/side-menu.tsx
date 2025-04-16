@@ -1,62 +1,69 @@
-import { Calendar, Home, Inbox, Search, Settings } from 'lucide-react';
+import { type Snapshot, useSnapshot } from 'valtio';
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
 } from '#ui/sidebar';
+import {
+  type HierarchicalReadingOrder,
+  content,
+  rootChar,
+} from '../stores/content';
 
-const items = [
-  {
-    title: 'Home',
-    url: '#',
-    icon: Home,
-  },
-  {
-    title: 'Inbox',
-    url: '#',
-    icon: Inbox,
-  },
-  {
-    title: 'Calendar',
-    url: '#',
-    icon: Calendar,
-  },
-  {
-    title: 'Search',
-    url: '#',
-    icon: Search,
-  },
-  {
-    title: 'Settings',
-    url: '#',
-    icon: Settings,
-  },
-];
+function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
+  const [name, ...items] = tree;
+
+  const children = items.map((item) => {
+    if (item.length < 2) {
+      return null;
+    }
+    const Item = name === rootChar ? SidebarMenuItem : SidebarMenuSubItem;
+    const hasChildren = Array.isArray(item[1]);
+    return (
+      <Item key={item[0]}>
+        <SidebarMenuButton
+          size="sm"
+          variant={hasChildren ? 'heading' : 'default'}
+          asChild
+        >
+          <a href="#TODO">
+            <span>{item[0]}</span>
+          </a>
+        </SidebarMenuButton>
+        {hasChildren && (
+          <FileTreeGroup tree={item as Snapshot<HierarchicalReadingOrder>} />
+        )}
+      </Item>
+    );
+  });
+
+  return name === rootChar ? (
+    <SidebarMenu>{children}</SidebarMenu>
+  ) : (
+    <SidebarMenuSub size="sm">{children}</SidebarMenuSub>
+  );
+}
+
+function FileTree() {
+  const { hierarchicalReadingOrder } = useSnapshot(content);
+  console.log(JSON.parse(JSON.stringify(hierarchicalReadingOrder)));
+
+  return <FileTreeGroup tree={hierarchicalReadingOrder} />;
+}
 
 export function SideMenu() {
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <FileTree />
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

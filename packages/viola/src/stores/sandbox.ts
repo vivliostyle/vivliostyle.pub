@@ -21,30 +21,12 @@ export interface CliWorkerEndpoint {
   ): DirectoryJSON<string | null>;
 }
 
-export const cli = proxy({
+export const sandbox = proxy({
   worker: null as Remote<CliWorkerEndpoint> | null,
   files: {} as Record<string, string>,
 });
 
-subscribe(cli, () => {
-  const files = snapshot(cli.files);
-  cli.worker?.fromJSON(files, '/workdir/contents');
+subscribe(sandbox, () => {
+  const files = snapshot(sandbox.files);
+  sandbox.worker?.fromJSON(files, '/workdir/contents');
 });
-
-export async function setupCli() {
-  const { worker } = snapshot(cli);
-  if (!worker) {
-    return;
-  }
-  await worker.write(
-    '/workdir/vivliostyle.config.json',
-    JSON.stringify({
-      title: 'title',
-      entry: ['./manuscript.html'],
-      entryContext: 'contents',
-      theme: '@vivliostyle/theme-techbook',
-    }),
-  );
-  cli.files = { 'manuscript.html': '' };
-  await worker.setupServer();
-}

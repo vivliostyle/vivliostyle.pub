@@ -4,6 +4,9 @@ import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from '#ui/theme-provider';
 import { routeTree } from './routeTree.gen';
 import './main.css';
+import { setupFirstContent } from './actions';
+
+setupFirstContent();
 
 const router = createRouter({
   routeTree,

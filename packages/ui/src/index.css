@@ -2,6 +2,18 @@
 
 @plugin "tailwindcss-animate";
 
+@utility scrollbar-gutter-auto {
+  scrollbar-gutter: auto;
+}
+
+@utility scrollbar-stable {
+  scrollbar-gutter: stable;
+}
+
+@utility scrollbar-both-edges {
+  scrollbar-gutter: stable both-edges;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

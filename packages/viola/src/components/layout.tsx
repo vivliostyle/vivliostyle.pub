@@ -1,88 +1,39 @@
-import * as Comlink from 'comlink';
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { useEffectOnce, useUnmount } from 'react-use';
+import { useSnapshot } from 'valtio';
 import { SidebarProvider, SidebarTrigger } from '#ui/sidebar';
 import { Editor } from '../components/editor';
-import { cli, setupCli } from '../stores/cli';
+import { ui } from '../stores/ui';
 import { Preview } from './preview';
+import { Sandbox, sandboxOrigin } from './sandbox';
 import { SideMenu } from './side-menu';
 
-const port = globalThis.location?.port;
-const sandboxOrigin = `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${port ? `:${port}` : ''}`;
-
-let initialized = false;
-
-function init() {
-  const cb = async (event: MessageEvent) => {
-    if (event.data.command !== 'bind') {
-      return;
-    }
-    const [messagePort] = event.ports;
-    if (event.data.channel === 'worker:cli') {
-      cli.worker = Comlink.wrap(messagePort);
-      setupCli();
-    }
-  };
-  initialized = true;
-  window.addEventListener('message', cb);
-
-  return () => {
-    initialized = false;
-    window.removeEventListener('message', cb);
-  };
-}
-
-function IframePortal() {
-  useEffectOnce(() => {
-    if (initialized) {
-      return;
-    }
-    return init();
-  });
-
-  useUnmount(() => {
-    initialized = false;
-    cli.worker?.[Comlink.releaseProxy]();
-    cli.worker = null;
-  });
-
-  return createPortal(
-    <iframe
-      title="Sandbox"
-      src={`${sandboxOrigin}/iframe`}
-      style={{ display: 'none' }}
-      sandbox="allow-same-origin allow-scripts"
-    />,
-    document.body,
-  );
-}
-
 export function Layout() {
-  const [openPreview, setOpenPreview] = useState(false);
+  const tabs = useSnapshot(ui.tabs);
 
   return (
     <SidebarProvider>
       <SideMenu />
-      <main className="relative size-full">
-        <div className="absolute top-0 left-0 z-10 p-2">
-          <SidebarTrigger className="size-8 cursor-pointer" />
-        </div>
-        <div className="size-full max-w-xl mx-auto">
-          <div>
-            <button type="button" onClick={() => setOpenPreview(true)}>
-              Open
-            </button>
+      <div className="size-full flex flex-col">
+        <main className="relative size-full flex-1 overflow-auto overscroll-contain scrollbar-stable">
+          <div className="absolute top-0 left-0 z-10 p-2">
+            <SidebarTrigger className="size-8 cursor-pointer" />
           </div>
-          <Editor />
-        </div>
-        {openPreview && (
-          <div className="h-full">
-            <Preview origin={sandboxOrigin} />
+          <div className="size-full max-w-xl mx-auto">
+            {tabs.map((tab) => {
+              if (tab.type === 'editor') {
+                return <Editor key={tab.id} {...tab} />;
+              }
+              if (tab.type === 'preview') {
+                return (
+                  <div key={tab.id} className="h-full">
+                    <Preview origin={sandboxOrigin} />
+                  </div>
+                );
+              }
+            })}
           </div>
-        )}
-      </main>
-      <IframePortal />
+        </main>
+      </div>
+      <Sandbox />
     </SidebarProvider>
   );
 }
