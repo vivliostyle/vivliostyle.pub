@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { sandboxOrigin } from '../sandbox';
 
-export const Preview = ({ origin }: { origin: string }) => {
+export const Preview = () => {
   const retry = useRef(0);
   const [failed, setFailed] = useState(false);
   const [url, setUrl] = useState<string>();
@@ -22,9 +23,9 @@ export const Preview = ({ origin }: { origin: string }) => {
 
   useEffect(() => {
     setUrl(
-      `${origin}/__vivliostyle-viewer/index.html#src=${origin}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`,
+      `${sandboxOrigin}/__vivliostyle-viewer/index.html#src=${sandboxOrigin}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`,
     );
-  }, [origin]);
+  }, []);
 
   return (
     <>

@@ -1,9 +1,7 @@
-import { snapshot } from 'valtio';
+import { ref, snapshot } from 'valtio';
 import { setupEditor } from './libs/editor';
-import { generateId } from './libs/generate-id';
 import { type ContentId, content } from './stores/content';
 import { sandbox } from './stores/sandbox';
-import { ui } from './stores/ui';
 
 const contentId = 'h23HaDuA5MG2bSLW' as ContentId;
 
@@ -13,15 +11,8 @@ export async function setupFirstContent() {
     json: {},
   };
   content.readingOrder = [contentId];
-  ui.tabs = [
-    {
-      id: generateId(),
-      type: 'editor',
-      contentId,
-    },
-  ];
   const editor = await setupEditor({ contentId });
-  content.editor[contentId] = editor;
+  content.editor[contentId] = ref(editor);
 }
 
 export async function setupCli() {

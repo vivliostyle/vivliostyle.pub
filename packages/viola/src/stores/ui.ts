@@ -1,14 +1,16 @@
 import { proxy } from 'valtio';
 import type { ContentId } from './content';
 
-declare const tabIdBrand: unique symbol;
-export type TabId = string & { [tabIdBrand]: never };
+declare const paneIdBrand: unique symbol;
+export type PaneId = string & { [paneIdBrand]: never };
 
-export type TabContent = { id: TabId } & (
+export type PaneContent = { id: PaneId } & (
   | { type: 'editor'; contentId: ContentId }
   | { type: 'preview' }
+  | { type: 'settings' }
 );
 
 export const ui = proxy({
-  tabs: [] as TabContent[],
+  tabs: [] as PaneContent[],
+  dedicatedModal: null as PaneContent | null,
 });

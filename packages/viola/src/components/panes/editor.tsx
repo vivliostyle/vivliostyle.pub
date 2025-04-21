@@ -8,13 +8,13 @@ import { useCallback, useState } from 'react';
 import { useDebounce } from 'react-use';
 import { useSnapshot } from 'valtio';
 import { cn } from '#ui/lib/utils';
-import { type ContentId, content } from '../stores/content';
-import { sandbox } from '../stores/sandbox';
+import { type ContentId, content } from '../../stores/content';
+import { sandbox } from '../../stores/sandbox';
 import editorStyle from './editor.module.css';
 
 export function Editor({ contentId }: { contentId: ContentId }) {
-  const contentSnapshot = useSnapshot(content);
-  const editor = contentSnapshot.editor[contentId];
+  const contentSnap = useSnapshot(content);
+  const editor = contentSnap.editor[contentId];
   const [contentHtml, setContentHtml] = useState('');
   const handleUpdate = useCallback(({ editor }: EditorEvents['update']) => {
     setContentHtml(editor.getHTML());
@@ -45,9 +45,6 @@ export function Editor({ contentId }: { contentId: ContentId }) {
         },
       }}
       onUpdate={handleUpdate}
-    >
-      <FloatingMenu editor={null}>This is the floating menu</FloatingMenu>
-      <BubbleMenu editor={null}>This is the bubble menu</BubbleMenu>
-    </EditorProvider>
+    />
   );
 }

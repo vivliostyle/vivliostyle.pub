@@ -1,13 +1,19 @@
 import { useSnapshot } from 'valtio';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '#ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '#ui/sidebar';
-import { Editor } from '../components/editor';
 import { ui } from '../stores/ui';
-import { Preview } from './preview';
-import { Sandbox, sandboxOrigin } from './sandbox';
+import { Pane } from './pane';
+import { Sandbox } from './sandbox';
 import { SideMenu } from './side-menu';
 
-export function Layout() {
-  const tabs = useSnapshot(ui.tabs);
+export function Layout(_: { children?: React.ReactNode }) {
+  const uiSnap = useSnapshot(ui);
 
   return (
     <SidebarProvider>
@@ -18,21 +24,25 @@ export function Layout() {
             <SidebarTrigger className="size-8 cursor-pointer" />
           </div>
           <div className="size-full max-w-xl mx-auto">
-            {tabs.map((tab) => {
-              if (tab.type === 'editor') {
-                return <Editor key={tab.id} {...tab} />;
-              }
-              if (tab.type === 'preview') {
-                return (
-                  <div key={tab.id} className="h-full">
-                    <Preview origin={sandboxOrigin} />
-                  </div>
-                );
-              }
-            })}
+            {uiSnap.tabs.map((tab) => (
+              <Pane key={tab.id} content={tab} />
+            ))}
           </div>
         </main>
       </div>
+
+      {uiSnap.dedicatedModal && (
+        <Dialog open>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Title</DialogTitle>
+            </DialogHeader>
+
+            <Pane content={uiSnap.dedicatedModal} />
+          </DialogContent>
+        </Dialog>
+      )}
+
       <Sandbox />
     </SidebarProvider>
   );

@@ -1,9 +1,14 @@
 import type { Extensions } from '@tiptap/react';
-import { proxy, ref } from 'valtio';
+import { proxy } from 'valtio';
 import type * as Y from 'yjs';
 
 declare const contentIdBrand: unique symbol;
 export type ContentId = string & { [contentIdBrand]: never };
+
+export interface EditorContent {
+  doc: Y.Doc;
+  extensions: Extensions;
+}
 
 export interface FileContent {
   path: string;
@@ -19,15 +24,7 @@ export const rootChar = '.';
 export const separatorChar = '/';
 
 export const content = proxy({
-  editor: ref<
-    Record<
-      ContentId,
-      {
-        doc: Y.Doc;
-        extensions: Extensions;
-      }
-    >
-  >({}),
+  editor: {} as Record<ContentId, EditorContent>,
   files: {} as Record<ContentId, FileContent>,
   readingOrder: [] as ContentId[],
 
