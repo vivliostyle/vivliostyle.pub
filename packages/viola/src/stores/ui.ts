@@ -4,7 +4,7 @@ import type { ContentId } from './content';
 declare const paneIdBrand: unique symbol;
 export type PaneId = string & { [paneIdBrand]: never };
 
-export type PaneContent = { id: PaneId } & (
+export type PaneContent = { id: PaneId; title: () => React.ReactNode } & (
   | { type: 'editor'; contentId: ContentId }
   | { type: 'preview' }
   | { type: 'settings' }

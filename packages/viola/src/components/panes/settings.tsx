@@ -1,3 +1,3 @@
 export function Settings() {
-  return <div>settings</div>;
+  return <div>Lorem</div>;
 }

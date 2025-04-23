@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type React from 'react';
-import { type Snapshot, useSnapshot } from 'valtio';
+import { type Snapshot, ref, useSnapshot } from 'valtio';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,6 +74,7 @@ function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
           id: generateId(),
           type: 'editor',
           contentId: id,
+          title: ref(() => <>Editor</>),
         },
       ];
     };
