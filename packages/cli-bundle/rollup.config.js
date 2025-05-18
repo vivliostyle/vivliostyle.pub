@@ -54,6 +54,15 @@ export default {
   plugins: [
     alias({
       entries: [
+        // https://github.com/nodejs/readable-stream/issues/540
+        // https://github.com/nodejs/readable-stream/commit/b733ae549e674b639a2528ddfd5394b6b8bb9bb4
+        {
+          find: 'process/',
+          replacement: path.resolve(
+            fileURLToPath(import.meta.url),
+            '../src/stubs/node/process',
+          ),
+        },
         ...Object.entries({
           ...stdLibBrowser,
           ...Object.fromEntries(
@@ -100,6 +109,13 @@ export default {
           replacement: path.resolve(
             fileURLToPath(import.meta.url),
             '../src/stubs/node/fs',
+          ),
+        },
+        {
+          find: 'terminal-link',
+          replacement: path.resolve(
+            fileURLToPath(import.meta.url),
+            '../src/stubs/terminal-link',
           ),
         },
         {
