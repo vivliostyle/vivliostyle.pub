@@ -39,7 +39,7 @@ const setupWorker = ({
 
 async function init() {
   cliWorker ??= await setupWorker({
-    initWorker: () => new Worker('/@worker/cli.js', { name: 'worker:cli' }),
+    initWorker: () => new Worker('/@cli/worker.js', { name: 'worker:cli' }),
     initData: {},
     channelName: 'worker:cli',
   });

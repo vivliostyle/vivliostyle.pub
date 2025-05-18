@@ -12,6 +12,7 @@ import typescript from '@rollup/plugin-typescript';
 import { nodeExternalModules } from '@vivliostyle/cli/node-modules';
 import stdLibBrowser from 'node-stdlib-browser';
 import { packageDirectorySync } from 'pkg-dir';
+import { defineConfig } from 'rollup';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 const require = createRequire(import.meta.url);
@@ -38,10 +39,10 @@ const resolvePkgDir = (cwd) => {
   return { root, name };
 };
 
-export default {
+const workerConfig = defineConfig({
   input: 'src/index.ts',
   output: {
-    file: 'dist/cli.js',
+    file: 'dist/worker.js',
     inlineDynamicImports: true,
   },
   external: [
@@ -259,4 +260,20 @@ exports.xxhashBase16 = xxhashBase16;
       },
     },
   ],
-};
+});
+
+const clientCustomHmrConfig = defineConfig({
+  input: 'src/client/custom-hmr.ts',
+  output: {
+    file: 'dist/client/custom-hmr.js',
+  },
+  plugins: [
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false,
+    }),
+    typescript(),
+  ],
+});
+
+export default defineConfig([workerConfig, clientCustomHmrConfig]);

@@ -27,9 +27,7 @@ self.addEventListener('fetch', (event) => {
   if (!/^sandbox\./.test(url.host)) {
     return;
   }
-  if (
-    ['/@worker/', '/@viewer/'].some((base) => url.pathname.startsWith(base))
-  ) {
+  if (['/@cli/', '/@viewer/'].some((base) => url.pathname.startsWith(base))) {
     return;
   }
   if (request.mode === 'navigate') {

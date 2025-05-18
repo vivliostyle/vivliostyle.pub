@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@andrewbranch/untar.js": "^1.0.3",
+    "@mswjs/interceptors": "^0.38.6",
     "@npmcli/arborist": "^7.5.4",
     "@rollup/plugin-alias": "^5.1.1",
     "@rollup/plugin-commonjs": "^28.0.2",
@@ -32,6 +33,7 @@
     "crypto-browserify": "^3.12.1",
     "esbuild-wasm": "^0.25.0",
     "fflate": "^0.8.2",
+    "magic-string": "^0.30.17",
     "memfs": "^4.17.0",
     "node-mocks-http": "^1.16.2",
     "node-stdlib-browser": "^1.3.1",

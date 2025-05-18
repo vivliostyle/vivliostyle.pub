@@ -11,9 +11,10 @@ import { fs, vol } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
 import { toSnapshotSync } from 'memfs/lib/snapshot';
 import type { MockResponse, RequestMethod } from 'node-mocks-http';
-import { type ViteDevServer, createServer } from 'vite';
+import { type HotPayload, type ViteDevServer, createServer } from 'vite';
 import initRollup from '#rollup-wasm-bindings';
 import { createMocks } from './http';
+import { vsCustomHmrPlugin } from './vite-plugin';
 
 const commonHeaders = {
   'cache-control': 'no-store',
@@ -21,6 +22,11 @@ const commonHeaders = {
   'cross-origin-opener-policy': 'same-origin',
   'cross-origin-resource-policy': 'cross-origin',
 };
+
+const hmrChannel = new BroadcastChannel('worker:vite-hmr');
+function sendHotPayload(payload: HotPayload) {
+  hmrChannel.postMessage(payload);
+}
 
 let server: ViteDevServer;
 
@@ -41,9 +47,16 @@ async function setupServer() {
         cwd: '/workdir',
         logLevel: 'info',
       }),
+      vsCustomHmrPlugin({
+        sendHotPayload,
+      }),
     ],
   });
   console.log(toTreeSync(fs));
+}
+
+function webSocketConnect() {
+  sendHotPayload({ type: 'connected' });
 }
 
 function zipDirectory(pwd: string) {
@@ -160,7 +173,16 @@ self.addEventListener('message', async (event) => {
   if (event.data.command === 'init') {
     const channel = new BroadcastChannel('worker:cli');
     Comlink.expose(
-      { serve, setupServer, build, read, write, fromJSON, toJSON },
+      {
+        serve,
+        setupServer,
+        webSocketConnect,
+        build,
+        read,
+        write,
+        fromJSON,
+        toJSON,
+      },
       channel,
     );
     self.postMessage({ command: 'init' });
