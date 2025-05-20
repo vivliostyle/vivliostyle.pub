@@ -7,6 +7,7 @@ type WorkerInterface = {
 };
 
 const channel = new BroadcastChannel('worker:cli');
+const cli = Comlink.wrap<WorkerInterface>(channel);
 const webSocketInterceptor = new WebSocketInterceptor();
 
 webSocketInterceptor.on('connection', async ({ client, server, info }) => {
@@ -17,6 +18,6 @@ webSocketInterceptor.on('connection', async ({ client, server, info }) => {
   hmrChannel.addEventListener('message', (event) => {
     client.send(JSON.stringify(event.data));
   });
-  await Comlink.wrap<WorkerInterface>(channel).webSocketConnect();
+  await cli.webSocketConnect();
 });
 webSocketInterceptor.apply();
