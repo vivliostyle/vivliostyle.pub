@@ -12,6 +12,10 @@
   "imports": {
     "#rollup-wasm-bindings": "./src/stubs/rollup/wasm/bindings_wasm.js"
   },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
   "devDependencies": {
     "@andrewbranch/untar.js": "^1.0.3",
     "@mswjs/interceptors": "^0.38.6",

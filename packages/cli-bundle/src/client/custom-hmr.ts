@@ -1,13 +1,8 @@
 import { WebSocketInterceptor } from '@mswjs/interceptors/WebSocket';
 import * as Comlink from 'comlink';
 
-type WorkerInterface = {
-  read: (path: string, encoding?: string) => Promise<string>;
-  webSocketConnect: () => Promise<void>;
-};
-
 const channel = new BroadcastChannel('worker:cli');
-const cli = Comlink.wrap<WorkerInterface>(channel);
+const cli = Comlink.wrap<typeof import('..')>(channel);
 const webSocketInterceptor = new WebSocketInterceptor();
 
 webSocketInterceptor.on('connection', async ({ client, server, info }) => {

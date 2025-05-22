@@ -1,9 +1,6 @@
 /// <reference lib="webworker" />
 
-import './volume';
-
 import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
-import * as Comlink from 'comlink';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
@@ -30,7 +27,7 @@ function sendHotPayload(payload: HotPayload) {
 
 let server: ViteDevServer;
 
-async function setupServer() {
+export async function setupServer() {
   await Promise.all([
     initialize({ wasmURL: 'esbuild.wasm' }),
     initRollup({ module_or_path: 'bindings_wasm_bg.wasm' }),
@@ -55,7 +52,7 @@ async function setupServer() {
   console.log(toTreeSync(fs));
 }
 
-function webSocketConnect() {
+export function webSocketConnect() {
   sendHotPayload({ type: 'connected' });
 }
 
@@ -95,7 +92,7 @@ function zipDirectory(pwd: string) {
   return zip;
 }
 
-async function serve(
+export async function serve(
   ...[request, init]: ConstructorParameters<typeof Request>
 ) {
   if (!server) {
@@ -149,7 +146,7 @@ async function serve(
   );
 }
 
-async function build() {
+export async function build() {
   if (!server) {
     throw new Error('Server is not ready');
   }
@@ -161,30 +158,11 @@ async function build() {
   return zipDirectory('/workdir/dist');
 }
 
-const read = (...args: Parameters<typeof fs.promises.readFile>) =>
+export const read = (...args: Parameters<typeof fs.promises.readFile>) =>
   fs.promises.readFile(...args);
-const write = (...args: Parameters<typeof fs.promises.writeFile>) =>
+export const write = (...args: Parameters<typeof fs.promises.writeFile>) =>
   fs.promises.writeFile(...args);
-const fromJSON = (...args: Parameters<typeof vol.fromJSON>) =>
+export const fromJSON = (...args: Parameters<typeof vol.fromJSON>) =>
   vol.fromJSON(...args);
-const toJSON = (...args: Parameters<typeof vol.toJSON>) => vol.toJSON(...args);
-
-self.addEventListener('message', async (event) => {
-  if (event.data.command === 'init') {
-    const channel = new BroadcastChannel('worker:cli');
-    Comlink.expose(
-      {
-        serve,
-        setupServer,
-        webSocketConnect,
-        build,
-        read,
-        write,
-        fromJSON,
-        toJSON,
-      },
-      channel,
-    );
-    self.postMessage({ command: 'init' });
-  }
-});
+export const toJSON = (...args: Parameters<typeof vol.toJSON>) =>
+  vol.toJSON(...args);

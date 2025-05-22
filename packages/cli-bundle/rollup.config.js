@@ -40,7 +40,7 @@ const resolvePkgDir = (cwd) => {
 };
 
 const workerConfig = defineConfig({
-  input: 'src/index.ts',
+  input: 'src/worker.ts',
   output: {
     file: 'dist/worker.js',
     inlineDynamicImports: true,
