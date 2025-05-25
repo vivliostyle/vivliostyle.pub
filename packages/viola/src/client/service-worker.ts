@@ -2,12 +2,6 @@
 
 import * as Comlink from 'comlink';
 
-type WorkerInterface = {
-  serve: (
-    ...req: ConstructorParameters<typeof Request>
-  ) => Promise<ConstructorParameters<typeof Response>>;
-};
-
 const self = globalThis as unknown as ServiceWorkerGlobalScope;
 
 self.addEventListener('install', (event: ExtendableEvent) => {
@@ -21,13 +15,11 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
-  if (location.origin !== url.origin) {
-    return;
-  }
-  if (!/^sandbox\./.test(url.host)) {
-    return;
-  }
-  if (['/@cli/', '/@viewer/'].some((base) => url.pathname.startsWith(base))) {
+  if (
+    location.origin !== url.origin ||
+    !/^sandbox\./.test(url.host) ||
+    url.pathname.startsWith('/@cli/')
+  ) {
     return;
   }
   if (request.mode === 'navigate') {
@@ -67,7 +59,7 @@ async function handleNavigate(event: FetchEvent) {
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
     url.host = url.host.slice('sandbox.'.length);
-    url.pathname = '/@viewer/index.html';
+    url.pathname = '/@cli/viewer/index.html';
     const viewerHtml = await fetch(url, { mode: 'cors' }).then((res) =>
       res.text(),
     );
@@ -92,7 +84,7 @@ async function handleRequest(event: FetchEvent) {
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
     url.host = url.host.slice('sandbox.'.length);
-    url.pathname = `/@viewer${url.pathname.slice('/__vivliostyle-viewer'.length)}`;
+    url.pathname = `/@cli/viewer${url.pathname.slice('/__vivliostyle-viewer'.length)}`;
     return fetch(url, { mode: 'no-cors' });
   }
 
@@ -107,10 +99,24 @@ async function handleRequest(event: FetchEvent) {
   ) {
     requestInit.body = await request.arrayBuffer();
   }
+  if (request.method === 'HEAD') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+      },
+    });
+  }
 
   try {
     const ret = await Promise.race([
-      Comlink.wrap<WorkerInterface>(channel).serve(request.url, requestInit),
+      Comlink.wrap<typeof import('#cli-bundle')>(channel).serve(
+        request.url,
+        requestInit,
+      ),
       new Promise<never>((_, reject) =>
         setTimeout(reject, 5000, new Error('Request timeout')),
       ),

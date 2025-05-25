@@ -36,33 +36,15 @@ export default defineConfig(({ mode }) => {
         },
       }),
       {
-        name: 'serve-worker-dir',
+        name: 'serve-cli',
+        enforce: 'pre',
         configureServer(server) {
-          const dir = path.dirname(
-            require.resolve('@v/cli-bundle/dist/cli.js'),
+          const dir = path.resolve(
+            require.resolve('@v/cli-bundle/package.json'),
+            '../dist',
           );
           server.middlewares.use(
-            '/@worker',
-            sirv(dir, {
-              dev: true,
-              etag: false,
-              setHeaders: (res) => {
-                res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
-                res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-                res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-              },
-            }),
-          );
-        },
-      },
-      {
-        name: 'serve-vivliostyle-viewer',
-        configureServer(server) {
-          const dir = path.dirname(
-            require.resolve('@v/cli-bundle/dist/viewer/index.html'),
-          );
-          server.middlewares.use(
-            '/@viewer',
+            '/@cli',
             sirv(dir, {
               dev: true,
               etag: false,
@@ -79,12 +61,28 @@ export default defineConfig(({ mode }) => {
             }),
           );
         },
+        resolveId(id) {
+          if (id === '#cli-bundle') {
+            return '@v/cli-bundle';
+          }
+        },
+        load(id) {
+          if (id === '@v/cli-bundle') {
+            return '';
+          }
+        },
+        transform(_code, id) {
+          if (id === '@v/cli-bundle') {
+            // skip transform
+            return `export default ((f) => import(/* @vite-ignore */ f))('/@cli/index.js')`;
+          }
+        },
       },
     ],
     server: {
       https: {
         key: fs.readFileSync(path.join(root, 'certs/privkey.pem')),
-        cert: fs.readFileSync(path.join(root, 'certs/cert.pem')),
+        cert: fs.readFileSync(path.join(root, 'certs/fullchain.pem')),
       },
       headers: {
         'Cross-Origin-Embedder-Policy': 'credentialless',

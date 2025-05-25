@@ -9,7 +9,7 @@
     "preview": "vite preview --host"
   },
   "imports": {
-    "#cli-bundle/*": "@v/config/*",
+    "#cli-bundle": "@v/cli-bundle",
     "#config/*": "@v/config/*",
     "#ui/*": "@v/ui/*"
   },

@@ -13,6 +13,7 @@ import { nodeExternalModules } from '@vivliostyle/cli/node-modules';
 import stdLibBrowser from 'node-stdlib-browser';
 import { packageDirectorySync } from 'pkg-dir';
 import { defineConfig } from 'rollup';
+import dts from 'rollup-plugin-dts';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 const require = createRequire(import.meta.url);
@@ -40,9 +41,9 @@ const resolvePkgDir = (cwd) => {
 };
 
 const workerConfig = defineConfig({
-  input: 'src/worker.ts',
+  input: 'src/index.ts',
   output: {
-    file: 'dist/worker.js',
+    file: 'dist/index.js',
     inlineDynamicImports: true,
   },
   external: [
@@ -262,6 +263,15 @@ exports.xxhashBase16 = xxhashBase16;
   ],
 });
 
+const dtsConfig = defineConfig({
+  input: 'src/index.ts',
+  output: {
+    file: 'dist/index.d.ts',
+    format: 'es',
+  },
+  plugins: [dts()],
+});
+
 const clientCustomHmrConfig = defineConfig({
   input: 'src/client/custom-hmr.ts',
   output: {
@@ -276,4 +286,4 @@ const clientCustomHmrConfig = defineConfig({
   ],
 });
 
-export default defineConfig([workerConfig, clientCustomHmrConfig]);
+export default defineConfig([workerConfig, dtsConfig, clientCustomHmrConfig]);

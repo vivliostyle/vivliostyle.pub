@@ -18,12 +18,12 @@ export function vsCustomHmrPlugin({
       config = _config;
     },
     resolveId(id) {
-      if (['/@cli/', '/@viewer/'].some((base) => id.startsWith(base))) {
+      if (id.startsWith('/@cli/')) {
         return { id, external: true };
       }
     },
     load(id) {
-      if (['/@cli/', '/@viewer/'].some((base) => id.startsWith(base))) {
+      if (id.startsWith('/@cli/')) {
         // The string returned here is not used since it is proxied by the service worker before being referenced.
         return '';
       }

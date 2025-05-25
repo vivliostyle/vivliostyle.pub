@@ -1,4 +1,4 @@
-/// <reference lib="webworker" />
+import './volume';
 
 import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
 import connect from 'connect';
@@ -29,8 +29,8 @@ let server: ViteDevServer;
 
 export async function setupServer() {
   await Promise.all([
-    initialize({ wasmURL: 'esbuild.wasm' }),
-    initRollup({ module_or_path: 'bindings_wasm_bg.wasm' }),
+    initialize({ wasmURL: '/@cli/esbuild.wasm' }),
+    initRollup({ module_or_path: '/@cli/bindings_wasm_bg.wasm' }),
   ]);
   server = await createServer({
     root: '/workdir',
