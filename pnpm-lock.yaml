@@ -40,6 +40,9 @@ importers:
       lint-staged:
         specifier: 15.4.1
         version: 15.4.1
+      outvariant:
+        specifier: ^1.4.3
+        version: 1.4.3
       postcss:
         specifier: 8.5.1
         version: 8.5.1
@@ -70,9 +73,6 @@ importers:
 
   packages/cli-bundle:
     devDependencies:
-      '@andrewbranch/untar.js':
-        specifier: ^1.0.3
-        version: 1.0.3
       '@mswjs/interceptors':
         specifier: ^0.38.6
         version: 0.38.6
@@ -115,6 +115,9 @@ importers:
       '@v/config':
         specifier: workspace:*
         version: link:../config
+      '@v/theme-registry':
+        specifier: workspace:*
+        version: link:../theme-registry
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
@@ -127,9 +130,6 @@ importers:
       esbuild-wasm:
         specifier: ^0.25.0
         version: 0.25.0
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.2
       magic-string:
         specifier: ^0.30.17
         version: 0.30.17
@@ -174,6 +174,24 @@ importers:
         version: 0.12.5
 
   packages/config: {}
+
+  packages/theme-registry:
+    devDependencies:
+      '@andrewbranch/untar.js':
+        specifier: ^1.0.3
+        version: 1.0.3
+      '@types/semver':
+        specifier: ^7.5.8
+        version: 7.5.8
+      '@v/config':
+        specifier: workspace:*
+        version: link:../config
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
+      semver:
+        specifier: ^7.7.1
+        version: 7.7.1
 
   packages/ui:
     dependencies:
@@ -241,6 +259,9 @@ importers:
       '@v/config':
         specifier: workspace:*
         version: link:../config
+      '@v/theme-registry':
+        specifier: workspace:*
+        version: link:../theme-registry
       '@v/ui':
         specifier: workspace:*
         version: link:../ui

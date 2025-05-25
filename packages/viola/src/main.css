@@ -1,7 +1,22 @@
+@layer theme, base, components, vs-theme, utilities;
+
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/preflight" layer(base);
+@import "tailwindcss/utilities" layer(utilities);
+
 @import "#ui/index.css";
 @import "#ui/global.css" layer(base);
 
+@import "./styles/vs-theme.css" layer(vs-theme);
+
 @source "../../ui/src";
+
+:root {
+  --vs-columns: auto;
+  --vs-font-family: var(--font-sans);
+  --vs-spacing-rlh: 0;
+  --vs--monospace-font-family: var(--font-mono);
+}
 
 html,
 body {

@@ -1,44 +1,19 @@
 import assert from 'node:assert';
 import path from 'node:path';
-import { untar } from '@andrewbranch/untar.js';
 import type {
   BuildIdealTreeOptions,
   Options,
   ReifyOptions,
 } from '@npmcli/arborist';
-import { Gunzip } from 'fflate';
+import * as Comlink from 'comlink';
 import { fs } from 'memfs';
 import npa from 'npm-package-arg';
 import { satisfies as semverSatisfies } from 'semver';
-
-const registryOrigin = 'https://registry.npmjs.org';
+import type { IdealTree, ThemeRegistry } from '#theme-registry';
 
 interface Node {
   children: Map<string, Node>;
 }
-
-type PackageJson = {
-  name: string;
-  version: string;
-  dependencies?: Record<string, string>;
-  dist?: {
-    tarball: string;
-  };
-};
-
-type IdealTree = {
-  [name: string]: Omit<PackageJson, 'dependencies'> & {
-    dependencies: IdealTree;
-  };
-};
-
-type PackageMetadata = {
-  versions: Record<string, PackageJson>;
-  'dist-tags': {
-    latest: string;
-    [tag: string]: string;
-  };
-};
 
 const parseSpecifier = (specifier: string) => {
   const { name, type, fetchSpec } = npa(specifier);
@@ -51,6 +26,10 @@ const parseSpecifier = (specifier: string) => {
   }
   return { name, type, fetchSpec };
 };
+
+const themeRegistry = Comlink.wrap<ThemeRegistry>(
+  new BroadcastChannel('worker:theme-registry'),
+);
 
 export default class NpmRegistry {
   constructor(public options?: Options) {}
@@ -120,10 +99,8 @@ export default class NpmRegistry {
       specifier: string,
     ): Promise<IdealTree[string]> {
       const { name, type, fetchSpec } = parseSpecifier(specifier);
-      const url = `${registryOrigin}/${name}`;
-      const { versions, 'dist-tags': distTags } = await fetch(url).then(
-        (res): Promise<PackageMetadata> => res.json(),
-      );
+      const { versions, 'dist-tags': distTags } =
+        await themeRegistry.fetchPackageMetadata(name);
       const pkg =
         type === 'tag'
           ? versions[distTags[fetchSpec]]
@@ -213,33 +190,11 @@ export default class NpmRegistry {
   }
 
   protected async _install(tree: IdealTree, rootPath: string): Promise<void> {
-    await Promise.all(
-      Object.values(tree).map(async (pkg) => {
-        const pkgPath = path.resolve(rootPath, 'node_modules', pkg.name);
-        const url = pkg.dist?.tarball;
-        if (url) {
-          if (!fs.existsSync(pkgPath)) {
-            fs.mkdirSync(pkgPath, { recursive: true });
-          }
-          const tarball = await fetch(url).then((res) => res.arrayBuffer());
-          // https://github.com/101arrowz/fflate/issues/207
-          let unzipped: Uint8Array | undefined;
-          new Gunzip((chunk) => {
-            unzipped = chunk;
-          }).push(new Uint8Array(tarball), true);
-          if (!unzipped) {
-            throw new Error('Failed to unzip tarball');
-          }
-          const data = untar(unzipped);
-          for (const { name, fileData } of data) {
-            const p = path.resolve(pkgPath, name.replace(/^package\//, ''));
-            fs.mkdirSync(path.dirname(p), { recursive: true });
-            fs.writeFileSync(p, fileData);
-          }
-        }
-        await this._install(pkg.dependencies ?? {}, pkgPath);
-      }),
-    );
+    const fileList = await themeRegistry.fetchPackageContent(tree, rootPath);
+    fileList.forEach((fileData, p) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, fileData);
+    });
   }
 
   protected _updatePkgJson(tree: IdealTree, rootPath: string, add?: string[]) {

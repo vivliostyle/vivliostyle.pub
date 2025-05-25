@@ -40,6 +40,11 @@ function WorkspaceMenu() {
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start">
             <DropdownMenuItem asChild>
+              <Link to="/theme">
+                <span>Customize theme</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link to="/settings">
                 <span>Settings</span>
               </Link>
@@ -75,6 +80,11 @@ function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
           type: 'editor',
           contentId: id,
           title: ref(() => <>Editor</>),
+        },
+        {
+          id: generateId(),
+          type: 'preview',
+          title: ref(() => <>Preview</>),
         },
       ];
     };

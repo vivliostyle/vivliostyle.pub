@@ -11,6 +11,7 @@
   "imports": {
     "#cli-bundle": "@v/cli-bundle",
     "#config/*": "@v/config/*",
+    "#theme-registry": "@v/theme-registry",
     "#ui/*": "@v/ui/*"
   },
   "devDependencies": {
@@ -24,6 +25,7 @@
     "@tiptap/starter-kit": "^2.11.5",
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
+    "@v/theme-registry": "workspace:*",
     "@v/ui": "workspace:*",
     "@vivliostyle/theme-base": "^2.0.0",
     "comlink": "^4.4.2",

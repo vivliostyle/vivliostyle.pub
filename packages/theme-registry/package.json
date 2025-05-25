@@ -1,0 +1,21 @@
+{
+  "name": "@v/theme-registry",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "imports": {
+    "#config/*": "@v/config/*"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "devDependencies": {
+    "@andrewbranch/untar.js": "^1.0.3",
+    "@types/semver": "^7.5.8",
+    "@v/config": "workspace:*",
+    "fflate": "^0.8.2",
+    "semver": "^7.7.1"
+  }
+}

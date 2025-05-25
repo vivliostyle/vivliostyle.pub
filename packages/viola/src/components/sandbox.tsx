@@ -1,6 +1,7 @@
 import * as Comlink from 'comlink';
 import { createPortal } from 'react-dom';
 import { useEffectOnce, useUnmount } from 'react-use';
+import { type ThemeRegistry, setupThemeRegistry } from '#theme-registry';
 import { setupCli } from '../actions';
 import { sandbox } from '../stores/sandbox';
 
@@ -9,15 +10,39 @@ export const sandboxOrigin = `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${
 
 let initialized = false;
 
+declare global {
+  interface Window {
+    __debug: {
+      cli?: unknown;
+      themeRegistry?: ThemeRegistry;
+    };
+  }
+}
+if (import.meta.env.DEV) {
+  window.__debug ??= {};
+}
+
 function init() {
+  const themeRegistry = setupThemeRegistry();
   const cb = async (event: MessageEvent) => {
     if (event.data.command !== 'bind') {
       return;
     }
     const [messagePort] = event.ports;
     if (event.data.channel === 'worker:cli') {
-      sandbox.worker = Comlink.wrap(messagePort);
+      const cli = Comlink.wrap<typeof import('#cli-bundle')>(messagePort);
+      sandbox.worker = cli;
+      if (import.meta.env.DEV) {
+        window.__debug.cli = cli;
+      }
       setupCli();
+    }
+    if (event.data.channel === 'worker:theme-registry') {
+      sandbox.themeRegistry = themeRegistry;
+      if (import.meta.env.DEV) {
+        window.__debug.themeRegistry = themeRegistry;
+      }
+      Comlink.expose(themeRegistry, messagePort);
     }
   };
   initialized = true;

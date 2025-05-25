@@ -36,7 +36,7 @@ export function Editor({ contentId }: { contentId: ContentId }) {
       key={contentId}
       extensions={editor.extensions}
       editorContainerProps={{
-        className: cn(editorStyle.editor, 'h-full'),
+        className: cn(editorStyle.editor, 'vs-theme-base h-full'),
       }}
       editorProps={{
         attributes: {

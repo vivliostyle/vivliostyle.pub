@@ -72,11 +72,11 @@ export function Layout(_: { children?: React.ReactNode }) {
     <SidebarProvider>
       <SideMenu />
       <div className="size-full flex flex-col">
-        <main className="relative size-full flex-1 overflow-auto overscroll-contain scrollbar-stable">
+        <main className="relative size-full flex-1">
           <div className="absolute top-0 left-0 z-10 p-2">
             <SidebarTrigger className="size-8 cursor-pointer" />
           </div>
-          <div className="size-full max-w-xl mx-auto">
+          <div className="size-full grid grid-flow-col auto-cols-fr">
             {uiSnap.tabs.map((tab) => (
               <Pane key={tab.id} content={tab} />
             ))}

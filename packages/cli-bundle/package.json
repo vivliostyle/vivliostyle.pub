@@ -10,7 +10,8 @@
     "dev": "rollup -c -w --no-watch.clearScreen"
   },
   "imports": {
-    "#rollup-wasm-bindings": "./src/stubs/rollup/wasm/bindings_wasm.js"
+    "#rollup-wasm-bindings": "./src/stubs/rollup/wasm/bindings_wasm.js",
+    "#theme-registry": "@v/theme-registry"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -20,7 +21,6 @@
     }
   },
   "devDependencies": {
-    "@andrewbranch/untar.js": "^1.0.3",
     "@mswjs/interceptors": "^0.38.6",
     "@npmcli/arborist": "^7.5.4",
     "@rollup/plugin-alias": "^5.1.1",
@@ -35,11 +35,11 @@
     "@types/npmcli__arborist": "^6.3.0",
     "@types/semver": "^7.5.8",
     "@v/config": "workspace:*",
+    "@v/theme-registry": "workspace:*",
     "comlink": "^4.4.2",
     "connect": "^3.7.0",
     "crypto-browserify": "^3.12.1",
     "esbuild-wasm": "^0.25.0",
-    "fflate": "^0.8.2",
     "magic-string": "^0.30.17",
     "memfs": "^4.17.0",
     "node-mocks-http": "^1.16.2",

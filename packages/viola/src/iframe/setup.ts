@@ -1,13 +1,137 @@
+import * as Comlink from 'comlink';
+
 let cliWorker: Worker | undefined;
+let cliChannels: BroadcastChannel[];
+
+let handleMessageDebug:
+  | ((
+      channelName: string,
+      direction: 'host' | 'worker',
+      e: MessageEvent,
+    ) => void)
+  | undefined;
+if (import.meta.env.DEV) {
+  const comlinkMessageMap = new Map<
+    string,
+    // biome-ignore lint/suspicious/noExplicitAny:
+    { time: number; data: any; clear: () => void }
+  >();
+  // biome-ignore lint/suspicious/noExplicitAny:
+  const mapWireValue = (value: any) => {
+    switch (value.type) {
+      case 'HANDLER':
+        try {
+          // biome-ignore lint/style/noNonNullAssertion:
+          return Comlink.transferHandlers
+            .get(value.name)!
+            .deserialize(value.value);
+        } catch (e) {
+          return e;
+        }
+      case 'RAW':
+        return value.value;
+    }
+  };
+
+  handleMessageDebug = (channelName, direction, e) => {
+    const { type, id } = e.data;
+    if (!type || !id) {
+      return;
+    }
+    const message = comlinkMessageMap.get(id);
+    if (message) {
+      const { time, data } = message;
+      message.clear();
+      const diff = performance.now() - time;
+      const isError = e.data.type === 'HANDLER' && e.data.value.isError;
+      console.groupCollapsed(
+        [
+          isError ? '%c❌' : '%c📦',
+          `${direction === 'host' ? '----->' : '<-----'}`,
+          `[${channelName}]`,
+          `(${diff.toFixed(2)} ms)`,
+          data.type,
+          ['GET', 'SET', 'APPLY', 'CONSTRUCT'].includes(data.type) &&
+            data.path.join('.'),
+        ]
+          .filter(Boolean)
+          .join(' '),
+        isError ? 'color: red;' : 'color: #888;',
+      );
+      console.log(
+        'request message:',
+        data.type === 'SET'
+          ? mapWireValue(data.value)
+          : data.type === 'APPLY' || data.type === 'CONSTRUCT'
+            ? data.argumentList.map(mapWireValue)
+            : undefined,
+      );
+      console.log('response message:', mapWireValue(e.data));
+      console.groupEnd();
+    } else {
+      const timer = setTimeout(() => {
+        console.groupCollapsed(
+          [
+            '%c',
+            `${direction === 'worker' ? '--❌️->' : '<-❌️--'}`,
+            `[${channelName}]`,
+            e.data.type,
+            ['GET', 'SET', 'APPLY', 'CONSTRUCT'].includes(e.data.type) &&
+              e.data.path.join('.'),
+          ]
+            .filter(Boolean)
+            .join(' '),
+          'color: yellow;',
+        );
+        console.log(
+          'request message:',
+          e.data.type === 'SET'
+            ? mapWireValue(e.data.value)
+            : e.data.type === 'APPLY' || e.data.type === 'CONSTRUCT'
+              ? e.data.argumentList.map(mapWireValue)
+              : undefined,
+        );
+        console.groupEnd();
+      }, 5000);
+      comlinkMessageMap.set(id, {
+        time: performance.now(),
+        data: e.data,
+        clear: () => {
+          clearTimeout(timer);
+          comlinkMessageMap.delete(id);
+        },
+      });
+    }
+  };
+}
+
+const setupChannel = (channelName: string) => {
+  const messagePorts = new MessageChannel();
+  const channel = new BroadcastChannel(channelName);
+
+  messagePorts.port1.onmessage = (e) => {
+    handleMessageDebug?.(channelName, 'worker', e);
+    channel.postMessage(e.data);
+  };
+  channel.onmessage = (e) => {
+    handleMessageDebug?.(channelName, 'host', e);
+    messagePorts.port1.postMessage(e.data);
+  };
+
+  window.parent.postMessage(
+    { command: 'bind', channel: channelName },
+    `https://${import.meta.env.VITE_APP_HOSTNAME}${location.port ? `:${location.port}` : ''}`,
+    [messagePorts.port2],
+  );
+  return channel;
+};
 
 const setupWorker = ({
   initWorker,
-  initData,
-  channelName,
+  initCallback = () => {},
 }: {
   initWorker: () => Worker;
-  initData: object;
-  channelName: string;
+  initCallback?: () => void;
 }) => {
   const defer = Promise.withResolvers<Worker>();
   const worker = initWorker();
@@ -17,23 +141,11 @@ const setupWorker = ({
     }
     worker.removeEventListener('message', cb);
 
-    const messagePorts = new MessageChannel();
-    const channel = new BroadcastChannel(channelName);
-    messagePorts.port1.onmessage = (e) => {
-      channel.postMessage(e.data);
-    };
-    channel.onmessage = (e) => {
-      messagePorts.port1.postMessage(e.data);
-    };
-    window.parent.postMessage(
-      { command: 'bind', channel: channelName },
-      `https://${import.meta.env.VITE_APP_HOSTNAME}${location.port ? `:${location.port}` : ''}`,
-      [messagePorts.port2],
-    );
+    initCallback();
     defer.resolve(worker);
   };
   worker.addEventListener('message', cb);
-  worker.postMessage({ command: 'init', ...initData });
+  worker.postMessage({ command: 'init' });
   return defer.promise;
 };
 
@@ -44,9 +156,11 @@ async function init() {
         name: 'worker:cli',
         type: 'module',
       }),
-    initData: {},
-    channelName: 'worker:cli',
+    initCallback: () => {
+      setupChannel('worker:cli');
+    },
   });
+  cliChannels ??= [setupChannel('worker:theme-registry')];
 }
 
 init();

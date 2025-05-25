@@ -1,5 +1,4 @@
-import { fs, vol } from 'memfs';
-import { toTreeSync } from 'memfs/lib/print';
+import { vol } from 'memfs';
 
 vol.fromJSON(__volume__);
 
@@ -10,5 +9,3 @@ vol.fromNestedJSON({
     }),
   },
 });
-
-console.log(toTreeSync(fs));

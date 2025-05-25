@@ -3,7 +3,6 @@ import './volume';
 import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
-import { type Zippable, type ZippableFile, zipSync } from 'fflate';
 import { fs, vol } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
 import { toSnapshotSync } from 'memfs/lib/snapshot';
@@ -49,7 +48,6 @@ export async function setupServer() {
       }),
     ],
   });
-  console.log(toTreeSync(fs));
 }
 
 export function webSocketConnect() {
@@ -166,3 +164,7 @@ export const fromJSON = (...args: Parameters<typeof vol.fromJSON>) =>
   vol.fromJSON(...args);
 export const toJSON = (...args: Parameters<typeof vol.toJSON>) =>
   vol.toJSON(...args);
+
+export const printTree = () => {
+  console.log(toTreeSync(fs));
+};
