@@ -1,16 +1,38 @@
-import {
-  BubbleMenu,
-  type EditorEvents,
-  EditorProvider,
-  FloatingMenu,
-} from '@tiptap/react';
-import { useCallback, useState } from 'react';
+import { type EditorEvents, EditorProvider } from '@tiptap/react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import shadowRoot from 'react-shadow';
 import { useDebounce } from 'react-use';
 import { useSnapshot } from 'valtio';
-import { cn } from '#ui/lib/utils';
 import { type ContentId, content } from '../../stores/content';
 import { sandbox } from '../../stores/sandbox';
-import editorStyle from './editor.module.css';
+import editorBaseCss from './editor.css?inline';
+
+function EditorStyleContainer({ children }: React.PropsWithChildren) {
+  const shadowRootRef = useRef<ShadowRoot | null>(null);
+
+  useLayoutEffect(() => {
+    if (
+      !shadowRootRef.current ||
+      shadowRootRef.current.adoptedStyleSheets.length > 0
+    ) {
+      return;
+    }
+    const editorStyleSheet = new CSSStyleSheet();
+    editorStyleSheet.replaceSync(editorBaseCss.replace(/:root/g, ':host'));
+    shadowRootRef.current.adoptedStyleSheets = [editorStyleSheet];
+  }, []);
+
+  return (
+    <shadowRoot.div
+      className="h-full"
+      ref={(el) => {
+        shadowRootRef.current = el?.shadowRoot ?? null;
+      }}
+    >
+      {children}
+    </shadowRoot.div>
+  );
+}
 
 export function Editor({ contentId }: { contentId: ContentId }) {
   const contentSnap = useSnapshot(content);
@@ -32,19 +54,17 @@ export function Editor({ contentId }: { contentId: ContentId }) {
   }
 
   return (
-    <EditorProvider
-      key={contentId}
-      extensions={editor.extensions}
-      editorContainerProps={{
-        className: cn(editorStyle.editor, 'vs-theme-base h-full'),
-      }}
-      editorProps={{
-        attributes: {
-          class:
-            'min-h-full max-w-full px-8 pt-16 pb-[calc(100svh_-_12rem)] focus-visible:outline-none',
-        },
-      }}
-      onUpdate={handleUpdate}
-    />
+    <>
+      <EditorStyleContainer>
+        <EditorProvider
+          key={contentId}
+          extensions={editor.extensions}
+          editorContainerProps={{
+            className: 'editor-root',
+          }}
+          onUpdate={handleUpdate}
+        />
+      </EditorStyleContainer>
+    </>
   );
 }

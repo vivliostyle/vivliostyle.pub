@@ -28,6 +28,11 @@
             "inputComponents": ["Input"]
           }
         }
+      },
+      "correctness": {
+        "noUnknownFunction": {
+          "level": "off"
+        }
       }
     }
   },

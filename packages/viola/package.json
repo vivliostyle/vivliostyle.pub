@@ -31,6 +31,7 @@
     "comlink": "^4.4.2",
     "idb": "^8.0.2",
     "nanoid": "^5.1.5",
+    "react-shadow": "^20.6.0",
     "react-use": "^17.6.0",
     "sirv": "^3.0.0",
     "valtio": "^2.1.4",

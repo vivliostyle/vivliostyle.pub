@@ -1,0 +1,38 @@
+@layer theme, base, vs-theme, components;
+
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/preflight" layer(base);
+
+@import "@vivliostyle/theme-base/css/common/meta-properties.css" layer(vs-theme);
+@import "@vivliostyle/theme-base/css/common/basic.css" layer(vs-theme);
+
+:host {
+  --vs-columns: auto;
+  --vs-font-family: var(--font-sans);
+  --vs-spacing-rlh: 0;
+  --vs--monospace-font-family: var(--font-mono);
+}
+
+.editor-root {
+  height: 100%;
+}
+
+.tiptap {
+  min-height: 100%;
+  max-width: 100%;
+  padding-inline: calc(8 * var(--spacing));
+  padding-top: calc(16 * var(--spacing));
+  padding-bottom: calc(100svh - 12rem);
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:not(.ProseMirror-focused) .is-editor-empty:first-child::before {
+    color: theme(--color-gray-400);
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+}
