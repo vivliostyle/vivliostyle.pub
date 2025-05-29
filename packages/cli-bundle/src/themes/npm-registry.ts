@@ -9,7 +9,8 @@ import * as Comlink from 'comlink';
 import { fs } from 'memfs';
 import npa from 'npm-package-arg';
 import { satisfies as semverSatisfies } from 'semver';
-import type { IdealTree, ThemeRegistry } from '#theme-registry';
+import type * as ThemeRegistry from '#theme-registry';
+import type { IdealTree } from '#theme-registry/type';
 
 interface Node {
   children: Map<string, Node>;
@@ -27,7 +28,7 @@ const parseSpecifier = (specifier: string) => {
   return { name, type, fetchSpec };
 };
 
-const themeRegistry = Comlink.wrap<ThemeRegistry>(
+const themeRegistry = Comlink.wrap<typeof ThemeRegistry>(
   new BroadcastChannel('worker:theme-registry'),
 );
 
@@ -190,10 +191,11 @@ export default class NpmRegistry {
   }
 
   protected async _install(tree: IdealTree, rootPath: string): Promise<void> {
-    const fileList = await themeRegistry.fetchPackageContent(tree, rootPath);
+    const fileList = await themeRegistry.fetchPackageContent(tree);
     fileList.forEach((fileData, p) => {
-      fs.mkdirSync(path.dirname(p), { recursive: true });
-      fs.writeFileSync(p, fileData);
+      const absPath = path.resolve(rootPath, p);
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, fileData);
     });
   }
 

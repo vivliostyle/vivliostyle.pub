@@ -1,5 +1,9 @@
-import { invariant } from 'outvariant';
 import { ref, snapshot } from 'valtio';
+import {
+  buildTreeFromRegistry,
+  bundleCss,
+  fetchPackageContent,
+} from '#theme-registry';
 import { setupEditor } from './libs/editor';
 import { type ContentId, content } from './stores/content';
 import { sandbox } from './stores/sandbox';
@@ -36,16 +40,19 @@ export async function setupCli() {
 }
 
 export async function installTheme(specifier: string) {
-  const { themeRegistry, worker } = snapshot(sandbox);
-  invariant(themeRegistry, 'themeRegistry is not initialized');
+  const { worker } = snapshot(sandbox);
   const packageName = specifier.split(/(?!^)@/)[0];
   theme.installingError = null;
   const timer = setTimeout(() => {
     theme.installingPackageName = packageName;
   }, 100);
   try {
-    const tree = await themeRegistry.buildTreeFromRegistry(specifier);
-    await themeRegistry.fetchPackageContent(tree);
+    const tree = await buildTreeFromRegistry(specifier);
+    await fetchPackageContent(tree);
+
+    const { code } = await bundleCss(`@import "${packageName}"`);
+    theme.bundledCss = new TextDecoder().decode(code);
+
     theme.packageName = packageName;
     await worker?.write(
       '/workdir/vivliostyle.config.json',

@@ -1,7 +1,7 @@
 import * as Comlink from 'comlink';
 import { createPortal } from 'react-dom';
 import { useEffectOnce, useUnmount } from 'react-use';
-import { type ThemeRegistry, setupThemeRegistry } from '#theme-registry';
+import * as themeRegistry from '#theme-registry';
 import { setupCli } from '../actions';
 import { sandbox } from '../stores/sandbox';
 
@@ -14,7 +14,7 @@ declare global {
   interface Window {
     __debug: {
       cli?: unknown;
-      themeRegistry?: ThemeRegistry;
+      themeRegistry?: typeof themeRegistry;
     };
   }
 }
@@ -23,7 +23,6 @@ if (import.meta.env.DEV) {
 }
 
 function init() {
-  const themeRegistry = setupThemeRegistry();
   const cb = async (event: MessageEvent) => {
     if (event.data.command !== 'bind') {
       return;
@@ -38,7 +37,6 @@ function init() {
       setupCli();
     }
     if (event.data.channel === 'worker:theme-registry') {
-      sandbox.themeRegistry = themeRegistry;
       if (import.meta.env.DEV) {
         window.__debug.themeRegistry = themeRegistry;
       }

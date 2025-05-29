@@ -6,13 +6,6 @@
 @import "@vivliostyle/theme-base/css/common/meta-properties.css" layer(vs-theme);
 @import "@vivliostyle/theme-base/css/common/basic.css" layer(vs-theme);
 
-:host {
-  --vs-columns: auto;
-  --vs-font-family: var(--font-sans);
-  --vs-spacing-rlh: 0;
-  --vs--monospace-font-family: var(--font-mono);
-}
-
 .editor-root {
   height: 100%;
 }

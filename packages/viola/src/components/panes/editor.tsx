@@ -1,13 +1,29 @@
 import { type EditorEvents, EditorProvider } from '@tiptap/react';
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import shadowRoot from 'react-shadow';
 import { useDebounce } from 'react-use';
 import { useSnapshot } from 'valtio';
 import { type ContentId, content } from '../../stores/content';
 import { sandbox } from '../../stores/sandbox';
+import { theme } from '../../stores/theme';
+import editorOverrideCss from './editor-theme-override.css?inline';
 import editorBaseCss from './editor.css?inline';
 
+const editorBaseStyleSheet = new CSSStyleSheet();
+editorBaseStyleSheet.replaceSync(
+  `${editorBaseCss.replace(/:root/g, ':host')}${editorOverrideCss}`,
+);
+
+const editorThemeStyleSheet = new CSSStyleSheet();
+
 function EditorStyleContainer({ children }: React.PropsWithChildren) {
+  const themeSnap = useSnapshot(theme);
   const shadowRootRef = useRef<ShadowRoot | null>(null);
 
   useLayoutEffect(() => {
@@ -17,10 +33,17 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
     ) {
       return;
     }
-    const editorStyleSheet = new CSSStyleSheet();
-    editorStyleSheet.replaceSync(editorBaseCss.replace(/:root/g, ':host'));
-    shadowRootRef.current.adoptedStyleSheets = [editorStyleSheet];
+    shadowRootRef.current.adoptedStyleSheets = [
+      editorBaseStyleSheet,
+      editorThemeStyleSheet,
+    ];
   }, []);
+
+  useEffect(() => {
+    editorThemeStyleSheet.replaceSync(
+      `${themeSnap.bundledCss?.replace(/:root/g, ':host') ?? ''}${editorOverrideCss}`,
+    );
+  }, [themeSnap.bundledCss]);
 
   return (
     <shadowRoot.div
