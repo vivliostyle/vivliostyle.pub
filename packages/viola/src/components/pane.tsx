@@ -1,5 +1,5 @@
 import type { PaneContent } from '../stores/ui';
-import { Editor } from './panes/editor';
+import { Edit } from './panes/edit';
 import { Preview } from './panes/preview';
 import { Settings } from './panes/settings';
 import { Theme } from './panes/theme';
@@ -26,10 +26,10 @@ function PaneContainer({
 
 export function Pane({ content }: { content: PaneContent }) {
   switch (content.type) {
-    case 'editor':
+    case 'edit':
       return (
         <ScrollOverflow>
-          <Editor {...content} />
+          <Edit {...content} />
         </ScrollOverflow>
       );
     case 'preview':

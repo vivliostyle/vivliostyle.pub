@@ -2,6 +2,7 @@ import Collaboration from '@tiptap/extension-collaboration';
 import Placeholder from '@tiptap/extension-placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import * as idb from 'idb';
+import { ref } from 'valtio';
 import * as Y from 'yjs';
 import { debounce } from '../libs/debounce';
 import type { ContentId } from '../stores/content';
@@ -86,7 +87,7 @@ export async function setupEditor({ contentId }: { contentId: ContentId }) {
 
   return {
     doc,
-    extensions: [
+    extensions: ref([
       StarterKit.configure({
         history: false,
       }),
@@ -96,6 +97,6 @@ export async function setupEditor({ contentId }: { contentId: ContentId }) {
       Collaboration.configure({
         document: doc,
       }),
-    ],
+    ]),
   };
 }

@@ -132,6 +132,11 @@ export function Theme() {
           )}
         </form>
       </section>
+
+      <section className="grid gap-2">
+        <h3 className="text-l font-bold">Edit custom CSS</h3>
+        <textarea />
+      </section>
     </div>
   );
 }

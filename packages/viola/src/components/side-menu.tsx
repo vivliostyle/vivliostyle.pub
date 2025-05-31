@@ -70,14 +70,14 @@ function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
       const tab = ui.tabs.at(0);
       if (
         typeof id !== 'string' ||
-        (tab?.type === 'editor' && tab.contentId !== item[0])
+        (tab?.type === 'edit' && tab.contentId !== item[0])
       ) {
         return;
       }
       ui.tabs = [
         {
           id: generateId(),
-          type: 'editor',
+          type: 'edit',
           contentId: id,
           title: ref(() => <>Editor</>),
         },

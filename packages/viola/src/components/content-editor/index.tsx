@@ -1,4 +1,9 @@
-import { type EditorEvents, EditorProvider } from '@tiptap/react';
+import {
+  type EditorEvents,
+  EditorProvider,
+  type Extensions,
+} from '@tiptap/react';
+import { invariant } from 'outvariant';
 import {
   useCallback,
   useEffect,
@@ -12,8 +17,8 @@ import { useSnapshot } from 'valtio';
 import { type ContentId, content } from '../../stores/content';
 import { sandbox } from '../../stores/sandbox';
 import { theme } from '../../stores/theme';
+import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
-import editorBaseCss from './editor.css?inline';
 
 const editorBaseStyleSheet = new CSSStyleSheet();
 editorBaseStyleSheet.replaceSync(
@@ -57,7 +62,7 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
   );
 }
 
-export function Editor({ contentId }: { contentId: ContentId }) {
+export function ContentEditor({ contentId }: { contentId: ContentId }) {
   const contentSnap = useSnapshot(content);
   const editor = contentSnap.editor[contentId];
   const [contentHtml, setContentHtml] = useState('');
@@ -72,22 +77,17 @@ export function Editor({ contentId }: { contentId: ContentId }) {
     [contentHtml],
   );
 
-  if (!editor) {
-    return null;
-  }
-
+  invariant(editor, `Editor not found for contentId: ${contentId}`);
   return (
-    <>
-      <EditorStyleContainer>
-        <EditorProvider
-          key={contentId}
-          extensions={editor.extensions}
-          editorContainerProps={{
-            className: 'editor-root',
-          }}
-          onUpdate={handleUpdate}
-        />
-      </EditorStyleContainer>
-    </>
+    <EditorStyleContainer>
+      <EditorProvider
+        key={contentId}
+        extensions={editor.extensions as Extensions}
+        editorContainerProps={{
+          className: 'editor-root',
+        }}
+        onUpdate={handleUpdate}
+      />
+    </EditorStyleContainer>
   );
 }
