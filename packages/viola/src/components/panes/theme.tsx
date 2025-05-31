@@ -6,6 +6,7 @@ import { Check, Loader2 } from '#ui/icon';
 import { Input } from '#ui/input';
 import { installTheme } from '../../actions';
 import { theme } from '../../stores/theme';
+import { CodeEditor } from '../code-editor';
 
 const officialThemes = [
   { packageName: '@vivliostyle/theme-base', title: 'Base Theme' },
@@ -135,7 +136,7 @@ export function Theme() {
 
       <section className="grid gap-2">
         <h3 className="text-l font-bold">Edit custom CSS</h3>
-        <textarea />
+        <CodeEditor aria-label="Code editor of custom CSS" />
       </section>
     </div>
   );

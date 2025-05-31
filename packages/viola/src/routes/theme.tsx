@@ -11,7 +11,7 @@ export const Route = createFileRoute('/theme')({
       type: 'theme',
       title: ref(() => <>Customize theme</>),
     } satisfies PaneContent;
-    ui.tabs = [content, ...ui.tabs.slice(1)];
+    ui.tabs = [...ui.tabs.slice(0, 1), content];
   },
 });
 
