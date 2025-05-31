@@ -5,4 +5,7 @@ export const theme = proxy({
   installingPackageName: null as string | null,
   installingError: null as Error | null,
   bundledCss: null as string | null,
+  customCss: `:root {
+  /* Edit this CSS to customize the theme */
+}`,
 });

@@ -1,6 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import type React from 'react';
-import { type Snapshot, ref, useSnapshot } from 'valtio';
+import { type Snapshot, useSnapshot } from 'valtio';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,14 +18,11 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
 } from '#ui/sidebar';
-import { generateId } from '../libs/generate-id';
 import {
-  type ContentId,
   type HierarchicalReadingOrder,
   content,
   rootChar,
 } from '../stores/content';
-import { ui } from '../stores/ui';
 
 function WorkspaceMenu() {
   return (
@@ -65,29 +61,6 @@ function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
     }
     const Item = name === rootChar ? SidebarMenuItem : SidebarMenuSubItem;
     const hasChildren = Array.isArray(item[1]);
-    const select = () => {
-      const id = item[1] as ContentId | HierarchicalReadingOrder;
-      const tab = ui.tabs.at(0);
-      if (
-        typeof id !== 'string' ||
-        (tab?.type === 'edit' && tab.contentId !== item[0])
-      ) {
-        return;
-      }
-      ui.tabs = [
-        {
-          id: generateId(),
-          type: 'edit',
-          contentId: id,
-          title: ref(() => <>Editor</>),
-        },
-        {
-          id: generateId(),
-          type: 'preview',
-          title: ref(() => <>Preview</>),
-        },
-      ];
-    };
     return (
       <Item key={item[0]}>
         <SidebarMenuButton
@@ -95,9 +68,13 @@ function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
           variant={hasChildren ? 'heading' : 'default'}
           asChild
         >
-          <Link to="/" onClick={select}>
+          {typeof item[1] === 'string' ? (
+            <Link to="/edit/$contentId" params={{ contentId: item[1] }} replace>
+              <span>{item[0]}</span>
+            </Link>
+          ) : (
             <span>{item[0]}</span>
-          </Link>
+          )}
         </SidebarMenuButton>
         {hasChildren && (
           <FileTreeGroup tree={item as Snapshot<HierarchicalReadingOrder>} />

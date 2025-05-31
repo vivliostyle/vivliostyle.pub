@@ -45,10 +45,12 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    editorThemeStyleSheet.replaceSync(
-      `${themeSnap.bundledCss?.replace(/:root/g, ':host') ?? ''}${editorOverrideCss}`,
-    );
-  }, [themeSnap.bundledCss]);
+    const css = `
+      ${themeSnap.bundledCss?.replace(/:root/g, ':host') ?? ''}
+      ${editorOverrideCss}
+      ${themeSnap.customCss.replace(/:root/g, ':host')}`;
+    editorThemeStyleSheet.replaceSync(css);
+  }, [themeSnap.bundledCss, themeSnap.customCss]);
 
   return (
     <shadowRoot.div
@@ -62,7 +64,7 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
   );
 }
 
-export function ContentEditor({ contentId }: { contentId: ContentId }) {
+export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   const contentSnap = useSnapshot(content);
   const editor = contentSnap.editor[contentId];
   const [contentHtml, setContentHtml] = useState('');

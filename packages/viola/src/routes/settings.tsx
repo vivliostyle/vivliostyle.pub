@@ -4,7 +4,7 @@ import { generateId } from '../libs/generate-id';
 import { type PaneContent, ui } from '../stores/ui';
 
 export const Route = createFileRoute('/settings')({
-  component: Settings,
+  component: () => null,
   onEnter: () => {
     const content = {
       id: generateId(),
@@ -18,7 +18,3 @@ export const Route = createFileRoute('/settings')({
     }
   },
 });
-
-function Settings() {
-  return null;
-}

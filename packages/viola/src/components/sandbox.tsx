@@ -1,9 +1,6 @@
 import * as Comlink from 'comlink';
 import { createPortal } from 'react-dom';
-import { useEffectOnce, useUnmount } from 'react-use';
-import * as themeRegistry from '#theme-registry';
-import { setupCli } from '../actions';
-import { sandbox } from '../stores/sandbox';
+import { setCliWorker } from '../stores/sandbox';
 
 const port = globalThis.location?.port;
 export const sandboxOrigin = `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${port ? `:${port}` : ''}`;
@@ -14,7 +11,7 @@ declare global {
   interface Window {
     __debug: {
       cli?: unknown;
-      themeRegistry?: typeof themeRegistry;
+      themeRegistry?: typeof import('#theme-registry');
     };
   }
 }
@@ -22,7 +19,10 @@ if (import.meta.env.DEV) {
   window.__debug ??= {};
 }
 
-function init() {
+function init(iframe: HTMLIFrameElement) {
+  if (initialized) {
+    return;
+  }
   const cb = async (event: MessageEvent) => {
     if (event.data.command !== 'bind') {
       return;
@@ -30,13 +30,14 @@ function init() {
     const [messagePort] = event.ports;
     if (event.data.channel === 'worker:cli') {
       const cli = Comlink.wrap<typeof import('#cli-bundle')>(messagePort);
-      sandbox.worker = cli;
       if (import.meta.env.DEV) {
         window.__debug.cli = cli;
       }
-      setupCli();
+      cli.read;
+      setCliWorker(cli);
     }
     if (event.data.channel === 'worker:theme-registry') {
+      const themeRegistry = await import('#theme-registry');
       if (import.meta.env.DEV) {
         window.__debug.themeRegistry = themeRegistry;
       }
@@ -46,28 +47,22 @@ function init() {
   initialized = true;
   window.addEventListener('message', cb);
 
-  return () => {
-    initialized = false;
-    window.removeEventListener('message', cb);
-  };
+  const observer = new MutationObserver((mutations) => {
+    const removed = mutations
+      .flatMap(({ removedNodes }) => Array.from(removedNodes))
+      .some((node) => node === iframe);
+    if (!removed) {
+      initialized = false;
+      window.removeEventListener('message', cb);
+    }
+  });
+  observer.observe(document.body, { childList: true });
 }
 
 export function Sandbox() {
-  useEffectOnce(() => {
-    if (initialized) {
-      return;
-    }
-    return init();
-  });
-
-  useUnmount(() => {
-    initialized = false;
-    sandbox.worker?.[Comlink.releaseProxy]();
-    sandbox.worker = null;
-  });
-
   return createPortal(
     <iframe
+      ref={init}
       title="Sandbox"
       src={`${sandboxOrigin}/iframe`}
       style={{ display: 'none' }}

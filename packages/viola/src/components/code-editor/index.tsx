@@ -19,14 +19,20 @@ import {
 } from '@codemirror/view';
 import { useCallback, useEffect, useRef } from 'react';
 
-export function CodeEditor(
-  props: Required<Pick<React.HTMLAttributes<HTMLDivElement>, 'aria-label'>>,
-) {
-  const editorParentRef = useRef<HTMLDivElement>(null);
+export function CodeEditor({
+  defaultCode = '',
+  onCodeUpdate,
+  ...other
+}: Required<Pick<React.HTMLAttributes<HTMLDivElement>, 'aria-label'>> & {
+  defaultCode?: string;
+  onCodeUpdate?: (code: string) => void;
+}) {
+  const currentCode = useRef('');
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView>(null);
 
   useEffect(() => {
-    if (!editorParentRef.current) {
+    if (!editorContainerRef.current) {
       return;
     }
 
@@ -49,16 +55,40 @@ export function CodeEditor(
             outline: 'none',
           },
         }),
+        EditorView.updateListener.of((update) => {
+          if (!update.docChanged) {
+            return;
+          }
+          const code = update.state.doc.toString();
+          currentCode.current = code;
+          onCodeUpdate?.(code);
+        }),
         css(),
       ],
-      parent: editorParentRef.current,
+      parent: editorContainerRef.current,
     });
     editorView.contentDOM.setAttribute('tabIndex', '-1');
     editorViewRef.current = editorView;
     return () => {
       editorViewRef.current?.destroy();
     };
-  }, []);
+  }, [onCodeUpdate]);
+
+  useEffect(() => {
+    const editorView = editorViewRef.current;
+    if (!editorView || currentCode.current === defaultCode) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      editorView.dispatch({
+        changes: {
+          from: 0,
+          to: editorView.state.doc.length,
+          insert: defaultCode,
+        },
+      });
+    });
+  }, [defaultCode]);
 
   const handleParentKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -72,8 +102,8 @@ export function CodeEditor(
 
   return (
     <div
-      {...props}
-      ref={editorParentRef}
+      {...other}
+      ref={editorContainerRef}
       aria-autocomplete="list"
       aria-multiline="true"
       role="textbox"

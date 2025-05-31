@@ -1,14 +1,59 @@
-import type { Remote } from 'comlink';
+import type { BuildTask } from '@vivliostyle/cli/schema';
+import * as Comlink from 'comlink';
 import { proxy, snapshot, subscribe } from 'valtio';
-import type * as cli from '#cli-bundle';
 
 export const sandbox = proxy({
-  worker: null as Remote<typeof cli> | null,
-  theme: '@vivliostyle/theme-base',
   files: {} as Record<string, string>,
+  vivliostyleConfig: {
+    title: 'title',
+    entry: ['./manuscript.html'],
+    entryContext: 'contents',
+    theme: ['@vivliostyle/theme-base', './style.css'],
+  } satisfies BuildTask as BuildTask,
+  customCss: { value: '' },
 });
 
-subscribe(sandbox, () => {
+let fulfilledCli: Comlink.Remote<typeof import('#cli-bundle')> | undefined;
+
+export function setCliWorker(cliWorker: typeof fulfilledCli) {
+  fulfilledCli?.[Comlink.releaseProxy]();
+  fulfilledCli = cliWorker;
+  // Write initial files
+  cliWorker?.fromJSON({
+    '/workdir/vivliostyle.config.json': JSON.stringify(
+      sandbox.vivliostyleConfig,
+    ),
+    '/workdir/style.css': sandbox.customCss.value,
+  });
+}
+
+export const cliPromise = new Promise<
+  Comlink.Remote<typeof import('#cli-bundle')>
+>((resolve) => {
+  const loop = () => {
+    if (fulfilledCli) {
+      return resolve(fulfilledCli);
+    }
+    requestAnimationFrame(loop);
+  };
+  loop();
+});
+
+subscribe(sandbox.files, async () => {
+  const cli = await cliPromise;
   const files = snapshot(sandbox.files);
-  sandbox.worker?.fromJSON(files, '/workdir/contents');
+  cli.fromJSON(files, '/workdir/contents');
+});
+
+subscribe(sandbox.vivliostyleConfig, async () => {
+  const cli = await cliPromise;
+  cli.write(
+    '/workdir/vivliostyle.config.json',
+    JSON.stringify(sandbox.vivliostyleConfig),
+  );
+});
+
+subscribe(sandbox.customCss, async () => {
+  const cli = await cliPromise;
+  cli.write('/workdir/style.css', sandbox.customCss.value);
 });

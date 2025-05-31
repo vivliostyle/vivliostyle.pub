@@ -1,10 +1,12 @@
 import { cn } from '@v/ui/lib/utils';
 import { useId, useState } from 'react';
+import { useDebounce } from 'react-use';
 import { useSnapshot } from 'valtio';
 import { Button } from '#ui/button';
 import { Check, Loader2 } from '#ui/icon';
 import { Input } from '#ui/input';
 import { installTheme } from '../../actions';
+import { sandbox } from '../../stores/sandbox';
 import { theme } from '../../stores/theme';
 import { CodeEditor } from '../code-editor';
 
@@ -42,6 +44,16 @@ export function Theme() {
   );
   const packageNameInputDescriptionId = useId();
   const currentPackageName = theme.installingPackageName || theme.packageName;
+  const [customCss, setCustomCss] = useState(() => themeSnap.customCss);
+
+  useDebounce(
+    () => {
+      theme.customCss = customCss;
+      sandbox.customCss.value = customCss;
+    },
+    1000,
+    [customCss],
+  );
 
   return (
     <div className="grid gap-4">
@@ -136,7 +148,11 @@ export function Theme() {
 
       <section className="grid gap-2">
         <h3 className="text-l font-bold">Edit custom CSS</h3>
-        <CodeEditor aria-label="Code editor of custom CSS" />
+        <CodeEditor
+          aria-label="Code editor of custom CSS"
+          defaultCode={customCss}
+          onCodeUpdate={setCustomCss}
+        />
       </section>
     </div>
   );
