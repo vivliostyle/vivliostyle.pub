@@ -1,5 +1,7 @@
 import type { Extensions } from '@tiptap/react';
+import { sep } from 'pathe';
 import { proxy } from 'valtio';
+import { proxyMap } from 'valtio/utils';
 import type * as Y from 'yjs';
 
 declare const contentIdBrand: unique symbol;
@@ -11,8 +13,9 @@ export interface EditorContent {
 }
 
 export interface FileContent {
-  path: string;
-  json: object;
+  format: 'html';
+  filename: string;
+  editor: EditorContent;
 }
 
 export type HierarchicalReadingOrder = [
@@ -20,19 +23,19 @@ export type HierarchicalReadingOrder = [
   ...(ContentId | HierarchicalReadingOrder)[],
 ];
 
-export const rootChar = '.';
-export const separatorChar = '/';
-
-export const content = proxy({
-  editor: {} as Record<ContentId, EditorContent>,
-  files: {} as Record<ContentId, FileContent>,
+export const $content = proxy({
+  files: proxyMap<ContentId, FileContent>(),
   readingOrder: [] as ContentId[],
 
   get hierarchicalReadingOrder(): HierarchicalReadingOrder {
     return this.readingOrder.reduce(
       (acc, contentId) => {
-        const { path } = this.files[contentId];
-        const segments = path.split(separatorChar);
+        const file = this.files.get(contentId);
+        if (!file) {
+          return acc;
+        }
+        const { filename } = file;
+        const segments = filename.split(sep);
         let current = acc;
         for (const n of segments) {
           const tail = current.at(-1) as string | HierarchicalReadingOrder;
@@ -47,7 +50,7 @@ export const content = proxy({
         current.push(contentId);
         return acc;
       },
-      [rootChar] as HierarchicalReadingOrder,
+      ['.'] as HierarchicalReadingOrder,
     );
   },
 });

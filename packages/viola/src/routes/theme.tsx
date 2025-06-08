@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ref } from 'valtio';
 import { generateId } from '../libs/generate-id';
-import { type PaneContent, ui } from '../stores/ui';
+import { $ui, type PaneContent } from '../stores/ui';
 
 export const Route = createFileRoute('/theme')({
   component: () => null,
@@ -11,6 +11,6 @@ export const Route = createFileRoute('/theme')({
       type: 'theme',
       title: ref(() => <>Customize theme</>),
     } satisfies PaneContent;
-    ui.tabs = [...ui.tabs.slice(0, 1), content];
+    $ui.tabs = [...$ui.tabs.slice(0, 1), content];
   },
 });

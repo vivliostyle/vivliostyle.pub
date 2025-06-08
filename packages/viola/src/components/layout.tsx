@@ -3,14 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '#ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '#ui/sidebar';
-import { type PaneContent, ui } from '../stores/ui';
+import { $ui, type PaneContent } from '../stores/ui';
 import { Pane } from './pane';
 import { Sandbox } from './sandbox';
 import { SideMenu } from './side-menu';
 
 function DedicatedModal() {
   const router = useRouter();
-  const uiSnap = useSnapshot(ui);
+  const uiSnap = useSnapshot($ui);
   const [open, setOpen] = useState(false);
   const [modalContent, setModalContent] = useState<PaneContent>();
 
@@ -26,7 +26,7 @@ function DedicatedModal() {
       router.subscribe('onBeforeLoad', ({ fromLocation, toLocation }) => {
         if (fromLocation.pathname !== toLocation.pathname) {
           setOpen(false);
-          ui.dedicatedModal = null;
+          $ui.dedicatedModal = null;
         }
       }),
     [router.subscribe],
@@ -66,7 +66,7 @@ function DedicatedModal() {
 }
 
 export function Layout(_: { children?: React.ReactNode }) {
-  const uiSnap = useSnapshot(ui);
+  const uiSnap = useSnapshot($ui);
 
   return (
     <SidebarProvider>

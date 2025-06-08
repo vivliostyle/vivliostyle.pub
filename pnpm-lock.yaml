@@ -135,7 +135,7 @@ importers:
         version: 0.30.17
       memfs:
         specifier: ^4.17.0
-        version: 4.17.0
+        version: 4.17.2
       node-mocks-http:
         specifier: ^1.16.2
         version: 1.16.2(@types/node@22.10.7)
@@ -298,6 +298,12 @@ importers:
       nanoid:
         specifier: ^5.1.5
         version: 5.1.5
+      nanoid-dictionary:
+        specifier: ^5.0.0
+        version: 5.0.0
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       react-shadow:
         specifier: ^20.6.0
         version: 20.6.0(prop-types@15.8.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -4533,8 +4539,8 @@ packages:
     resolution: {integrity: sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==}
     engines: {node: '>= 0.6'}
 
-  memfs@4.17.0:
-    resolution: {integrity: sha512-4eirfZ7thblFmqFjywlTmuWVSvccHAJbn1r8qQLzmTO11qcqpohOjmY2mFce6x7x7WtskzRqApPD0hv+Oa74jg==}
+  memfs@4.17.2:
+    resolution: {integrity: sha512-NgYhCOWgovOXSzvYgUW0LQ7Qy72rWQMGGFJDoWg4G30RHd3z77VbYdtJ4fembJXBy8pMIUA31XNAupobOQlwdg==}
     engines: {node: '>= 4.0.0'}
 
   meow@9.0.0:
@@ -4705,6 +4711,9 @@ packages:
     peerDependencies:
       react: '*'
       react-dom: '*'
+
+  nanoid-dictionary@5.0.0:
+    resolution: {integrity: sha512-/iCyQHwt36XkaIvSE9fcC8p6DiMPCZMTSMj9UT56Cv6T7f5CuxvOMhpNncaNieQ4z4d32p7ruEtAfRsb7Ya8Gw==}
 
   nanoid@3.3.8:
     resolution: {integrity: sha512-WNLf5Sd8oZxOm+TzppcYk8gVOgP+l58xNy58D0nbUnOxOWRWvlcCV4kUF7ltmI6PsrLl/BgKEyS4mqsGChFN0w==}
@@ -5026,6 +5035,9 @@ packages:
   path-scurry@1.11.1:
     resolution: {integrity: sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA==}
     engines: {node: '>=16 || 14 >=14.18'}
+
+  pathe@2.0.3:
+    resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
   pbkdf2@3.1.2:
     resolution: {integrity: sha512-iuh7L6jA7JEGu2WxDwtQP1ddOpaJNC4KlDEFfdQajSGgGPNi4OyDc2R7QnbY2bR9QjBVGwgvTdNJZoE7RaxUMA==}
@@ -11278,7 +11290,7 @@ snapshots:
 
   media-typer@0.3.0: {}
 
-  memfs@4.17.0:
+  memfs@4.17.2:
     dependencies:
       '@jsonjoy.com/json-pack': 1.1.1(tslib@2.8.1)
       '@jsonjoy.com/util': 1.5.0(tslib@2.8.1)
@@ -11450,6 +11462,8 @@ snapshots:
       rtl-css-js: 1.16.1
       stacktrace-js: 2.0.2
       stylis: 4.3.6
+
+  nanoid-dictionary@5.0.0: {}
 
   nanoid@3.3.8: {}
 
@@ -11889,6 +11903,8 @@ snapshots:
     dependencies:
       lru-cache: 10.4.3
       minipass: 7.1.2
+
+  pathe@2.0.3: {}
 
   pbkdf2@3.1.2:
     dependencies:

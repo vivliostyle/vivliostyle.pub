@@ -18,11 +18,16 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
 } from '#ui/sidebar';
-import {
-  type HierarchicalReadingOrder,
-  content,
-  rootChar,
-} from '../stores/content';
+import { createContentFile } from '../stores/actions/content-file';
+import { $content, type HierarchicalReadingOrder } from '../stores/content';
+
+function CreateNewFileButton() {
+  return (
+    <button type="button" onClick={() => createContentFile({ format: 'html' })}>
+      Create a new file
+    </button>
+  );
+}
 
 function WorkspaceMenu() {
   return (
@@ -48,18 +53,21 @@ function WorkspaceMenu() {
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+      <SidebarMenuItem>
+        <CreateNewFileButton />
+      </SidebarMenuItem>
     </SidebarMenu>
   );
 }
 
-function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
+function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
   const [name, ...items] = tree;
 
   const children = items.map((item) => {
     if (item.length < 2) {
       return null;
     }
-    const Item = name === rootChar ? SidebarMenuItem : SidebarMenuSubItem;
+    const Item = name === '.' ? SidebarMenuItem : SidebarMenuSubItem;
     const hasChildren = Array.isArray(item[1]);
     return (
       <Item key={item[0]}>
@@ -77,13 +85,13 @@ function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
           )}
         </SidebarMenuButton>
         {hasChildren && (
-          <FileTreeGroup tree={item as Snapshot<HierarchicalReadingOrder>} />
+          <FileTreeGroup tree={item as HierarchicalReadingOrder} />
         )}
       </Item>
     );
   });
 
-  return name === rootChar ? (
+  return name === '.' ? (
     <SidebarMenu>{children}</SidebarMenu>
   ) : (
     <SidebarMenuSub size="sm">{children}</SidebarMenuSub>
@@ -91,9 +99,13 @@ function FileTreeGroup({ tree }: { tree: Snapshot<HierarchicalReadingOrder> }) {
 }
 
 function FileTree() {
-  const { hierarchicalReadingOrder } = useSnapshot(content);
+  const content = useSnapshot($content);
 
-  return <FileTreeGroup tree={hierarchicalReadingOrder} />;
+  return (
+    <FileTreeGroup
+      tree={content.hierarchicalReadingOrder as HierarchicalReadingOrder}
+    />
+  );
 }
 
 export function SideMenu() {

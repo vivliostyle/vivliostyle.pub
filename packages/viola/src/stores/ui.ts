@@ -11,7 +11,7 @@ export type PaneContent = { id: PaneId; title: () => React.ReactNode } & (
   | { type: 'settings' }
 );
 
-export const ui = proxy({
+export const $ui = proxy({
   tabs: [] as PaneContent[],
   dedicatedModal: null as PaneContent | null,
 });

@@ -1,13 +1,14 @@
 import { cn } from '@v/ui/lib/utils';
-import { useId, useState } from 'react';
+import { use, useId, useState } from 'react';
 import { useDebounce } from 'react-use';
-import { useSnapshot } from 'valtio';
+import { ref, useSnapshot } from 'valtio';
 import { Button } from '#ui/button';
 import { Check, Loader2 } from '#ui/icon';
 import { Input } from '#ui/input';
-import { installTheme } from '../../actions';
-import { sandbox } from '../../stores/sandbox';
-import { theme } from '../../stores/theme';
+import { installTheme } from '../../stores/actions/install-theme';
+import { $project } from '../../stores/project';
+import { $sandbox } from '../../stores/sandbox';
+import { $theme } from '../../stores/theme';
 import { CodeEditor } from '../code-editor';
 
 const officialThemes = [
@@ -35,7 +36,9 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
 }
 
 export function Theme() {
-  const themeSnap = useSnapshot(theme);
+  use($project.value);
+
+  const themeSnap = useSnapshot($theme);
   const usesCustomTheme = !officialThemes.some(
     (t) => t.packageName === themeSnap.packageName,
   );
@@ -43,13 +46,15 @@ export function Theme() {
     usesCustomTheme ? themeSnap.packageName : '',
   );
   const packageNameInputDescriptionId = useId();
-  const currentPackageName = theme.installingPackageName || theme.packageName;
+  const currentPackageName = $theme.installingPackageName || $theme.packageName;
   const [customCss, setCustomCss] = useState(() => themeSnap.customCss);
 
   useDebounce(
     () => {
-      theme.customCss = customCss;
-      sandbox.customCss.value = customCss;
+      $theme.customCss = customCss;
+      $sandbox.files['style.css'] = ref(
+        new Blob([customCss], { type: 'text/css' }),
+      );
     },
     1000,
     [customCss],

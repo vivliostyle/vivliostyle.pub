@@ -4,6 +4,7 @@ import {
   type Extensions,
 } from '@tiptap/react';
 import { invariant } from 'outvariant';
+import { join } from 'pathe';
 import {
   useCallback,
   useEffect,
@@ -13,10 +14,10 @@ import {
 } from 'react';
 import shadowRoot from 'react-shadow';
 import { useDebounce } from 'react-use';
-import { useSnapshot } from 'valtio';
-import { type ContentId, content } from '../../stores/content';
-import { sandbox } from '../../stores/sandbox';
-import { theme } from '../../stores/theme';
+import { ref, useSnapshot } from 'valtio';
+import { $content, type ContentId } from '../../stores/content';
+import { $sandbox } from '../../stores/sandbox';
+import { $theme } from '../../stores/theme';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
 
@@ -28,7 +29,7 @@ editorBaseStyleSheet.replaceSync(
 const editorThemeStyleSheet = new CSSStyleSheet();
 
 function EditorStyleContainer({ children }: React.PropsWithChildren) {
-  const themeSnap = useSnapshot(theme);
+  const themeSnap = useSnapshot($theme);
   const shadowRootRef = useRef<ShadowRoot | null>(null);
 
   useLayoutEffect(() => {
@@ -65,26 +66,28 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
 }
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
-  const contentSnap = useSnapshot(content);
-  const editor = contentSnap.editor[contentId];
+  const contentSnap = useSnapshot($content);
+  const file = contentSnap.files.get(contentId);
+  invariant(file, `Editor not found for contentId: ${contentId}`);
   const [contentHtml, setContentHtml] = useState('');
   const handleUpdate = useCallback(({ editor }: EditorEvents['update']) => {
     setContentHtml(editor.getHTML());
   }, []);
   useDebounce(
     () => {
-      sandbox.files['manuscript.html'] = contentHtml;
+      $sandbox.files[
+        join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
+      ] = ref(new Blob([contentHtml], { type: 'text/html' }));
     },
     1000,
     [contentHtml],
   );
 
-  invariant(editor, `Editor not found for contentId: ${contentId}`);
   return (
     <EditorStyleContainer>
       <EditorProvider
         key={contentId}
-        extensions={editor.extensions as Extensions}
+        extensions={file.editor.extensions as Extensions}
         editorContainerProps={{
           className: 'editor-root',
         }}

@@ -1,5 +1,6 @@
 import './volume';
 
+import path from 'node:path';
 import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
@@ -160,8 +161,26 @@ export const read = (...args: Parameters<typeof fs.promises.readFile>) =>
   fs.promises.readFile(...args);
 export const write = (...args: Parameters<typeof fs.promises.writeFile>) =>
   fs.promises.writeFile(...args);
-export const fromJSON = (...args: Parameters<typeof vol.fromJSON>) =>
-  vol.fromJSON(...args);
+export const rm = (...args: Parameters<typeof fs.promises.rm>) =>
+  fs.promises.rm(...args);
+export const fromJSON = async (
+  json: { [key: string]: string | Uint8Array | null },
+  cwd: string,
+) => {
+  for (const filename in json) {
+    const data = json[filename];
+    const fullPath = path.resolve(cwd, filename);
+    if (data !== null) {
+      const dir = path.dirname(fullPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(fullPath, data);
+    } else {
+      fs.rmSync(fullPath, { force: true, recursive: true });
+    }
+  }
+};
 export const toJSON = (...args: Parameters<typeof vol.toJSON>) =>
   vol.toJSON(...args);
 

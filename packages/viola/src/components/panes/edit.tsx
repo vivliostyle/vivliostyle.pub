@@ -1,9 +1,9 @@
 import { lazy } from 'react';
-import { setupProjectPromise } from '../../actions';
 import type { ContentId } from '../../stores/content';
+import { $project } from '../../stores/project';
 
 const ContentEditor = lazy(() =>
-  setupProjectPromise.then(() => import('../content-editor')),
+  $project.value.then(() => import('../content-editor')),
 );
 
 export function Edit({ contentId }: { contentId: ContentId }) {

@@ -1,6 +1,6 @@
 import * as Comlink from 'comlink';
 import { createPortal } from 'react-dom';
-import { setCliWorker } from '../stores/sandbox';
+import { createCliWorkerResolver } from '../stores/sandbox';
 
 const port = globalThis.location?.port;
 export const sandboxOrigin = `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${port ? `:${port}` : ''}`;
@@ -23,6 +23,7 @@ function init(iframe: HTMLIFrameElement) {
   if (initialized) {
     return;
   }
+  const cliWorkerResolver = createCliWorkerResolver();
   const cb = async (event: MessageEvent) => {
     if (event.data.command !== 'bind') {
       return;
@@ -33,8 +34,7 @@ function init(iframe: HTMLIFrameElement) {
       if (import.meta.env.DEV) {
         window.__debug.cli = cli;
       }
-      cli.read;
-      setCliWorker(cli);
+      cliWorkerResolver.resolve(cli);
     }
     if (event.data.channel === 'worker:theme-registry') {
       const themeRegistry = await import('#theme-registry');
@@ -51,9 +51,14 @@ function init(iframe: HTMLIFrameElement) {
     const removed = mutations
       .flatMap(({ removedNodes }) => Array.from(removedNodes))
       .some((node) => node === iframe);
-    if (!removed) {
+    if (removed) {
+      if (import.meta.env.DEV) {
+        window.__debug.cli = undefined;
+      }
+      cliWorkerResolver.reset();
       initialized = false;
       window.removeEventListener('message', cb);
+      observer.disconnect();
     }
   });
   observer.observe(document.body, { childList: true });
