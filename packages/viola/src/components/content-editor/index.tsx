@@ -1,7 +1,9 @@
 import {
+  EditorContent,
+  EditorContext,
   type EditorEvents,
-  EditorProvider,
-  type Extensions,
+  useCurrentEditor,
+  useEditor,
 } from '@tiptap/react';
 import { invariant } from 'outvariant';
 import { join } from 'pathe';
@@ -65,6 +67,37 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
   );
 }
 
+function EditArea() {
+  const { editor } = useCurrentEditor();
+
+  return (
+    <EditorStyleContainer>
+      <EditorContent {...{ editor }} className="editor-root" />
+    </EditorStyleContainer>
+  );
+}
+
+function EditMenu() {
+  const { editor } = useCurrentEditor();
+
+  return (
+    <div className="flex items-center gap-2 w-full justify-end">
+      <button
+        type="button"
+        onClick={() =>
+          editor?.chain().focus().exportVfm({ onExport: console.log }).run()
+        }
+      >
+        Save
+      </button>
+
+      <button type="button" onClick={() => console.log(editor?.getHTML())}>
+        HTML
+      </button>
+    </div>
+  );
+}
+
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   const contentSnap = useSnapshot($content);
   const file = contentSnap.files.get(contentId);
@@ -83,16 +116,15 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
     [contentHtml],
   );
 
+  const editor = useEditor({
+    extensions: file.editor.extensions,
+    onUpdate: handleUpdate,
+  });
+
   return (
-    <EditorStyleContainer>
-      <EditorProvider
-        key={contentId}
-        extensions={file.editor.extensions as Extensions}
-        editorContainerProps={{
-          className: 'editor-root',
-        }}
-        onUpdate={handleUpdate}
-      />
-    </EditorStyleContainer>
+    <EditorContext.Provider value={{ editor }}>
+      <EditMenu />
+      <EditArea />
+    </EditorContext.Provider>
   );
 }

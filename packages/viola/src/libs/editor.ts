@@ -1,6 +1,25 @@
-import Collaboration from '@tiptap/extension-collaboration';
-import Placeholder from '@tiptap/extension-placeholder';
-import StarterKit from '@tiptap/starter-kit';
+import { Blockquote } from '@tiptap/extension-blockquote';
+import { Bold } from '@tiptap/extension-bold';
+import { BulletList } from '@tiptap/extension-bullet-list';
+import { Code } from '@tiptap/extension-code';
+import { CodeBlock } from '@tiptap/extension-code-block';
+import { Collaboration } from '@tiptap/extension-collaboration';
+import { Document } from '@tiptap/extension-document';
+import { Dropcursor } from '@tiptap/extension-dropcursor';
+import { Gapcursor } from '@tiptap/extension-gapcursor';
+import { HardBreak } from '@tiptap/extension-hard-break';
+import { Heading } from '@tiptap/extension-heading';
+import { HorizontalRule } from '@tiptap/extension-horizontal-rule';
+import { Italic } from '@tiptap/extension-italic';
+import { ListItem } from '@tiptap/extension-list-item';
+import { OrderedList } from '@tiptap/extension-ordered-list';
+import { Paragraph } from '@tiptap/extension-paragraph';
+import { Placeholder } from '@tiptap/extension-placeholder';
+import { Strike } from '@tiptap/extension-strike';
+import { Text } from '@tiptap/extension-text';
+
+import { Vfm } from '#tiptap-extension-vfm';
+
 import * as idb from 'idb';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
@@ -88,9 +107,27 @@ export async function setupEditor({ contentId }: { contentId: ContentId }) {
   return {
     doc,
     extensions: ref([
-      StarterKit.configure({
-        history: false,
-      }),
+      // Starter kit extensions
+      Bold.configure({}),
+      Blockquote.configure({}),
+      BulletList.configure({}),
+      Code.configure({}),
+      CodeBlock.configure({}),
+      Document.configure({}),
+      Dropcursor.configure({}),
+      Gapcursor.configure({}),
+      HardBreak.configure({}),
+      Heading.configure({}),
+      // History.configure({}),
+      HorizontalRule.configure({}),
+      Italic.configure({}),
+      ListItem.configure({}),
+      OrderedList.configure({}),
+      Paragraph.configure({}),
+      Strike.configure({}),
+      Text.configure({}),
+
+      Vfm.configure({}),
       Placeholder.configure({
         placeholder: 'Start typing...',
       }),
