@@ -32,7 +32,6 @@ export const Vfm = Extension.create({
       exportVfm:
         ({ onExport } = {}) =>
         ({ state, editor }) => {
-          console.log(state.doc);
           onExport?.(toVfm(state.doc, editor.schema));
           return true;
         },

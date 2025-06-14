@@ -1,13 +1,22 @@
+import {
+  Editor,
+  type Extensions,
+  type Content as TiptapContent,
+  getSchema,
+} from '@tiptap/core';
 import { Collaboration } from '@tiptap/extension-collaboration';
 import { Placeholder } from '@tiptap/extension-placeholder';
 
-import { Extensions } from '#tiptap-extensions';
+import { PubExtensions } from '#tiptap-extensions';
+import { fromVfm } from '#tiptap-extensions/vfm';
 
 import * as idb from 'idb';
+import { join } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
 import { debounce } from '../libs/debounce';
-import type { ContentId } from '../stores/content';
+import { $content, type ContentId } from '../stores/content';
+import { $sandbox } from '../stores/sandbox';
 
 async function setupPersistence({
   doc,
@@ -83,20 +92,55 @@ async function setupPersistence({
   doc.on('destroy', onDestroy);
 }
 
-export async function setupEditor({ contentId }: { contentId: ContentId }) {
-  const doc = new Y.Doc();
-  await setupPersistence({ doc, contentId });
+const saveContent = debounce(
+  ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
+    const file = $content.files.get(contentId);
+    if (!file) {
+      return;
+    }
+    editor
+      .chain()
+      .exportVfm({
+        onExport: (vfm) => {
+          $sandbox.files[
+            join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
+          ] = ref(new Blob([vfm], { type: 'text/markdown' }));
+        },
+      })
+      .run();
+  },
+  1000,
+  { trailing: true },
+);
 
-  return {
-    doc,
-    extensions: ref([
-      Extensions.configure(),
-      Placeholder.configure({
-        placeholder: 'Start typing...',
-      }),
-      Collaboration.configure({
-        document: doc,
-      }),
-    ]),
-  };
+export async function setupEditor({
+  contentId,
+  initialFile,
+}: { contentId: ContentId; initialFile?: Blob }) {
+  // const doc = new Y.Doc();
+  // await setupPersistence({ doc, contentId });
+
+  const extensions = [
+    PubExtensions.configure(),
+    Placeholder.configure({
+      placeholder: 'Start typing...',
+    }),
+    // Collaboration.configure({
+    //   document: doc,
+    // }),
+  ] satisfies Extensions;
+
+  let initialContent: ReturnType<typeof fromVfm> | undefined;
+  if (initialFile) {
+    const text = await initialFile.text();
+    initialContent = fromVfm(text, getSchema(extensions));
+  }
+
+  return new Editor({
+    extensions,
+    content: initialContent as unknown as TiptapContent,
+    onUpdate: ({ editor }) => {
+      saveContent({ editor, contentId });
+    },
+  });
 }

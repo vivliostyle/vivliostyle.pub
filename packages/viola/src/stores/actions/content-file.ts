@@ -9,11 +9,11 @@ import { $sandbox } from '../sandbox';
 export async function createContentFile({
   format,
   insertAfter,
-}: { format: 'html'; insertAfter?: ContentId }): Promise<ContentId> {
+}: { format: 'markdown'; insertAfter?: ContentId }): Promise<ContentId> {
   const prevFile = insertAfter && $content.files.get(insertAfter);
   const prevFileDir = prevFile && dirname(prevFile.filename);
   const contentId = generateId<ContentId>();
-  const extname = '.html';
+  const extname = '.md';
   const basename = `${generateRandomName()}${extname}`;
   const filename = join(prevFileDir || '', basename);
   const index =
@@ -22,7 +22,7 @@ export async function createContentFile({
   // update sandbox
   $sandbox.files[
     join($sandbox.vivliostyleConfig.entryContext || '', filename)
-  ] = ref(new Blob([], { type: 'text/html' }));
+  ] = ref(new Blob([], { type: 'text/markdown' }));
   $sandbox.updateVivliostyleConfig((config) => {
     config.entry = [$sandbox.vivliostyleConfig.entry]
       .flat()

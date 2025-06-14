@@ -34,18 +34,19 @@ export async function setupProject(projectId: string) {
     );
   }
   const contentIdMap: Record<string, ContentId> = {};
-  for (const [rootFilename, docFile] of Object.entries($sandbox.files)) {
+  for (const [rootFilename, initialFile] of Object.entries($sandbox.files)) {
     const matched = rootFilename.match(/^contents\/(?<name>.+)$/);
-    if (!matched?.groups) {
+    const name = matched?.groups?.name;
+    const format = name?.endsWith('.md') ? 'markdown' : undefined;
+    if (!name || !format) {
       continue;
     }
-    const { name } = matched.groups;
     const contentId = generateId<ContentId>();
     contentIdMap[name] = contentId;
     $content.files.set(contentId, {
-      format: 'html',
+      format,
       filename: name,
-      editor: ref(await setupEditor({ contentId })),
+      editor: ref(await setupEditor({ contentId, initialFile })),
     });
   }
   $content.readingOrder = [$sandbox.vivliostyleConfig.entry]

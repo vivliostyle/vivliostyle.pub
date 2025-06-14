@@ -1,21 +1,15 @@
-import type { Extensions } from '@tiptap/react';
+import type { Editor } from '@tiptap/core';
 import { sep } from 'pathe';
 import { proxy } from 'valtio';
 import { proxyMap } from 'valtio/utils';
-import type * as Y from 'yjs';
 
 declare const contentIdBrand: unique symbol;
 export type ContentId = string & { [contentIdBrand]: never };
 
-export interface EditorContent {
-  doc: Y.Doc;
-  extensions: Extensions;
-}
-
 export interface FileContent {
-  format: 'html';
+  format: 'markdown';
   filename: string;
-  editor: EditorContent;
+  editor: Editor;
 }
 
 export type HierarchicalReadingOrder = [

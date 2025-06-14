@@ -19,7 +19,7 @@ import { Text } from '@tiptap/extension-text';
 
 import { Vfm } from './extensions/vfm';
 
-export const Extensions = Extension.create({
+export const PubExtensions = Extension.create({
   name: 'pubExtensions',
   addExtensions() {
     return [

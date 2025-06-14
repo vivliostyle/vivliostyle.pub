@@ -13,6 +13,7 @@
     "#config/*": "@v/config/*",
     "#theme-registry": "@v/theme-registry",
     "#tiptap-extensions": "@v/tiptap-extensions",
+    "#tiptap-extensions/*": "@v/tiptap-extensions/*",
     "#ui/*": "@v/ui/*"
   },
   "devDependencies": {

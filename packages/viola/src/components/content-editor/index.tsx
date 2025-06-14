@@ -1,24 +1,9 @@
-import {
-  EditorContent,
-  EditorContext,
-  type EditorEvents,
-  useCurrentEditor,
-  useEditor,
-} from '@tiptap/react';
+import { EditorContent, EditorContext, useCurrentEditor } from '@tiptap/react';
 import { invariant } from 'outvariant';
-import { join } from 'pathe';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import shadowRoot from 'react-shadow';
-import { useDebounce } from 'react-use';
-import { ref, useSnapshot } from 'valtio';
+import { useSnapshot } from 'valtio';
 import { $content, type ContentId } from '../../stores/content';
-import { $sandbox } from '../../stores/sandbox';
 import { $theme } from '../../stores/theme';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
@@ -77,53 +62,13 @@ function EditArea() {
   );
 }
 
-function EditMenu() {
-  const { editor } = useCurrentEditor();
-
-  return (
-    <div className="flex items-center gap-2 w-full justify-end">
-      <button
-        type="button"
-        onClick={() =>
-          editor?.chain().focus().exportVfm({ onExport: console.log }).run()
-        }
-      >
-        Save
-      </button>
-
-      <button type="button" onClick={() => console.log(editor?.getHTML())}>
-        HTML
-      </button>
-    </div>
-  );
-}
-
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   const contentSnap = useSnapshot($content);
   const file = contentSnap.files.get(contentId);
   invariant(file, `Editor not found for contentId: ${contentId}`);
-  const [contentHtml, setContentHtml] = useState('');
-  const handleUpdate = useCallback(({ editor }: EditorEvents['update']) => {
-    setContentHtml(editor.getHTML());
-  }, []);
-  useDebounce(
-    () => {
-      $sandbox.files[
-        join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
-      ] = ref(new Blob([contentHtml], { type: 'text/html' }));
-    },
-    1000,
-    [contentHtml],
-  );
-
-  const editor = useEditor({
-    extensions: file.editor.extensions,
-    onUpdate: handleUpdate,
-  });
 
   return (
-    <EditorContext.Provider value={{ editor }}>
-      <EditMenu />
+    <EditorContext.Provider value={{ editor: file.editor }}>
       <EditArea />
     </EditorContext.Provider>
   );

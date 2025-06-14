@@ -23,7 +23,10 @@ import { $content, type HierarchicalReadingOrder } from '../stores/content';
 
 function CreateNewFileButton() {
   return (
-    <button type="button" onClick={() => createContentFile({ format: 'html' })}>
+    <button
+      type="button"
+      onClick={() => createContentFile({ format: 'markdown' })}
+    >
       Create a new file
     </button>
   );

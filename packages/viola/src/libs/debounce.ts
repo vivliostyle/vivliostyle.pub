@@ -1,4 +1,5 @@
-export const debounce = <T extends (...rest: unknown[]) => unknown>(
+// biome-ignore lint/suspicious/noExplicitAny:
+export const debounce = <T extends (...rest: any[]) => unknown>(
   fn: T,
   delay: number,
   options: { leading?: boolean; trailing?: boolean } = {},
@@ -7,12 +8,13 @@ export const debounce = <T extends (...rest: unknown[]) => unknown>(
   let lastArgs: unknown[] | null = null;
 
   const debouncedFn = function (this: unknown, ...args: unknown[]) {
+    lastArgs = args;
+
     if (timeoutId) {
-      lastArgs = args;
-      return;
+      clearTimeout(timeoutId);
     }
 
-    if (options.leading) {
+    if (options.leading && !timeoutId) {
       fn.apply(this, args);
     }
 
