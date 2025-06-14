@@ -23,6 +23,10 @@
       "dependsOn": ["build:rollup-wasm", "build:viewer-resource"],
       "cache": false,
       "persistent": true
+    },
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["coverage/**"]
     }
   }
 }

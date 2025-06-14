@@ -26,3 +26,4 @@ dist-ssr
 .turbo
 *.tsbuildinfo
 *.gen.ts
+coverage/
