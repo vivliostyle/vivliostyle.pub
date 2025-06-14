@@ -4,7 +4,6 @@
   "author": "Vivliostyle Pub",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0",
   "scripts": {
     "build": "turbo build",
     "check": "biome check .",
@@ -23,6 +22,7 @@
     "husky": "^9.1.7",
     "lint-staged": "15.4.1",
     "outvariant": "^1.4.3",
+    "pnpm": "^10.12.1",
     "postcss": "8.5.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",

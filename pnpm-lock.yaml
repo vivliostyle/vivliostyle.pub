@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   buffer:
-    hash: bj6h5gaik4nxqktiimk54la34q
+    hash: fb4463cfef2c37547a516af669984870dc20ff2e30de4bc390203536e91c04d1
     path: patches/buffer.patch
 
 importers:
@@ -43,6 +43,9 @@ importers:
       outvariant:
         specifier: ^1.4.3
         version: 1.4.3
+      pnpm:
+        specifier: ^10.12.1
+        version: 10.12.1
       postcss:
         specifier: 8.5.1
         version: 8.5.1
@@ -5294,6 +5297,11 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  pnpm@10.12.1:
+    resolution: {integrity: sha512-8N2oWA8O6UgcXHmh2Se5Fk8sR46QmSrSaLuyRlpzaYQ5HWMz0sMnkTV4soBK8zR0ylVLopwEqLEwYKcXZ1rjrA==}
+    engines: {node: '>=18.12'}
+    hasBin: true
+
   possible-typed-array-names@1.0.0:
     resolution: {integrity: sha512-d7Uw+eZoloe0EHDIYoe+bQ5WXnGMOpmiZFTuMWCwpjzzkL2nTjcKiAk4hh8TjnGye2TwWOk3UXucZ+3rbmBa8Q==}
     engines: {node: '>= 0.4'}
@@ -9817,12 +9825,12 @@ snapshots:
 
   buffer-xor@1.0.3: {}
 
-  buffer@5.7.1(patch_hash=bj6h5gaik4nxqktiimk54la34q):
+  buffer@5.7.1(patch_hash=fb4463cfef2c37547a516af669984870dc20ff2e30de4bc390203536e91c04d1):
     dependencies:
       base64-js: 1.5.1
       ieee754: 1.2.1
 
-  buffer@6.0.3(patch_hash=bj6h5gaik4nxqktiimk54la34q):
+  buffer@6.0.3(patch_hash=fb4463cfef2c37547a516af669984870dc20ff2e30de4bc390203536e91c04d1):
     dependencies:
       base64-js: 1.5.1
       ieee754: 1.2.1
@@ -12071,7 +12079,7 @@ snapshots:
       assert: 2.1.0
       browser-resolve: 2.0.0
       browserify-zlib: 0.2.0
-      buffer: 5.7.1(patch_hash=bj6h5gaik4nxqktiimk54la34q)
+      buffer: 5.7.1(patch_hash=fb4463cfef2c37547a516af669984870dc20ff2e30de4bc390203536e91c04d1)
       console-browserify: 1.2.0
       constants-browserify: 1.0.0
       create-require: 1.1.1
@@ -12485,6 +12493,8 @@ snapshots:
 
   playwright-core@1.52.0: {}
 
+  pnpm@10.12.1: {}
+
   possible-typed-array-names@1.0.0: {}
 
   possible-typed-array-names@1.1.0: {}
@@ -12838,7 +12848,7 @@ snapshots:
   readable-stream@4.7.0:
     dependencies:
       abort-controller: 3.0.0
-      buffer: 6.0.3(patch_hash=bj6h5gaik4nxqktiimk54la34q)
+      buffer: 6.0.3(patch_hash=fb4463cfef2c37547a516af669984870dc20ff2e30de4bc390203536e91c04d1)
       events: 3.3.0
       process: 0.11.10
       string_decoder: 1.3.0
