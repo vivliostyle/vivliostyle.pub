@@ -283,6 +283,9 @@ importers:
       '@tiptap/extension-text-style':
         specifier: ^2.14.0
         version: 2.14.0(@tiptap/core@2.14.0(@tiptap/pm@2.14.0))
+      '@tiptap/pm':
+        specifier: ^2.14.0
+        version: 2.14.0
       '@v/config':
         specifier: workspace:*
         version: link:../config

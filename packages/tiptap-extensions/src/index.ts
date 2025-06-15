@@ -17,12 +17,17 @@ import { Paragraph } from '@tiptap/extension-paragraph';
 import { Strike } from '@tiptap/extension-strike';
 import { Text } from '@tiptap/extension-text';
 
+import { LineBreak } from './extensions/line-break';
 import { Vfm } from './extensions/vfm';
 
-export const PubExtensions = Extension.create({
+export const PubExtensions = Extension.create<PubExtensionsOptions>({
   name: 'pubExtensions',
+
   addExtensions() {
     return [
+      // Override core extensions
+      LineBreak.configure(),
+
       // Starter kit extensions
       Bold.configure({}),
       Blockquote.configure({}),

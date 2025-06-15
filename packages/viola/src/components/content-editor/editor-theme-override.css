@@ -1,7 +1,6 @@
 :host {
   --vs-columns: auto;
   /* --vs-font-family: var(--vs-font-family, var(--font-sans)); */
-  --vs-spacing-rlh: 0;
   /* --vs--monospace-font-family: var(--vs--monospace-font-family, var(--font-mono)); */
   --vs-color-body: var(--vs-color-body, inherit);
   --vs-color-bg: var(--vs-color-bg, inherit);

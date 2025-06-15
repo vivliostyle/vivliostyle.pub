@@ -131,9 +131,9 @@ export async function setupEditor({
   ] satisfies Extensions;
 
   let initialContent: ReturnType<typeof fromVfm> | undefined;
-  if (initialFile) {
-    const text = await initialFile.text();
-    initialContent = fromVfm(text, getSchema(extensions));
+  const markdown = await initialFile?.text();
+  if (markdown?.trim()) {
+    initialContent = fromVfm(markdown, getSchema(extensions));
   }
 
   return new Editor({
