@@ -98,6 +98,12 @@ const saveContent = debounce(
     if (!file) {
       return;
     }
+    file.summary =
+      editor
+        .getText()
+        .split('\n')
+        .find((s) => s.trim())
+        ?.trim() || '';
     editor
       .chain()
       .exportVfm({

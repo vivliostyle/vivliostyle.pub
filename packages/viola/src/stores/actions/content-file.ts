@@ -33,6 +33,7 @@ export async function createContentFile({
   $content.files.set(contentId, {
     format,
     filename,
+    summary: '',
     editor: ref(await setupEditor({ contentId })),
   });
   $content.readingOrder.splice(index, 0, contentId);

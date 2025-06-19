@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { invariant } from 'outvariant';
 import { type Snapshot, useSnapshot } from 'valtio';
 import {
   DropdownMenu,
@@ -6,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#ui/dropdown';
+import { cn } from '#ui/lib/utils';
 import {
   Sidebar,
   SidebarContent,
@@ -19,7 +21,11 @@ import {
   SidebarMenuSubItem,
 } from '#ui/sidebar';
 import { createContentFile } from '../stores/actions/content-file';
-import { $content, type HierarchicalReadingOrder } from '../stores/content';
+import {
+  $content,
+  type ContentId,
+  type HierarchicalReadingOrder,
+} from '../stores/content';
 
 function CreateNewFileButton() {
   return (
@@ -63,6 +69,18 @@ function WorkspaceMenu() {
   );
 }
 
+function FileTreeItem({ contentId }: { contentId: ContentId }) {
+  const content = useSnapshot($content);
+  const file = content.files.get(contentId);
+  invariant(file, `File not found for contentId: ${contentId}`);
+
+  return (
+    <span className={cn(!file.summary && 'opacity-50')}>
+      {file.summary || 'Empty file'}
+    </span>
+  );
+}
+
 function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
   const [name, ...items] = tree;
 
@@ -81,7 +99,7 @@ function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
         >
           {typeof item[1] === 'string' ? (
             <Link to="/edit/$contentId" params={{ contentId: item[1] }} replace>
-              <span>{item[0]}</span>
+              <FileTreeItem contentId={item[1] as ContentId} />
             </Link>
           ) : (
             <span>{item[0]}</span>

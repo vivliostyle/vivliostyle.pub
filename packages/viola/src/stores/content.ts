@@ -9,6 +9,7 @@ export type ContentId = string & { [contentIdBrand]: never };
 export interface FileContent {
   format: 'markdown';
   filename: string;
+  summary: string;
   editor: Editor;
 }
 

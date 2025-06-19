@@ -42,11 +42,20 @@ export async function setupProject(projectId: string) {
       continue;
     }
     const contentId = generateId<ContentId>();
+    const editor = await setupEditor({ contentId, initialFile });
+    const summary =
+      editor
+        .getText({ blockSeparator: '\n' })
+        .split('\n')
+        .find((s) => s.trim())
+        ?.trim() || '';
+
     contentIdMap[name] = contentId;
     $content.files.set(contentId, {
       format,
       filename: name,
-      editor: ref(await setupEditor({ contentId, initialFile })),
+      summary,
+      editor: ref(editor),
     });
   }
   $content.readingOrder = [$sandbox.vivliostyleConfig.entry]
