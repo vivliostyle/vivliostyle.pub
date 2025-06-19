@@ -5,6 +5,7 @@ import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
 import { $content, type ContentId } from '../content';
 import { $sandbox } from '../sandbox';
+import { $ui } from '../ui';
 
 export async function createContentFile({
   format,
@@ -47,14 +48,23 @@ export async function deleteContentFile({
   invariant(file, `File does not exist: ${contentId}`);
   const index = $content.readingOrder.indexOf(contentId);
 
+  // update ui
+  if (
+    $ui.tabs.some((tab) => tab.type === 'edit' && tab.contentId === contentId)
+  ) {
+    $ui.tabs = [];
+  }
+
   // update content
   $content.readingOrder.splice(index, 1);
   $content.files.delete(contentId);
 
   // update sandbox
   $sandbox.updateVivliostyleConfig((config) => {
-    [config.entry].flat().toSpliced(index, 1);
+    config.entry = [config.entry].flat().toSpliced(index, 1);
   });
-  delete $sandbox.files[file.filename];
+  delete $sandbox.files[
+    join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
+  ];
   return contentId;
 }

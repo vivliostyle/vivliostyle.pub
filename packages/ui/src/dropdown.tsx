@@ -4,6 +4,7 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Circle } from 'lucide-react';
 import * as React from 'react';
 
+import { type VariantProps, cva } from 'class-variance-authority';
 import { cn } from './lib/utils';
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
@@ -75,16 +76,36 @@ const DropdownMenuContent = React.forwardRef<
 ));
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
+const dropdownMenuItemVariants = cva(
+  'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0',
+  {
+    variants: {
+      variant: {
+        default: 'focus:bg-accent focus:text-accent-foreground',
+        destructive:
+          'text-danger-foreground focus:bg-accent-danger focus:text-accent-danger-foreground',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+    },
+  },
+);
+
+export interface DropdownMenuItemProps
+  extends React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item>,
+    VariantProps<typeof dropdownMenuItemVariants> {
+  inset?: boolean;
+}
+
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
-    inset?: boolean;
-  }
->(({ className, inset, ...props }, ref) => (
+  DropdownMenuItemProps
+>(({ className, variant, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0',
+      dropdownMenuItemVariants({ variant }),
       inset && 'pl-8',
       className,
     )}

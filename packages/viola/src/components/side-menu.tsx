@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { invariant } from 'outvariant';
+import type React from 'react';
 import { type Snapshot, useSnapshot } from 'valtio';
 import {
   DropdownMenu,
@@ -7,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#ui/dropdown';
+import { MoreHorizontal } from '#ui/icon';
 import { cn } from '#ui/lib/utils';
 import {
   Sidebar,
@@ -15,12 +17,16 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubItem,
 } from '#ui/sidebar';
-import { createContentFile } from '../stores/actions/content-file';
+import {
+  createContentFile,
+  deleteContentFile,
+} from '../stores/actions/content-file';
 import {
   $content,
   type ContentId,
@@ -69,15 +75,71 @@ function WorkspaceMenu() {
   );
 }
 
-function FileTreeItem({ contentId }: { contentId: ContentId }) {
+function FileMenu({
+  contentId,
+  children,
+}: React.PropsWithChildren<{ contentId: ContentId }>) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="start">
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => {
+            deleteContentFile({ contentId });
+          }}
+        >
+          <span>Delete file</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function FileTreeItem({
+  item,
+  name,
+  children,
+  className,
+  ...other
+}: React.PropsWithChildren<
+  React.ComponentProps<'li'> & {
+    item: ContentId | HierarchicalReadingOrder;
+    name: string;
+  }
+>) {
   const content = useSnapshot($content);
-  const file = content.files.get(contentId);
-  invariant(file, `File not found for contentId: ${contentId}`);
+
+  const file = typeof item === 'string' ? content.files.get(item) : undefined;
+
+  const Item = name === '.' ? SidebarMenuItem : SidebarMenuSubItem;
 
   return (
-    <span className={cn(!file.summary && 'opacity-50')}>
-      {file.summary || 'Empty file'}
-    </span>
+    <Item className="group/file-tree-item" {...other}>
+      <SidebarMenuButton
+        size="sm"
+        variant={typeof item === 'string' ? 'default' : 'heading'}
+        asChild
+      >
+        {typeof item === 'string' ? (
+          <Link to="/edit/$contentId" params={{ contentId: item }} replace>
+            <span className={cn(!file?.summary && 'text-muted-foreground')}>
+              {file?.summary || 'Empty file'}
+            </span>
+          </Link>
+        ) : (
+          <span>{name}</span>
+        )}
+      </SidebarMenuButton>
+      {typeof item === 'string' && (
+        <FileMenu contentId={item}>
+          <SidebarMenuAction className="opacity-0 group-hover/file-tree-item:opacity-100 group-has-[*:focus]/file-tree-item:opacity-100 data-[state=open]:opacity-100">
+            <MoreHorizontal aria-label="Open menu" />
+          </SidebarMenuAction>
+        </FileMenu>
+      )}
+      {children}
+    </Item>
   );
 }
 
@@ -88,27 +150,17 @@ function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
     if (item.length < 2) {
       return null;
     }
-    const Item = name === '.' ? SidebarMenuItem : SidebarMenuSubItem;
     const hasChildren = Array.isArray(item[1]);
     return (
-      <Item key={item[0]}>
-        <SidebarMenuButton
-          size="sm"
-          variant={hasChildren ? 'heading' : 'default'}
-          asChild
-        >
-          {typeof item[1] === 'string' ? (
-            <Link to="/edit/$contentId" params={{ contentId: item[1] }} replace>
-              <FileTreeItem contentId={item[1] as ContentId} />
-            </Link>
-          ) : (
-            <span>{item[0]}</span>
-          )}
-        </SidebarMenuButton>
+      <FileTreeItem
+        key={item[0]}
+        name={item[0]}
+        item={item[1] as ContentId | HierarchicalReadingOrder}
+      >
         {hasChildren && (
           <FileTreeGroup tree={item as HierarchicalReadingOrder} />
         )}
-      </Item>
+      </FileTreeItem>
     );
   });
 
@@ -122,11 +174,7 @@ function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
 function FileTree() {
   const content = useSnapshot($content);
 
-  return (
-    <FileTreeGroup
-      tree={content.hierarchicalReadingOrder as HierarchicalReadingOrder}
-    />
-  );
+  return <FileTreeGroup tree={content.hierarchicalReadingOrder} />;
 }
 
 export function SideMenu() {

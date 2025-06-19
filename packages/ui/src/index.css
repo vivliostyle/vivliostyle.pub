@@ -27,8 +27,11 @@
   --secondary-foreground: hsl(24, 9.8%, 10%);
   --muted: hsl(60, 4.8%, 95.9%);
   --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --danger-foreground: hsl(0, 84.2%, 60.2%);
   --accent: hsl(60, 4.8%, 95.9%);
   --accent-foreground: hsl(24, 9.8%, 10%);
+  --accent-danger: hsl(0, 100%, 95%);
+  --accent-danger-foreground: hsl(0, 83%, 45%);
   --destructive: hsl(0, 84.2%, 60.2%);
   --destructive-foreground: hsl(60, 9.1%, 97.8%);
   --border: hsl(20, 5.9%, 90%);
@@ -63,8 +66,11 @@
   --secondary-foreground: hsl(60, 9.1%, 97.8%);
   --muted: hsl(12, 6.5%, 15.1%);
   --muted-foreground: hsl(24, 5.4%, 63.9%);
+  --danger-foreground: hsl(0, 93%, 66%);
   --accent: hsl(12, 6.5%, 15.1%);
   --accent-foreground: hsl(60, 9.1%, 97.8%);
+  --accent-danger: hsl(0, 28%, 19%);
+  --accent-danger-foreground: hsl(0, 93%, 66%);
   --destructive: hsl(0, 62.8%, 30.6%);
   --destructive-foreground: hsl(60, 9.1%, 97.8%);
   --border: hsl(12, 6.5%, 15.1%);
@@ -98,8 +104,11 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-danger-foreground: var(--danger-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-danger: var(--accent-danger);
+  --color-accent-danger-foreground: var(--accent-danger-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);

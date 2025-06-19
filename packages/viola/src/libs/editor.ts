@@ -100,7 +100,7 @@ const saveContent = debounce(
     }
     file.summary =
       editor
-        .getText()
+        .getText({ blockSeparator: '\n' })
         .split('\n')
         .find((s) => s.trim())
         ?.trim() || '';
