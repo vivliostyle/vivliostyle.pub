@@ -36,7 +36,7 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
 }
 
 export function Theme() {
-  use($project.value);
+  use($project.setupPromise);
 
   const themeSnap = useSnapshot($theme);
   const usesCustomTheme = !officialThemes.some(

@@ -56,6 +56,11 @@ function WorkspaceMenu() {
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start">
             <DropdownMenuItem asChild>
+              <Link to="/bibliography">
+                <span>Bibliography</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link to="/theme">
                 <span>Customize theme</span>
               </Link>

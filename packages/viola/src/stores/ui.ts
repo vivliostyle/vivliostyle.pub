@@ -5,6 +5,7 @@ declare const paneIdBrand: unique symbol;
 export type PaneId = string & { [paneIdBrand]: never };
 
 export type PaneContent = { id: PaneId; title: () => React.ReactNode } & (
+  | { type: 'bibliography' }
   | { type: 'edit'; contentId: ContentId }
   | { type: 'preview' }
   | { type: 'theme' }

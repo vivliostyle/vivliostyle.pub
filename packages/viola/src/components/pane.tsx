@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Loader2 } from '#ui/icon';
 import type { PaneContent } from '../stores/ui';
+import { Bibliography } from './panes/bibliography';
 import { Edit } from './panes/edit';
 import { Preview } from './panes/preview';
 import { Settings } from './panes/settings';
@@ -37,6 +38,14 @@ export function Pane({ content }: { content: PaneContent }) {
     >
       {(() => {
         switch (content.type) {
+          case 'bibliography':
+            return (
+              <ScrollOverflow>
+                <PaneContainer {...{ content }}>
+                  <Bibliography />
+                </PaneContainer>
+              </ScrollOverflow>
+            );
           case 'edit':
             return (
               <ScrollOverflow>
