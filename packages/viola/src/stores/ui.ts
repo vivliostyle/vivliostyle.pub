@@ -9,7 +9,6 @@ export type PaneContent = { id: PaneId; title: () => React.ReactNode } & (
   | { type: 'edit'; contentId: ContentId }
   | { type: 'preview' }
   | { type: 'theme' }
-  | { type: 'settings' }
 );
 
 export const $ui = proxy({

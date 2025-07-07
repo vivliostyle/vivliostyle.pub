@@ -4,7 +4,6 @@ import type { PaneContent } from '../stores/ui';
 import { Bibliography } from './panes/bibliography';
 import { Edit } from './panes/edit';
 import { Preview } from './panes/preview';
-import { Settings } from './panes/settings';
 import { Theme } from './panes/theme';
 
 function ScrollOverflow({ children }: React.PropsWithChildren<object>) {
@@ -59,14 +58,6 @@ export function Pane({ content }: { content: PaneContent }) {
               <ScrollOverflow>
                 <PaneContainer {...{ content }}>
                   <Theme />
-                </PaneContainer>
-              </ScrollOverflow>
-            );
-          case 'settings':
-            return (
-              <ScrollOverflow>
-                <PaneContainer {...{ content }}>
-                  <Settings />
                 </PaneContainer>
               </ScrollOverflow>
             );
