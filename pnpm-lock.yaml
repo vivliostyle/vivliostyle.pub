@@ -139,6 +139,9 @@ importers:
       esbuild-wasm:
         specifier: ^0.25.0
         version: 0.25.0
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
       magic-string:
         specifier: ^0.30.17
         version: 0.30.17

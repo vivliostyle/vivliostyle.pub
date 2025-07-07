@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
+import { type Zippable, type ZippableFile, zipSync } from 'fflate';
 import { fs, vol } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
 import { toSnapshotSync } from 'memfs/lib/snapshot';
@@ -69,6 +70,12 @@ function zipDirectory(pwd: string) {
         const [, , entries] = snapshot;
         return Object.fromEntries(
           Object.entries(entries).flatMap(([name, entry]) => {
+            if (
+              path === '.' &&
+              (name.startsWith('.') || name === 'node_modules')
+            ) {
+              return [];
+            }
             const value = toZippable(
               entry,
               [path, name].filter(Boolean).join('/'),
@@ -85,7 +92,7 @@ function zipDirectory(pwd: string) {
   }
   const files = toZippable(out);
   if (!files) {
-    return;
+    throw new Error(`Failed to create zip: ${pwd}`);
   }
   const zip = zipSync(files as Zippable);
   return zip;
@@ -145,16 +152,34 @@ export async function serve(
   );
 }
 
-export async function build() {
+export async function buildEpub() {
   if (!server) {
     throw new Error('Server is not ready');
   }
   await vivliostyleBuild({
     cwd: '/workdir',
     logLevel: 'info',
-    output: 'dist',
+    output: '/out/dist.epub',
+    disableServerStartup: true,
   });
-  return zipDirectory('/workdir/dist');
+  return fs.readFileSync('/out/dist.epub') as Uint8Array;
+}
+
+export async function buildWebPub() {
+  if (!server) {
+    throw new Error('Server is not ready');
+  }
+  await vivliostyleBuild({
+    cwd: '/workdir',
+    logLevel: 'info',
+    output: '/out/dist',
+    disableServerStartup: true,
+  });
+  return zipDirectory('/out/dist');
+}
+
+export async function exportProjectZip() {
+  return zipDirectory('/workdir');
 }
 
 export const read = (...args: Parameters<typeof fs.promises.readFile>) =>

@@ -1,11 +1,11 @@
 import { Link } from '@tanstack/react-router';
-import { invariant } from 'outvariant';
 import type React from 'react';
 import { type Snapshot, useSnapshot } from 'valtio';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#ui/dropdown';
 import { MoreHorizontal } from '#ui/icon';
@@ -27,6 +27,11 @@ import {
   createContentFile,
   deleteContentFile,
 } from '../stores/actions/content-file';
+import {
+  exportEpub,
+  exportProjectZip,
+  exportWebPub,
+} from '../stores/actions/export-project';
 import {
   $content,
   type ContentId,
@@ -64,6 +69,16 @@ function WorkspaceMenu() {
               <Link to="/theme">
                 <span>Customize theme</span>
               </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={exportEpub}>
+              <span>Export EPUB</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={exportWebPub}>
+              <span>Export Web Publication</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={exportProjectZip}>
+              <span>Export Vivliostyle Project files</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

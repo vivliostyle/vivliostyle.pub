@@ -141,6 +141,7 @@ const workerConfig = defineConfig({
         '../src/stubs/node/process.ts',
       ),
       Buffer: [stdLibBrowser.buffer, 'Buffer'],
+      setImmediate: ['process', 'nextTick'],
     }),
     replace({
       values: {

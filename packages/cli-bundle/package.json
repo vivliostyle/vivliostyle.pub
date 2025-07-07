@@ -41,6 +41,7 @@
     "connect": "^3.7.0",
     "crypto-browserify": "^3.12.1",
     "esbuild-wasm": "^0.25.0",
+    "fflate": "^0.8.2",
     "magic-string": "^0.30.17",
     "memfs": "^4.17.0",
     "node-mocks-http": "^1.16.2",
