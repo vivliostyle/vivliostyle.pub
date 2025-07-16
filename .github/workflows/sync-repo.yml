@@ -1,0 +1,24 @@
+name: sync-repo
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2.0.6
+        id: create_token
+        with:
+          app-id: ${{ secrets.PUB_DEVOPS_GH_APP_ID }}
+          private-key: ${{ secrets.PUB_DEVOPS_GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner}}
+          repositories: ${{ secrets.SYNC_REPO_TARGET }}
+      - uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        with:
+          token: ${{ steps.create_token.outputs.token }}
+          repository: ${{ github.repository_owner }}/${{ secrets.SYNC_REPO_TARGET }}
+          event-type: sync-repo
