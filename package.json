@@ -13,28 +13,12 @@
     "test": "turbo test"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
-    "@tailwindcss/vite": "4.0.12",
-    "@types/node": "22.10.7",
-    "@types/react": "19.1.1",
-    "@types/react-dom": "19.1.2",
-    "@vitejs/plugin-react-swc": "3.7.2",
-    "@vitest/coverage-v8": "^3.2.3",
-    "@vivliostyle/cli": "9.2.0",
-    "husky": "^9.1.7",
-    "lint-staged": "15.4.1",
-    "outvariant": "^1.4.3",
-    "pnpm": "^10.12.1",
-    "postcss": "8.5.1",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "tailwindcss": "4.0.12",
-    "tailwindcss-animate": "1.0.7",
-    "tsx": "4.19.3",
-    "turbo": "2.3.3",
-    "typescript": "5.7.3",
-    "vite": "6.2.1",
-    "vitest": "3.2.3"
+    "@biomejs/biome": "catalog:",
+    "husky": "catalog:",
+    "lint-staged": "catalog:",
+    "pnpm": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
   },
   "lint-staged": {
     "*": ["biome format --write --files-ignore-unknown=true"]
