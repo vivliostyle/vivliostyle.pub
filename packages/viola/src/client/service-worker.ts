@@ -113,7 +113,7 @@ async function handleRequest(event: FetchEvent) {
 
   try {
     const ret = await Promise.race([
-      Comlink.wrap<typeof import('#cli-bundle')>(channel).serve(
+      Comlink.wrap<typeof import('@v/cli-bundle')>(channel).serve(
         request.url,
         requestInit,
       ),

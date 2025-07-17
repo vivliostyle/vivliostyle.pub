@@ -9,11 +9,6 @@
     "build:viewer-resource": "tsx scripts/build-viewer-resource.ts",
     "dev": "rollup -c -w --no-watch.clearScreen"
   },
-  "imports": {
-    "#rollup-wasm-bindings": "./src/stubs/rollup/wasm/bindings_wasm.js",
-    "#theme-registry": "@v/theme-registry",
-    "#theme-registry/*": "@v/theme-registry/*"
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": {

@@ -5,7 +5,7 @@ import { basename, dirname, join, sep } from 'pathe';
 import { proxy, ref, subscribe } from 'valtio';
 import { subscribeKey } from 'valtio/utils';
 
-export type RemoteCli = Comlink.Remote<typeof import('#cli-bundle')>;
+export type RemoteCli = Comlink.Remote<typeof import('@v/cli-bundle')>;
 
 const cliProxy = proxy({
   awaiter: undefined as Promise<RemoteCli> | undefined,

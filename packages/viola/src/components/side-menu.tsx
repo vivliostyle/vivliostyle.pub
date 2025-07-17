@@ -8,9 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '#ui/dropdown';
-import { MoreHorizontal } from '#ui/icon';
-import { cn } from '#ui/lib/utils';
+} from '@v/ui/dropdown';
+import { MoreHorizontal } from '@v/ui/icon';
+import { cn } from '@v/ui/lib/utils';
 import {
   Sidebar,
   SidebarContent,
@@ -23,7 +23,7 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubItem,
-} from '#ui/sidebar';
+} from '@v/ui/sidebar';
 import {
   createContentFile,
   deleteContentFile,

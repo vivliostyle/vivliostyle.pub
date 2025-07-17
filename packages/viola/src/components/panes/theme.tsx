@@ -2,10 +2,10 @@ import { use, useId, useState } from 'react';
 import { useDebounce } from 'react-use';
 import { ref, useSnapshot } from 'valtio';
 
+import { Button } from '@v/ui/button';
+import { Check, Loader2 } from '@v/ui/icon';
+import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
-import { Button } from '#ui/button';
-import { Check, Loader2 } from '#ui/icon';
-import { Input } from '#ui/input';
 import { installTheme } from '../../stores/actions/install-theme';
 import { $project } from '../../stores/project';
 import { $sandbox } from '../../stores/sandbox';

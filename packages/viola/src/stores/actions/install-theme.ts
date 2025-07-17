@@ -2,7 +2,7 @@ import {
   buildTreeFromRegistry,
   bundleCss,
   fetchPackageContent,
-} from '#theme-registry';
+} from '@v/theme-registry';
 import { $sandbox } from '../sandbox';
 import { $theme } from '../theme';
 

@@ -12,7 +12,7 @@ declare global {
   interface Window {
     __debug: {
       cli?: unknown;
-      themeRegistry?: typeof import('#theme-registry');
+      themeRegistry?: typeof import('@v/theme-registry');
     };
   }
 }
@@ -31,14 +31,14 @@ function init(iframe: HTMLIFrameElement) {
     }
     const [messagePort] = event.ports;
     if (event.data.channel === 'worker:cli') {
-      const cli = Comlink.wrap<typeof import('#cli-bundle')>(messagePort);
+      const cli = Comlink.wrap<typeof import('@v/cli-bundle')>(messagePort);
       if (import.meta.env.DEV) {
         window.__debug.cli = cli;
       }
       cliWorkerResolver.resolve(cli);
     }
     if (event.data.channel === 'worker:theme-registry') {
-      const themeRegistry = await import('#theme-registry');
+      const themeRegistry = await import('@v/theme-registry');
       if (import.meta.env.DEV) {
         window.__debug.themeRegistry = themeRegistry;
       }

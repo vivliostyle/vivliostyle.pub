@@ -61,11 +61,6 @@ export default defineConfig(({ mode }) => {
             }),
           );
         },
-        resolveId(id) {
-          if (id === '#cli-bundle') {
-            return '@v/cli-bundle';
-          }
-        },
         load(id) {
           if (id === '@v/cli-bundle') {
             return '';
