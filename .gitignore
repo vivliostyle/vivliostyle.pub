@@ -29,3 +29,8 @@ dist-ssr
 *.gen.ts
 coverage/
 vivliostyle-pub/
+/secrets/*
+!/secrets/*/
+/secrets/*/*
+!/secrets/**/*.sample
+!/secrets/**/README.md
