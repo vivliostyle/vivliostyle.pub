@@ -27,3 +27,4 @@ dist-ssr
 *.tsbuildinfo
 *.gen.ts
 coverage/
+vivliostyle-pub/
