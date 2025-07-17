@@ -1,5 +1,6 @@
 import * as Comlink from 'comlink';
 import { createPortal } from 'react-dom';
+
 import { createCliWorkerResolver } from '../stores/sandbox';
 
 const port = globalThis.location?.port;

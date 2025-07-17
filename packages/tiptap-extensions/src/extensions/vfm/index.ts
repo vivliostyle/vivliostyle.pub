@@ -25,7 +25,7 @@ export const Vfm = Extension.create({
     return {
       importVfm:
         ({ markdown, onImport }) =>
-        ({ state, editor }) => {
+        ({ editor }) => {
           onImport?.({ content: fromVfm(markdown, editor.schema) });
           return true;
         },

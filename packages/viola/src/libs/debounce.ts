@@ -1,5 +1,4 @@
-// biome-ignore lint/suspicious/noExplicitAny:
-export const debounce = <T extends (...rest: any[]) => unknown>(
+export const debounce = <T extends (...rest: unknown[]) => unknown>(
   fn: T,
   delay: number,
   options: { leading?: boolean; trailing?: boolean } = {},

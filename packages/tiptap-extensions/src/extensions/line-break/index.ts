@@ -1,4 +1,4 @@
-import { Extension, isMacOS, isiOS } from '@tiptap/core';
+import { Extension, isiOS, isMacOS } from '@tiptap/core';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {

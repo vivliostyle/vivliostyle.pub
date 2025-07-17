@@ -1,14 +1,16 @@
-import init from 'lightningcss-wasm';
-import * as lightningCss from 'lightningcss-wasm';
+import init, * as lightningCss from 'lightningcss-wasm';
 import wasmUrl from 'lightningcss-wasm/lightningcss_node.wasm?url';
+
 import { contentCache, directorySourceMap, fileMap } from './store';
 import type { PackageJson } from './type';
 import { validate as validatePackageName } from './validate-npm-package-name';
 
 export function locateDefaultThemeFile({
   packageJson,
-}: { packageJson: PackageJson }): string {
-  // biome-ignore lint/suspicious/noExplicitAny:
+}: {
+  packageJson: PackageJson;
+}): string {
+  // biome-ignore lint/suspicious/noExplicitAny: FIXME
   const pkg = packageJson as any;
   const maybeStyle = pkg.vivliostyle?.theme?.style ?? pkg.style ?? pkg.main;
   if (typeof maybeStyle !== 'string' || !maybeStyle.endsWith('.css')) {
@@ -28,7 +30,7 @@ export function locateThemeFileFromImportPath({
   importPath: string;
   fileList: string[];
 }): string {
-  // biome-ignore lint/suspicious/noExplicitAny:
+  // biome-ignore lint/suspicious/noExplicitAny: FIXME
   const pkg = packageJson as any;
   if (pkg.exports) {
     if (typeof pkg.exports !== 'object') {
@@ -69,7 +71,7 @@ function resolve(specifier: string, from: string): string {
 
   // Resolve a package name
   const matched = specifier.match(
-    /^(?<packageName>(?:@([^\/]+?)[\/])?([^\/]+?))(\/(?<importPath>.*[^\/]))?$/,
+    /^(?<packageName>(?:@([^/]+?)[/])?([^/]+?))(\/(?<importPath>.*[^/]))?$/,
   );
   if (matched?.groups && validatePackageName(matched.groups.packageName)) {
     const { packageName, importPath } = matched.groups;

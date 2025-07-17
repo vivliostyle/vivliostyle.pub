@@ -1,6 +1,7 @@
 import { invariant } from 'outvariant';
 import { dirname, join } from 'pathe';
 import { ref } from 'valtio';
+
 import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
 import { $content, type ContentId } from '../content';
@@ -10,7 +11,10 @@ import { $ui } from '../ui';
 export async function createContentFile({
   format,
   insertAfter,
-}: { format: 'markdown'; insertAfter?: ContentId }): Promise<ContentId> {
+}: {
+  format: 'markdown';
+  insertAfter?: ContentId;
+}): Promise<ContentId> {
   const prevFile = insertAfter && $content.files.get(insertAfter);
   const prevFileDir = prevFile && dirname(prevFile.filename);
   const contentId = generateId<ContentId>();
@@ -43,7 +47,9 @@ export async function createContentFile({
 
 export async function deleteContentFile({
   contentId,
-}: { contentId: ContentId }): Promise<ContentId> {
+}: {
+  contentId: ContentId;
+}): Promise<ContentId> {
   const file = $content.files.get(contentId);
   invariant(file, `File does not exist: ${contentId}`);
   const index = $content.readingOrder.indexOf(contentId);

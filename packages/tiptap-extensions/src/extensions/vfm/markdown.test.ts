@@ -1,5 +1,6 @@
 import { getSchema } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
+
 import { Extensions } from '../..';
 import { fromVfm, toVfm } from './io';
 

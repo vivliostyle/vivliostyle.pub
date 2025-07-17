@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import type React from 'react';
-import { type Snapshot, useSnapshot } from 'valtio';
+import { useSnapshot } from 'valtio';
+
 import {
   DropdownMenu,
   DropdownMenuContent,

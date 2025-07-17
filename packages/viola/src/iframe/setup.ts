@@ -1,7 +1,66 @@
 import * as Comlink from 'comlink';
 
-let cliWorker: Worker | undefined;
-let cliChannels: BroadcastChannel[];
+// https://github.com/GoogleChromeLabs/comlink/tree/HEAD/src/protocol.ts
+
+interface RawWireValue {
+  id?: string;
+  type: 'RAW';
+  value: unknown;
+}
+
+interface HandlerWireValue {
+  id?: string;
+  type: 'HANDLER';
+  name: string;
+  value: unknown;
+}
+
+type WireValue = RawWireValue | HandlerWireValue;
+
+export interface GetMessage {
+  id?: string;
+  type: 'GET';
+  path: string[];
+}
+
+export interface SetMessage {
+  id?: string;
+  type: 'SET';
+  path: string[];
+  value: WireValue;
+}
+
+export interface ApplyMessage {
+  id?: string;
+  type: 'APPLY';
+  path: string[];
+  argumentList: WireValue[];
+}
+
+export interface ConstructMessage {
+  id?: string;
+  type: 'CONSTRUCT';
+  path: string[];
+  argumentList: WireValue[];
+}
+
+export interface EndpointMessage {
+  id?: string;
+  type: 'ENDPOINT';
+}
+
+export interface ReleaseMessage {
+  id?: string;
+  type: 'RELEASE';
+}
+
+export type Message =
+  | GetMessage
+  | SetMessage
+  | ApplyMessage
+  | ConstructMessage
+  | EndpointMessage
+  | ReleaseMessage;
 
 let handleMessageDebug:
   | ((
@@ -13,15 +72,13 @@ let handleMessageDebug:
 if (import.meta.env.DEV) {
   const comlinkMessageMap = new Map<
     string,
-    // biome-ignore lint/suspicious/noExplicitAny:
-    { time: number; data: any; clear: () => void }
+    { time: number; data: Message; clear: () => void }
   >();
-  // biome-ignore lint/suspicious/noExplicitAny:
-  const mapWireValue = (value: any) => {
+  const mapWireValue = (value: WireValue) => {
     switch (value.type) {
       case 'HANDLER':
         try {
-          // biome-ignore lint/style/noNonNullAssertion:
+          // biome-ignore lint/style/noNonNullAssertion: safely catch the error
           return Comlink.transferHandlers
             .get(value.name)!
             .deserialize(value.value);
@@ -52,7 +109,9 @@ if (import.meta.env.DEV) {
           `(${diff.toFixed(2)} ms)`,
           data.type,
           ['GET', 'SET', 'APPLY', 'CONSTRUCT'].includes(data.type) &&
-            data.path.join('.'),
+            (
+              data as Exclude<Message, EndpointMessage | ReleaseMessage>
+            ).path.join('.'),
         ]
           .filter(Boolean)
           .join(' '),
@@ -150,7 +209,7 @@ const setupWorker = ({
 };
 
 async function init() {
-  cliWorker ??= await setupWorker({
+  await setupWorker({
     initWorker: () =>
       new Worker(new URL('../client/cli-worker.js', import.meta.url), {
         name: 'worker:cli',
@@ -160,7 +219,7 @@ async function init() {
       setupChannel('worker:cli');
     },
   });
-  cliChannels ??= [setupChannel('worker:theme-registry')];
+  setupChannel('worker:theme-registry');
 }
 
 init();

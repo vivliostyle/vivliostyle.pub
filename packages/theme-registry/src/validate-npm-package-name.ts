@@ -1,6 +1,6 @@
 // https://github.com/npm/validate-npm-package-name
 
-const scopedPackagePattern = /^(?:@([^\/]+?)[\/])?([^\/]+?)$/;
+const scopedPackagePattern = /^(?:@([^/]+?)[/])?([^/]+?)$/;
 const blacklist = ['node_modules', 'favicon.ico'];
 
 export function validate(name: unknown) {
@@ -89,12 +89,10 @@ const done = (warnings: string[], errors: string[]) => {
   };
   if (!result.warnings.length) {
     // @ts-ignore
-    // biome-ignore lint/performance/noDelete:
     delete result.warnings;
   }
   if (!result.errors.length) {
     // @ts-ignore
-    // biome-ignore lint/performance/noDelete:
     delete result.errors;
   }
   return result;

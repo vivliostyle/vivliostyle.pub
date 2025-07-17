@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+
 import { Loader2 } from '#ui/icon';
 import type { PaneContent } from '../stores/ui';
 import { Bibliography } from './panes/bibliography';

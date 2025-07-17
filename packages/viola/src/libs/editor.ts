@@ -1,26 +1,27 @@
 import {
   Editor,
   type Extensions,
-  type Content as TiptapContent,
   getSchema,
+  type Content as TiptapContent,
 } from '@tiptap/core';
-import { Collaboration } from '@tiptap/extension-collaboration';
 import { Placeholder } from '@tiptap/extension-placeholder';
-
-import { PubExtensions } from '#tiptap-extensions';
-import { fromVfm } from '#tiptap-extensions/vfm';
-
 import * as idb from 'idb';
 import { join } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
+
+import { PubExtensions } from '@v/tiptap-extensions';
+import { fromVfm } from '@v/tiptap-extensions/vfm';
 import { debounce } from '../libs/debounce';
 import { $content, type ContentId } from '../stores/content';
 import { $sandbox } from '../stores/sandbox';
 
-async function setupPersistence({
+async function _setupPersistence({
   doc,
-}: { doc: Y.Doc; contentId: ContentId }): Promise<void> {
+}: {
+  doc: Y.Doc;
+  contentId: ContentId;
+}): Promise<void> {
   const preferredTrimSize = 500;
   const storeName = 'update';
   // @ts-expect-error
@@ -122,7 +123,10 @@ const saveContent = debounce(
 export async function setupEditor({
   contentId,
   initialFile,
-}: { contentId: ContentId; initialFile?: Blob }) {
+}: {
+  contentId: ContentId;
+  initialFile?: Blob;
+}) {
   // const doc = new Y.Doc();
   // await setupPersistence({ doc, contentId });
 

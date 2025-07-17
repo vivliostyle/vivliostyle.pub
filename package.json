@@ -21,12 +21,19 @@
     "typescript": "catalog:"
   },
   "lint-staged": {
-    "*": ["biome format --write --files-ignore-unknown=true"]
+    "*": [
+      "biome format --write --files-ignore-unknown=true"
+    ]
   },
   "pnpm": {
     "patchedDependencies": {
       "buffer": "patches/buffer.patch"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "@swc/core",
+      "esbuild"
+    ]
   },
   "packageManager": "pnpm@10.12.1"
 }

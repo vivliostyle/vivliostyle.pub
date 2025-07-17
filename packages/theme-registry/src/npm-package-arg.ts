@@ -1,6 +1,7 @@
 // https://github.com/npm/npm-package-arg
 
 import { valid, validRange } from 'semver';
+
 import { validate as validatePackageName } from './validate-npm-package-name.js';
 
 const hasSlashes = /[/]/;
@@ -158,7 +159,7 @@ export class Result {
   raw: string;
 
   constructor(
-    // biome-ignore lint/suspicious/noExplicitAny:
+    // biome-ignore lint/suspicious/noExplicitAny: FIXME
     opts: any,
   ) {
     this.type = opts.type;
@@ -212,7 +213,6 @@ export class Result {
 
   toJSON() {
     const result = Object.assign({}, this);
-    // biome-ignore lint/performance/noDelete:
     delete result.hosted;
     return result;
   }

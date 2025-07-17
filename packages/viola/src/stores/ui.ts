@@ -1,4 +1,5 @@
 import { proxy } from 'valtio';
+
 import type { ContentId } from './content';
 
 declare const paneIdBrand: unique symbol;

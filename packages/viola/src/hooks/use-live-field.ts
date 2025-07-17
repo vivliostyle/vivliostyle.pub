@@ -1,9 +1,10 @@
-import type { Checkbox } from '@v/ui/checkbox';
-import type { Input } from '@v/ui/input';
-import type { Select } from '@v/ui/select';
 import type React from 'react';
 import { useCallback, useState } from 'react';
 import { useDebounce } from 'react-use';
+
+import type { Checkbox } from '@v/ui/checkbox';
+import type { Input } from '@v/ui/input';
+import type { Select } from '@v/ui/select';
 
 export function useLiveInputField<T extends string | number>(
   initialValue: T | (() => T),

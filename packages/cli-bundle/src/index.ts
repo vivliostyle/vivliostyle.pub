@@ -9,7 +9,9 @@ import { fs, vol } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
 import { toSnapshotSync } from 'memfs/lib/snapshot';
 import type { MockResponse, RequestMethod } from 'node-mocks-http';
-import { type HotPayload, type ViteDevServer, createServer } from 'vite';
+import { createServer, type HotPayload, type ViteDevServer } from 'vite';
+
+// @ts-expect-error: Resolved by rollup plugin
 import initRollup from '#rollup-wasm-bindings';
 import { createMocks } from './http';
 import { vsCustomHmrPlugin } from './vite-plugin';
@@ -107,7 +109,8 @@ export async function serve(
   const url = request as Exclude<RequestInfo, Request>;
   const headers = init?.headers as Exclude<HeadersInit, Headers>;
   const method = init?.method;
-  const body = init?.body as Extract<BodyInit, string | ArrayBuffer>;
+  // TODO: Handle body
+  // const body = init?.body as Extract<BodyInit, string | ArrayBuffer>;
 
   return await new Promise<ConstructorParameters<typeof Response>>(
     (resolve, reject) => {

@@ -4,7 +4,11 @@ function downloadFile({
   name,
   mimeType,
   content,
-}: { name: string; mimeType: string; content: Uint8Array }) {
+}: {
+  name: string;
+  mimeType: string;
+  content: Uint8Array;
+}) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

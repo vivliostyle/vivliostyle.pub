@@ -3,6 +3,7 @@ import { invariant } from 'outvariant';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import shadowRoot from 'react-shadow';
 import { useSnapshot } from 'valtio';
+
 import { $content, type ContentId } from '../../stores/content';
 import { $theme } from '../../stores/theme';
 import editorBaseCss from './editor-base.css?inline';

@@ -1,4 +1,5 @@
 import type { TarLocalFile } from '@andrewbranch/untar.js';
+
 import type { PackageMetadata } from './type';
 
 declare const registryUrlBrand: unique symbol;

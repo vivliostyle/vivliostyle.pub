@@ -1,4 +1,5 @@
 import { ref } from 'valtio';
+
 import { setupEditor } from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
 import { $content, type ContentId } from '../content';

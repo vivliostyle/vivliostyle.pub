@@ -1,4 +1,5 @@
 import { lazy } from 'react';
+
 import type { ContentId } from '../../stores/content';
 import { $project } from '../../stores/project';
 

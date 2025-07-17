@@ -1,16 +1,40 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-
-  "vcs": {
-    "enabled": true,
-    "clientKind": "git",
-    "useIgnoreFile": true
+  "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ":URL:",
+              ":PACKAGE_WITH_PROTOCOL:",
+              [":PACKAGE:", "!@v/**"],
+              ":BLANK_LINE:",
+              "**"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "css": {
+    "formatter": {
+      "enabled": true
+    },
+    "linter": {
+      "enabled": true
+    },
+    "parser": {
+      "cssModules": true
+    }
   },
   "files": {
     "ignoreUnknown": false,
-    "ignore": [
-      "packages/cli-bundle/src/stubs/rollup/**/*",
-      "vivliostyle-pub/**/*"
+    "includes": [
+      "**",
+      "!**/packages/cli-bundle/src/stubs/rollup/**/*",
+      "!**/vivliostyle-pub/**/*"
     ]
   },
   "formatter": {
@@ -18,13 +42,15 @@
     "indentStyle": "space",
     "indentWidth": 2
   },
-  "organizeImports": {
-    "enabled": true
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always"
+    }
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
       "a11y": {
         "noLabelWithoutControl": {
           "level": "error",
@@ -43,24 +69,13 @@
         "noUnknownFunction": {
           "level": "off"
         }
-      }
+      },
+      "recommended": true
     }
   },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "semicolons": "always"
-    }
-  },
-  "css": {
-    "formatter": {
-      "enabled": true
-    },
-    "linter": {
-      "enabled": true
-    },
-    "parser": {
-      "cssModules": true
-    }
+  "vcs": {
+    "clientKind": "git",
+    "enabled": true,
+    "useIgnoreFile": true
   }
 }

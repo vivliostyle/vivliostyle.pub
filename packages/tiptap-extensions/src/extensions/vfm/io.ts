@@ -1,8 +1,8 @@
 import {
-  type RemarkProseMirrorOptions,
   fromPmMark,
   fromPmNode,
   fromProseMirror,
+  type RemarkProseMirrorOptions,
   remarkProseMirror,
   toPmMark,
   toPmNode,

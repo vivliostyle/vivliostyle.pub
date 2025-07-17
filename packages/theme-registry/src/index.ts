@@ -2,14 +2,15 @@ import { untar } from '@andrewbranch/untar.js';
 import { Gunzip } from 'fflate';
 import { invariant } from 'outvariant';
 import { satisfies as semverSatisfies } from 'semver';
+
 import { locateDefaultThemeFile } from './css-bundler';
 import { npa } from './npm-package-arg';
 import {
-  type RegistryUrl,
   contentCache,
   directorySourceMap,
   fileMap,
   metadataCache,
+  type RegistryUrl,
 } from './store';
 import type { IdealTree, PackageJson, PackageMetadata } from './type';
 

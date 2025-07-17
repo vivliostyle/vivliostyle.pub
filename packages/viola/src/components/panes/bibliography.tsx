@@ -1,3 +1,7 @@
+import type React from 'react';
+import { use } from 'react';
+import { useSnapshot } from 'valtio';
+
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import {
@@ -8,9 +12,6 @@ import {
   SelectValue,
 } from '@v/ui/select';
 import { Switch } from '@v/ui/switch';
-import type React from 'react';
-import { use } from 'react';
-import { useSnapshot } from 'valtio';
 import {
   useLiveCheckboxField,
   useLiveInputField,
@@ -115,17 +116,12 @@ function TocSectionDepthSelect({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="0">Do not display sections</SelectItem>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <SelectItem
-              key={
-                // biome-ignore lint/suspicious/noArrayIndexKey:
-                i
-              }
-              value={`${i + 1}`}
-            >
-              Level {i + 1}
-            </SelectItem>
-          ))}
+          <SelectItem value="1">Level 1</SelectItem>
+          <SelectItem value="2">Level 2</SelectItem>
+          <SelectItem value="3">Level 3</SelectItem>
+          <SelectItem value="4">Level 4</SelectItem>
+          <SelectItem value="5">Level 5</SelectItem>
+          <SelectItem value="6">Level 6</SelectItem>
         </SelectContent>
       </Select>
     </label>

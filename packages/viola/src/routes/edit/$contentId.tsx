@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { ref } from 'valtio';
+
 import { generateId } from '../../libs/generate-id';
 import { $content, type ContentId } from '../../stores/content';
 import { $ui } from '../../stores/ui';

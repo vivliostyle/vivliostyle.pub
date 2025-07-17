@@ -4,7 +4,9 @@ import type * as vite from 'vite';
 
 export function vsCustomHmrPlugin({
   sendHotPayload,
-}: { sendHotPayload: (payload: vite.HotPayload) => void }): vite.Plugin {
+}: {
+  sendHotPayload: (payload: vite.HotPayload) => void;
+}): vite.Plugin {
   let config: vite.ResolvedConfig;
   return {
     name: 'vivliostyle:custom-hmr',

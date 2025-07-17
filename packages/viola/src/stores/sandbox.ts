@@ -111,7 +111,6 @@ export async function loadProjectFromCache() {
   const projectDir = $sandbox.projectDirectoryHandle;
   invariant(projectDir, 'projectDirectoryHandle is not set');
 
-  let vivliostyleConfig: BuildTask;
   const newFiles: (typeof $sandbox)['files'] = {};
   try {
     const configFileHandle = await projectDir.getFileHandle(
@@ -119,7 +118,6 @@ export async function loadProjectFromCache() {
     );
     const file = await configFileHandle.getFile();
     newFiles['vivliostyle.config.json'] = ref(file);
-    vivliostyleConfig = JSON.parse(await file.text());
   } catch {
     throw new Error('Project does not exist');
   }

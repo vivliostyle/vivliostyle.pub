@@ -9,6 +9,7 @@ import * as Comlink from 'comlink';
 import { fs } from 'memfs';
 import npa from 'npm-package-arg';
 import { satisfies as semverSatisfies } from 'semver';
+
 import type * as ThemeRegistry from '#theme-registry';
 import type { IdealTree } from '#theme-registry/type';
 

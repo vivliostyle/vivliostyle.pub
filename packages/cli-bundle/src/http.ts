@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { Writable } from 'node:stream';
 import {
-  type RequestOptions,
   createRequest,
   createResponse,
+  type RequestOptions,
 } from 'node-mocks-http';
 
 export function createMocks(option: RequestOptions) {

@@ -5,7 +5,7 @@ const channel = new BroadcastChannel('worker:cli');
 const cli = Comlink.wrap<typeof import('..')>(channel);
 const webSocketInterceptor = new WebSocketInterceptor();
 
-webSocketInterceptor.on('connection', async ({ client, server, info }) => {
+webSocketInterceptor.on('connection', async ({ client, info }) => {
   if (info.protocols !== 'vite-hmr') {
     return;
   }
