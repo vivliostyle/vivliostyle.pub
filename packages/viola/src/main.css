@@ -4,8 +4,8 @@
 @import "tailwindcss/preflight" layer(base);
 @import "tailwindcss/utilities" layer(utilities);
 
-@import "#ui/index.css";
-@import "#ui/global.css" layer(base);
+@import "@v/ui/index.css";
+@import "@v/ui/global.css" layer(base);
 
 @source "../../ui/src";
 

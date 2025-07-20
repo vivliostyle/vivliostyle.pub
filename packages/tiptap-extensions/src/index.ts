@@ -20,7 +20,7 @@ import { Text } from '@tiptap/extension-text';
 import { LineBreak } from './extensions/line-break';
 import { Vfm } from './extensions/vfm';
 
-export const PubExtensions = Extension.create<PubExtensionsOptions>({
+export const PubExtensions = Extension.create({
   name: 'pubExtensions',
 
   addExtensions() {

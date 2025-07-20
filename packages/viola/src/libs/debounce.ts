@@ -1,4 +1,5 @@
-export const debounce = <T extends (...rest: unknown[]) => unknown>(
+// biome-ignore lint/suspicious/noExplicitAny: This is a utility function that can accept any type of arguments.
+export const debounce = <T extends (...rest: any[]) => unknown>(
   fn: T,
   delay: number,
   options: { leading?: boolean; trailing?: boolean } = {},

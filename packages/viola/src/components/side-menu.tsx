@@ -190,7 +190,17 @@ function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
 function FileTree() {
   const content = useSnapshot($content);
 
-  return <FileTreeGroup tree={content.hierarchicalReadingOrder} />;
+  return (
+    <FileTreeGroup
+      tree={
+        (
+          content as unknown as {
+            hierarchicalReadingOrder: HierarchicalReadingOrder;
+          }
+        ).hierarchicalReadingOrder
+      }
+    />
+  );
 }
 
 export function SideMenu() {

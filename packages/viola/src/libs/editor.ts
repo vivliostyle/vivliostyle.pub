@@ -16,6 +16,7 @@ import { debounce } from '../libs/debounce';
 import { $content, type ContentId } from '../stores/content';
 import { $sandbox } from '../stores/sandbox';
 
+// @ts-ignore
 async function _setupPersistence({
   doc,
 }: {
