@@ -17,7 +17,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (
     location.origin !== url.origin ||
-    !/^sandbox\./.test(url.host) ||
+    !location.hostname.split('.')[0].startsWith('sandbox-') ||
     url.pathname.startsWith('/@cli/')
   ) {
     return;
@@ -58,7 +58,7 @@ async function handleNavigate(event: FetchEvent) {
   }
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
-    url.host = url.host.slice('sandbox.'.length);
+    url.hostname = url.hostname.split('.').slice(1).join('.');
     url.pathname = '/@cli/viewer/index.html';
     const viewerHtml = await fetch(url, { mode: 'cors' }).then((res) =>
       res.text(),
@@ -83,7 +83,7 @@ async function handleRequest(event: FetchEvent) {
   const url = new URL(request.url);
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
-    url.host = url.host.slice('sandbox.'.length);
+    url.hostname = url.hostname.split('.').slice(1).join('.');
     url.pathname = `/@cli/viewer${url.pathname.slice('/__vivliostyle-viewer'.length)}`;
     return fetch(url, { mode: 'no-cors' });
   }

@@ -37,6 +37,7 @@ const vivliostyleConfig = proxy({
 export const $sandbox = proxy({
   files: {} as Record<string, ReturnType<typeof ref<Blob>>>,
   projectDirectoryHandle: null as FileSystemDirectoryHandle | null,
+  sandboxOrigin: null as string | null,
 
   get cli(): Readonly<typeof cliProxy.value> {
     return cliProxy.value;

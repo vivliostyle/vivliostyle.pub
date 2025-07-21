@@ -34,6 +34,10 @@ export async function setupProject(projectId: string) {
       new Blob([defaultCss], { type: 'text/css' }),
     );
   }
+  const url = new URL(location.href);
+  url.hostname = `sandbox-${projectId}.${url.hostname}`;
+  $sandbox.sandboxOrigin = url.origin;
+
   const contentIdMap: Record<string, ContentId> = {};
   for (const [rootFilename, initialFile] of Object.entries($sandbox.files)) {
     const matched = rootFilename.match(/^contents\/(?<name>.+)$/);

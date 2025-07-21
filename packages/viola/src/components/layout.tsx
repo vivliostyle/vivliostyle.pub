@@ -1,5 +1,5 @@
 import { useRouter } from '@tanstack/react-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
@@ -86,7 +86,9 @@ export function Layout(_: { children?: React.ReactNode }) {
       </div>
 
       <DedicatedModal />
-      <Sandbox />
+      <Suspense>
+        <Sandbox />
+      </Suspense>
     </SidebarProvider>
   );
 }

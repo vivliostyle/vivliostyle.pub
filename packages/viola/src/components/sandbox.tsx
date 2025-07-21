@@ -1,10 +1,11 @@
 import * as Comlink from 'comlink';
+import { invariant } from 'outvariant';
+import { use } from 'react';
 import { createPortal } from 'react-dom';
+import { useSnapshot } from 'valtio';
 
-import { createCliWorkerResolver } from '../stores/sandbox';
-
-const port = globalThis.location?.port;
-export const sandboxOrigin = `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}${port ? `:${port}` : ''}`;
+import { $project } from '../stores/project';
+import { $sandbox, createCliWorkerResolver } from '../stores/sandbox';
 
 let initialized = false;
 
@@ -66,11 +67,15 @@ function init(iframe: HTMLIFrameElement) {
 }
 
 export function Sandbox() {
+  use($project.setupPromise);
+  const sandboxSnap = useSnapshot($sandbox);
+  invariant(sandboxSnap.sandboxOrigin, 'Sandbox is not initialized');
+
   return createPortal(
     <iframe
       ref={init}
       title="Sandbox"
-      src={`${sandboxOrigin}/iframe`}
+      src={`${sandboxSnap.sandboxOrigin}/iframe`}
       style={{ display: 'none' }}
       sandbox="allow-same-origin allow-scripts"
     />,
