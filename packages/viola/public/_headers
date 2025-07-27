@@ -1,0 +1,13 @@
+# https://developers.cloudflare.com/workers/static-assets/headers/
+
+/assets/*
+  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: cross-origin
+
+/_cli/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Headers: Origin, Content-Type, Accept, Range
+  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: cross-origin

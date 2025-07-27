@@ -1,4 +1,3 @@
-import path from 'node:path';
 import MagicString from 'magic-string';
 import type * as vite from 'vite';
 
@@ -7,7 +6,6 @@ export function vsCustomHmrPlugin({
 }: {
   sendHotPayload: (payload: vite.HotPayload) => void;
 }): vite.Plugin {
-  let config: vite.ResolvedConfig;
   return {
     name: 'vivliostyle:custom-hmr',
     enforce: 'post',
@@ -16,16 +14,13 @@ export function vsCustomHmrPlugin({
         server.environments.client.hot.send = sendHotPayload;
       };
     },
-    configResolved(_config) {
-      config = _config;
-    },
     resolveId(id) {
-      if (id.startsWith('/@cli/')) {
+      if (id.startsWith('/_cli/')) {
         return { id, external: true };
       }
     },
     load(id) {
-      if (id.startsWith('/@cli/')) {
+      if (id.startsWith('/_cli/')) {
         // The string returned here is not used since it is proxied by the service worker before being referenced.
         return '';
       }
@@ -34,7 +29,6 @@ export function vsCustomHmrPlugin({
       if (id !== '/@vivliostyle:viewer:client') {
         return null;
       }
-      const { base } = config;
       const importer = (
         this.environment as vite.DevEnvironment
       ).moduleGraph.getModuleById(id);
@@ -47,8 +41,8 @@ export function vsCustomHmrPlugin({
       // We need to import custom-hmr.js before the Vite client.
       s.replace(/import\.meta\.hot/g, 'import.meta.__hot');
       s.prepend(
-        `import "${path.posix.join(base, '/@cli/client/custom-hmr.js')}";` +
-          `import { createHotContext as __vite__createHotContext } from "${path.posix.join(base, '/@vite/client')}";` +
+        `import "/_cli/client/custom-hmr.js";` +
+          `import { createHotContext as __vite__createHotContext } from "/_cli/client/vite-client.js";` +
           `import.meta.__hot = __vite__createHotContext(${JSON.stringify(importer.url)});`,
       );
       return {

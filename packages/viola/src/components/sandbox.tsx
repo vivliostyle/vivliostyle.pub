@@ -75,7 +75,7 @@ export function Sandbox() {
     <iframe
       ref={init}
       title="Sandbox"
-      src={`${sandboxSnap.sandboxOrigin}/iframe`}
+      src={`${sandboxSnap.sandboxOrigin}/sandbox`}
       style={{ display: 'none' }}
       sandbox="allow-same-origin allow-scripts"
     />,

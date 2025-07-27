@@ -273,10 +273,10 @@ const dtsConfig = defineConfig({
   plugins: [dts()],
 });
 
-const clientCustomHmrConfig = defineConfig({
-  input: 'src/client/custom-hmr.ts',
+const clientConfig = defineConfig({
+  input: ['src/client/vite-client.ts', 'src/client/custom-hmr.ts'],
   output: {
-    file: 'dist/client/custom-hmr.js',
+    dir: 'dist/client',
   },
   plugins: [
     nodeResolve({
@@ -284,7 +284,50 @@ const clientCustomHmrConfig = defineConfig({
       preferBuiltins: false,
     }),
     typescript(),
+    {
+      name: 'resolve-vite-client',
+      resolveId(id) {
+        if (id.startsWith('@vite/')) {
+          return id;
+        }
+      },
+      load(id) {
+        if (id.startsWith('@vite/')) {
+          const code = fs.readFileSync(
+            path.resolve(
+              require.resolve('vite/package.json'),
+              '../dist/client',
+              `${id.replace(/^@vite\//, '')}.mjs`,
+            ),
+            'utf8',
+          );
+
+          // https://github.com/vitejs/vite/blob/HEAD/packages/vite/src/node/plugins/clientInjections.ts
+          function escapeReplacement(value) {
+            const jsonValue = JSON.stringify(value);
+            return () => jsonValue;
+          }
+          return code
+            .replace(/__DEFINES__/g, escapeReplacement({}))
+            .replace(`__MODE__`, escapeReplacement('development'))
+            .replace(/__BASE__/g, escapeReplacement('/'))
+            .replace(`__SERVER_HOST__`, escapeReplacement('localhost:5173/'))
+            .replace(`__HMR_PROTOCOL__`, escapeReplacement(null))
+            .replace(`__HMR_HOSTNAME__`, escapeReplacement(null))
+            .replace(`__HMR_PORT__`, escapeReplacement(null))
+            .replace(
+              `__HMR_DIRECT_TARGET__`,
+              escapeReplacement('localhost:5173/'),
+            )
+            .replace(`__HMR_BASE__`, escapeReplacement('/'))
+            .replace(`__HMR_TIMEOUT__`, escapeReplacement(30000))
+            .replace(`__HMR_ENABLE_OVERLAY__`, escapeReplacement(true))
+            .replace(`__HMR_CONFIG_NAME__`, escapeReplacement('vite.config.ts'))
+            .replace(`__WS_TOKEN__`, escapeReplacement('dummy'));
+        }
+      },
+    },
   ],
 });
 
-export default defineConfig([workerConfig, dtsConfig, clientCustomHmrConfig]);
+export default defineConfig([workerConfig, dtsConfig, clientConfig]);

@@ -1,0 +1,6 @@
+name = "vivliostyle-pub-app"
+compatibility_date = "2025-04-01"
+
+[assets]
+directory = "./packages/viola/dist/"
+not_found_handling = "single-page-application"

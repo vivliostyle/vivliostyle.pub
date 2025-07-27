@@ -18,7 +18,7 @@ self.addEventListener('fetch', (event) => {
   if (
     location.origin !== url.origin ||
     !location.hostname.split('.')[0].startsWith('sandbox-') ||
-    url.pathname.startsWith('/@cli/')
+    url.pathname.startsWith('/_cli/')
   ) {
     return;
   }
@@ -42,9 +42,8 @@ async function handleNavigate(event: FetchEvent) {
   const { request } = event;
   const url = new URL(request.url);
 
-  if (url.pathname === '/iframe') {
-    const iframeHtml =
-      '<!doctype html><html><head><script src="/src/iframe/setup.ts" type="module"></script><meta charset="UTF-8" /></head><body></body></html>';
+  if (url.pathname === '/sandbox') {
+    const iframeHtml = import.meta.env.VITE_IFRAME_HTML;
     return new Response(iframeHtml, {
       status: 200,
       headers: {
@@ -59,7 +58,7 @@ async function handleNavigate(event: FetchEvent) {
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
     url.hostname = url.hostname.split('.').slice(1).join('.');
-    url.pathname = '/@cli/viewer/index.html';
+    url.pathname = '/_cli/viewer/index.html';
     const viewerHtml = await fetch(url, { mode: 'cors' }).then((res) =>
       res.text(),
     );
@@ -84,7 +83,7 @@ async function handleRequest(event: FetchEvent) {
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
     url.hostname = url.hostname.split('.').slice(1).join('.');
-    url.pathname = `/@cli/viewer${url.pathname.slice('/__vivliostyle-viewer'.length)}`;
+    url.pathname = `/_cli/viewer${url.pathname.slice('/__vivliostyle-viewer'.length)}`;
     return fetch(url, { mode: 'no-cors' });
   }
 

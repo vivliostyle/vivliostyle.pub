@@ -32,8 +32,8 @@ let server: ViteDevServer;
 
 export async function setupServer() {
   await Promise.all([
-    initialize({ wasmURL: '/@cli/esbuild.wasm' }),
-    initRollup({ module_or_path: '/@cli/bindings_wasm_bg.wasm' }),
+    initialize({ wasmURL: '/_cli/esbuild.wasm' }),
+    initRollup({ module_or_path: '/_cli/bindings_wasm_bg.wasm' }),
   ]);
   server = await createServer({
     root: '/workdir',
