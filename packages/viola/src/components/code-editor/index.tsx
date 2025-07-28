@@ -19,7 +19,7 @@ import {
 } from '@codemirror/view';
 import { useCallback, useEffect, useRef } from 'react';
 
-export function CodeEditor({
+export default function CodeEditor({
   defaultCode = '',
   onCodeUpdate,
   ...other

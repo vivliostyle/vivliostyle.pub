@@ -1,4 +1,4 @@
-import { use, useId, useState } from 'react';
+import { lazy, use, useId, useState } from 'react';
 import { useDebounce } from 'react-use';
 import { ref, useSnapshot } from 'valtio';
 
@@ -10,7 +10,8 @@ import { installTheme } from '../../stores/actions/install-theme';
 import { $project } from '../../stores/project';
 import { $sandbox } from '../../stores/sandbox';
 import { $theme } from '../../stores/theme';
-import { CodeEditor } from '../code-editor';
+
+const CodeEditor = lazy(() => import('../code-editor'));
 
 const officialThemes = [
   { packageName: '@vivliostyle/theme-base', title: 'Base Theme' },
