@@ -44,6 +44,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-use": "catalog:",
+    "rollup-plugin-visualizer": "catalog:",
     "sirv": "3.0.0",
     "tailwindcss": "catalog:",
     "tailwindcss-animate": "catalog:",

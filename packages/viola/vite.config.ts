@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
+import { visualizer } from 'rollup-plugin-visualizer';
 import sirv from 'sirv';
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // @ts-expect-error
@@ -154,6 +155,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       serviceWorker(),
       serveCli(),
+      visualizer() as PluginOption,
     ],
     server: {
       https: {
