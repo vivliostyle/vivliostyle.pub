@@ -61,7 +61,6 @@ catalog:
   pnpm: 10.12.1
   react: 19.1.0
   react-dom: 19.1.0
-  react-shadow: 20.6.0
   react-use: 17.6.0
   semver: 7.7.1
   tailwindcss: 4.0.12

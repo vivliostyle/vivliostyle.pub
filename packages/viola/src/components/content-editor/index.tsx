@@ -1,13 +1,20 @@
 import { EditorContent, EditorContext, useCurrentEditor } from '@tiptap/react';
 import { invariant } from 'outvariant';
-import { useEffect, useLayoutEffect, useRef } from 'react';
-import shadowRoot from 'react-shadow';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
 import { $content, type ContentId } from '../../stores/content';
 import { $theme } from '../../stores/theme';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
+
+function ShadowContent({
+  children,
+  root,
+}: React.PropsWithChildren<{ root: Element | DocumentFragment }>) {
+  return createPortal(children, root);
+}
 
 const editorBaseStyleSheet = new CSSStyleSheet();
 editorBaseStyleSheet.replaceSync(
@@ -17,21 +24,24 @@ editorBaseStyleSheet.replaceSync(
 const editorThemeStyleSheet = new CSSStyleSheet();
 
 function EditorStyleContainer({ children }: React.PropsWithChildren) {
+  const node = useRef<HTMLDivElement | null>(null);
+  const [root, setRoot] = useState<DocumentFragment | null>(null);
   const themeSnap = useSnapshot($theme);
-  const shadowRootRef = useRef<ShadowRoot | null>(null);
 
   useLayoutEffect(() => {
-    if (
-      !shadowRootRef.current ||
-      shadowRootRef.current.adoptedStyleSheets.length > 0
-    ) {
+    if (!node.current || node.current.shadowRoot) {
       return;
     }
-    shadowRootRef.current.adoptedStyleSheets = [
+    const shadowRoot = node.current.attachShadow({
+      mode: 'open',
+      delegatesFocus: false,
+    });
+    shadowRoot.adoptedStyleSheets = [
       editorBaseStyleSheet,
       editorThemeStyleSheet,
     ];
-  }, []);
+    setRoot(shadowRoot);
+  }, [node]);
 
   useEffect(() => {
     const css = `
@@ -42,14 +52,9 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
   }, [themeSnap.bundledCss, themeSnap.customCss]);
 
   return (
-    <shadowRoot.div
-      className="h-full"
-      ref={(el) => {
-        shadowRootRef.current = el?.shadowRoot ?? null;
-      }}
-    >
-      {children}
-    </shadowRoot.div>
+    <div ref={node} className="h-full">
+      {root && <ShadowContent root={root}>{children}</ShadowContent>}
+    </div>
   );
 }
 
