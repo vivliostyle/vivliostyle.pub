@@ -24,7 +24,7 @@ const PreviewIframe = () => {
       title="Preview"
       src={url}
       className="size-full"
-      sandbox="allow-same-origin allow-scripts"
+      sandbox="allow-same-origin allow-scripts allow-modals"
     />
   );
 };

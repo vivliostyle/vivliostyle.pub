@@ -37,6 +37,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 const channel = new BroadcastChannel('worker:cli');
+const cli = Comlink.wrap<typeof import('@v/cli-bundle')>(channel);
 
 async function handleNavigate(event: FetchEvent) {
   const { request } = event;
@@ -112,12 +113,9 @@ async function handleRequest(event: FetchEvent) {
 
   try {
     const ret = await Promise.race([
-      Comlink.wrap<typeof import('@v/cli-bundle')>(channel).serve(
-        request.url,
-        requestInit,
-      ),
+      cli.serve(request.url, requestInit),
       new Promise<never>((_, reject) =>
-        setTimeout(reject, 5000, new Error('Request timeout')),
+        setTimeout(reject, 5000, new Error(`Request timeout: ${request.url}`)),
       ),
     ]);
     return new Response(...ret);
