@@ -21,7 +21,7 @@ jobs:
       preview-alias: ${{ steps.build-env.outputs.preview-alias }}
       hostname: ${{ steps.build-env.outputs.hostname }}
     steps:
-      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
       - name: Determine build environment
         id: build-env
         run: |
@@ -44,7 +44,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
       - run: pnpm build
         env:
           VITE_APP_HOSTNAME: ${{ needs.build.outputs.hostname }}
