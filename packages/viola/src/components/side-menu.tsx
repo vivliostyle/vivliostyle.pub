@@ -1,15 +1,38 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { Link } from '@tanstack/react-router';
 import type React from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
+import { Button } from '@v/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@v/ui/dropdown';
-import { MoreHorizontal } from '@v/ui/icon';
+import { BookOpen, CirclePlus, MoreHorizontal, Palette } from '@v/ui/icon';
 import { cn } from '@v/ui/lib/utils';
 import {
   Sidebar,
@@ -23,10 +46,13 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubItem,
+  SidebarSeparator,
 } from '@v/ui/sidebar';
+import VivliostyleLogo from '../assets/vivliostyle-logo.svg';
 import {
   createContentFile,
   deleteContentFile,
+  moveContentFileInReadingOrder,
 } from '../stores/actions/content-file';
 import {
   exportEpub,
@@ -38,60 +64,108 @@ import {
   type ContentId,
   type HierarchicalReadingOrder,
 } from '../stores/content';
+import { $project } from '../stores/project';
 
-function CreateNewFileButton() {
+const DraggingContentContext = createContext<ContentId | null>(null);
+
+function AddNewFileButton({ children }: React.PropsWithChildren) {
   return (
-    <button
-      type="button"
+    <SidebarMenuButton
       onClick={() => createContentFile({ format: 'markdown' })}
     >
-      Create a new file
-    </button>
+      {children}
+    </SidebarMenuButton>
   );
 }
 
-function WorkspaceMenu() {
+function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="start">
+        <DropdownMenuItem inset onClick={exportEpub}>
+          <span>Export EPUB</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem inset onClick={exportWebPub}>
+          <span>Export Web Publication</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem inset onClick={exportProjectZip}>
+          <span>Export Vivliostyle Project files</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel
+          inset
+          className={cn('text-xs text-muted-foreground my-1')}
+        >
+          <p>Vivliostyle Pub Alpha</p>
+        </DropdownMenuLabel>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent side="right" align="start">
+        <DropdownMenuItem asChild>
+          <Link to="/bibliography">
+            <BookOpen />
+            <span>Bibliography</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/theme">
+            <Palette />
+            <span>Customize theme</span>
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function TopMenuSection() {
+  const projectSnap = useSnapshot($project);
+  return (
+    <SidebarMenu>
+      <div className={cn('flex items-center gap-0.5')}>
+        <ApplicationDropdownMenu>
+          <Button variant="ghost" size="icon" className={cn('h-10 w-10 p-2')}>
+            <img src={VivliostyleLogo} alt="" />
+            <div className="sr-only">Open workspace menu</div>
+          </Button>
+        </ApplicationDropdownMenu>
+        <ProjectDropdownMenu>
+          <SidebarMenuButton
+            className={cn(
+              'font-semibold px-0.5',
+              !projectSnap.bibliography.title && 'text-muted-foreground',
+            )}
+          >
+            <span>{projectSnap.bibliography.title || 'Untitled'}</span>
+          </SidebarMenuButton>
+        </ProjectDropdownMenu>
+      </div>
+    </SidebarMenu>
+  );
+}
+
+function ContentMenuSection() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton>
-              <span className="font-semibold">Vivliostyle Pub</span>
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start">
-            <DropdownMenuItem asChild>
-              <Link to="/bibliography">
-                <span>Bibliography</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/theme">
-                <span>Customize theme</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={exportEpub}>
-              <span>Export EPUB</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={exportWebPub}>
-              <span>Export Web Publication</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={exportProjectZip}>
-              <span>Export Vivliostyle Project files</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <CreateNewFileButton />
+        <AddNewFileButton>
+          <CirclePlus />
+          Add new file
+        </AddNewFileButton>
       </SidebarMenuItem>
     </SidebarMenu>
   );
 }
 
-function FileMenu({
+function FileDropdownMenu({
   contentId,
   children,
 }: React.PropsWithChildren<{ contentId: ContentId }>) {
@@ -125,13 +199,32 @@ function FileTreeItem({
   }
 >) {
   const content = useSnapshot($content);
+  const draggingContentId = useContext(DraggingContentContext);
+  const sortable = typeof item === 'string' && useSortable({ id: item });
 
   const file = typeof item === 'string' ? content.files.get(item) : undefined;
 
   const Item = name === '.' ? SidebarMenuItem : SidebarMenuSubItem;
 
   return (
-    <Item className="group/file-tree-item" {...other}>
+    <Item
+      className="group/file-tree-item touch-manipulation"
+      {...(sortable
+        ? {
+            ref: sortable.setNodeRef,
+            style: {
+              transform: sortable.transform
+                ? `translate3d(${sortable.transform.x}px, ${sortable.transform.y}px, 0)`
+                : undefined,
+              transition: sortable.transition,
+              opacity: draggingContentId === item ? 0 : 1,
+            },
+            ...sortable.attributes,
+            ...sortable.listeners,
+          }
+        : {})}
+      {...other}
+    >
       <SidebarMenuButton
         size="sm"
         variant={typeof item === 'string' ? 'default' : 'heading'}
@@ -148,14 +241,33 @@ function FileTreeItem({
         )}
       </SidebarMenuButton>
       {typeof item === 'string' && (
-        <FileMenu contentId={item}>
+        <FileDropdownMenu contentId={item}>
           <SidebarMenuAction className="opacity-0 group-hover/file-tree-item:opacity-100 group-has-[*:focus]/file-tree-item:opacity-100 data-[state=open]:opacity-100">
             <MoreHorizontal aria-label="Open menu" />
           </SidebarMenuAction>
-        </FileMenu>
+        </FileDropdownMenu>
       )}
       {children}
     </Item>
+  );
+}
+
+function FileTreeDraggingItem() {
+  const draggingContentId = useContext(DraggingContentContext);
+  const content = useSnapshot($content);
+  const file = draggingContentId && content.files.get(draggingContentId);
+
+  if (!file) {
+    return null;
+  }
+  return (
+    <SidebarMenuItem>
+      <div className="opacity-80 flex w-full items-center gap-2 overflow-hidden rounded-md px-2 text-left bg-sidebar-accent text-sidebar-accent-foreground [&>span:last-child]:truncate text-sm min-h-7">
+        <span className={cn(!file?.summary && 'text-muted-foreground')}>
+          {file?.summary || 'Empty file'}
+        </span>
+      </div>
+    </SidebarMenuItem>
   );
 }
 
@@ -189,17 +301,64 @@ function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
 
 function FileTree() {
   const content = useSnapshot($content);
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const [draggingContentId, setDraggingContentId] = useState<ContentId | null>(
+    null,
+  );
+  const onDragStart = useCallback(({ active }: DragStartEvent) => {
+    setDraggingContentId(active.id as ContentId);
+  }, []);
+  const onDragEnd = useCallback(({ active, over }: DragEndEvent) => {
+    setDraggingContentId(null);
+    if (over && active.id !== over.id) {
+      moveContentFileInReadingOrder({
+        fromContentId: [active.id as ContentId],
+        toContentId: over.id as ContentId,
+        fromDepth: 0,
+        toDepth: 0,
+      });
+    }
+  }, []);
+  const onDragCancel = useCallback(() => {
+    setDraggingContentId(null);
+  }, []);
 
   return (
-    <FileTreeGroup
-      tree={
-        (
-          content as unknown as {
-            hierarchicalReadingOrder: HierarchicalReadingOrder;
-          }
-        ).hierarchicalReadingOrder
-      }
-    />
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
+      {...{ onDragStart, onDragEnd, onDragCancel }}
+    >
+      <DraggingContentContext.Provider value={draggingContentId}>
+        <SortableContext
+          items={[...content.readingOrder]}
+          strategy={verticalListSortingStrategy}
+        >
+          <FileTreeGroup
+            tree={
+              // @ts-ignore: Type instantiation is excessively deep and possibly infinite.
+              content.hierarchicalReadingOrder as HierarchicalReadingOrder
+            }
+          />
+        </SortableContext>
+        {createPortal(
+          <DragOverlay dropAnimation={null}>
+            {draggingContentId && <FileTreeDraggingItem />}
+          </DragOverlay>,
+          document.body,
+        )}
+      </DraggingContentContext.Provider>
+    </DndContext>
   );
 }
 
@@ -207,9 +366,15 @@ export function SideMenu() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <WorkspaceMenu />
+        <TopMenuSection />
       </SidebarHeader>
+      <SidebarSeparator />
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <ContentMenuSection />
+          </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupContent>
             <FileTree />

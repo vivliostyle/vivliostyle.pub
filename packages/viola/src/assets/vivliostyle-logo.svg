@@ -1,0 +1,20 @@
+<svg width="116" height="116" viewBox="0 0 116 116" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M57.8375 115.402C89.7803 115.402 115.675 89.5686 115.675 57.7011C115.675 25.8337 89.7803 0 57.8375 0C25.8947 0 0 25.8337 0 57.7011C0 89.5686 25.8947 115.402 57.8375 115.402Z" fill="url(#paint0_radial_4665_13)"/>
+<mask id="mask0_4665_13" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="116" height="116">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M57.8375 115.402C89.7803 115.402 115.675 89.5686 115.675 57.7011C115.675 25.8337 89.7803 0 57.8375 0C25.8947 0 0 25.8337 0 57.7011C0 89.5686 25.8947 115.402 57.8375 115.402Z" fill="white"/>
+</mask>
+<g mask="url(#mask0_4665_13)">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M82.2613 70.8638C28.6144 -2.33969 -3.60905 -11.0707 -3.60905 -11.0707C-34.3415 -12.6338 -25.4307 54.0619 -25.4307 54.0619C-25.4307 54.0619 18.5031 47.7499 82.2613 120.917V70.8638Z" fill="#D15430"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M82.165 70.8638C135.812 -2.33969 168.035 -11.0707 168.035 -11.0707C198.768 -12.6338 189.857 54.0619 189.857 54.0619C189.857 54.0619 145.923 47.7499 82.165 120.917V70.8638Z" fill="#73281B"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M82.2612 79.801C21.4593 8.69013 -16.457 13.9707 -16.457 13.9707L-21.1626 29.5093C-21.1626 29.5093 17.4388 21.0782 82.2612 94.6658V79.801Z" fill="#D5663F"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M82.165 79.801C142.967 8.69013 180.883 13.9707 180.883 13.9707L185.589 29.5093C185.589 29.5093 146.987 21.0782 82.165 94.6658V79.801Z" fill="#C5542C"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M82.261 70.8594C28.5601 -2.46858 -3.69585 -11.2144 -3.69585 -11.2144C-34.4592 -12.7802 -17.845 14.687 -17.845 14.687C-17.845 14.687 25.1113 12.6342 82.261 80.3384V70.8594Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M82.1646 70.8594C135.866 -2.46858 168.121 -11.2144 168.121 -11.2144C198.885 -12.7802 182.271 14.687 182.271 14.687C182.271 14.687 139.314 12.6342 82.1646 80.3384V70.8594Z" fill="white"/>
+</g>
+<defs>
+<radialGradient id="paint0_radial_4665_13" cx="0" cy="0" r="1" gradientTransform="matrix(69.6912 91.3918 -91.6078 69.5268 27.5091 10.8593)" gradientUnits="userSpaceOnUse">
+<stop stop-color="#257FC9"/>
+<stop offset="1" stop-color="#1A1194"/>
+</radialGradient>
+</defs>
+</svg>

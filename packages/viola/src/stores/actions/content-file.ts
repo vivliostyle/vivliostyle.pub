@@ -1,5 +1,6 @@
+import type { EntryConfig } from '@vivliostyle/cli/schema';
 import { invariant } from 'outvariant';
-import { dirname, join } from 'pathe';
+import { dirname, join, sep } from 'pathe';
 import { ref } from 'valtio';
 
 import { setupEditor } from '../../libs/editor';
@@ -73,4 +74,92 @@ export async function deleteContentFile({
     join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
   ];
   return contentId;
+}
+
+export function moveContentFileInReadingOrder({
+  fromContentId,
+  toContentId,
+  fromDepth,
+  toDepth,
+}: {
+  fromContentId: ContentId[];
+  toContentId: ContentId;
+  fromDepth: number;
+  toDepth: number;
+}) {
+  const fromItems = fromContentId.map((id) => {
+    const item = $content.files.get(id);
+    invariant(item, `File does not exist: ${id}`);
+    return item;
+  });
+  const toItem = $content.files.get(toContentId);
+  invariant(toItem, `File does not exist: ${toContentId}`);
+  const fromIndexes = fromContentId.map((id) => {
+    const index = $content.readingOrder.indexOf(id);
+    invariant(index !== -1, `File not in reading order: ${id}`);
+    return index;
+  });
+  const toIndex = $content.readingOrder.indexOf(toContentId);
+  invariant(toIndex !== -1, `File not in reading order: ${toContentId}`);
+
+  const renamedFiles: [string, string][] = [];
+  const entryContext = $sandbox.vivliostyleConfig.entryContext || '';
+
+  // update content
+  const toFolder = toItem.filename.split(sep).slice(0, toDepth);
+  for (const item of fromItems) {
+    const newFilename = [
+      ...toFolder,
+      ...item.filename.split(sep).slice(fromDepth),
+    ].join(sep);
+    if (newFilename === item.filename) {
+      continue;
+    }
+    renamedFiles.push([
+      join(entryContext, item.filename),
+      join(entryContext, newFilename),
+    ]);
+    item.filename = newFilename;
+  }
+  const arr = $content.readingOrder.filter((id) => !fromContentId.includes(id));
+  const insertIndex =
+    arr.indexOf(toContentId) + (toIndex > Math.min(...fromIndexes) ? 1 : 0);
+  $content.readingOrder = [
+    ...arr.slice(0, insertIndex),
+    ...fromContentId,
+    ...arr.slice(insertIndex),
+  ];
+
+  // update sandbox
+  for (const [oldFilename, newFilename] of renamedFiles) {
+    $sandbox.files[newFilename] = $sandbox.files[oldFilename];
+    delete $sandbox.files[oldFilename];
+  }
+  $sandbox.updateVivliostyleConfig((config) => {
+    const getPath = (it: EntryConfig | string) =>
+      typeof it === 'string' ? it : it.path;
+    const entries = [config.entry].flat();
+    const arr = entries.filter((_, index) => !fromIndexes.includes(index));
+    const insertIndex =
+      arr.findIndex((it) => getPath(it) === getPath(entries[toIndex])) +
+      (toIndex > Math.min(...fromIndexes) ? 1 : 0);
+    config.entry = [
+      ...arr.slice(0, insertIndex),
+      ...entries
+        .filter((_, index) => fromIndexes.includes(index))
+        .map((it) => {
+          const filename = getPath(it);
+          const renamed = renamedFiles.find(
+            ([oldFilename]) => oldFilename === filename,
+          );
+          if (renamed) {
+            return typeof it === 'string'
+              ? renamed[1]
+              : { ...it, path: renamed[1] };
+          }
+          return it;
+        }),
+      ...arr.slice(insertIndex),
+    ];
+  });
 }
