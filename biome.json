@@ -34,7 +34,8 @@
     "includes": [
       "**",
       "!**/packages/cli-bundle/src/stubs/rollup/**/*",
-      "!**/vivliostyle-pub/**/*"
+      "!**/vivliostyle-pub/**/*",
+      "!**/routeTree.gen.ts"
     ]
   },
   "formatter": {
