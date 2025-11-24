@@ -1,10 +1,9 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalEnv": ["VITE_APP_*"],
   "tasks": {
     "build": {
-      "dependsOn": ["^build", "build:rollup-wasm", "build:viewer-resource"],
+      "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "dist/**"]
     },
@@ -18,10 +17,25 @@
     },
     "build:viewer-resource": {
       "inputs": [],
-      "outputs": ["dist/viewer.html"]
+      "outputs": ["dist/viewer/**"]
+    },
+    "@v/cli-bundle#build": {
+      "dependsOn": [
+        "^build",
+        "@v/cli-bundle#build:rollup-wasm",
+        "@v/cli-bundle#build:viewer-resource"
+      ],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
+    },
+    "@v/viola#build": {
+      "dependsOn": ["^build"],
+      "env": ["VITE_APP_*"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
     },
     "dev": {
-      "dependsOn": ["build:rollup-wasm", "build:viewer-resource"],
+      "dependsOn": ["@v/cli-bundle#build"],
       "cache": false,
       "persistent": true
     },

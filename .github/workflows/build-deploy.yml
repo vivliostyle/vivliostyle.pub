@@ -16,25 +16,46 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      VITE_APP_HOSTNAME: alpha.vivliostyle.pub
+    outputs:
+      preview: ${{ steps.build-env.outputs.preview }}
+      preview-alias: ${{ steps.build-env.outputs.preview-alias }}
+      hostname: ${{ steps.build-env.outputs.hostname }}
     steps:
       - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
+      - name: Determine build environment
+        id: build-env
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "preview=false" >> $GITHUB_OUTPUT
+            echo "hostname=alpha.vivliostyle.pub" >> $GITHUB_OUTPUT
+          else
+            echo "preview=true" >> $GITHUB_OUTPUT
+            echo "preview-alias=pr-preview-${{ github.event.number }}" >> $GITHUB_OUTPUT
+            echo "hostname=pr-preview-${{ github.event.number }}-vivliostyle-pub-app.vivliostyle.workers.dev" >> $GITHUB_OUTPUT
+          fi
       - run: pnpm build
+        env:
+          VITE_APP_HOSTNAME: ${{ steps.build-env.outputs.hostname }}
 
   deploy:
-    # if: ${{ github.ref == 'refs/heads/main' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      VITE_APP_HOSTNAME: alpha.vivliostyle.pub
     steps:
       - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
       - run: pnpm build
-      - uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.50.0'
+        env:
+          VITE_APP_HOSTNAME: ${{ needs.build.outputs.hostname }}
+      - name: Deploy production
+        if: ${{ !fromJSON(needs.build.outputs.preview) }}
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy preview
+        if: ${{ fromJSON(needs.build.outputs.preview) }}
+        run: npx wrangler versions upload --preview-alias ${{ needs.build.outputs.preview-alias }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
