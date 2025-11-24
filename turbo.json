@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": ["VITE_APP_*"],
   "tasks": {
     "build": {
       "dependsOn": ["^build", "build:rollup-wasm", "build:viewer-resource"],

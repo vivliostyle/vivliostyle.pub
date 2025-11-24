@@ -1,4 +1,4 @@
-name: deploy
+name: build-deploy
 
 on:
   push:
@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      VITE_APP_HOSTNAME: alpha.vivliostyle.pub
     steps:
       - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
       - run: pnpm build
@@ -26,6 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      VITE_APP_HOSTNAME: alpha.vivliostyle.pub
     steps:
       - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
       - run: pnpm build
