@@ -13,7 +13,7 @@ on:
 
 jobs:
   setup:
-    uses: vivliostyle/vivliostyle.pub/.github/workflows/setup.yml@main
+    uses: vivliostyle/vivliostyle.pub/.github/workflows/setup.yml@ci/deploy
 
   build:
     needs: setup
