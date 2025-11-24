@@ -12,15 +12,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  setup:
-    uses: vivliostyle/vivliostyle.pub/.github/workflows/setup.yml@ci/deploy
-
   build:
-    needs: setup
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
       - run: pnpm build
 
   deploy:
@@ -30,4 +27,5 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
       - run: pnpm build
