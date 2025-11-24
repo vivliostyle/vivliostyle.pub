@@ -27,7 +27,7 @@ export async function setupProject(projectId: string) {
     $sandbox.updateVivliostyleConfig((config) => {
       config.entryContext = 'contents';
       config.entry = [];
-      config.title = 'title';
+      config.title = '';
       config.theme = ['@vivliostyle/theme-base', './style.css'];
     });
     $sandbox.files['style.css'] = ref(
