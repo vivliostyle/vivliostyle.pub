@@ -132,7 +132,7 @@ const serviceWorker = () => [
 ];
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, secretsDir);
 
   return {
@@ -157,26 +157,31 @@ export default defineConfig(({ mode }) => {
       serveCli(),
       visualizer() as PluginOption,
     ],
-    server: {
-      https: {
-        key: fs.readFileSync(path.join(secretsDir, 'certs/privkey.pem')),
-        cert: fs.readFileSync(path.join(secretsDir, 'certs/fullchain.pem')),
-      },
-      headers: {
-        'Cross-Origin-Embedder-Policy': 'credentialless',
-        'Cross-Origin-Opener-Policy': 'same-origin',
-        'Cross-Origin-Resource-Policy': 'cross-origin',
-      },
-      allowedHosts: [
-        // Leading dot allows any subdomains
-        `.${env.VITE_APP_HOSTNAME}`,
-      ],
-      cors: {
-        origin: new RegExp(
-          `^https?://([\\w-]+\\.)?${env.VITE_APP_HOSTNAME.replace('.', '\\.')}(?::\\d+)$`,
-        ),
-      },
-    },
+    server:
+      command === 'serve'
+        ? {
+            https: {
+              key: fs.readFileSync(path.join(secretsDir, 'certs/privkey.pem')),
+              cert: fs.readFileSync(
+                path.join(secretsDir, 'certs/fullchain.pem'),
+              ),
+            },
+            headers: {
+              'Cross-Origin-Embedder-Policy': 'credentialless',
+              'Cross-Origin-Opener-Policy': 'same-origin',
+              'Cross-Origin-Resource-Policy': 'cross-origin',
+            },
+            allowedHosts: [
+              // Leading dot allows any subdomains
+              `.${env.VITE_APP_HOSTNAME}`,
+            ],
+            cors: {
+              origin: new RegExp(
+                `^https?://([\\w-]+\\.)?${env.VITE_APP_HOSTNAME.replace('.', '\\.')}(?::\\d+)$`,
+              ),
+            },
+          }
+        : undefined,
     envDir: secretsDir,
   };
 });
