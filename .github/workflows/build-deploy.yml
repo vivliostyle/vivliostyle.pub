@@ -1,4 +1,4 @@
-name: deploy
+name: build-deploy
 
 on:
   push:
@@ -12,22 +12,29 @@ on:
   workflow_dispatch:
 
 jobs:
-  setup:
-    uses: vivliostyle/vivliostyle.pub/.github/workflows/setup.yml@main
-
   build:
-    needs: setup
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      VITE_APP_HOSTNAME: alpha.vivliostyle.pub
     steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
       - run: pnpm build
 
   deploy:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    # if: ${{ github.ref == 'refs/heads/main' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      VITE_APP_HOSTNAME: alpha.vivliostyle.pub
     steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@ci/deploy
       - run: pnpm build
+      - uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.50.0'

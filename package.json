@@ -22,7 +22,7 @@
   },
   "lint-staged": {
     "*": [
-      "biome format --write --files-ignore-unknown=true"
+      "biome format --write --files-ignore-unknown=true --no-errors-on-unmatched"
     ]
   },
   "pnpm": {
