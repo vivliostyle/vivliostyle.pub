@@ -17,7 +17,6 @@ import { Text } from '@tiptap/extension-text';
 import { Underline } from '@tiptap/extension-underline';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 
-import { LineBreak } from './extensions/line-break';
 import { Vfm } from './extensions/vfm';
 
 export const PubExtensions = Extension.create({
@@ -25,9 +24,6 @@ export const PubExtensions = Extension.create({
 
   addExtensions() {
     return [
-      // Override core extensions
-      LineBreak.configure(),
-
       // Starter kit extensions
       Bold.configure({}),
       Blockquote.configure({}),
