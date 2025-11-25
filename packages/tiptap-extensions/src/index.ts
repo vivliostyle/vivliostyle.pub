@@ -5,17 +5,17 @@ import { BulletList } from '@tiptap/extension-bullet-list';
 import { Code } from '@tiptap/extension-code';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import { Document } from '@tiptap/extension-document';
-import { Dropcursor } from '@tiptap/extension-dropcursor';
-import { Gapcursor } from '@tiptap/extension-gapcursor';
 import { HardBreak } from '@tiptap/extension-hard-break';
 import { Heading } from '@tiptap/extension-heading';
 import { HorizontalRule } from '@tiptap/extension-horizontal-rule';
 import { Italic } from '@tiptap/extension-italic';
-import { ListItem } from '@tiptap/extension-list-item';
-import { OrderedList } from '@tiptap/extension-ordered-list';
+import { Link } from '@tiptap/extension-link';
+import { ListItem, ListKeymap, OrderedList } from '@tiptap/extension-list';
 import { Paragraph } from '@tiptap/extension-paragraph';
 import { Strike } from '@tiptap/extension-strike';
 import { Text } from '@tiptap/extension-text';
+import { Underline } from '@tiptap/extension-underline';
+import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 
 import { LineBreak } from './extensions/line-break';
 import { Vfm } from './extensions/vfm';
@@ -39,14 +39,18 @@ export const PubExtensions = Extension.create({
       Gapcursor.configure({}),
       HardBreak.configure({}),
       Heading.configure({}),
-      // History.configure({}),
+      // UndoRedo.configure({}),
       HorizontalRule.configure({}),
       Italic.configure({}),
       ListItem.configure({}),
+      ListKeymap.configure({}),
+      Link.configure({}),
       OrderedList.configure({}),
       Paragraph.configure({}),
       Strike.configure({}),
       Text.configure({}),
+      Underline.configure({}),
+      // TrailingNode.configure({}),
 
       Vfm.configure({}),
     ];

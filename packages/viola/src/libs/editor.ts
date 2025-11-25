@@ -4,7 +4,7 @@ import {
   getSchema,
   type Content as TiptapContent,
 } from '@tiptap/core';
-import { Placeholder } from '@tiptap/extension-placeholder';
+import { Placeholder } from '@tiptap/extensions';
 import * as idb from 'idb';
 import { join } from 'pathe';
 import { ref } from 'valtio';
