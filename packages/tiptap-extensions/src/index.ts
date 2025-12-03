@@ -16,8 +16,7 @@ import { Strike } from '@tiptap/extension-strike';
 import { Text } from '@tiptap/extension-text';
 import { Underline } from '@tiptap/extension-underline';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
-
-import { Vfm } from './extensions/vfm';
+import { Markdown } from '@tiptap/markdown';
 
 export const PubExtensions = Extension.create({
   name: 'pubExtensions',
@@ -48,7 +47,7 @@ export const PubExtensions = Extension.create({
       Underline.configure({}),
       // TrailingNode.configure({}),
 
-      Vfm.configure({}),
+      Markdown.configure({}),
     ];
   },
 });

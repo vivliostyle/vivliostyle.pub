@@ -31,6 +31,7 @@
     "@tiptap/extension-text-style": "catalog:",
     "@tiptap/extension-underline": "catalog:",
     "@tiptap/extensions": "catalog:",
+    "@tiptap/markdown": "catalog:",
     "@tiptap/pm": "catalog:",
     "@v/config": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
