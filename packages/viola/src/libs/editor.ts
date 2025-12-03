@@ -1,17 +1,11 @@
-import {
-  Editor,
-  type Extensions,
-  getSchema,
-  type Content as TiptapContent,
-} from '@tiptap/core';
-import { Placeholder } from '@tiptap/extension-placeholder';
+import { Editor, type Extensions } from '@tiptap/core';
+import { Placeholder } from '@tiptap/extensions';
 import * as idb from 'idb';
 import { join } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
 
 import { PubExtensions } from '@v/tiptap-extensions';
-import { fromVfm } from '@v/tiptap-extensions/vfm';
 import { debounce } from '../libs/debounce';
 import { $content, type ContentId } from '../stores/content';
 import { $sandbox } from '../stores/sandbox';
@@ -106,16 +100,10 @@ const saveContent = debounce(
         .split('\n')
         .find((s) => s.trim())
         ?.trim() || '';
-    editor
-      .chain()
-      .exportVfm({
-        onExport: (vfm) => {
-          $sandbox.files[
-            join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
-          ] = ref(new Blob([vfm], { type: 'text/markdown' }));
-        },
-      })
-      .run();
+    const markdown = editor.getMarkdown();
+    $sandbox.files[
+      join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
+    ] = ref(new Blob([markdown], { type: 'text/markdown' }));
   },
   1000,
   { trailing: true },
@@ -141,15 +129,11 @@ export async function setupEditor({
     // }),
   ] satisfies Extensions;
 
-  let initialContent: ReturnType<typeof fromVfm> | undefined;
   const markdown = await initialFile?.text();
-  if (markdown?.trim()) {
-    initialContent = fromVfm(markdown, getSchema(extensions));
-  }
-
   return new Editor({
     extensions,
-    content: initialContent as unknown as TiptapContent,
+    content: markdown?.trim(),
+    contentType: 'markdown',
     onUpdate: ({ editor }) => {
       saveContent({ editor, contentId });
     },

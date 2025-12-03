@@ -24,7 +24,7 @@
     "@tanstack/router-plugin": "catalog:",
     "@tiptap/core": "catalog:",
     "@tiptap/extension-collaboration": "catalog:",
-    "@tiptap/extension-placeholder": "catalog:",
+    "@tiptap/extensions": "catalog:",
     "@tiptap/pm": "catalog:",
     "@tiptap/react": "catalog:",
     "@types/node": "catalog:",
