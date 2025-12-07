@@ -425,7 +425,7 @@ export function VfmAstViewerPane() {
         </code>
       </TabsContent>
       <TabsContent value="html" className="ps-2">
-        <code className="text-sm ">
+        <code className="text-sm">
           {parseHtml(html, htmlTreeParserOptions)}
         </code>
       </TabsContent>
