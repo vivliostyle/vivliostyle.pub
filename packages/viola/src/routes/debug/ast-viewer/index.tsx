@@ -45,6 +45,7 @@ function AstViewerView() {
               ? bs62.encode(new TextEncoder().encode(markdown))
               : undefined,
           }),
+          replace: true,
         });
       },
       [search],
@@ -60,6 +61,7 @@ function AstViewerView() {
                 ? undefined
                 : selectingAstTab,
           }),
+          replace: true,
         });
       },
       [search],
