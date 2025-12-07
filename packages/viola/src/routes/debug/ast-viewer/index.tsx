@@ -98,7 +98,7 @@ function AstViewerView() {
           <div className="sticky top-0 bg-background px-6 py-2 border-b border-neutral-300 text-secondary-foreground font-semibold">
             VFM Preview
           </div>
-          <div className="px-[min(6cqw,2rem)] text-se cursor-default select-none">
+          <div className="px-[min(6cqw,2rem)] cursor-default select-none">
             <VfmPreviewPane />
           </div>
         </section>
