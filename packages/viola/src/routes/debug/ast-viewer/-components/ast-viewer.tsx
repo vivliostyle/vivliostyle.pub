@@ -259,7 +259,7 @@ function AstTreeValue({ value }: { value: unknown }) {
     );
   }
   if (value == null) {
-    <span className="text-muted">{`${value}`}</span>;
+    return <span className="text-muted">{`${value}`}</span>;
   }
   return (
     <span
