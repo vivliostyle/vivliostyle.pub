@@ -36,7 +36,7 @@ jobs:
           if [[ "${{ github.ref_name }}" == "main" ]]; then
             echo "preview=false" >> $GITHUB_OUTPUT
             echo "hostname=alpha.vivliostyle.pub" >> $GITHUB_OUTPUT
-          else
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "preview=true" >> $GITHUB_OUTPUT
             echo "preview-alias=pr-preview-${{ github.event.number }}" >> $GITHUB_OUTPUT
             echo "hostname=pr-preview-${{ github.event.number }}-vivliostyle-pub-app.vivliostyle.workers.dev" >> $GITHUB_OUTPUT
