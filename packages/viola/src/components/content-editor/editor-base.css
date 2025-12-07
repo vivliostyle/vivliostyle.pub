@@ -8,14 +8,15 @@
 
 .editor-root {
   height: 100%;
+  container-type: size;
 }
 
 .tiptap {
   min-height: 100%;
   max-width: 100%;
-  padding-inline: calc(8 * var(--spacing));
-  padding-top: calc(16 * var(--spacing));
-  padding-bottom: calc(100svh - 12rem);
+  padding-inline: min(calc(8 * var(--spacing)), 6cqw);
+  padding-top: max(min(calc(16 * var(--spacing)), 10cqh), 1px);
+  padding-bottom: max(calc(100cqh - 12rem), 1px);
 
   &:focus-visible {
     outline: none;

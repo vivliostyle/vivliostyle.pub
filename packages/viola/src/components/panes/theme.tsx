@@ -157,7 +157,7 @@ export function Theme() {
         <h3 className="text-l font-bold">Edit custom CSS</h3>
         <CodeEditor
           aria-label="Code editor of custom CSS"
-          defaultCode={customCss}
+          code={customCss}
           onCodeUpdate={setCustomCss}
         />
       </section>

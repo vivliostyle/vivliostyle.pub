@@ -6,6 +6,7 @@ import {
   indentWithTab,
 } from '@codemirror/commands';
 import { css } from '@codemirror/lang-css';
+import { markdown } from '@codemirror/lang-markdown';
 import {
   bracketMatching,
   defaultHighlightStyle,
@@ -20,12 +21,14 @@ import {
 import { useCallback, useEffect, useRef } from 'react';
 
 export default function CodeEditor({
-  defaultCode = '',
+  code = '',
   onCodeUpdate,
+  language = 'css',
   ...other
 }: Required<Pick<React.HTMLAttributes<HTMLDivElement>, 'aria-label'>> & {
-  defaultCode?: string;
+  code?: string;
   onCodeUpdate?: (code: string) => void;
+  language?: 'css' | 'markdown';
 }) {
   const currentCode = useRef('');
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -63,7 +66,10 @@ export default function CodeEditor({
           currentCode.current = code;
           onCodeUpdate?.(code);
         }),
-        css(),
+        {
+          css: css(),
+          markdown: markdown(),
+        }[language],
       ],
       parent: editorContainerRef.current,
     });
@@ -72,11 +78,11 @@ export default function CodeEditor({
     return () => {
       editorViewRef.current?.destroy();
     };
-  }, [onCodeUpdate]);
+  }, [onCodeUpdate, language]);
 
   useEffect(() => {
     const editorView = editorViewRef.current;
-    if (!editorView || currentCode.current === defaultCode) {
+    if (!editorView || currentCode.current === code) {
       return;
     }
     window.requestAnimationFrame(() => {
@@ -84,11 +90,11 @@ export default function CodeEditor({
         changes: {
           from: 0,
           to: editorView.state.doc.length,
-          insert: defaultCode,
+          insert: code,
         },
       });
     });
-  }, [defaultCode]);
+  }, [code]);
 
   const handleParentKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {

@@ -1,5 +1,6 @@
 import { EditorContent, EditorContext, useCurrentEditor } from '@tiptap/react';
 import { invariant } from 'outvariant';
+import type React from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
@@ -23,7 +24,7 @@ editorBaseStyleSheet.replaceSync(
 
 const editorThemeStyleSheet = new CSSStyleSheet();
 
-function EditorStyleContainer({ children }: React.PropsWithChildren) {
+export function EditorStyleContainer({ children }: React.PropsWithChildren) {
   const node = useRef<HTMLDivElement | null>(null);
   const [root, setRoot] = useState<DocumentFragment | null>(null);
   const themeSnap = useSnapshot($theme);
@@ -58,14 +59,10 @@ function EditorStyleContainer({ children }: React.PropsWithChildren) {
   );
 }
 
-function EditArea() {
+export function EditArea() {
   const { editor } = useCurrentEditor();
 
-  return (
-    <EditorStyleContainer>
-      <EditorContent {...{ editor }} className="editor-root" />
-    </EditorStyleContainer>
-  );
+  return <EditorContent {...{ editor }} className="editor-root" />;
 }
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
@@ -75,7 +72,9 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
 
   return (
     <EditorContext.Provider value={{ editor: file.editor }}>
-      <EditArea />
+      <EditorStyleContainer>
+        <EditArea />
+      </EditorStyleContainer>
     </EditorContext.Provider>
   );
 }
