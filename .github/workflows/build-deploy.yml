@@ -9,7 +9,15 @@ on:
       - opened
       - synchronize
       - reopened
+  merge_group:
+    types: [checks_requested]
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:

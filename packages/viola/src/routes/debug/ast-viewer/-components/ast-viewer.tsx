@@ -72,7 +72,7 @@ export function RichEditorPane() {
     },
     onUpdate: useCallback(() => {
       setContentInEditor(editor.getMarkdown());
-    }, [editor]),
+    }, []),
   });
 
   const [, cancel] = useDebounce(
