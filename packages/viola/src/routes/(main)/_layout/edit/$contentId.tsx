@@ -1,11 +1,11 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { ref } from 'valtio';
 
-import { generateId } from '../../libs/generate-id';
-import { $content, type ContentId } from '../../stores/content';
-import { $ui } from '../../stores/ui';
+import { generateId } from '../../../../libs/generate-id';
+import { $content, type ContentId } from '../../../../stores/content';
+import { $ui } from '../../../../stores/ui';
 
-export const Route = createFileRoute('/edit/$contentId')({
+export const Route = createFileRoute('/(main)/_layout/edit/$contentId')({
   component: () => null,
   beforeLoad: ({ params }) => {
     const contentId = params.contentId as ContentId;
