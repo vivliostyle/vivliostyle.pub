@@ -18,16 +18,16 @@ function ShadowContent({
 }
 
 const editorBaseStyleSheet = new CSSStyleSheet();
-editorBaseStyleSheet.replaceSync(
-  `${editorBaseCss.replace(/:root/g, ':host')}${editorOverrideCss}`,
-);
+editorBaseStyleSheet.replaceSync(editorBaseCss.replace(/:root/g, ':host'));
 
-const editorThemeStyleSheet = new CSSStyleSheet();
-
-export function EditorStyleContainer({ children }: React.PropsWithChildren) {
+export function EditorStyleContainer({
+  children,
+  bundledCss,
+  customCss,
+}: React.PropsWithChildren<{ bundledCss?: string; customCss?: string }>) {
   const node = useRef<HTMLDivElement | null>(null);
   const [root, setRoot] = useState<DocumentFragment | null>(null);
-  const themeSnap = useSnapshot($theme);
+  const editorConfigurableStyleSheet = useRef(new CSSStyleSheet());
 
   useLayoutEffect(() => {
     if (!node.current || node.current.shadowRoot) {
@@ -39,19 +39,17 @@ export function EditorStyleContainer({ children }: React.PropsWithChildren) {
     });
     shadowRoot.adoptedStyleSheets = [
       editorBaseStyleSheet,
-      editorThemeStyleSheet,
+      editorConfigurableStyleSheet.current,
     ];
     setRoot(shadowRoot);
   }, [node]);
 
   useEffect(() => {
-    const css = `
-      ${themeSnap.bundledCss?.replace(/:root/g, ':host') ?? ''}
-      ${editorOverrideCss}
-      ${themeSnap.customCss.replace(/:root/g, ':host')}`;
-    editorThemeStyleSheet.replaceSync(css);
-  }, [themeSnap.bundledCss, themeSnap.customCss]);
-
+    const css = `${bundledCss?.replace(/:root/g, ':host') ?? ''}
+${editorOverrideCss}
+${customCss?.replace(/:root/g, ':host') ?? ''}`;
+    editorConfigurableStyleSheet.current.replaceSync(css);
+  }, [bundledCss, customCss]);
   return (
     <div ref={node} className="h-full">
       {root && <ShadowContent root={root}>{children}</ShadowContent>}
@@ -67,12 +65,16 @@ export function EditArea() {
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   const contentSnap = useSnapshot($content);
+  const themeSnap = useSnapshot($theme);
   const file = contentSnap.files.get(contentId);
   invariant(file, `Editor not found for contentId: ${contentId}`);
 
   return (
     <EditorContext.Provider value={{ editor: file.editor }}>
-      <EditorStyleContainer>
+      <EditorStyleContainer
+        bundledCss={themeSnap.bundledCss ?? ''}
+        customCss={themeSnap.customCss ?? ''}
+      >
         <EditArea />
       </EditorStyleContainer>
     </EditorContext.Provider>

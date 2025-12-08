@@ -5,6 +5,7 @@ import * as v from 'valibot';
 
 import {
   AstViewerContext,
+  CssEditorPane,
   defaultAstViewerContext,
   RawEditorPane,
   RichEditorPane,
@@ -19,6 +20,7 @@ const bs62 = basex(
 
 const RouteSearchSchema = v.object({
   md: v.optional(v.string()),
+  css: v.optional(v.string()),
   tab: v.optional(v.picklist(['tree', 'html', 'json'])),
 });
 
@@ -34,6 +36,9 @@ function AstViewerView() {
   const [contextValue, setContextValue] = useState<AstViewerContext>({
     ...defaultAstViewerContext,
     markdown: search.md ? new TextDecoder().decode(bs62.decode(search.md)) : '',
+    css: search.css
+      ? new TextDecoder().decode(bs62.decode(search.css))
+      : defaultAstViewerContext.css,
     selectingAstTab: search.tab ?? defaultAstViewerContext.selectingAstTab,
     onMarkdownChange: useCallback(
       (markdown: string) => {
@@ -50,6 +55,19 @@ function AstViewerView() {
       },
       [search],
     ),
+    onCssChange: useCallback((css: string) => {
+      setContextValue((prev) => ({ ...prev, css }));
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          css:
+            css === defaultAstViewerContext.css
+              ? undefined
+              : bs62.encode(new TextEncoder().encode(css)),
+        }),
+        replace: true,
+      });
+    }, []),
     onSelectingAstTabChange: useCallback(
       (selectingAstTab: 'tree' | 'html' | 'json') => {
         setContextValue((prev) => ({ ...prev, selectingAstTab }));
@@ -77,7 +95,7 @@ function AstViewerView() {
   return (
     <AstViewerContext.Provider value={contextValue}>
       <div className="grid grid-cols-3 grid-rows-2 divide-x divide-y divide-neutral-300 size-full *:size-full *:overflow-auto *:overscroll-contain *:scrollbar-stable *:scroll-py-4">
-        <section className="row-span-2">
+        <section>
           <div className="sticky top-0 bg-background px-6 py-2 border-b border-neutral-300 text-secondary-foreground font-semibold">
             VFM Editor
           </div>
@@ -93,6 +111,12 @@ function AstViewerView() {
         </section>
         <section className="bg-accent">
           <TiptapAstViewerPane />
+        </section>
+        <section>
+          <div className="sticky top-0 bg-background px-6 py-2 border-b border-neutral-300 text-secondary-foreground font-semibold">
+            CSS Editor
+          </div>
+          <CssEditorPane />
         </section>
         <section className="@container flex flex-col">
           <div className="sticky top-0 bg-background px-6 py-2 border-b border-neutral-300 text-secondary-foreground font-semibold">
