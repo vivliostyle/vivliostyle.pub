@@ -31,10 +31,12 @@ type AstTabType = 'tree' | 'html' | 'json';
 
 export interface AstViewerContext {
   markdown: string;
+  css: string;
   selectingAstTab: AstTabType;
   editorAst?: unknown;
   editorHtml?: string;
   onMarkdownChange?: (markdown: string) => void;
+  onCssChange?: (css: string) => void;
   onSelectingAstTabChange?: (tab: AstTabType) => void;
   onEditorAstChange?: (editorAst: unknown) => void;
   onEditorHtmlChange?: (editorHtml: string) => void;
@@ -42,6 +44,10 @@ export interface AstViewerContext {
 
 export const defaultAstViewerContext: AstViewerContext = {
   markdown: '',
+  css: `:root {
+  --vs-font-family: var(--font-sans);
+  --vs--monospace-font-family: var(--font-mono);
+}\n`,
   selectingAstTab: 'tree',
 };
 
@@ -98,7 +104,7 @@ export function RichEditorPane() {
 
   return (
     <EditorContext.Provider value={{ editor }}>
-      <EditorStyleContainer>
+      <EditorStyleContainer customCss={context.css}>
         <EditArea />
       </EditorStyleContainer>
     </EditorContext.Provider>
@@ -133,6 +139,34 @@ export function RawEditorPane() {
   );
 }
 
+export function CssEditorPane() {
+  const context = useContext(AstViewerContext);
+  const [contentInEditor, setContentInEditor] = useState(context.css);
+
+  const [, cancel] = useDebounce(
+    () => context.onCssChange?.(contentInEditor),
+    deferMs,
+    [contentInEditor],
+  );
+
+  useEffect(() => {
+    if (contentInEditor === context.css) {
+      return;
+    }
+    setContentInEditor(context.css);
+    setTimeout(cancel, deferMs - 1);
+  }, [context.css]);
+
+  return (
+    <CodeEditor
+      aria-label="CSS editor"
+      language="css"
+      code={contentInEditor}
+      onCodeUpdate={setContentInEditor}
+    />
+  );
+}
+
 const processor = VFM({ partial: true });
 
 export function VfmPreviewPane() {
@@ -146,7 +180,7 @@ export function VfmPreviewPane() {
   }, [context.markdown]);
 
   return (
-    <EditorStyleContainer>
+    <EditorStyleContainer customCss={context.css}>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Sanitized above */}
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </EditorStyleContainer>

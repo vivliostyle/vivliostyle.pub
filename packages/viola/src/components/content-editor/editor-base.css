@@ -1,7 +1,4 @@
-@layer theme, base, vs-theme, components;
-
-@import "tailwindcss/theme" layer(theme);
-@import "tailwindcss/preflight" layer(base);
+@layer vs-theme;
 
 @import "@vivliostyle/theme-base/css/common/meta-properties.css" layer(vs-theme);
 @import "@vivliostyle/theme-base/css/common/basic.css" layer(vs-theme);
@@ -23,7 +20,7 @@
   }
 
   &:not(.ProseMirror-focused) .is-editor-empty:first-child::before {
-    color: theme(--color-gray-400);
+    color: var(--muted-foreground);
     content: attr(data-placeholder);
     float: left;
     height: 0;
