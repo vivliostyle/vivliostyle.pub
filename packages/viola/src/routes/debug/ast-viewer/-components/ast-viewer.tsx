@@ -155,7 +155,7 @@ export function CssEditorPane() {
     }
     setContentInEditor(context.css);
     setTimeout(cancel, deferMs - 1);
-  }, [context.css, cancel, contentInEditor]);
+  }, [context.css]);
 
   return (
     <CodeEditor

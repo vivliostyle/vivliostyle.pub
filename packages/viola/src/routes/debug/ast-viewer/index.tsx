@@ -67,7 +67,7 @@ function AstViewerView() {
         }),
         replace: true,
       });
-    }, [navigate]),
+    }, []),
     onSelectingAstTabChange: useCallback(
       (selectingAstTab: 'tree' | 'html' | 'json') => {
         setContextValue((prev) => ({ ...prev, selectingAstTab }));
