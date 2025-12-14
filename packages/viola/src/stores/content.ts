@@ -48,4 +48,12 @@ export const $content = proxy({
       ['.'] as HierarchicalReadingOrder,
     );
   },
+
+  getFileByFilename(filename: string): [ContentId, FileContent] | undefined {
+    for (const [contentId, file] of this.files.entries()) {
+      if (file.filename === filename) {
+        return [contentId, file];
+      }
+    }
+  },
 });

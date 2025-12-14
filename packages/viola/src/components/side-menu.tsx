@@ -247,8 +247,8 @@ function FileTreeItem({
         variant={typeof item === 'string' ? 'default' : 'heading'}
         asChild
       >
-        {typeof item === 'string' ? (
-          <Link to="/edit/$contentId" params={{ contentId: item }} replace>
+        {file ? (
+          <Link to="/edit/$" params={{ _splat: file?.filename }} replace>
             <span className={cn(!file?.summary && 'text-muted-foreground')}>
               {file?.summary || 'Empty file'}
             </span>

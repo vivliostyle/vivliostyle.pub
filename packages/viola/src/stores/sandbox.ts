@@ -7,6 +7,8 @@ import { subscribeKey } from 'valtio/utils';
 
 export type RemoteCli = Comlink.Remote<typeof import('@v/cli-bundle')>;
 
+export const defaultDraftDir = 'drafts';
+
 const cliProxy = proxy({
   awaiter: undefined as Promise<RemoteCli> | undefined,
   fulfilledValue: undefined as RemoteCli | undefined,
@@ -113,15 +115,18 @@ export async function loadProjectFromCache() {
   invariant(projectDir, 'projectDirectoryHandle is not set');
 
   const newFiles: (typeof $sandbox)['files'] = {};
+  let configJson: string;
   try {
     const configFileHandle = await projectDir.getFileHandle(
       'vivliostyle.config.json',
     );
     const file = await configFileHandle.getFile();
     newFiles['vivliostyle.config.json'] = ref(file);
+    configJson = await file.text();
   } catch {
     throw new Error('Project does not exist');
   }
+  vivliostyleConfig.value = JSON.parse(configJson);
 
   await readFileSystemRecursive({
     dirHandle: projectDir,
