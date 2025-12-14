@@ -37,6 +37,7 @@ export function vsCustomHmrPlugin({
       }
 
       const s = new MagicString(code);
+      s.prepend(`import "/_cli/client/viewer-adapter.js";`);
       // Replace normal HMR to customize code injection by vite:import-analysis.
       // We need to import custom-hmr.js before the Vite client.
       s.replace(/import\.meta\.hot/g, 'import.meta.__hot');

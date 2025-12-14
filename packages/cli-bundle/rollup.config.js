@@ -274,7 +274,11 @@ const dtsConfig = defineConfig({
 });
 
 const clientConfig = defineConfig({
-  input: ['src/client/vite-client.ts', 'src/client/custom-hmr.ts'],
+  input: [
+    'src/client/vite-client.ts',
+    'src/client/custom-hmr.ts',
+    'src/client/viewer-adapter.ts',
+  ],
   output: {
     dir: 'dist/client',
   },
