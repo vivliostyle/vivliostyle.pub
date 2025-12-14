@@ -9,7 +9,7 @@ const PreviewIframe = () => {
   const iframeRef = useCallback((el: HTMLIFrameElement | null) => {
     if (el) {
       $viewer.iframeElement = ref(el);
-    } else if ($viewer.iframeElement) {
+    } else {
       $viewer.iframeElement = undefined;
     }
   }, []);
