@@ -19,6 +19,13 @@ function ShadowContent({
 
 const editorBaseStyleSheet = new CSSStyleSheet();
 editorBaseStyleSheet.replaceSync(editorBaseCss.replace(/:root/g, ':host'));
+if (import.meta.hot) {
+  import.meta.hot.accept('./editor-base.css?inline', (newModule) => {
+    if (!newModule) return;
+    const { default: editorBaseCss } = newModule;
+    editorBaseStyleSheet.replaceSync(editorBaseCss.replace(/:root/g, ':host'));
+  });
+}
 
 export function EditorStyleContainer({
   children,
@@ -49,7 +56,12 @@ export function EditorStyleContainer({
 ${editorOverrideCss}
 ${customCss?.replace(/:root/g, ':host') ?? ''}`;
     editorConfigurableStyleSheet.current.replaceSync(css);
-  }, [bundledCss, customCss]);
+  }, [
+    bundledCss,
+    customCss,
+    // Add imported CSS as dependency to re-apply on HMR
+    editorOverrideCss,
+  ]);
   return (
     <div ref={node} className="h-full">
       {root && <ShadowContent root={root}>{children}</ShadowContent>}
