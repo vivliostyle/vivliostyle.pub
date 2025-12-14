@@ -1,3 +1,4 @@
+import { join } from 'pathe';
 import { ref } from 'valtio';
 
 import { setupEditor } from '../../libs/editor';
@@ -25,7 +26,6 @@ export async function setupProject(projectId: string) {
       await root.getDirectoryHandle(projectId, { create: true }),
     );
     $sandbox.updateVivliostyleConfig((config) => {
-      config.entryContext = 'contents';
       config.entry = [];
       config.theme = ['@vivliostyle/theme-base', './style.css'];
     });
@@ -37,16 +37,31 @@ export async function setupProject(projectId: string) {
   url.hostname = `sandbox-${projectId}.${url.hostname}`;
   $sandbox.sandboxOrigin = url.origin;
 
-  const contentIdMap: Record<string, ContentId> = {};
-  for (const [rootFilename, initialFile] of Object.entries($sandbox.files)) {
-    const matched = rootFilename.match(/^contents\/(?<name>.+)$/);
-    const name = matched?.groups?.name;
-    const format = name?.endsWith('.md') ? 'markdown' : undefined;
-    if (!name || !format) {
+  const entryContext = $sandbox.vivliostyleConfig.entryContext || '';
+  const entryFiles = [$sandbox.vivliostyleConfig.entry].flat().flatMap((it) => {
+    const entry = typeof it === 'string' ? { path: it } : it;
+    if (!entry.path) {
+      return [];
+    }
+    const filename = join(entryContext, entry.path);
+    const format = entry.path.endsWith('.md')
+      ? ('markdown' as const)
+      : undefined;
+    const content = $sandbox.files[filename];
+    if (!content) {
+      return [];
+    }
+    return { filename, format, content };
+  });
+
+  const readingOrder: ContentId[] = [];
+  for (const { filename, format, content } of entryFiles) {
+    if (!format) {
+      // TODO: handle other formats
       continue;
     }
     const contentId = generateId<ContentId>();
-    const editor = await setupEditor({ contentId, initialFile });
+    const editor = await setupEditor({ contentId, initialFile: content });
     const summary =
       editor
         .getText({ blockSeparator: '\n' })
@@ -54,19 +69,14 @@ export async function setupProject(projectId: string) {
         .find((s) => s.trim())
         ?.trim() || '';
 
-    contentIdMap[name] = contentId;
+    readingOrder.push(contentId);
     $content.files.set(contentId, {
       format,
-      filename: name,
+      filename,
       summary,
       editor: ref(editor),
     });
   }
-  $content.readingOrder = [$sandbox.vivliostyleConfig.entry]
-    .flat()
-    .flatMap((e) => {
-      const p = e && typeof e === 'object' ? e.path : e;
-      return p ? [contentIdMap[p]] : [];
-    });
+  $content.readingOrder = readingOrder;
   $theme.customCss = await $sandbox.files['style.css'].text();
 }

@@ -32,7 +32,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@v/ui/dropdown';
-import { BookOpen, CirclePlus, MoreHorizontal, Palette } from '@v/ui/icon';
+import {
+  BookOpen,
+  CirclePlus,
+  MoreHorizontal,
+  Palette,
+  Printer,
+} from '@v/ui/icon';
 import { cn } from '@v/ui/lib/utils';
 import {
   Sidebar,
@@ -84,6 +90,13 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
+        <DropdownMenuItem asChild>
+          <Link to="/preview">
+            <Printer />
+            <span>Open Print Preview</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem inset onClick={printPdf}>
           <span>Print PDF</span>
         </DropdownMenuItem>
@@ -234,8 +247,8 @@ function FileTreeItem({
         variant={typeof item === 'string' ? 'default' : 'heading'}
         asChild
       >
-        {typeof item === 'string' ? (
-          <Link to="/edit/$contentId" params={{ contentId: item }} replace>
+        {file ? (
+          <Link to="/edit/$" params={{ _splat: file.filename }} replace>
             <span className={cn(!file?.summary && 'text-muted-foreground')}>
               {file?.summary || 'Empty file'}
             </span>

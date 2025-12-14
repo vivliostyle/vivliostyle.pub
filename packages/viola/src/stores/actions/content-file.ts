@@ -6,7 +6,7 @@ import { ref } from 'valtio';
 import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
 import { $content, type ContentId } from '../content';
-import { $sandbox } from '../sandbox';
+import { $sandbox, defaultDraftDir } from '../sandbox';
 import { $ui } from '../ui';
 
 export async function createContentFile({
@@ -21,18 +21,20 @@ export async function createContentFile({
   const contentId = generateId<ContentId>();
   const extname = '.md';
   const basename = `${generateRandomName()}${extname}`;
-  const filename = join(prevFileDir || '', basename);
+  const entryPath = join(prevFileDir || defaultDraftDir, basename);
+  const filename = join(
+    $sandbox.vivliostyleConfig.entryContext || '',
+    entryPath,
+  );
   const index =
     ((insertAfter && $content.readingOrder.indexOf(insertAfter)) ?? -1) + 1;
 
   // update sandbox
-  $sandbox.files[
-    join($sandbox.vivliostyleConfig.entryContext || '', filename)
-  ] = ref(new Blob([], { type: 'text/markdown' }));
+  $sandbox.files[filename] = ref(new Blob([], { type: 'text/markdown' }));
   $sandbox.updateVivliostyleConfig((config) => {
     config.entry = [$sandbox.vivliostyleConfig.entry]
       .flat()
-      .toSpliced(index, 0, filename);
+      .toSpliced(index, 0, entryPath);
   });
 
   // update content
