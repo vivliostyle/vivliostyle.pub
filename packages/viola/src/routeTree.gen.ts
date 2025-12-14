@@ -17,6 +17,7 @@ import { Route as mainLayoutImport } from './routes/(main)/_layout'
 import { Route as DebugAstViewerIndexImport } from './routes/debug/ast-viewer/index'
 import { Route as mainLayoutIndexImport } from './routes/(main)/_layout/index'
 import { Route as mainLayoutThemeImport } from './routes/(main)/_layout/theme'
+import { Route as mainLayoutPreviewImport } from './routes/(main)/_layout/preview'
 import { Route as mainLayoutBibliographyImport } from './routes/(main)/_layout/bibliography'
 import { Route as mainLayoutEditContentIdImport } from './routes/(main)/_layout/edit/$contentId'
 
@@ -51,6 +52,12 @@ const mainLayoutIndexRoute = mainLayoutIndexImport.update({
 const mainLayoutThemeRoute = mainLayoutThemeImport.update({
   id: '/theme',
   path: '/theme',
+  getParentRoute: () => mainLayoutRoute,
+} as any)
+
+const mainLayoutPreviewRoute = mainLayoutPreviewImport.update({
+  id: '/preview',
+  path: '/preview',
   getParentRoute: () => mainLayoutRoute,
 } as any)
 
@@ -91,6 +98,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof mainLayoutBibliographyImport
       parentRoute: typeof mainLayoutImport
     }
+    '/(main)/_layout/preview': {
+      id: '/(main)/_layout/preview'
+      path: '/preview'
+      fullPath: '/preview'
+      preLoaderRoute: typeof mainLayoutPreviewImport
+      parentRoute: typeof mainLayoutImport
+    }
     '/(main)/_layout/theme': {
       id: '/(main)/_layout/theme'
       path: '/theme'
@@ -126,6 +140,7 @@ declare module '@tanstack/react-router' {
 
 interface mainLayoutRouteChildren {
   mainLayoutBibliographyRoute: typeof mainLayoutBibliographyRoute
+  mainLayoutPreviewRoute: typeof mainLayoutPreviewRoute
   mainLayoutThemeRoute: typeof mainLayoutThemeRoute
   mainLayoutIndexRoute: typeof mainLayoutIndexRoute
   mainLayoutEditContentIdRoute: typeof mainLayoutEditContentIdRoute
@@ -133,6 +148,7 @@ interface mainLayoutRouteChildren {
 
 const mainLayoutRouteChildren: mainLayoutRouteChildren = {
   mainLayoutBibliographyRoute: mainLayoutBibliographyRoute,
+  mainLayoutPreviewRoute: mainLayoutPreviewRoute,
   mainLayoutThemeRoute: mainLayoutThemeRoute,
   mainLayoutIndexRoute: mainLayoutIndexRoute,
   mainLayoutEditContentIdRoute: mainLayoutEditContentIdRoute,
@@ -155,6 +171,7 @@ const mainRouteWithChildren = mainRoute._addFileChildren(mainRouteChildren)
 export interface FileRoutesByFullPath {
   '/': typeof mainLayoutIndexRoute
   '/bibliography': typeof mainLayoutBibliographyRoute
+  '/preview': typeof mainLayoutPreviewRoute
   '/theme': typeof mainLayoutThemeRoute
   '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
   '/edit/$contentId': typeof mainLayoutEditContentIdRoute
@@ -162,6 +179,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/bibliography': typeof mainLayoutBibliographyRoute
+  '/preview': typeof mainLayoutPreviewRoute
   '/theme': typeof mainLayoutThemeRoute
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
@@ -173,6 +191,7 @@ export interface FileRoutesById {
   '/(main)': typeof mainRouteWithChildren
   '/(main)/_layout': typeof mainLayoutRouteWithChildren
   '/(main)/_layout/bibliography': typeof mainLayoutBibliographyRoute
+  '/(main)/_layout/preview': typeof mainLayoutPreviewRoute
   '/(main)/_layout/theme': typeof mainLayoutThemeRoute
   '/(main)/_layout/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
@@ -184,12 +203,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/bibliography'
+    | '/preview'
     | '/theme'
     | '/debug/ast-viewer'
     | '/edit/$contentId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/bibliography'
+    | '/preview'
     | '/theme'
     | '/'
     | '/debug/ast-viewer'
@@ -199,6 +220,7 @@ export interface FileRouteTypes {
     | '/(main)'
     | '/(main)/_layout'
     | '/(main)/_layout/bibliography'
+    | '/(main)/_layout/preview'
     | '/(main)/_layout/theme'
     | '/(main)/_layout/'
     | '/debug/ast-viewer/'
@@ -241,6 +263,7 @@ export const routeTree = rootRoute
       "parent": "/(main)",
       "children": [
         "/(main)/_layout/bibliography",
+        "/(main)/_layout/preview",
         "/(main)/_layout/theme",
         "/(main)/_layout/",
         "/(main)/_layout/edit/$contentId"
@@ -248,6 +271,10 @@ export const routeTree = rootRoute
     },
     "/(main)/_layout/bibliography": {
       "filePath": "(main)/_layout/bibliography.tsx",
+      "parent": "/(main)/_layout"
+    },
+    "/(main)/_layout/preview": {
+      "filePath": "(main)/_layout/preview.tsx",
       "parent": "/(main)/_layout"
     },
     "/(main)/_layout/theme": {

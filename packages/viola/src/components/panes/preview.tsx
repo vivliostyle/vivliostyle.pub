@@ -1,6 +1,7 @@
 import { use } from 'react';
 import { ref } from 'valtio';
 
+import { $project } from '../../stores/project';
 import { $viewer } from '../../stores/viewer';
 
 const iframeRef = (el: HTMLIFrameElement | null) => {
@@ -8,6 +9,8 @@ const iframeRef = (el: HTMLIFrameElement | null) => {
 };
 
 const PreviewIframe = () => {
+  use($project.setupPromise);
+
   const url = use($viewer.setupServer());
 
   return (

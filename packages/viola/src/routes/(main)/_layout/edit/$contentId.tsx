@@ -25,11 +25,6 @@ export const Route = createFileRoute('/(main)/_layout/edit/$contentId')({
         contentId: contentId,
         title: ref(() => <>Editor</>),
       },
-      {
-        id: generateId(),
-        type: 'preview',
-        title: ref(() => <>Preview</>),
-      },
     ];
   },
 });
