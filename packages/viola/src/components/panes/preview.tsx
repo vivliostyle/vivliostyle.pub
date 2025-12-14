@@ -1,18 +1,22 @@
-import { use, useCallback } from 'react';
+import { use, useCallback, useEffect, useRef } from 'react';
 import { ref } from 'valtio';
 
 import { $viewer } from '../../stores/viewer';
 
 const PreviewIframe = () => {
   const url = use($viewer.setupServer());
+  const elementRef = useRef<HTMLIFrameElement | null>(null);
 
   const iframeRef = useCallback((el: HTMLIFrameElement | null) => {
-    if (!el) {
-      return;
+    elementRef.current = el;
+    if (el) {
+      $viewer.iframeElement = ref(el);
     }
-    $viewer.iframeElement = ref(el);
+  }, []);
+
+  useEffect(() => {
     return () => {
-      if ($viewer.iframeElement === el) {
+      if (elementRef.current && $viewer.iframeElement === elementRef.current) {
         $viewer.iframeElement = undefined;
       }
     };
