@@ -59,6 +59,7 @@ import {
   exportProjectZip,
   exportWebPub,
 } from '../stores/actions/export-project';
+import { printPdf } from '../stores/actions/print-pdf';
 import {
   $content,
   type ContentId,
@@ -83,6 +84,9 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
+        <DropdownMenuItem inset onClick={printPdf}>
+          <span>Print PDF</span>
+        </DropdownMenuItem>
         <DropdownMenuItem inset onClick={exportEpub}>
           <span>Export EPUB</span>
         </DropdownMenuItem>

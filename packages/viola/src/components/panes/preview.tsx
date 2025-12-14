@@ -1,26 +1,18 @@
-import { invariant } from 'outvariant';
 import { use } from 'react';
-import { proxy } from 'valtio';
+import { ref } from 'valtio';
 
-import { $sandbox } from '../../stores/sandbox';
+import { $viewer } from '../../stores/viewer';
 
-const server = proxy({
-  url: undefined as Promise<string> | undefined,
-  setupServer() {
-    this.url ??= (async () => {
-      invariant($sandbox.sandboxOrigin, 'sandboxOrigin is not set');
-      const cli = await $sandbox.cli;
-      await cli.setupServer();
-      return `${$sandbox.sandboxOrigin}/__vivliostyle-viewer/index.html#src=${$sandbox.sandboxOrigin}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`;
-    })();
-    return this.url;
-  },
-});
+const iframeRef = (el: HTMLIFrameElement | null) => {
+  $viewer.iframeElement = el ? ref(el) : undefined;
+};
 
 const PreviewIframe = () => {
-  const url = use(server.setupServer());
+  const url = use($viewer.setupServer());
+
   return (
     <iframe
+      ref={iframeRef}
       title="Preview"
       src={url}
       className="size-full"
