@@ -12,7 +12,8 @@ export const Route = createFileRoute('/(main)/_layout/edit/$')({
       return;
     }
     await $project.setupPromise;
-    const [contentId] = $content.getFileByFilename(params._splat || '') || [];
+    const result = $content.getFileByFilename(params._splat || '');
+    const contentId = result?.[0];
     if (!contentId) {
       throw redirect({ to: '/' });
     }

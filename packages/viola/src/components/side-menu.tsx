@@ -248,7 +248,7 @@ function FileTreeItem({
         asChild
       >
         {file ? (
-          <Link to="/edit/$" params={{ _splat: file?.filename }} replace>
+          <Link to="/edit/$" params={{ _splat: file.filename }} replace>
             <span className={cn(!file?.summary && 'text-muted-foreground')}>
               {file?.summary || 'Empty file'}
             </span>
