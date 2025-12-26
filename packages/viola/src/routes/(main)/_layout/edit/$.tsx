@@ -1,5 +1,4 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { ref } from 'valtio';
 
 import { generateId } from '../../../../libs/generate-id';
 import { $content } from '../../../../stores/content';
@@ -27,7 +26,6 @@ export const Route = createFileRoute('/(main)/_layout/edit/$')({
         id: generateId(),
         type: 'edit',
         contentId,
-        title: ref(() => <>Editor</>),
       },
     ];
   },

@@ -1,16 +1,11 @@
 import { proxy } from 'valtio';
 
-import type { ContentId } from './content';
-
 declare const paneIdBrand: unique symbol;
 export type PaneId = string & { [paneIdBrand]: never };
 
-export type PaneContent = { id: PaneId; title: () => React.ReactNode } & (
-  | { type: 'bibliography' }
-  | { type: 'edit'; contentId: ContentId }
-  | { type: 'preview' }
-  | { type: 'theme' }
-);
+export type PaneContent = {
+  [K in keyof PanePropertyMap]: { type: K; id: PaneId } & PanePropertyMap[K];
+}[keyof PanePropertyMap];
 
 export const $ui = proxy({
   tabs: [] as PaneContent[],
