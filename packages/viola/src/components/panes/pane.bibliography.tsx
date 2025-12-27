@@ -18,6 +18,26 @@ import {
   useLiveSelectField,
 } from '../../hooks/use-live-field';
 import { $project } from '../../stores/project';
+import { createPane, PaneContainer, ScrollOverflow } from './util';
+
+type BibliographyPaneProperty = object;
+
+declare global {
+  interface PanePropertyMap {
+    bibliography: BibliographyPaneProperty;
+  }
+}
+
+export const Pane = createPane<BibliographyPaneProperty>({
+  title: () => 'Bibliography',
+  content: (props) => (
+    <ScrollOverflow>
+      <PaneContainer>
+        <Content {...props} />
+      </PaneContainer>
+    </ScrollOverflow>
+  ),
+});
 
 function BookTitleInput({
   children,
@@ -128,7 +148,7 @@ function TocSectionDepthSelect({
   );
 }
 
-export function Bibliography() {
+function Content(_: BibliographyPaneProperty) {
   use($project.setupPromise);
 
   const projectSnap = useSnapshot($project);

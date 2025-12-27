@@ -10,6 +10,26 @@ import { installTheme } from '../../stores/actions/install-theme';
 import { $project } from '../../stores/project';
 import { $sandbox } from '../../stores/sandbox';
 import { $theme } from '../../stores/theme';
+import { createPane, PaneContainer, ScrollOverflow } from './util';
+
+type ThemePaneProperty = object;
+
+declare global {
+  interface PanePropertyMap {
+    theme: ThemePaneProperty;
+  }
+}
+
+export const Pane = createPane<ThemePaneProperty>({
+  title: () => 'Customize Theme',
+  content: (props) => (
+    <ScrollOverflow>
+      <PaneContainer>
+        <Content {...props} />
+      </PaneContainer>
+    </ScrollOverflow>
+  ),
+});
 
 const CodeEditor = lazy(() => import('../code-editor'));
 
@@ -37,7 +57,7 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-export function Theme() {
+function Content(_: ThemePaneProperty) {
   use($project.setupPromise);
 
   const themeSnap = useSnapshot($theme);
