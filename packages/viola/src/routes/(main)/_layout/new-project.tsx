@@ -3,14 +3,16 @@ import { createFileRoute } from '@tanstack/react-router';
 import { generateId } from '../../../libs/generate-id';
 import { $ui } from '../../../stores/ui';
 
-export const Route = createFileRoute('/(main)/_layout/theme')({
+export const Route = createFileRoute('/(main)/_layout/new-project')({
   component: () => null,
-  onEnter: () => {
+  beforeLoad: async ({ preload }) => {
+    if (preload) {
+      return;
+    }
     $ui.tabs = [
-      ...$ui.tabs.filter((t) => t.type === 'edit').slice(0, 1),
       {
         id: generateId(),
-        type: 'theme',
+        type: 'new-project',
       },
     ];
   },

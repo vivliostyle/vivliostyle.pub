@@ -48,7 +48,7 @@ catalog:
   '@vitejs/plugin-react-swc': 3.7.2
   '@vitest/coverage-v8': 3.2.3
   '@vitest/ui': 3.2.3
-  '@vivliostyle/cli': 9.7.1
+  '@vivliostyle/cli': 10.2.0
   '@vivliostyle/theme-base': 2.0.0
   '@vivliostyle/vfm': 2.4.0
   base-x: 5.0.1

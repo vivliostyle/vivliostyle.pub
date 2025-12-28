@@ -1,5 +1,5 @@
 import { invariant } from 'outvariant';
-import { ref, subscribe } from 'valtio';
+import { subscribe } from 'valtio';
 
 import { generateId } from '../../libs/generate-id';
 import { $ui } from '../ui';
@@ -13,7 +13,6 @@ export async function printPdf() {
       {
         id: generateId(),
         type: 'preview',
-        title: ref(() => <>Preview</>),
       },
     ];
   }
