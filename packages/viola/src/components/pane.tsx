@@ -12,7 +12,7 @@ export const panes = Object.fromEntries(
       import: 'Pane',
     }),
   ).map(([path, module]) => {
-    const matched = path.match(/pane\.(\w+)\.tsx$/);
+    const matched = path.match(/pane\.([\w-]+)\.tsx$/);
     invariant(matched, 'Unknown pane: %s', path);
     return [matched[1], module];
   }),
