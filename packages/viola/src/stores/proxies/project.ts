@@ -1,7 +1,7 @@
 import { proxy, ref, subscribe } from 'valtio';
 import { deepClone } from 'valtio/utils';
 
-import { setupProject } from './actions/setup-project';
+import { setupProject } from '../actions/setup-project';
 import { Content } from './content';
 import { Sandbox } from './sandbox';
 import { Theme } from './theme';

@@ -67,7 +67,10 @@ import {
   exportWebPub,
 } from '../stores/actions/export-project';
 import { printPdf } from '../stores/actions/print-pdf';
-import type { ContentId, HierarchicalReadingOrder } from '../stores/content';
+import type {
+  ContentId,
+  HierarchicalReadingOrder,
+} from '../stores/proxies/content';
 
 const DraggingContentContext = createContext<ContentId | null>(null);
 

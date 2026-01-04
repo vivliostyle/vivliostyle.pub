@@ -6,8 +6,8 @@ import { ref } from 'valtio';
 import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
 import { $content, $sandbox, $ui } from '../accessors';
-import type { ContentId } from '../content';
-import { defaultDraftDir } from '../sandbox';
+import type { ContentId } from '../proxies/content';
+import { defaultDraftDir } from '../proxies/sandbox';
 
 export async function createContentFile({
   format,
@@ -34,9 +34,7 @@ export async function createContentFile({
   // update sandbox
   $$sandbox.files[filename] = ref(new Blob([], { type: 'text/markdown' }));
   $$sandbox.updateVivliostyleConfig((config) => {
-    config.entry = [$$sandbox.vivliostyleConfig.entry]
-      .flat()
-      .toSpliced(index, 0, entryPath);
+    config.entry = [config.entry].flat().toSpliced(index, 0, entryPath);
   });
 
   // update content

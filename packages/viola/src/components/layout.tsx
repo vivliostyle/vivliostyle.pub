@@ -6,7 +6,7 @@ import { useSnapshot } from 'valtio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
 import { $ui } from '../stores/accessors';
-import type { PaneContent } from '../stores/ui';
+import type { PaneContent } from '../stores/proxies/ui';
 import { IframeSandbox } from './iframe-sandbox';
 import { Pane, panes } from './pane';
 import { PaneContext } from './panes/util';

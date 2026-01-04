@@ -4,7 +4,7 @@ import { ref } from 'valtio';
 import { setupEditor } from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
 import { $content, $sandbox, $theme } from '../accessors';
-import type { ContentId } from '../content';
+import type { ContentId } from '../proxies/content';
 
 export async function setupProject() {
   const $$content = $content.valueOrThrow;

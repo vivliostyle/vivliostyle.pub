@@ -2,7 +2,7 @@ import { invariant } from 'outvariant';
 import { Suspense, useContext } from 'react';
 
 import { Loader2 } from '@v/ui/icon';
-import type { PaneContent } from '../stores/ui';
+import type { PaneContent } from '../stores/proxies/ui';
 import { PaneContext, type PaneDefinition } from './panes/util';
 
 export const panes = Object.fromEntries(

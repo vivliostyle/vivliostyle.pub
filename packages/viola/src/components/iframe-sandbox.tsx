@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
 import { $project } from '../stores/accessors';
-import type { Sandbox } from '../stores/sandbox';
+import type { Sandbox } from '../stores/proxies/sandbox';
 
 let initialized = false;
 

@@ -3,7 +3,7 @@ import { basename, dirname, join, sep } from 'pathe';
 import { type INTERNAL_Op, proxy, ref, subscribe } from 'valtio';
 import { deepClone, subscribeKey } from 'valtio/utils';
 
-import type { DeepReadonly } from '../type-utils';
+import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { Project } from './project';
 

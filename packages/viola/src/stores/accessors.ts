@@ -1,8 +1,8 @@
 import { invariant } from 'outvariant';
 import { proxy } from 'valtio';
 
-import { projects } from './project';
-import { ui } from './ui';
+import { projects } from './proxies/project';
+import { ui } from './proxies/ui';
 
 export { projects as $projects };
 export { ui as $ui };

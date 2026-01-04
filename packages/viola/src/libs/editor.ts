@@ -8,7 +8,7 @@ import * as Y from 'yjs';
 import { PubExtensions } from '@v/tiptap-extensions';
 import { debounce } from '../libs/debounce';
 import { $content, $sandbox } from '../stores/accessors';
-import type { ContentId } from '../stores/content';
+import type { ContentId } from '../stores/proxies/content';
 
 // @ts-ignore
 async function _setupPersistence({

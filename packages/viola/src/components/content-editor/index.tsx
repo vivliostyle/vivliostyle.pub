@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
 import { $content, $theme } from '../../stores/accessors';
-import type { ContentId } from '../../stores/content';
+import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
 
