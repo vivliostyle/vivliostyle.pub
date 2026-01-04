@@ -127,6 +127,13 @@ const workerConfig = defineConfig({
             '../src/stubs/@npmcli/arborist',
           ),
         },
+        {
+          find: 'tinyexec',
+          replacement: path.resolve(
+            fileURLToPath(import.meta.url),
+            '../src/stubs/tinyexec',
+          ),
+        },
       ],
     }),
     commonjs(),
@@ -136,6 +143,10 @@ const workerConfig = defineConfig({
     }),
     json(),
     inject({
+      globalThis: path.resolve(
+        fileURLToPath(import.meta.url),
+        '../src/stubs/global-this.ts',
+      ),
       process: path.resolve(
         fileURLToPath(import.meta.url),
         '../src/stubs/node/process.ts',
@@ -174,7 +185,7 @@ const workerConfig = defineConfig({
           );
           return JSON.stringify(volume);
         })(),
-        __nodeVersion__: JSON.stringify('22.13.0'),
+        __nodeVersion__: JSON.stringify('24.11.1'),
       },
       preventAssignment: true,
     }),

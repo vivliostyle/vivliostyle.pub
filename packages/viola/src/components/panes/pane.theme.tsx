@@ -1,4 +1,4 @@
-import { lazy, use, useId, useState } from 'react';
+import { lazy, useId, useState } from 'react';
 import { useDebounce } from 'react-use';
 import { ref, useSnapshot } from 'valtio';
 
@@ -6,10 +6,28 @@ import { Button } from '@v/ui/button';
 import { Check, Loader2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
+import { $sandbox, $theme } from '../../stores/accessors';
 import { installTheme } from '../../stores/actions/install-theme';
-import { $project } from '../../stores/project';
-import { $sandbox } from '../../stores/sandbox';
-import { $theme } from '../../stores/theme';
+import { createPane, PaneContainer, ScrollOverflow } from './util';
+
+type ThemePaneProperty = object;
+
+declare global {
+  interface PanePropertyMap {
+    theme: ThemePaneProperty;
+  }
+}
+
+export const Pane = createPane<ThemePaneProperty>({
+  title: () => 'Customize Theme',
+  content: (props) => (
+    <ScrollOverflow>
+      <PaneContainer>
+        <Content {...props} />
+      </PaneContainer>
+    </ScrollOverflow>
+  ),
+});
 
 const CodeEditor = lazy(() => import('../code-editor'));
 
@@ -37,10 +55,8 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-export function Theme() {
-  use($project.setupPromise);
-
-  const themeSnap = useSnapshot($theme);
+function Content(_: ThemePaneProperty) {
+  const themeSnap = useSnapshot($theme).valueOrThrow;
   const usesCustomTheme = !officialThemes.some(
     (t) => t.packageName === themeSnap.packageName,
   );
@@ -48,13 +64,14 @@ export function Theme() {
     usesCustomTheme ? themeSnap.packageName : '',
   );
   const packageNameInputDescriptionId = useId();
-  const currentPackageName = $theme.installingPackageName || $theme.packageName;
+  const currentPackageName =
+    themeSnap.installingPackageName || themeSnap.packageName;
   const [customCss, setCustomCss] = useState(() => themeSnap.customCss);
 
   useDebounce(
     () => {
-      $theme.customCss = customCss;
-      $sandbox.files['style.css'] = ref(
+      $theme.valueOrThrow.customCss = customCss;
+      $sandbox.valueOrThrow.files['style.css'] = ref(
         new Blob([customCss], { type: 'text/css' }),
       );
     },

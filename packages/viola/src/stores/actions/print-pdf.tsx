@@ -1,9 +1,8 @@
 import { invariant } from 'outvariant';
-import { ref, subscribe } from 'valtio';
+import { subscribe } from 'valtio';
 
 import { generateId } from '../../libs/generate-id';
-import { $ui } from '../ui';
-import { $viewer } from '../viewer';
+import { $cli, $ui } from '../accessors';
 
 export async function printPdf() {
   // Ensure the viewer pane is visible
@@ -13,25 +12,25 @@ export async function printPdf() {
       {
         id: generateId(),
         type: 'preview',
-        title: ref(() => <>Preview</>),
       },
     ];
   }
-  if (!$viewer.iframeElement) {
+  const cli = $cli.valueOrThrow;
+
+  if (!cli.viewerIframeElement) {
     await Promise.race([
       new Promise<void>((resolve) => {
-        subscribe($viewer, () => {
-          $viewer.iframeElement && resolve();
+        subscribe(cli, () => {
+          cli.viewerIframeElement && resolve();
         });
       }),
       new Promise((resolve) => setTimeout(resolve, 10_000)), // timeout
     ]);
   }
 
-  invariant($viewer.url, 'Viewer URL is not set');
-  invariant($viewer.iframeElement, 'Viewer iframe element is not set');
-  const target = new URL(await $viewer.url);
-  const element = $viewer.iframeElement;
+  invariant(cli.viewerIframeElement, 'Viewer iframe element is not set');
+  const element = cli.viewerIframeElement;
+  const target = new URL(element.src);
   // Delay to ensure the iframe is fully loaded
   setTimeout(() => {
     element.contentWindow?.postMessage({ type: 'print-pdf' }, target.origin);

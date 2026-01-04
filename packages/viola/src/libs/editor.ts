@@ -7,8 +7,8 @@ import * as Y from 'yjs';
 
 import { PubExtensions } from '@v/tiptap-extensions';
 import { debounce } from '../libs/debounce';
-import { $content, type ContentId } from '../stores/content';
-import { $sandbox } from '../stores/sandbox';
+import { $content, $sandbox } from '../stores/accessors';
+import type { ContentId } from '../stores/proxies/content';
 
 // @ts-ignore
 async function _setupPersistence({
@@ -89,8 +89,8 @@ async function _setupPersistence({
 }
 
 const saveContent = debounce(
-  ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
-    const file = $content.files.get(contentId);
+  async ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
+    const file = $content.valueOrThrow.files.get(contentId);
     if (!file) {
       return;
     }
@@ -101,8 +101,11 @@ const saveContent = debounce(
         .find((s) => s.trim())
         ?.trim() || '';
     const markdown = editor.getMarkdown();
-    $sandbox.files[
-      join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
+    $sandbox.valueOrThrow.files[
+      join(
+        $sandbox.valueOrThrow.vivliostyleConfig.entryContext || '',
+        file.filename,
+      )
     ] = ref(new Blob([markdown], { type: 'text/markdown' }));
   },
   1000,

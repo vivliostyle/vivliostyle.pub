@@ -4,7 +4,7 @@ import path from 'node:path';
 const noop = () => {};
 
 export const builtinModules = [];
-export const createRequire = noop;
+export const createRequire = () => noop;
 
 export const _nodeModulePaths = (from: string) => {
   const paths = [];

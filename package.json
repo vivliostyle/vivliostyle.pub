@@ -8,7 +8,7 @@
     "build": "turbo build",
     "check": "biome check .",
     "dev": "turbo dev",
-    "fix": "biome check --write .",
+    "fix": "biome check --write --unsafe .",
     "prepare": "husky",
     "test": "turbo test"
   },

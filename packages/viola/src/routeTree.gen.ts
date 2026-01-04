@@ -18,6 +18,7 @@ import { Route as DebugAstViewerIndexImport } from './routes/debug/ast-viewer/in
 import { Route as mainLayoutIndexImport } from './routes/(main)/_layout/index'
 import { Route as mainLayoutThemeImport } from './routes/(main)/_layout/theme'
 import { Route as mainLayoutPreviewImport } from './routes/(main)/_layout/preview'
+import { Route as mainLayoutNewProjectImport } from './routes/(main)/_layout/new-project'
 import { Route as mainLayoutBibliographyImport } from './routes/(main)/_layout/bibliography'
 import { Route as mainLayoutEditSplatImport } from './routes/(main)/_layout/edit/$'
 
@@ -61,6 +62,12 @@ const mainLayoutPreviewRoute = mainLayoutPreviewImport.update({
   getParentRoute: () => mainLayoutRoute,
 } as any)
 
+const mainLayoutNewProjectRoute = mainLayoutNewProjectImport.update({
+  id: '/new-project',
+  path: '/new-project',
+  getParentRoute: () => mainLayoutRoute,
+} as any)
+
 const mainLayoutBibliographyRoute = mainLayoutBibliographyImport.update({
   id: '/bibliography',
   path: '/bibliography',
@@ -96,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/bibliography'
       fullPath: '/bibliography'
       preLoaderRoute: typeof mainLayoutBibliographyImport
+      parentRoute: typeof mainLayoutImport
+    }
+    '/(main)/_layout/new-project': {
+      id: '/(main)/_layout/new-project'
+      path: '/new-project'
+      fullPath: '/new-project'
+      preLoaderRoute: typeof mainLayoutNewProjectImport
       parentRoute: typeof mainLayoutImport
     }
     '/(main)/_layout/preview': {
@@ -140,6 +154,7 @@ declare module '@tanstack/react-router' {
 
 interface mainLayoutRouteChildren {
   mainLayoutBibliographyRoute: typeof mainLayoutBibliographyRoute
+  mainLayoutNewProjectRoute: typeof mainLayoutNewProjectRoute
   mainLayoutPreviewRoute: typeof mainLayoutPreviewRoute
   mainLayoutThemeRoute: typeof mainLayoutThemeRoute
   mainLayoutIndexRoute: typeof mainLayoutIndexRoute
@@ -148,6 +163,7 @@ interface mainLayoutRouteChildren {
 
 const mainLayoutRouteChildren: mainLayoutRouteChildren = {
   mainLayoutBibliographyRoute: mainLayoutBibliographyRoute,
+  mainLayoutNewProjectRoute: mainLayoutNewProjectRoute,
   mainLayoutPreviewRoute: mainLayoutPreviewRoute,
   mainLayoutThemeRoute: mainLayoutThemeRoute,
   mainLayoutIndexRoute: mainLayoutIndexRoute,
@@ -171,6 +187,7 @@ const mainRouteWithChildren = mainRoute._addFileChildren(mainRouteChildren)
 export interface FileRoutesByFullPath {
   '/': typeof mainLayoutIndexRoute
   '/bibliography': typeof mainLayoutBibliographyRoute
+  '/new-project': typeof mainLayoutNewProjectRoute
   '/preview': typeof mainLayoutPreviewRoute
   '/theme': typeof mainLayoutThemeRoute
   '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
@@ -179,6 +196,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/bibliography': typeof mainLayoutBibliographyRoute
+  '/new-project': typeof mainLayoutNewProjectRoute
   '/preview': typeof mainLayoutPreviewRoute
   '/theme': typeof mainLayoutThemeRoute
   '/': typeof mainLayoutIndexRoute
@@ -191,6 +209,7 @@ export interface FileRoutesById {
   '/(main)': typeof mainRouteWithChildren
   '/(main)/_layout': typeof mainLayoutRouteWithChildren
   '/(main)/_layout/bibliography': typeof mainLayoutBibliographyRoute
+  '/(main)/_layout/new-project': typeof mainLayoutNewProjectRoute
   '/(main)/_layout/preview': typeof mainLayoutPreviewRoute
   '/(main)/_layout/theme': typeof mainLayoutThemeRoute
   '/(main)/_layout/': typeof mainLayoutIndexRoute
@@ -203,6 +222,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/bibliography'
+    | '/new-project'
     | '/preview'
     | '/theme'
     | '/debug/ast-viewer'
@@ -210,6 +230,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/bibliography'
+    | '/new-project'
     | '/preview'
     | '/theme'
     | '/'
@@ -220,6 +241,7 @@ export interface FileRouteTypes {
     | '/(main)'
     | '/(main)/_layout'
     | '/(main)/_layout/bibliography'
+    | '/(main)/_layout/new-project'
     | '/(main)/_layout/preview'
     | '/(main)/_layout/theme'
     | '/(main)/_layout/'
@@ -263,6 +285,7 @@ export const routeTree = rootRoute
       "parent": "/(main)",
       "children": [
         "/(main)/_layout/bibliography",
+        "/(main)/_layout/new-project",
         "/(main)/_layout/preview",
         "/(main)/_layout/theme",
         "/(main)/_layout/",
@@ -271,6 +294,10 @@ export const routeTree = rootRoute
     },
     "/(main)/_layout/bibliography": {
       "filePath": "(main)/_layout/bibliography.tsx",
+      "parent": "/(main)/_layout"
+    },
+    "/(main)/_layout/new-project": {
+      "filePath": "(main)/_layout/new-project.tsx",
       "parent": "/(main)/_layout"
     },
     "/(main)/_layout/preview": {

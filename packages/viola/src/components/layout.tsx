@@ -1,12 +1,15 @@
 import { useRouter } from '@tanstack/react-router';
+import { invariant } from 'outvariant';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
-import { $ui, type PaneContent } from '../stores/ui';
-import { Pane } from './pane';
-import { Sandbox } from './sandbox';
+import { $ui } from '../stores/accessors';
+import type { PaneContent } from '../stores/proxies/ui';
+import { IframeSandbox } from './iframe-sandbox';
+import { Pane, panes } from './pane';
+import { PaneContext } from './panes/util';
 import { SideMenu } from './side-menu';
 
 function DedicatedModal() {
@@ -49,20 +52,33 @@ function DedicatedModal() {
     }
   }, [uiSnap.dedicatedModal]);
 
+  if (!modalContent) {
+    return null;
+  }
+
+  const { type, ...props } = modalContent;
+  const pane = panes[type];
+  invariant(pane, 'Unknown pane: %s', type);
+
+  type Props = PanePropertyMap[typeof type];
+  const Title = pane.title as React.ComponentType<Props>;
+
   return (
-    modalContent && (
+    <PaneContext.Provider value={{ ...pane, props, hideTitle: true }}>
       <Dialog open={open} onOpenChange={closeModal}>
         <DialogContent className="max-w-4xl p-0" onAnimationEnd={purgeModal}>
           <div className="size-full max-h-svh overflow-auto grid gap-4 p-6">
             <DialogHeader>
-              <DialogTitle>{modalContent.title()}</DialogTitle>
+              <DialogTitle>
+                <Title {...props} />
+              </DialogTitle>
             </DialogHeader>
 
             <Pane content={modalContent} />
           </div>
         </DialogContent>
       </Dialog>
-    )
+    </PaneContext.Provider>
   );
 }
 
@@ -87,7 +103,7 @@ export function Layout(_: { children?: React.ReactNode }) {
 
       <DedicatedModal />
       <Suspense>
-        <Sandbox />
+        <IframeSandbox />
       </Suspense>
     </SidebarProvider>
   );

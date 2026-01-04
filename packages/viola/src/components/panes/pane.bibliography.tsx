@@ -1,5 +1,4 @@
 import type React from 'react';
-import { use } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Input } from '@v/ui/input';
@@ -17,19 +16,42 @@ import {
   useLiveInputField,
   useLiveSelectField,
 } from '../../hooks/use-live-field';
-import { $project } from '../../stores/project';
+import { $project } from '../../stores/accessors';
+import { createPane, PaneContainer, ScrollOverflow } from './util';
+
+type BibliographyPaneProperty = object;
+
+declare global {
+  interface PanePropertyMap {
+    bibliography: BibliographyPaneProperty;
+  }
+}
+
+export const Pane = createPane<BibliographyPaneProperty>({
+  title: () => 'Bibliography',
+  content: (props) => (
+    <ScrollOverflow>
+      <PaneContainer>
+        <Content {...props} />
+      </PaneContainer>
+    </ScrollOverflow>
+  ),
+});
 
 function BookTitleInput({
   children,
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Input>>) {
-  const inputProps = useLiveInputField(() => $project.bibliography.title, {
-    onSave: (value) => {
-      const title = value.trim();
-      $project.bibliography.title = title;
-      return title;
+  const inputProps = useLiveInputField(
+    () => $project.valueOrThrow.bibliography.title,
+    {
+      onSave: (value) => {
+        const title = value.trim();
+        $project.valueOrThrow.bibliography.title = title;
+        return title;
+      },
     },
-  });
+  );
 
   return (
     <label className="contents">
@@ -43,13 +65,16 @@ function AuthorInput({
   children,
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Input>>) {
-  const inputProps = useLiveInputField(() => $project.bibliography.author, {
-    onSave: (value) => {
-      const author = value.trim();
-      $project.bibliography.author = author;
-      return author;
+  const inputProps = useLiveInputField(
+    () => $project.valueOrThrow.bibliography.author,
+    {
+      onSave: (value) => {
+        const author = value.trim();
+        $project.valueOrThrow.bibliography.author = author;
+        return author;
+      },
     },
-  });
+  );
 
   return (
     <label className="contents">
@@ -63,11 +88,14 @@ function UseTocSwitch({
   children,
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Switch>>) {
-  const inputProps = useLiveCheckboxField(() => $project.toc.enabled, {
-    onSave: (value) => {
-      $project.toc.enabled = value;
+  const inputProps = useLiveCheckboxField(
+    () => $project.valueOrThrow.toc.enabled,
+    {
+      onSave: (value) => {
+        $project.valueOrThrow.toc.enabled = value;
+      },
     },
-  });
+  );
 
   return (
     <label className="contents">
@@ -81,10 +109,10 @@ function TocTitleInput({
   children,
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Input>>) {
-  const inputProps = useLiveInputField(() => $project.toc.title, {
+  const inputProps = useLiveInputField(() => $project.valueOrThrow.toc.title, {
     onSave: (value) => {
       const title = value.trim();
-      $project.toc.title = title;
+      $project.valueOrThrow.toc.title = title;
       return title;
     },
   });
@@ -101,11 +129,14 @@ function TocSectionDepthSelect({
   children,
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Select>>) {
-  const inputProps = useLiveSelectField(() => `${$project.toc.sectionDepth}`, {
-    onSave: (value) => {
-      $project.toc.sectionDepth = value ? Number(value) : 0;
+  const inputProps = useLiveSelectField(
+    () => `${$project.valueOrThrow.toc.sectionDepth}`,
+    {
+      onSave: (value) => {
+        $project.valueOrThrow.toc.sectionDepth = value ? Number(value) : 0;
+      },
     },
-  });
+  );
 
   return (
     <label className="contents">
@@ -128,10 +159,8 @@ function TocSectionDepthSelect({
   );
 }
 
-export function Bibliography() {
-  use($project.setupPromise);
-
-  const projectSnap = useSnapshot($project);
+function Content(_: BibliographyPaneProperty) {
+  const projectSnap = useSnapshot($project).valueOrThrow;
 
   return (
     <div className="grid gap-4">

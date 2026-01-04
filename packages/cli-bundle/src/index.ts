@@ -28,7 +28,7 @@ function sendHotPayload(payload: HotPayload) {
   hmrChannel.postMessage(payload);
 }
 
-let server: ViteDevServer;
+let server: ViteDevServer | undefined;
 
 export async function setupServer() {
   await Promise.all([
@@ -52,6 +52,11 @@ export async function setupServer() {
       }),
     ],
   });
+}
+
+export async function teardownServer() {
+  await server?.close();
+  server = undefined;
 }
 
 export function webSocketConnect() {
@@ -103,9 +108,6 @@ function zipDirectory(pwd: string) {
 export async function serve(
   ...[request, init]: ConstructorParameters<typeof Request>
 ) {
-  if (!server) {
-    throw new Error('Server is not ready');
-  }
   const url = request as Exclude<RequestInfo, Request>;
   const headers = init?.headers as Exclude<HeadersInit, Headers>;
   const method = init?.method;
@@ -114,6 +116,9 @@ export async function serve(
 
   return await new Promise<ConstructorParameters<typeof Response>>(
     (resolve, reject) => {
+      if (!server) {
+        throw new Error('Server is not ready');
+      }
       const { req, res } = createMocks({
         url: new URL(url).pathname,
         headers: Array.isArray(headers) ? Object.fromEntries(headers) : headers,
