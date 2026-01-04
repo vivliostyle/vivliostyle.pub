@@ -52,6 +52,7 @@ catalog:
   '@vivliostyle/theme-base': 2.0.0
   '@vivliostyle/vfm': 2.4.0
   base-x: 5.0.1
+  bunshi: 2.2.0
   comlink: 4.4.2
   dompurify: 3.3.0
   fflate: 0.8.2
@@ -78,6 +79,7 @@ catalog:
   typescript: 5.7.3
   valibot: 1.2.0
   valtio: 2.1.4
+  valtio-reactive: 0.1.2
   vite: 6.2.1
   vite-plugin-pwa: 0.21.1
   vitest: 3.2.3

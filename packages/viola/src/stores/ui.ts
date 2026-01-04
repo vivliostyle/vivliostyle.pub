@@ -7,7 +7,7 @@ export type PaneContent = {
   [K in keyof PanePropertyMap]: { type: K; id: PaneId } & PanePropertyMap[K];
 }[keyof PanePropertyMap];
 
-export const $ui = proxy({
+export const ui = proxy({
   tabs: [] as PaneContent[],
   dedicatedModal: null as PaneContent | null,
 });

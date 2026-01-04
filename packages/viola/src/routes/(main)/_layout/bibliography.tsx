@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { generateId } from '../../../libs/generate-id';
-import { $ui } from '../../../stores/ui';
+import { $ui } from '../../../stores/accessors';
 
 export const Route = createFileRoute('/(main)/_layout/bibliography')({
   component: () => null,

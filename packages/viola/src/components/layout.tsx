@@ -5,10 +5,11 @@ import { useSnapshot } from 'valtio';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
-import { $ui, type PaneContent } from '../stores/ui';
+import { $ui } from '../stores/accessors';
+import type { PaneContent } from '../stores/ui';
+import { IframeSandbox } from './iframe-sandbox';
 import { Pane, panes } from './pane';
 import { PaneContext } from './panes/util';
-import { Sandbox } from './sandbox';
 import { SideMenu } from './side-menu';
 
 function DedicatedModal() {
@@ -102,7 +103,7 @@ export function Layout(_: { children?: React.ReactNode }) {
 
       <DedicatedModal />
       <Suspense>
-        <Sandbox />
+        <IframeSandbox />
       </Suspense>
     </SidebarProvider>
   );

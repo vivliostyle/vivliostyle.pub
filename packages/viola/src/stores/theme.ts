@@ -1,9 +1,21 @@
-import { proxy } from 'valtio';
+import { proxy, ref } from 'valtio';
 
-export const $theme = proxy({
-  packageName: '@vivliostyle/theme-base',
-  installingPackageName: null as string | null,
-  installingError: null as Error | null,
-  bundledCss: null as string | null,
-  customCss: '',
-});
+import type { Project } from './project';
+
+export class Theme {
+  static create(project: Project) {
+    return proxy(new Theme(project));
+  }
+
+  packageName = '@vivliostyle/theme-base';
+  installingPackageName: string | undefined;
+  installingError: Error | undefined;
+  bundledCss: string | undefined;
+  customCss = '';
+
+  protected project: Project;
+
+  protected constructor(project: Project) {
+    this.project = ref(project);
+  }
+}

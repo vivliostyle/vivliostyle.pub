@@ -1,8 +1,6 @@
 import { use } from 'react';
-import { ref } from 'valtio';
 
-import { $project } from '../../stores/project';
-import { $viewer } from '../../stores/viewer';
+import { $cli } from '../../stores/accessors';
 import { createPane } from './util';
 
 type PreviewPaneProperty = object;
@@ -18,18 +16,12 @@ export const Pane = createPane<PreviewPaneProperty>({
   content: (props) => <Content {...props} />,
 });
 
-const iframeRef = (el: HTMLIFrameElement | null) => {
-  $viewer.iframeElement = el ? ref(el) : undefined;
-};
-
 function Content(_: PreviewPaneProperty) {
-  use($project.setupPromise);
-
-  const url = use($viewer.setupServer());
+  const url = use($cli.valueOrThrow.createViewerUrlPromise());
 
   return (
     <iframe
-      ref={iframeRef}
+      ref={(el) => $cli.valueOrThrow.viewerIframeRef(el)}
       title="Preview"
       src={url}
       className="size-full"

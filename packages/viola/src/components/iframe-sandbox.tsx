@@ -1,11 +1,10 @@
 import * as Comlink from 'comlink';
-import { invariant } from 'outvariant';
 import { use } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
-import { $project } from '../stores/project';
-import { $sandbox, createCliWorkerResolver } from '../stores/sandbox';
+import { $project } from '../stores/accessors';
+import type { Sandbox } from '../stores/sandbox';
 
 let initialized = false;
 
@@ -21,11 +20,11 @@ if (import.meta.env.DEV) {
   window.__debug ??= {};
 }
 
-function init(iframe: HTMLIFrameElement) {
+function init(iframe: HTMLIFrameElement, sandbox: Sandbox) {
   if (initialized) {
     return;
   }
-  const cliWorkerResolver = createCliWorkerResolver();
+  const cliWorkerResolver = sandbox.cli.createRemoteResolver();
   const cb = async (event: MessageEvent) => {
     if (event.data.command !== 'bind') {
       return;
@@ -66,16 +65,15 @@ function init(iframe: HTMLIFrameElement) {
   observer.observe(document.body, { childList: true });
 }
 
-export function Sandbox() {
-  use($project.setupPromise);
-  const sandboxSnap = useSnapshot($sandbox);
-  invariant(sandboxSnap.sandboxOrigin, 'Sandbox is not initialized');
+export function IframeSandbox() {
+  const project = useSnapshot($project).valueOrThrow;
+  const sandbox = use(project.sandboxPromise);
 
   return createPortal(
     <iframe
-      ref={init}
+      ref={(el) => init(el as HTMLIFrameElement, sandbox)}
       title="Sandbox"
-      src={`${sandboxSnap.sandboxOrigin}/sandbox`}
+      src={`${sandbox.iframeOrigin}/sandbox`}
       style={{ display: 'none' }}
       sandbox="allow-same-origin allow-scripts"
     />,

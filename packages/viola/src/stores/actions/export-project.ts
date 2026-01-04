@@ -1,4 +1,4 @@
-import { $sandbox } from '../sandbox';
+import { $cli } from '../accessors';
 
 function downloadFile({
   name,
@@ -20,7 +20,7 @@ function downloadFile({
 }
 
 export async function exportEpub() {
-  const cli = await $sandbox.cli;
+  const cli = await $cli.valueOrThrow.createRemotePromise();
   const content = await cli.buildEpub();
   downloadFile({
     name: 'publication.epub',
@@ -30,7 +30,7 @@ export async function exportEpub() {
 }
 
 export async function exportWebPub() {
-  const cli = await $sandbox.cli;
+  const cli = await $cli.valueOrThrow.createRemotePromise();
   const content = await cli.buildWebPub();
   downloadFile({
     name: 'publication.zip',
@@ -40,7 +40,7 @@ export async function exportWebPub() {
 }
 
 export async function exportProjectZip() {
-  const cli = await $sandbox.cli;
+  const cli = await $cli.valueOrThrow.createRemotePromise();
   const content = await cli.exportProjectZip();
   downloadFile({
     name: 'project.zip',

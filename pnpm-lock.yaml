@@ -156,6 +156,9 @@ catalogs:
     base-x:
       specifier: 5.0.1
       version: 5.0.1
+    bunshi:
+      specifier: 2.2.0
+      version: 2.2.0
     comlink:
       specifier: 4.4.2
       version: 4.4.2
@@ -234,6 +237,9 @@ catalogs:
     valtio:
       specifier: 2.1.4
       version: 2.1.4
+    valtio-reactive:
+      specifier: 0.1.2
+      version: 0.1.2
     vite:
       specifier: 6.2.1
       version: 6.2.1
@@ -701,6 +707,9 @@ importers:
       base-x:
         specifier: 'catalog:'
         version: 5.0.1
+      bunshi:
+        specifier: 'catalog:'
+        version: 2.2.0(react@19.1.0)
       comlink:
         specifier: 'catalog:'
         version: 4.4.2
@@ -752,6 +761,9 @@ importers:
       valtio:
         specifier: 'catalog:'
         version: 2.1.4(@types/react@19.1.1)(react@19.1.0)
+      valtio-reactive:
+        specifier: 'catalog:'
+        version: 0.1.2(valtio@2.1.4(@types/react@19.1.1)(react@19.1.0))
       vite:
         specifier: 'catalog:'
         version: 6.2.1(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1)
@@ -4050,6 +4062,18 @@ packages:
 
   builtin-status-codes@3.0.0:
     resolution: {integrity: sha512-HpGFw18DgFWlncDfjTa2rcQ4W88O1mC8e8yZ2AvQY5KDaktSTwo+KRf6nHK6FRI5FyRyb/5T6+TSxfP7QyGsmQ==}
+
+  bunshi@2.2.0:
+    resolution: {integrity: sha512-s97ZI9apyF4AgvG5l/zql0X+RY5cZtBKbMKGeB5t+2JbXPdXpa1/XRn/ryMLHYHJ2FAhtK1bvOFcqsehi8UWZw==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: '>=16'
+      vue: '>=3'
+    peerDependenciesMeta:
+      react:
+        optional: true
+      vue:
+        optional: true
 
   cac@6.7.14:
     resolution: {integrity: sha512-b6Ilus+c3RrdDk+JhLKUAQfzzgLEPy6wcXqS7f/xe1EETvsDP6GORG7SFuOs6cID5YkqchW/LXZbX5bc8j7ZcQ==}
@@ -7704,6 +7728,11 @@ packages:
   validate-npm-package-name@7.0.1:
     resolution: {integrity: sha512-BM0Upcemlce8/9+HE+/VpWqn3u3mYh6Om/FEC8yPMnEHwf710fW5Q6fhjT1SQyRlZD1G9CJbgfH+rWgAcIvjlQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
+
+  valtio-reactive@0.1.2:
+    resolution: {integrity: sha512-9Zv/tFiFWQWEBzfDikJgY9lkQ6CXf4T+Rsk08AKQMMZVmI5YvkAS7qFnRtwd1uVPNT/wsK+QcKiFHBvjCRohYQ==}
+    peerDependencies:
+      valtio: '>=2.0.0'
 
   valtio@2.1.4:
     resolution: {integrity: sha512-O6U79SacltN5E5XOwLNixrGSAc4+TNkQw8AWSqjcpvvRjvFbfMvdbFW98g/VgxKoT8v9kb8WQkD8lvf+Dcme8w==}
@@ -11831,6 +11860,10 @@ snapshots:
       ieee754: 1.2.1
 
   builtin-status-codes@3.0.0: {}
+
+  bunshi@2.2.0(react@19.1.0):
+    optionalDependencies:
+      react: 19.1.0
 
   cac@6.7.14: {}
 
@@ -16154,6 +16187,10 @@ snapshots:
   validate-npm-package-name@6.0.0: {}
 
   validate-npm-package-name@7.0.1: {}
+
+  valtio-reactive@0.1.2(valtio@2.1.4(@types/react@19.1.1)(react@19.1.0)):
+    dependencies:
+      valtio: 2.1.4(@types/react@19.1.1)(react@19.1.0)
 
   valtio@2.1.4(@types/react@19.1.1)(react@19.1.0):
     dependencies:
