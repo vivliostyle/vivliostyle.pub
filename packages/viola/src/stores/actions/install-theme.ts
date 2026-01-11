@@ -6,8 +6,8 @@ import {
 import { $sandbox, $theme } from '../accessors';
 
 export async function installTheme(specifier: string) {
-  const $$sandbox = $sandbox.valueOrThrow;
-  const $$theme = $theme.valueOrThrow;
+  const $$sandbox = $sandbox.valueOrThrow();
+  const $$theme = $theme.valueOrThrow();
   const packageName = specifier.split(/(?!^)@/)[0];
   $$theme.installingError = undefined;
   const timer = setTimeout(() => {

@@ -76,8 +76,8 @@ export function EditArea() {
 }
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
-  const contentSnap = useSnapshot($content).valueOrThrow;
-  const themeSnap = useSnapshot($theme).valueOrThrow;
+  const contentSnap = useSnapshot($content).valueOrThrow();
+  const themeSnap = useSnapshot($theme).valueOrThrow();
   const file = contentSnap.files.get(contentId);
   invariant(file, `Editor not found for contentId: ${contentId}`);
 

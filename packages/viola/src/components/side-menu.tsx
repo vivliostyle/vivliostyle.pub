@@ -143,7 +143,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
 }
 
 function TopMenuSection() {
-  const projectSnap = useSnapshot($project.valueOrThrow);
+  const projectSnap = useSnapshot($project).valueOrThrow();
   return (
     <SidebarMenu>
       <div className={cn('flex items-center gap-0.5')}>
@@ -214,7 +214,7 @@ function FileTreeItem({
     name: string;
   }
 >) {
-  const content = useSnapshot($content).valueOrThrow;
+  const content = useSnapshot($content).valueOrThrow();
   const draggingContentId = useContext(DraggingContentContext);
   const sortable = typeof item === 'string' && useSortable({ id: item });
 
@@ -270,7 +270,7 @@ function FileTreeItem({
 
 function FileTreeDraggingItem() {
   const draggingContentId = useContext(DraggingContentContext);
-  const content = useSnapshot($content).valueOrThrow;
+  const content = useSnapshot($content).valueOrThrow();
   const file = draggingContentId && content.files.get(draggingContentId);
 
   if (!file) {
@@ -316,7 +316,7 @@ function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
 }
 
 function FileTree() {
-  const content = useSnapshot($content).valueOrThrow;
+  const content = useSnapshot($content).valueOrThrow();
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, {

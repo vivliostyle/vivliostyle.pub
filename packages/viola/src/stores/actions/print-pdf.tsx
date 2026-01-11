@@ -15,21 +15,21 @@ export async function printPdf() {
       },
     ];
   }
-  const cli = $cli.valueOrThrow;
+  const $$cli = $cli.valueOrThrow();
 
-  if (!cli.viewerIframeElement) {
+  if (!$$cli.viewerIframeElement) {
     await Promise.race([
       new Promise<void>((resolve) => {
-        subscribe(cli, () => {
-          cli.viewerIframeElement && resolve();
+        subscribe($$cli, () => {
+          $$cli.viewerIframeElement && resolve();
         });
       }),
       new Promise((resolve) => setTimeout(resolve, 10_000)), // timeout
     ]);
   }
 
-  invariant(cli.viewerIframeElement, 'Viewer iframe element is not set');
-  const element = cli.viewerIframeElement;
+  invariant($$cli.viewerIframeElement, 'Viewer iframe element is not set');
+  const element = $$cli.viewerIframeElement;
   const target = new URL(element.src);
   // Delay to ensure the iframe is fully loaded
   setTimeout(() => {

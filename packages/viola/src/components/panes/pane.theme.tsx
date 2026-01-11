@@ -56,7 +56,7 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
 }
 
 function Content(_: ThemePaneProperty) {
-  const themeSnap = useSnapshot($theme).valueOrThrow;
+  const themeSnap = useSnapshot($theme).valueOrThrow();
   const usesCustomTheme = !officialThemes.some(
     (t) => t.packageName === themeSnap.packageName,
   );
@@ -70,8 +70,8 @@ function Content(_: ThemePaneProperty) {
 
   useDebounce(
     () => {
-      $theme.valueOrThrow.customCss = customCss;
-      $sandbox.valueOrThrow.files['style.css'] = ref(
+      $theme.valueOrThrow().customCss = customCss;
+      $sandbox.valueOrThrow().files['style.css'] = ref(
         new Blob([customCss], { type: 'text/css' }),
       );
     },

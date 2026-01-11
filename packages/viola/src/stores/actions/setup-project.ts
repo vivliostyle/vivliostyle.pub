@@ -7,9 +7,9 @@ import { $content, $sandbox, $theme } from '../accessors';
 import type { ContentId } from '../proxies/content';
 
 export async function setupProject() {
-  const $$content = $content.valueOrThrow;
-  const $$sandbox = $sandbox.valueOrThrow;
-  const $$theme = $theme.valueOrThrow;
+  const $$content = $content.valueOrThrow();
+  const $$sandbox = $sandbox.valueOrThrow();
+  const $$theme = $theme.valueOrThrow();
   const entryContext = $$sandbox.vivliostyleConfig.entryContext || '';
   const entryFiles = [$$sandbox.vivliostyleConfig.entry]
     .flat()

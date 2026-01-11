@@ -8,8 +8,10 @@ export const Route = createFileRoute('/(main)/_layout/edit/$')({
     if (preload) {
       return;
     }
-    await $project.valueOrThrow.setupPromise;
-    const result = $content.valueOrThrow.getFileByFilename(params._splat || '');
+    await $project.valueOrThrow().setupPromise;
+    const result = $content
+      .valueOrThrow()
+      .getFileByFilename(params._splat || '');
     const contentId = result?.[0];
     if (!contentId) {
       throw redirect({ to: '/' });

@@ -25,8 +25,8 @@ export const Pane = createPane<EditPaneProperty>({
 const ContentEditor = lazy(() => import('../content-editor'));
 
 function Title({ contentId }: EditPaneProperty) {
-  const content = useSnapshot($content).valueOrThrow;
-  const file = content.files.get(contentId);
+  const content = useSnapshot($content).value();
+  const file = content?.files.get(contentId);
   return file ? `Content Editor: File ${file.filename}` : `Content Editor`;
 }
 

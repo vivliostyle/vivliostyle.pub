@@ -66,7 +66,7 @@ function init(iframe: HTMLIFrameElement, sandbox: Sandbox) {
 }
 
 export function IframeSandbox() {
-  const project = useSnapshot($project).valueOrThrow;
+  const project = useSnapshot($project).valueOrThrow();
   const sandbox = use(project.sandboxPromise);
 
   return createPortal(

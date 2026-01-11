@@ -43,11 +43,11 @@ function BookTitleInput({
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Input>>) {
   const inputProps = useLiveInputField(
-    () => $project.valueOrThrow.bibliography.title,
+    () => $project.valueOrThrow().bibliography.title,
     {
       onSave: (value) => {
         const title = value.trim();
-        $project.valueOrThrow.bibliography.title = title;
+        $project.valueOrThrow().bibliography.title = title;
         return title;
       },
     },
@@ -66,11 +66,11 @@ function AuthorInput({
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Input>>) {
   const inputProps = useLiveInputField(
-    () => $project.valueOrThrow.bibliography.author,
+    () => $project.valueOrThrow().bibliography.author,
     {
       onSave: (value) => {
         const author = value.trim();
-        $project.valueOrThrow.bibliography.author = author;
+        $project.valueOrThrow().bibliography.author = author;
         return author;
       },
     },
@@ -89,10 +89,10 @@ function UseTocSwitch({
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Switch>>) {
   const inputProps = useLiveCheckboxField(
-    () => $project.valueOrThrow.toc.enabled,
+    () => $project.valueOrThrow().toc.enabled,
     {
       onSave: (value) => {
-        $project.valueOrThrow.toc.enabled = value;
+        $project.valueOrThrow().toc.enabled = value;
       },
     },
   );
@@ -109,13 +109,16 @@ function TocTitleInput({
   children,
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Input>>) {
-  const inputProps = useLiveInputField(() => $project.valueOrThrow.toc.title, {
-    onSave: (value) => {
-      const title = value.trim();
-      $project.valueOrThrow.toc.title = title;
-      return title;
+  const inputProps = useLiveInputField(
+    () => $project.valueOrThrow().toc.title,
+    {
+      onSave: (value) => {
+        const title = value.trim();
+        $project.valueOrThrow().toc.title = title;
+        return title;
+      },
     },
-  });
+  );
 
   return (
     <label className="contents">
@@ -130,10 +133,10 @@ function TocSectionDepthSelect({
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Select>>) {
   const inputProps = useLiveSelectField(
-    () => `${$project.valueOrThrow.toc.sectionDepth}`,
+    () => `${$project.valueOrThrow().toc.sectionDepth}`,
     {
       onSave: (value) => {
-        $project.valueOrThrow.toc.sectionDepth = value ? Number(value) : 0;
+        $project.valueOrThrow().toc.sectionDepth = value ? Number(value) : 0;
       },
     },
   );
@@ -160,7 +163,7 @@ function TocSectionDepthSelect({
 }
 
 function Content(_: BibliographyPaneProperty) {
-  const projectSnap = useSnapshot($project).valueOrThrow;
+  const projectSnap = useSnapshot($project).valueOrThrow();
 
   return (
     <div className="grid gap-4">

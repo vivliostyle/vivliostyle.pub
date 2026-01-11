@@ -90,7 +90,9 @@ async function _setupPersistence({
 
 const saveContent = debounce(
   async ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
-    const file = $content.valueOrThrow.files.get(contentId);
+    const $$content = $content.valueOrThrow();
+    const $$sandbox = $sandbox.valueOrThrow();
+    const file = $$content.files.get(contentId);
     if (!file) {
       return;
     }
@@ -101,11 +103,8 @@ const saveContent = debounce(
         .find((s) => s.trim())
         ?.trim() || '';
     const markdown = editor.getMarkdown();
-    $sandbox.valueOrThrow.files[
-      join(
-        $sandbox.valueOrThrow.vivliostyleConfig.entryContext || '',
-        file.filename,
-      )
+    $$sandbox.files[
+      join($$sandbox.vivliostyleConfig.entryContext || '', file.filename)
     ] = ref(new Blob([markdown], { type: 'text/markdown' }));
   },
   1000,

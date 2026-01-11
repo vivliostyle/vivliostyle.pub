@@ -16,8 +16,8 @@ export async function createContentFile({
   format: 'markdown';
   insertAfter?: ContentId;
 }): Promise<ContentId> {
-  const $$content = $content.valueOrThrow;
-  const $$sandbox = $sandbox.valueOrThrow;
+  const $$content = $content.valueOrThrow();
+  const $$sandbox = $sandbox.valueOrThrow();
   const prevFile = insertAfter && $$content.files.get(insertAfter);
   const prevFileDir = prevFile && dirname(prevFile.filename);
   const contentId = generateId<ContentId>();
@@ -53,8 +53,8 @@ export async function deleteContentFile({
 }: {
   contentId: ContentId;
 }): Promise<ContentId> {
-  const $$content = $content.valueOrThrow;
-  const $$sandbox = $sandbox.valueOrThrow;
+  const $$content = $content.valueOrThrow();
+  const $$sandbox = $sandbox.valueOrThrow();
   const file = $$content.files.get(contentId);
   invariant(file, `File does not exist: ${contentId}`);
   const index = $$content.readingOrder.indexOf(contentId);
@@ -91,8 +91,8 @@ export function moveContentFileInReadingOrder({
   fromDepth: number;
   toDepth: number;
 }) {
-  const $$content = $content.valueOrThrow;
-  const $$sandbox = $sandbox.valueOrThrow;
+  const $$content = $content.valueOrThrow();
+  const $$sandbox = $sandbox.valueOrThrow();
   const fromItems = fromContentId.map((id) => {
     const item = $$content.files.get(id);
     invariant(item, `File does not exist: ${id}`);
