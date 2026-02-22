@@ -65,10 +65,15 @@ const workerConfig = defineConfig({
             '../src/stubs/node/process',
           ),
         },
+        {
+          find: 'buffer/',
+          replacement: require.resolve('buffer'),
+        },
         ...Object.entries({
           ...stdLibBrowser,
           ...Object.fromEntries(
             [
+              'buffer',
               'child_process',
               'crypto',
               'dns',
@@ -79,6 +84,7 @@ const workerConfig = defineConfig({
               'path',
               'perf_hooks',
               'process',
+              'stream',
               'util',
               'v8',
               'worker_threads',
@@ -136,7 +142,10 @@ const workerConfig = defineConfig({
         },
       ],
     }),
-    commonjs(),
+    commonjs({
+      extensions: ['.js', '.ts'],
+      transformMixedEsModules: true,
+    }),
     nodeResolve({
       browser: true,
       preferBuiltins: false,

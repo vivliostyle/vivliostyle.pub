@@ -1,7 +1,12 @@
 import './volume';
 
 import path from 'node:path';
-import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
+import {
+  createVitePlugin,
+  build as vivliostyleBuild,
+  create as vivliostyleCreate,
+} from '@vivliostyle/cli';
+import type { VivliostyleInlineConfig } from '@vivliostyle/cli/schema';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
@@ -188,6 +193,32 @@ export async function buildWebPub() {
 
 export async function exportProjectZip() {
   return zipDirectory('/workdir');
+}
+
+export async function setupTemplate(options: VivliostyleInlineConfig) {
+  fs.rmSync('/workdir', { recursive: true, force: true });
+  fs.mkdirSync('/workdir', { recursive: true });
+  await vivliostyleCreate({
+    ...options,
+    logger: {
+      info: (message) => {
+        console.log(`INFO: ${message}`);
+      },
+      warn: (message) => {
+        console.warn(`WARN: ${message}`);
+      },
+      error: (message) => {
+        console.warn(`ERROR: ${message}`);
+      },
+    },
+    stdout: {
+      write: () => true,
+    } as any,
+    cwd: '/workdir',
+    logLevel: 'debug',
+    projectPath: '.',
+    installDependencies: false,
+  });
 }
 
 export const read = (...args: Parameters<typeof fs.promises.readFile>) =>

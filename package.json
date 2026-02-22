@@ -27,7 +27,8 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "buffer": "patches/buffer.patch"
+      "vite@6.3.5": "patches/vite@6.3.5.patch",
+      "buffer@6.0.3": "patches/buffer@6.0.3.patch"
     },
     "onlyBuiltDependencies": [
       "@biomejs/biome",
