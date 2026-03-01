@@ -1,6 +1,7 @@
 import './volume';
 
 import path from 'node:path';
+import type stream from 'node:stream';
 import {
   createVitePlugin,
   build as vivliostyleBuild,
@@ -213,7 +214,7 @@ export async function setupTemplate(options: VivliostyleInlineConfig) {
     },
     stdout: {
       write: () => true,
-    } as any,
+    } as unknown as stream.Writable,
     cwd: '/workdir',
     logLevel: 'debug',
     projectPath: '.',

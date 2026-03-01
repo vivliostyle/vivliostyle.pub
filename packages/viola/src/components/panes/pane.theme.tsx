@@ -8,6 +8,7 @@ import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { $sandbox, $theme } from '../../stores/accessors';
 import { installTheme } from '../../stores/actions/install-theme';
+import { Theme } from '../../stores/proxies/theme';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
 type ThemePaneProperty = object;
@@ -31,18 +32,6 @@ export const Pane = createPane<ThemePaneProperty>({
 
 const CodeEditor = lazy(() => import('../code-editor'));
 
-const officialThemes = [
-  { packageName: '@vivliostyle/theme-base', title: 'Base Theme' },
-  { packageName: '@vivliostyle/theme-techbook', title: 'Techbook' },
-  { packageName: '@vivliostyle/theme-academic', title: 'Academic' },
-  { packageName: '@vivliostyle/theme-bunko', title: 'Bunko' },
-  { packageName: '@vivliostyle/theme-gutenberg', title: 'Gutenberg' },
-  { packageName: '@vivliostyle/theme-slide', title: 'Slide' },
-] satisfies {
-  packageName: string;
-  title: string;
-}[];
-
 function InstalledIcon({ className, ...props }: React.ComponentProps<'svg'>) {
   return <Check {...props} strokeWidth={4} className={cn(className)} />;
 }
@@ -57,9 +46,7 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
 
 function Content(_: ThemePaneProperty) {
   const themeSnap = useSnapshot($theme).valueOrThrow();
-  const usesCustomTheme = !officialThemes.some(
-    (t) => t.packageName === themeSnap.packageName,
-  );
+  const usesCustomTheme = !(themeSnap.packageName in Theme.officialThemes);
   const [packageNameInput, setPackageNameInput] = useState(() =>
     usesCustomTheme ? themeSnap.packageName : '',
   );
@@ -84,30 +71,32 @@ function Content(_: ThemePaneProperty) {
       <section className="grid gap-2">
         <h3 className="text-l font-bold">Vivliostyle Theme</h3>
         <ul className="grid grid-cols-2 gap-2">
-          {officialThemes.map((t) => (
-            <li key={t.packageName}>
-              <Button
-                type="button"
-                variant="outline"
-                className={cn(
-                  'size-full text-left',
-                  t.packageName === currentPackageName && 'border-primary',
-                )}
-                onClick={() => installTheme(t.packageName)}
-              >
-                <span className="flex-1">{t.title}</span>
-                {t.packageName === themeSnap.installingPackageName ? (
-                  <LoadingIcon />
-                ) : (
-                  <InstalledIcon
-                    className={cn(
-                      t.packageName !== currentPackageName && 'invisible',
-                    )}
-                  />
-                )}
-              </Button>
-            </li>
-          ))}
+          {Object.entries(Theme.officialThemes).map(
+            ([packageName, { title }]) => (
+              <li key={packageName}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    'size-full text-left',
+                    packageName === currentPackageName && 'border-primary',
+                  )}
+                  onClick={() => installTheme(packageName)}
+                >
+                  <span className="flex-1">{title}</span>
+                  {packageName === themeSnap.installingPackageName ? (
+                    <LoadingIcon />
+                  ) : (
+                    <InstalledIcon
+                      className={cn(
+                        packageName !== currentPackageName && 'invisible',
+                      )}
+                    />
+                  )}
+                </Button>
+              </li>
+            ),
+          )}
         </ul>
       </section>
 

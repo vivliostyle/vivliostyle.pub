@@ -3,10 +3,9 @@ import {
   bundleCss,
   fetchPackageContent,
 } from '@v/theme-registry';
-import { $sandbox, $theme } from '../accessors';
+import { $theme } from '../accessors';
 
 export async function installTheme(specifier: string) {
-  const $$sandbox = $sandbox.valueOrThrow();
   const $$theme = $theme.valueOrThrow();
   const packageName = specifier.split(/(?!^)@/)[0];
   $$theme.installingError = undefined;
@@ -21,9 +20,6 @@ export async function installTheme(specifier: string) {
     $$theme.bundledCss = new TextDecoder().decode(code);
 
     $$theme.packageName = packageName;
-    $$sandbox.updateVivliostyleConfig((config) => {
-      config.theme = [specifier, './style.css'];
-    });
   } catch (error) {
     $$theme.installingError = error as Error;
   } finally {

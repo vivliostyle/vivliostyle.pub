@@ -44,7 +44,6 @@ export class Cli {
           reject();
         }
         if (this.remote) {
-          this.remote.setupServer;
           return resolve(this.remote);
         }
         requestAnimationFrame(loop);

@@ -1,8 +1,10 @@
+import { join } from 'pathe';
 import { proxy, ref, subscribe } from 'valtio';
 import { deepClone } from 'valtio/utils';
 
-import { setupProject } from '../actions/setup-project';
-import { Content } from './content';
+import { setupEditor } from '../../libs/editor';
+import { generateId } from '../../libs/generate-id';
+import { Content, type ContentId } from './content';
 import { Sandbox } from './sandbox';
 import { Theme } from './theme';
 
@@ -14,6 +16,7 @@ export const draftProjectId: ProjectId = '__draft' as ProjectId;
 const initialBibliographyState = {
   title: '',
   author: '',
+  language: undefined as string | undefined,
 };
 
 const initialTocState = {
@@ -28,32 +31,98 @@ export const projects = proxy({
 });
 
 export class Project {
-  static addNewProject(projectId: ProjectId) {
-    const project = proxy(new Project(projectId));
+  static createProjectFromSandbox({
+    projectId,
+    sandbox,
+  }: {
+    projectId: ProjectId;
+    sandbox: Sandbox;
+  }) {
+    const project = proxy(
+      new Project({
+        projectId,
+        sandboxPromise: Promise.resolve(sandbox),
+      }),
+    );
     subscribe(project.bibliography, () => project.handleBibliographyUpdate());
     subscribe(project.toc, () => project.handleTocUpdate());
+    subscribe(project.theme, () => project.handleThemeUpdate());
 
     projects.value[projectId] = project;
-    projects.currentProjectId = projectId;
     return project;
+  }
+
+  static createNewProject(projectId: ProjectId) {
+    const sandboxPromise = Project.initProjectSandbox({ projectId });
+    const project = proxy(new Project({ projectId, sandboxPromise }));
+    subscribe(project.bibliography, () => project.handleBibliographyUpdate());
+    subscribe(project.toc, () => project.handleTocUpdate());
+    subscribe(project.theme, () => project.handleThemeUpdate());
+
+    projects.value[projectId] = project;
+    return project;
+  }
+
+  static createDraftProject() {
+    const sandboxPromise = Project.initProjectSandbox({
+      projectId: draftProjectId,
+    });
+    const project = proxy(
+      new Project({ projectId: draftProjectId, sandboxPromise }),
+    );
+    subscribe(project.bibliography, () => project.handleBibliographyUpdate());
+    subscribe(project.toc, () => project.handleTocUpdate());
+    subscribe(project.theme, () => project.handleThemeUpdate());
+
+    projects.value[draftProjectId] = project;
+    return project;
+  }
+
+  static async initProjectSandbox({ projectId }: { projectId: ProjectId }) {
+    const root = await navigator.storage.getDirectory();
+    const directoryHandle = await root.getDirectoryHandle(projectId, {
+      create: true,
+    });
+    const sandbox = proxy(Sandbox.create({ projectId, directoryHandle }));
+    try {
+      await sandbox.loadFromFileSystem();
+    } catch (error) {
+      console.warn(error);
+      // Not exist or invalid project file
+      await root.removeEntry(projectId, { recursive: true });
+      sandbox.projectDirectoryHandle = ref(
+        await root.getDirectoryHandle(projectId, { create: true }),
+      );
+      await sandbox.initializeProjectFiles({
+        themePackageName: '@vivliostyle/theme-base',
+        entry: [],
+      });
+    }
+    return sandbox;
   }
 
   projectId: ProjectId;
   content = Content.create(this);
   theme = Theme.create(this);
   sandbox: Sandbox | undefined;
-  sandboxPromise = this.setupSandbox();
+  sandboxPromise: Promise<Sandbox>;
   setupPromise: Promise<void>;
   bibliography = deepClone(initialBibliographyState);
   toc = deepClone(initialTocState);
 
-  protected constructor(projectId: ProjectId) {
+  protected constructor({
+    projectId,
+    sandboxPromise,
+  }: { projectId: ProjectId; sandboxPromise: Promise<Sandbox> }) {
     this.projectId = projectId;
+    this.sandboxPromise = sandboxPromise;
     this.setupPromise = (async () => {
-      const sandbox = await this.sandboxPromise;
-      await setupProject();
+      const sandbox = await sandboxPromise;
+      this.sandbox = sandbox;
+      await this.restoreProjectFromFileSystem();
       this.bibliography.title = sandbox.vivliostyleConfig.title || '';
       this.bibliography.author = sandbox.vivliostyleConfig.author || '';
+      this.bibliography.language = sandbox.vivliostyleConfig.language;
       this.toc.enabled = Boolean(sandbox.vivliostyleConfig.toc);
       if (typeof sandbox.vivliostyleConfig.toc === 'object') {
         this.toc.title = sandbox.vivliostyleConfig.toc.title || '';
@@ -62,25 +131,58 @@ export class Project {
     })();
   }
 
-  protected async setupSandbox() {
-    const root = await navigator.storage.getDirectory();
-    const directoryHandle = await root.getDirectoryHandle(this.projectId, {
-      create: true,
-    });
-    const sandbox = proxy(Sandbox.create(this, ref(directoryHandle)));
-    try {
-      await sandbox.loadFromFileSystem();
-    } catch (error) {
-      console.warn(error);
-      // Not exist or invalid project file
-      await root.removeEntry(this.projectId, { recursive: true });
-      sandbox.projectDirectoryHandle = ref(
-        await root.getDirectoryHandle(this.projectId, { create: true }),
-      );
-      await sandbox.initializeProjectFiles();
+  protected async restoreProjectFromFileSystem() {
+    const sandbox = await this.sandboxPromise;
+    const entryContext = sandbox.vivliostyleConfig.entryContext || '';
+    const entryFiles = [sandbox.vivliostyleConfig.entry]
+      .flat()
+      .flatMap((it) => {
+        const entry = typeof it === 'string' ? { path: it } : it;
+        if (!entry.path) {
+          return [];
+        }
+        const filename = join(entryContext, entry.path);
+        const format = entry.path.endsWith('.md')
+          ? ('markdown' as const)
+          : undefined;
+        const content = sandbox.files[filename];
+        if (!content) {
+          return [];
+        }
+        return { filename, format, content };
+      });
+
+    const readingOrder: ContentId[] = [];
+    for (const { filename, format, content } of entryFiles) {
+      if (!format) {
+        // TODO: handle other formats
+        continue;
+      }
+      const contentId = generateId<ContentId>();
+      const editor = await setupEditor({ contentId, initialFile: content });
+      const summary =
+        editor
+          .getText({ blockSeparator: '\n' })
+          .split('\n')
+          .find((s) => s.trim())
+          ?.trim() || '';
+
+      readingOrder.push(contentId);
+      this.content.files.set(contentId, {
+        format,
+        filename,
+        summary,
+        editor: ref(editor),
+      });
     }
-    this.sandbox = sandbox;
-    return sandbox;
+    this.content.readingOrder = readingOrder;
+    this.theme.customCss = await sandbox.files['style.css'].text();
+    if (
+      Array.isArray(sandbox.vivliostyleConfig.theme) &&
+      sandbox.vivliostyleConfig.theme[0] in Theme.officialThemes
+    ) {
+      this.theme.packageName = sandbox.vivliostyleConfig.theme[0];
+    }
   }
 
   protected async handleBibliographyUpdate() {
@@ -88,6 +190,7 @@ export class Project {
     sandbox.updateVivliostyleConfig((config) => {
       config.title = this.bibliography.title || undefined;
       config.author = this.bibliography.author || undefined;
+      config.language = this.bibliography.language || undefined;
     });
   }
 
@@ -102,6 +205,11 @@ export class Project {
         : undefined;
     });
   }
-}
 
-Project.addNewProject('alpha-v1' as ProjectId);
+  protected async handleThemeUpdate() {
+    const sandbox = await this.sandboxPromise;
+    sandbox.updateVivliostyleConfig((config) => {
+      config.theme = [this.theme.packageName, './style.css'];
+    });
+  }
+}

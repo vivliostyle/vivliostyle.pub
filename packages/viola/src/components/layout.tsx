@@ -1,15 +1,15 @@
 import { useRouter } from '@tanstack/react-router';
 import { invariant } from 'outvariant';
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
 import { $ui } from '../stores/accessors';
 import type { PaneContent } from '../stores/proxies/ui';
-import { IframeSandbox } from './iframe-sandbox';
 import { Pane, panes } from './pane';
 import { PaneContext } from './panes/util';
+import { SandboxPortal } from './sandbox-portal';
 import { SideMenu } from './side-menu';
 
 function DedicatedModal() {
@@ -102,9 +102,7 @@ export function Layout(_: { children?: React.ReactNode }) {
       </div>
 
       <DedicatedModal />
-      <Suspense>
-        <IframeSandbox />
-      </Suspense>
+      <SandboxPortal />
     </SidebarProvider>
   );
 }

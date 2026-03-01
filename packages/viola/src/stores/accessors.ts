@@ -1,10 +1,12 @@
 import { invariant } from 'outvariant';
 import { proxy } from 'valtio';
 
-import { projects } from './proxies/project';
+import { draftProjectId, projects } from './proxies/project';
+import { sandboxes } from './proxies/sandbox';
 import { ui } from './proxies/ui';
 
 export { projects as $projects };
+export { sandboxes as $sandboxes };
 export { ui as $ui };
 
 function createProxyGetter<S extends unknown[], T>(
@@ -32,6 +34,12 @@ export const $project = createProxyGetter(
   (projects) =>
     projects.currentProjectId && projects.value[projects.currentProjectId],
   '$project is not available',
+);
+
+export const $draftProject = createProxyGetter(
+  [projects],
+  (projects) => projects.value[draftProjectId],
+  '$draftProject is not available',
 );
 
 export const $content = createProxyGetter(
