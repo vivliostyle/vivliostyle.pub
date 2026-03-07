@@ -1,8 +1,11 @@
+import { useNavigate } from '@tanstack/react-router';
 import { LANGUAGES } from '@vivliostyle/cli/constants';
 import { useMolecule } from 'bunshi/react';
-import { useCallback, useState } from 'react';
+import { invariant } from 'outvariant';
+import { useCallback, useState, useTransition } from 'react';
 import { useSnapshot } from 'valtio';
 
+import { Button } from '@v/ui/button';
 import {
   Command,
   CommandEmpty,
@@ -20,7 +23,7 @@ import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@v/ui/popover';
 import { useLiveInputField } from '../../../hooks/use-live-field';
-import { $draftProject } from '../../../stores/accessors';
+import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
 import type { ProjectId } from '../../../stores/proxies/project';
 import { Theme } from '../../../stores/proxies/theme';
@@ -146,20 +149,36 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
   );
 }
 
-export function ProjectDetailForm({ children }: React.PropsWithChildren) {
+export function ProjectDetailForm() {
   const { templateStoreProxy } = useMolecule(TemplateStoreMolecule);
+  const [isPending, startTransition] = useTransition();
+  const navigate = useNavigate();
 
   return (
     <form
       className="contents"
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault();
-        if (!templateStoreProxy.selected) {
+        const templateValue = templateStoreProxy.selected;
+        if (!templateValue) {
           return;
         }
-        await setupProjectFromDraft({
-          projectId: 'alpha-v1' as ProjectId,
-          templateValue: templateStoreProxy.selected,
+        startTransition(async () => {
+          await setupProjectFromDraft({
+            projectId: 'alpha-v1' as ProjectId,
+            templateValue,
+          });
+          const project = $project.valueOrThrow();
+          const contentId = project.content.readingOrder[0];
+          const file = project.content.files.get(contentId);
+          invariant(file, 'First content file not found');
+          navigate({
+            to: '/edit/$',
+            params: {
+              _splat: file.filename,
+            },
+            replace: true,
+          });
         });
       }}
     >
@@ -187,7 +206,9 @@ export function ProjectDetailForm({ children }: React.PropsWithChildren) {
         </ThemeSelect>
       </section>
 
-      {children}
+      <Button type="submit" loading={isPending} loadingText="Creating project">
+        Create Project
+      </Button>
     </form>
   );
 }
