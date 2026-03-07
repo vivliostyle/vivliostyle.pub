@@ -35,6 +35,7 @@ import {
 import {
   BookOpen,
   CirclePlus,
+  FilePlus,
   MoreHorizontal,
   Palette,
   Printer,
@@ -89,6 +90,13 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
+        <DropdownMenuItem asChild>
+          <Link to="/new-project">
+            <FilePlus />
+            <span>New Project</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/preview">
             <Printer />

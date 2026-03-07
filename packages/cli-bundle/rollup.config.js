@@ -160,7 +160,13 @@ const workerConfig = defineConfig({
         fileURLToPath(import.meta.url),
         '../src/stubs/node/process.ts',
       ),
-      Buffer: [stdLibBrowser.buffer, 'Buffer'],
+      Buffer: [
+        path.resolve(
+          fileURLToPath(import.meta.url),
+          '../src/stubs/node/buffer.ts',
+        ),
+        'Buffer',
+      ],
       setImmediate: ['process', 'nextTick'],
     }),
     replace({

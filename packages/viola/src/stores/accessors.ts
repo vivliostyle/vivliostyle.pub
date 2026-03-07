@@ -1,6 +1,7 @@
 import { invariant } from 'outvariant';
 import { proxy } from 'valtio';
 
+import { awaiter } from '../libs/awaiter';
 import { draftProjectId, projects } from './proxies/project';
 import { sandboxes } from './proxies/sandbox';
 import { ui } from './proxies/ui';
@@ -23,6 +24,12 @@ function createProxyGetter<S extends unknown[], T>(
       const value = this.value();
       invariant(value, message);
       return value;
+    },
+    awaiter() {
+      return awaiter({
+        getter: () => this.value(),
+        name: message,
+      });
     },
   });
 

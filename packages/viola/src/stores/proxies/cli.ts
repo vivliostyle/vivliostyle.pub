@@ -1,11 +1,14 @@
 import * as Comlink from 'comlink';
 import { proxy, ref } from 'valtio';
 
+import { awaiter } from '../../libs/awaiter';
 import type { Sandbox } from './sandbox';
 
 export type RemoteCli = Comlink.Remote<typeof import('@v/cli-bundle')>;
 
 export class Cli {
+  protected static remoteMap = new Map<string, RemoteCli>();
+
   static create(sandbox: Sandbox) {
     return proxy(new Cli(sandbox));
   }
@@ -13,7 +16,6 @@ export class Cli {
   viewerIframeElement: HTMLIFrameElement | undefined;
 
   protected sandbox: Sandbox;
-  protected remote: RemoteCli | undefined;
   protected remoteAbortController: AbortController | undefined;
   protected lazyRemotePromise: Promise<RemoteCli> | undefined;
   protected lazyViewerUrlPromise: Promise<string> | undefined;
@@ -24,7 +26,11 @@ export class Cli {
 
   createRemotePromise() {
     this.remoteAbortController ??= ref(new AbortController());
-    this.lazyRemotePromise ??= this.getAwaiter();
+    this.lazyRemotePromise ??= awaiter({
+      getter: () => Cli.remoteMap.get(this.sandbox.iframeOrigin),
+      name: 'createRemoteResolver',
+      abortSignal: this.remoteAbortController.signal,
+    });
     return this.lazyRemotePromise;
   }
 
@@ -37,26 +43,10 @@ export class Cli {
     return this.lazyViewerUrlPromise;
   }
 
-  protected getAwaiter() {
-    const cliPromise = new Promise<RemoteCli>((resolve, reject) => {
-      const loop = () => {
-        if (this.remoteAbortController?.signal.aborted) {
-          reject();
-        }
-        if (this.remote) {
-          return resolve(this.remote);
-        }
-        requestAnimationFrame(loop);
-      };
-      loop();
-    });
-    return cliPromise;
-  }
-
   createRemoteResolver() {
     return {
       resolve: (value: RemoteCli) => {
-        this.remote = value;
+        Cli.remoteMap.set(this.sandbox.iframeOrigin, value);
         this.remoteAbortController = undefined;
       },
       reset: () => {
@@ -66,10 +56,14 @@ export class Cli {
   }
 
   protected disposeRemote() {
-    this.remote?.[Comlink.releaseProxy]();
+    const remote = Cli.remoteMap.get(this.sandbox.iframeOrigin);
+    if (remote) {
+      remote[Comlink.releaseProxy]();
+      Cli.remoteMap.delete(this.sandbox.iframeOrigin);
+    }
     this.remoteAbortController?.abort();
-    this.remote = undefined;
     this.lazyRemotePromise = undefined;
+    this.lazyViewerUrlPromise = undefined;
   }
 
   viewerIframeRef(el: HTMLIFrameElement | null) {

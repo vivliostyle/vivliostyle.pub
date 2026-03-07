@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 
+import { Button } from '@v/ui/button';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
 type StartPaneProperty = object;
@@ -25,8 +26,10 @@ export const Pane = createPane<StartPaneProperty>({
 function Content(_: StartPaneProperty) {
   return (
     <div className="grid gap-4">
-      <p>Start writing your book.</p>
-      <Link to="/new-project">Create a new project</Link>
+      <p className="text-2xl py-8">Start writing your book.</p>
+      <Button asChild>
+        <Link to="/new-project">Create a new project</Link>
+      </Button>
     </div>
   );
 }

@@ -33,15 +33,15 @@ export const projects = proxy({
 export class Project {
   static createProjectFromSandbox({
     projectId,
-    sandbox,
+    sandboxPromise,
   }: {
     projectId: ProjectId;
-    sandbox: Sandbox;
+    sandboxPromise: Promise<Sandbox>;
   }) {
     const project = proxy(
       new Project({
         projectId,
-        sandboxPromise: Promise.resolve(sandbox),
+        sandboxPromise,
       }),
     );
     subscribe(project.bibliography, () => project.handleBibliographyUpdate());
@@ -52,8 +52,8 @@ export class Project {
     return project;
   }
 
-  static createNewProject(projectId: ProjectId) {
-    const sandboxPromise = Project.initProjectSandbox({ projectId });
+  protected static createNewProject({ projectId }: { projectId: ProjectId }) {
+    const sandboxPromise = Sandbox.createNewSandbox({ projectId });
     const project = proxy(new Project({ projectId, sandboxPromise }));
     subscribe(project.bibliography, () => project.handleBibliographyUpdate());
     subscribe(project.toc, () => project.handleTocUpdate());
@@ -64,41 +64,7 @@ export class Project {
   }
 
   static createDraftProject() {
-    const sandboxPromise = Project.initProjectSandbox({
-      projectId: draftProjectId,
-    });
-    const project = proxy(
-      new Project({ projectId: draftProjectId, sandboxPromise }),
-    );
-    subscribe(project.bibliography, () => project.handleBibliographyUpdate());
-    subscribe(project.toc, () => project.handleTocUpdate());
-    subscribe(project.theme, () => project.handleThemeUpdate());
-
-    projects.value[draftProjectId] = project;
-    return project;
-  }
-
-  static async initProjectSandbox({ projectId }: { projectId: ProjectId }) {
-    const root = await navigator.storage.getDirectory();
-    const directoryHandle = await root.getDirectoryHandle(projectId, {
-      create: true,
-    });
-    const sandbox = proxy(Sandbox.create({ projectId, directoryHandle }));
-    try {
-      await sandbox.loadFromFileSystem();
-    } catch (error) {
-      console.warn(error);
-      // Not exist or invalid project file
-      await root.removeEntry(projectId, { recursive: true });
-      sandbox.projectDirectoryHandle = ref(
-        await root.getDirectoryHandle(projectId, { create: true }),
-      );
-      await sandbox.initializeProjectFiles({
-        themePackageName: '@vivliostyle/theme-base',
-        entry: [],
-      });
-    }
-    return sandbox;
+    return Project.createNewProject({ projectId: draftProjectId });
   }
 
   projectId: ProjectId;

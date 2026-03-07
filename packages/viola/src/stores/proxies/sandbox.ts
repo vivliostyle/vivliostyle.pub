@@ -41,7 +41,7 @@ export class Sandbox {
     },
   } as const;
 
-  static create({
+  protected static create({
     projectId,
     directoryHandle,
   }: {
@@ -55,6 +55,52 @@ export class Sandbox {
     });
 
     sandboxes.value[projectId] = sandbox;
+    return sandbox;
+  }
+
+  static async checkFilesystemExists({ projectId }: { projectId: ProjectId }) {
+    const root = await navigator.storage.getDirectory();
+    try {
+      await root.getDirectoryHandle(projectId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  static async createNewSandbox({ projectId }: { projectId: ProjectId }) {
+    const root = await navigator.storage.getDirectory();
+    try {
+      await root.removeEntry(projectId, { recursive: true });
+    } catch {
+      // ignore
+    }
+    const directoryHandle = ref(
+      await root.getDirectoryHandle(projectId, {
+        create: true,
+      }),
+    );
+    const sandbox = proxy(Sandbox.create({ projectId, directoryHandle }));
+    await sandbox.initializeProjectFiles({
+      themePackageName: '@vivliostyle/theme-base',
+      entry: [],
+    });
+    return sandbox;
+  }
+
+  static async createSandboxFromFilesystem({
+    projectId,
+  }: {
+    projectId: ProjectId;
+  }) {
+    const root = await navigator.storage.getDirectory();
+    const directoryHandle = ref(
+      await root.getDirectoryHandle(projectId, {
+        create: true,
+      }),
+    );
+    const sandbox = proxy(Sandbox.create({ projectId, directoryHandle }));
+    await sandbox.loadFromFileSystem();
     return sandbox;
   }
 

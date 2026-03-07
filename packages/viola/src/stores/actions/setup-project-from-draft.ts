@@ -1,6 +1,11 @@
 import type { BuildTask } from '@vivliostyle/cli/schema';
 import { deepClone } from 'valtio/utils';
 
+import {
+  buildTreeFromRegistry,
+  bundleCss,
+  fetchPackageContent,
+} from '@v/theme-registry';
 import { $draftProject, $projects } from '../accessors';
 import { Project, type ProjectId } from '../proxies/project';
 import { Sandbox } from '../proxies/sandbox';
@@ -18,11 +23,8 @@ export async function setupProjectFromDraft({
       templateValue as keyof typeof Sandbox.officialTemplates
     ];
 
-  const root = await navigator.storage.getDirectory();
-  const directoryHandle = await root.getDirectoryHandle(projectId, {
-    create: true,
-  });
-  const sandbox = Sandbox.create({ projectId, directoryHandle });
+  $projects.currentProjectId = null;
+  const sandbox = await Sandbox.createNewSandbox({ projectId });
   const cli = await sandbox.cli.createRemotePromise();
 
   await cli.setupTemplate({
@@ -37,6 +39,18 @@ export async function setupProjectFromDraft({
     themePackageName: $$draftProject.theme.packageName,
     entry: deepClone(sandbox.vivliostyleConfig.entry) as BuildTask['entry'],
   });
-  Project.createProjectFromSandbox({ projectId, sandbox });
+  const project = Project.createProjectFromSandbox({
+    projectId,
+    sandboxPromise: Promise.resolve(sandbox),
+  });
+
+  const { packageName } = $$draftProject.theme;
+  const tree = await buildTreeFromRegistry(packageName);
+  await fetchPackageContent(tree);
+
+  const { code } = await bundleCss(`@import "${packageName}"`);
+  project.theme.bundledCss = new TextDecoder().decode(code);
+  project.theme.packageName = packageName;
+
   $projects.currentProjectId = projectId;
 }

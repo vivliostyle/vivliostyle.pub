@@ -1,5 +1,4 @@
-import { use } from 'react';
-import { useSnapshot } from 'valtio';
+import { use, useRef } from 'react';
 
 import { $cli } from '../../stores/accessors';
 import { createPane } from './util';
@@ -18,12 +17,13 @@ export const Pane = createPane<PreviewPaneProperty>({
 });
 
 function Content(_: PreviewPaneProperty) {
-  const cliSnap = useSnapshot($cli).valueOrThrow();
-  const url = use(cliSnap.createViewerUrlPromise());
+  const cliAwaiter = useRef($cli.awaiter());
+  const cli = use(cliAwaiter.current);
+  const url = use(cli.createViewerUrlPromise());
 
   return (
     <iframe
-      ref={(el) => cliSnap.viewerIframeRef(el)}
+      ref={(el) => cli.viewerIframeRef(el)}
       title="Preview"
       src={url}
       className="size-full"
