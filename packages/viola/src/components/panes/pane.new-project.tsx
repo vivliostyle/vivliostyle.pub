@@ -1,8 +1,12 @@
-import { ScopeProvider } from 'bunshi/react';
+import { ScopeProvider, useMolecule } from 'bunshi/react';
 import { useId } from 'react';
+import { useSnapshot } from 'valtio';
 
 import { ProjectDetailForm } from './new-project/project-detail-form';
-import { NewProjectPaneScope } from './new-project/store';
+import {
+  NewProjectPaneScope,
+  TemplateStoreMolecule,
+} from './new-project/store';
 import { TemplateSelectForm } from './new-project/template-select-form';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -28,10 +32,13 @@ export const Pane = createPane<NewProjectPaneProps>({
 });
 
 function Content(_: NewProjectPaneProps) {
+  const { templateStoreProxy } = useMolecule(TemplateStoreMolecule);
+  const snap = useSnapshot(templateStoreProxy);
+
   return (
     <div className="grid gap-8">
       <TemplateSelectForm />
-      <ProjectDetailForm />
+      {snap.selected && <ProjectDetailForm />}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
   CommandItem,
   CommandList,
 } from '@v/ui/command';
+import { LoadingUI } from '@v/ui/custom/loading-ui';
 import {
   StackedRadioGroup,
   StackedRadioGroupItem,
@@ -45,7 +46,7 @@ function BookTitleInput({ children }: React.PropsWithChildren) {
     <label className="grid gap-2">
       {children}
       <div>
-        <Input type="text" name="bookTitle" {...inputProps} />
+        <Input type="text" name="bookTitle" required {...inputProps} />
       </div>
     </label>
   );
@@ -67,7 +68,7 @@ function AuthorInput({ children }: React.PropsWithChildren) {
     <label className="grid gap-2">
       {children}
       <div>
-        <Input type="text" name="author" {...inputProps} />
+        <Input type="text" name="author" required {...inputProps} />
       </div>
     </label>
   );
@@ -93,12 +94,21 @@ function LanguageSelect({ children }: React.PropsWithChildren) {
         <PopoverTrigger
           role="combobox"
           className={cn(
-            "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-            'w-xs',
+            "border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+            'relative w-xs has-focus-visible:border-ring',
           )}
         >
-          {LANGUAGES[snap.bibliography.language as keyof typeof LANGUAGES] ||
-            'Select language'}
+          <input
+            type="text"
+            name="language"
+            required
+            value={snap.bibliography.language}
+            tabIndex={-1}
+            className="sr-only inset-0 size-auto pointer-events-none"
+          />
+          {LANGUAGES[snap.bibliography.language as keyof typeof LANGUAGES] || (
+            <span className="text-muted-foreground">Select language</span>
+          )}
           <ChevronDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </PopoverTrigger>
         <PopoverContent className="w-xs p-0">
@@ -140,7 +150,7 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
         onValueChange={handleSelect}
       >
         {Object.entries(Theme.officialThemes).map(([value, { title }]) => (
-          <StackedRadioGroupItem key={value} value={value}>
+          <StackedRadioGroupItem key={value} value={value} required>
             {title}
           </StackedRadioGroupItem>
         ))}
@@ -206,8 +216,9 @@ export function ProjectDetailForm() {
         </ThemeSelect>
       </section>
 
-      <Button type="submit" loading={isPending} loadingText="Creating project">
-        Create Project
+      <Button type="submit" loading={isPending}>
+        <span>Create Project</span>
+        <LoadingUI>Creating project</LoadingUI>
       </Button>
     </form>
   );
