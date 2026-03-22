@@ -79,13 +79,10 @@ function LanguageSelect({ children }: React.PropsWithChildren) {
   const snap = useSnapshot($draftProject).valueOrThrow();
   const [open, setOpen] = useState(false);
 
-  const handleSelect = useCallback(
-    (value: string) => {
-      setOpen(false);
-      $draftProject.valueOrThrow().bibliography.language = value;
-    },
-    [snap],
-  );
+  const handleSelect = useCallback((value: string) => {
+    setOpen(false);
+    $draftProject.valueOrThrow().bibliography.language = value;
+  }, []);
 
   return (
     <div className="grid gap-2">

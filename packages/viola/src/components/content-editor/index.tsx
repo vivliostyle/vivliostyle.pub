@@ -52,7 +52,6 @@ export function EditorStyleContainer({
   }, [node]);
 
   useEffect(() => {
-    console.log({ bundledCss, customCss, editorOverrideCss });
     const css = `${bundledCss?.replace(/:root/g, ':host') ?? ''}
 ${editorOverrideCss}
 ${customCss?.replace(/:root/g, ':host') ?? ''}`;
