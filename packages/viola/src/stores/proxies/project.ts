@@ -1,3 +1,4 @@
+import { LANGUAGES } from '@vivliostyle/cli/constants';
 import { join } from 'pathe';
 import { proxy, ref, subscribe } from 'valtio';
 import { deepClone } from 'valtio/utils';
@@ -7,6 +8,14 @@ import { generateId } from '../../libs/generate-id';
 import { Content, type ContentId } from './content';
 import { Sandbox } from './sandbox';
 import { Theme } from './theme';
+
+function detectBrowserLanguage(): string {
+  const lang = navigator.language;
+  if (lang in LANGUAGES) return lang;
+  const base = lang.split('-')[0];
+  if (base in LANGUAGES) return base;
+  return 'en';
+}
 
 declare const projectIdBrand: unique symbol;
 export type ProjectId = string & { [projectIdBrand]: never };
@@ -88,7 +97,8 @@ export class Project {
       await this.restoreProjectFromFileSystem();
       this.bibliography.title = sandbox.vivliostyleConfig.title || '';
       this.bibliography.author = sandbox.vivliostyleConfig.author || '';
-      this.bibliography.language = sandbox.vivliostyleConfig.language;
+      this.bibliography.language =
+        sandbox.vivliostyleConfig.language ?? detectBrowserLanguage();
       this.toc.enabled = Boolean(sandbox.vivliostyleConfig.toc);
       if (typeof sandbox.vivliostyleConfig.toc === 'object') {
         this.toc.title = sandbox.vivliostyleConfig.toc.title || '';
