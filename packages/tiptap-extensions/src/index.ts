@@ -5,9 +5,11 @@ import { BulletList } from '@tiptap/extension-bullet-list';
 import { Code } from '@tiptap/extension-code';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import { Document } from '@tiptap/extension-document';
+import { FileHandler } from '@tiptap/extension-file-handler';
 import { HardBreak } from '@tiptap/extension-hard-break';
 import { Heading } from '@tiptap/extension-heading';
 import { HorizontalRule } from '@tiptap/extension-horizontal-rule';
+import { Image } from '@tiptap/extension-image';
 import { Italic } from '@tiptap/extension-italic';
 import { Link } from '@tiptap/extension-link';
 import { ListItem, ListKeymap, OrderedList } from '@tiptap/extension-list';
@@ -47,6 +49,8 @@ export const PubExtensions = Extension.create({
       Underline.configure({}),
       // TrailingNode.configure({}),
 
+      FileHandler.configure({}),
+      Image.configure({}),
       Markdown.configure({}),
     ];
   },
