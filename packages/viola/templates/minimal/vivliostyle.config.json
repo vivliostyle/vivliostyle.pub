@@ -1,0 +1,18 @@
+{
+  "title": "{{proper title}}",
+  "author": "{{author}}",
+  {{#if language}}
+  "language": "{{language}}",
+  {{/if}}
+  {{#if size}}
+  "size": "{{size}}",
+  {{/if}}
+  {{#if theme}}
+  "theme": {{json theme}},
+  {{/if}}
+  {{#if browser}}
+  "browser": "{{browser.type}}{{#if browser.tag}}@{{browser.tag}}{{/if}}",
+  {{/if}}
+  "image": "${CONTAINER_URL}:{{cliVersion}}",
+  "entry": ["manuscript.md"]
+}
