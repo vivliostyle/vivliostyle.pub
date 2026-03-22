@@ -24,6 +24,7 @@ import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@v/ui/popover';
 import { useLiveInputField } from '../../../hooks/use-live-field';
+import { usePromiseState } from '../../../hooks/use-promise-state';
 import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
 import type { ProjectId } from '../../../stores/proxies/project';
@@ -136,9 +137,12 @@ function LanguageSelect({ children }: React.PropsWithChildren) {
 
 function ThemeSelect({ children }: React.PropsWithChildren) {
   const snap = useSnapshot($draftProject).valueOrThrow();
+  const { value: installedTheme } = usePromiseState(snap.theme.installPromise);
+  const currentPackageName =
+    snap.theme.installingPackageName || installedTheme?.packageName;
 
   const handleSelect = useCallback((value: string) => {
-    $draftProject.valueOrThrow().theme.packageName = value;
+    $draftProject.valueOrThrow().theme.install(value);
   }, []);
 
   return (
@@ -146,7 +150,7 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
       {children}
       <StackedRadioGroup
         className="grid-cols-2"
-        value={snap.theme.packageName}
+        value={currentPackageName}
         onValueChange={handleSelect}
       >
         {Object.entries(Theme.officialThemes).map(([value, { title }]) => (

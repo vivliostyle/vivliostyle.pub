@@ -147,7 +147,7 @@ export class Project {
       Array.isArray(sandbox.vivliostyleConfig.theme) &&
       sandbox.vivliostyleConfig.theme[0] in Theme.officialThemes
     ) {
-      this.theme.packageName = sandbox.vivliostyleConfig.theme[0];
+      this.theme.install(sandbox.vivliostyleConfig.theme[0]);
     }
   }
 
@@ -174,8 +174,12 @@ export class Project {
 
   protected async handleThemeUpdate() {
     const sandbox = await this.sandboxPromise;
+    const installedTheme = await this.theme.installPromise;
+    if (!installedTheme?.packageName) {
+      return;
+    }
     sandbox.updateVivliostyleConfig((config) => {
-      config.theme = [this.theme.packageName, './style.css'];
+      config.theme = [installedTheme.packageName, './style.css'];
     });
   }
 }
