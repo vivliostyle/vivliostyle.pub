@@ -13,8 +13,6 @@ interface Tree<T> {
   [key: string]: Tree<T>;
 }
 
-export const defaultDraftDir = 'drafts';
-
 const origin = `https://${import.meta.env.VITE_APP_HOSTNAME}${location.port ? `:${location.port}` : ''}`;
 
 const defaultCss = /* css */ `:root {

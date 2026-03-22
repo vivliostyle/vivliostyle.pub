@@ -17,7 +17,7 @@
   "browser": "{{browser.type}}{{#if browser.tag}}@{{browser.tag}}{{/if}}",
   {{/if}}
   "image": "ghcr.io/vivliostyle/cli:{{cliVersion}}",
-  "entryContext": "draft",
+  "entryContext": "drafts",
   "entry": [
     {
       "rel": "cover",

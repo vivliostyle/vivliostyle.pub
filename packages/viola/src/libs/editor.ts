@@ -103,9 +103,9 @@ const saveContent = debounce(
         .find((s) => s.trim())
         ?.trim() || '';
     const markdown = editor.getMarkdown();
-    $$sandbox.files[
-      join($$sandbox.vivliostyleConfig.entryContext || '', file.filename)
-    ] = ref(new Blob([markdown], { type: 'text/markdown' }));
+    $$sandbox.files[file.filename] = ref(
+      new Blob([markdown], { type: 'text/markdown' }),
+    );
   },
   1000,
   { trailing: true },

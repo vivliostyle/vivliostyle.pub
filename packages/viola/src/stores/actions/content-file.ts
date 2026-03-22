@@ -1,13 +1,12 @@
 import type { EntryConfig } from '@vivliostyle/cli/schema';
 import { invariant } from 'outvariant';
-import { dirname, join, sep } from 'pathe';
+import { dirname, join, relative, sep } from 'pathe';
 import { ref } from 'valtio';
 
 import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
 import { $content, $sandbox, $ui } from '../accessors';
 import type { ContentId } from '../proxies/content';
-import { defaultDraftDir } from '../proxies/sandbox';
 
 export async function createContentFile({
   format,
@@ -19,15 +18,17 @@ export async function createContentFile({
   const $$content = $content.valueOrThrow();
   const $$sandbox = $sandbox.valueOrThrow();
   const prevFile = insertAfter && $$content.files.get(insertAfter);
-  const prevFileDir = prevFile && dirname(prevFile.filename);
+  const entryCotnext = $$sandbox.vivliostyleConfig.entryContext || '';
+  const prevFileDir =
+    prevFile && relative(entryCotnext, dirname(prevFile.filename));
   const contentId = generateId<ContentId>();
   const extname = '.md';
   const basename = `${generateRandomName()}${extname}`;
-  const entryPath = join(prevFileDir || defaultDraftDir, basename);
-  const filename = join(
-    $$sandbox.vivliostyleConfig.entryContext || '',
-    entryPath,
+  const entryPath = join(
+    prevFileDir && !prevFileDir.startsWith('.') ? prevFileDir : '',
+    basename,
   );
+  const filename = join(entryCotnext, entryPath);
   const index =
     ((insertAfter && $$content.readingOrder.indexOf(insertAfter)) ?? -1) + 1;
 
@@ -74,9 +75,7 @@ export async function deleteContentFile({
   $$sandbox.updateVivliostyleConfig((config) => {
     config.entry = [config.entry].flat().toSpliced(index, 1);
   });
-  delete $$sandbox.files[
-    join($$sandbox.vivliostyleConfig.entryContext || '', file.filename)
-  ];
+  delete $$sandbox.files[file.filename];
   return contentId;
 }
 

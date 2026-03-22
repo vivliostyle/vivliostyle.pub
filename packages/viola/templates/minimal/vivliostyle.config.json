@@ -14,5 +14,6 @@
   "browser": "{{browser.type}}{{#if browser.tag}}@{{browser.tag}}{{/if}}",
   {{/if}}
   "image": "${CONTAINER_URL}:{{cliVersion}}",
+  "entryContext": "drafts",
   "entry": ["manuscript.md"]
 }
