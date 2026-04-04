@@ -1,7 +1,6 @@
 import { Editor, type Extensions } from '@tiptap/core';
 import { Placeholder } from '@tiptap/extensions';
 import * as idb from 'idb';
-import { join } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
 
