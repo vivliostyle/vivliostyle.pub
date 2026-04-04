@@ -1,7 +1,13 @@
 import './volume';
 
 import path from 'node:path';
-import { createVitePlugin, build as vivliostyleBuild } from '@vivliostyle/cli';
+import type stream from 'node:stream';
+import {
+  createVitePlugin,
+  build as vivliostyleBuild,
+  create as vivliostyleCreate,
+} from '@vivliostyle/cli';
+import type { VivliostyleInlineConfig } from '@vivliostyle/cli/schema';
 import connect from 'connect';
 import { initialize } from 'esbuild-wasm/lib/browser.js';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
@@ -28,7 +34,7 @@ function sendHotPayload(payload: HotPayload) {
   hmrChannel.postMessage(payload);
 }
 
-let server: ViteDevServer;
+let server: ViteDevServer | undefined;
 
 export async function setupServer() {
   await Promise.all([
@@ -52,6 +58,11 @@ export async function setupServer() {
       }),
     ],
   });
+}
+
+export async function teardownServer() {
+  await server?.close();
+  server = undefined;
 }
 
 export function webSocketConnect() {
@@ -103,9 +114,6 @@ function zipDirectory(pwd: string) {
 export async function serve(
   ...[request, init]: ConstructorParameters<typeof Request>
 ) {
-  if (!server) {
-    throw new Error('Server is not ready');
-  }
   const url = request as Exclude<RequestInfo, Request>;
   const headers = init?.headers as Exclude<HeadersInit, Headers>;
   const method = init?.method;
@@ -114,6 +122,9 @@ export async function serve(
 
   return await new Promise<ConstructorParameters<typeof Response>>(
     (resolve, reject) => {
+      if (!server) {
+        throw new Error('Server is not ready');
+      }
       const { req, res } = createMocks({
         url: new URL(url).pathname,
         headers: Array.isArray(headers) ? Object.fromEntries(headers) : headers,
@@ -183,6 +194,32 @@ export async function buildWebPub() {
 
 export async function exportProjectZip() {
   return zipDirectory('/workdir');
+}
+
+export async function setupTemplate(options: VivliostyleInlineConfig) {
+  fs.rmSync('/workdir', { recursive: true, force: true });
+  fs.mkdirSync('/workdir', { recursive: true });
+  await vivliostyleCreate({
+    ...options,
+    logger: {
+      info: (message) => {
+        console.log(`INFO: ${message}`);
+      },
+      warn: (message) => {
+        console.warn(`WARN: ${message}`);
+      },
+      error: (message) => {
+        console.warn(`ERROR: ${message}`);
+      },
+    },
+    stdout: {
+      write: () => true,
+    } as unknown as stream.Writable,
+    cwd: '/workdir',
+    logLevel: 'debug',
+    projectPath: '.',
+    installDependencies: false,
+  });
 }
 
 export const read = (...args: Parameters<typeof fs.promises.readFile>) =>

@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
+    "./custom/*": "./src/custom/*.tsx",
     "./lib/*": "./src/lib/*.tsx",
     "./*.css": "./src/*.css",
     "./*": "./src/*.tsx"
@@ -21,14 +22,19 @@
     "@radix-ui/react-checkbox": "1.3.2",
     "@radix-ui/react-dialog": "1.1.6",
     "@radix-ui/react-dropdown-menu": "2.1.11",
+    "@radix-ui/react-label": "2.1.8",
+    "@radix-ui/react-popover": "1.1.15",
+    "@radix-ui/react-radio-group": "1.3.8",
     "@radix-ui/react-select": "2.2.5",
     "@radix-ui/react-separator": "1.1.2",
     "@radix-ui/react-slot": "1.1.2",
     "@radix-ui/react-switch": "1.2.5",
     "@radix-ui/react-tabs": "1.1.13",
     "@radix-ui/react-tooltip": "1.1.8",
+    "add": "2.0.6",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "cmdk": "1.1.1",
     "lucide-react": "0.473.0",
     "tailwind-merge": "2.6.0"
   }

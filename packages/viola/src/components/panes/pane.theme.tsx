@@ -1,4 +1,4 @@
-import { lazy, use, useId, useState } from 'react';
+import { lazy, useEffect, useId, useState } from 'react';
 import { useDebounce } from 'react-use';
 import { ref, useSnapshot } from 'valtio';
 
@@ -6,24 +6,31 @@ import { Button } from '@v/ui/button';
 import { Check, Loader2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
-import { installTheme } from '../../stores/actions/install-theme';
-import { $project } from '../../stores/project';
-import { $sandbox } from '../../stores/sandbox';
-import { $theme } from '../../stores/theme';
+import { usePromiseState } from '../../hooks/use-promise-state';
+import { $sandbox, $theme } from '../../stores/accessors';
+import { Theme } from '../../stores/proxies/theme';
+import { createPane, PaneContainer, ScrollOverflow } from './util';
+
+type ThemePaneProperty = object;
+
+declare global {
+  interface PanePropertyMap {
+    theme: ThemePaneProperty;
+  }
+}
+
+export const Pane = createPane<ThemePaneProperty>({
+  title: () => 'Customize Theme',
+  content: (props) => (
+    <ScrollOverflow>
+      <PaneContainer>
+        <Content {...props} />
+      </PaneContainer>
+    </ScrollOverflow>
+  ),
+});
 
 const CodeEditor = lazy(() => import('../code-editor'));
-
-const officialThemes = [
-  { packageName: '@vivliostyle/theme-base', title: 'Base Theme' },
-  { packageName: '@vivliostyle/theme-techbook', title: 'Techbook' },
-  { packageName: '@vivliostyle/theme-academic', title: 'Academic' },
-  { packageName: '@vivliostyle/theme-bunko', title: 'Bunko' },
-  { packageName: '@vivliostyle/theme-gutenberg', title: 'Gutenberg' },
-  { packageName: '@vivliostyle/theme-slide', title: 'Slide' },
-] satisfies {
-  packageName: string;
-  title: string;
-}[];
 
 function InstalledIcon({ className, ...props }: React.ComponentProps<'svg'>) {
   return <Check {...props} strokeWidth={4} className={cn(className)} />;
@@ -37,24 +44,28 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-export function Theme() {
-  use($project.setupPromise);
-
-  const themeSnap = useSnapshot($theme);
-  const usesCustomTheme = !officialThemes.some(
-    (t) => t.packageName === themeSnap.packageName,
-  );
-  const [packageNameInput, setPackageNameInput] = useState(() =>
-    usesCustomTheme ? themeSnap.packageName : '',
-  );
+function Content(_: ThemePaneProperty) {
+  const themeSnap = useSnapshot($theme).valueOrThrow();
   const packageNameInputDescriptionId = useId();
-  const currentPackageName = $theme.installingPackageName || $theme.packageName;
   const [customCss, setCustomCss] = useState(() => themeSnap.customCss);
+  const { value: installedTheme } = usePromiseState(themeSnap.installPromise);
+  const currentPackageName =
+    themeSnap.installingPackageName || installedTheme?.packageName;
+
+  const [packageNameInput, setPackageNameInput] = useState('');
+  useEffect(() => {
+    if (
+      installedTheme &&
+      !(installedTheme.packageName in Theme.officialThemes)
+    ) {
+      setPackageNameInput(installedTheme.packageName);
+    }
+  });
 
   useDebounce(
     () => {
-      $theme.customCss = customCss;
-      $sandbox.files['style.css'] = ref(
+      $theme.valueOrThrow().customCss = customCss;
+      $sandbox.valueOrThrow().files['style.css'] = ref(
         new Blob([customCss], { type: 'text/css' }),
       );
     },
@@ -67,30 +78,32 @@ export function Theme() {
       <section className="grid gap-2">
         <h3 className="text-l font-bold">Vivliostyle Theme</h3>
         <ul className="grid grid-cols-2 gap-2">
-          {officialThemes.map((t) => (
-            <li key={t.packageName}>
-              <Button
-                type="button"
-                variant="outline"
-                className={cn(
-                  'size-full text-left',
-                  t.packageName === currentPackageName && 'border-primary',
-                )}
-                onClick={() => installTheme(t.packageName)}
-              >
-                <span className="flex-1">{t.title}</span>
-                {t.packageName === themeSnap.installingPackageName ? (
-                  <LoadingIcon />
-                ) : (
-                  <InstalledIcon
-                    className={cn(
-                      t.packageName !== currentPackageName && 'invisible',
-                    )}
-                  />
-                )}
-              </Button>
-            </li>
-          ))}
+          {Object.entries(Theme.officialThemes).map(
+            ([packageName, { title }]) => (
+              <li key={packageName}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    'size-full text-left',
+                    packageName === currentPackageName && 'border-primary',
+                  )}
+                  onClick={() => $theme.valueOrThrow().install(packageName)}
+                >
+                  <span className="flex-1">{title}</span>
+                  {packageName === themeSnap.installingPackageName ? (
+                    <LoadingIcon />
+                  ) : (
+                    <InstalledIcon
+                      className={cn(
+                        packageName !== currentPackageName && 'invisible',
+                      )}
+                    />
+                  )}
+                </Button>
+              </li>
+            ),
+          )}
         </ul>
       </section>
 
@@ -102,7 +115,7 @@ export function Theme() {
             e.preventDefault();
             const value = e.currentTarget.packageName.value.trim();
             setPackageNameInput(value);
-            installTheme(value);
+            $theme.valueOrThrow().install(value);
           }}
         >
           <div className="flex items-center gap-2">
@@ -145,9 +158,9 @@ export function Theme() {
           >
             Enter the npm package name of the theme you want to install.
           </p>
-          {themeSnap.installingError && (
+          {themeSnap.installFailure && (
             <p className="text-sm text-destructive" aria-live="polite">
-              Error: {themeSnap.installingError.message}
+              Error: {themeSnap.installFailure.message}
             </p>
           )}
         </form>

@@ -7,6 +7,7 @@ import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
 import { visualizer } from 'rollup-plugin-visualizer';
 import sirv from 'sirv';
+import * as tar from 'tar';
 import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -16,6 +17,59 @@ import { getProjectRoot } from '@v/config/get-project-root.js';
 const secretsDir = path.join(getProjectRoot(), 'secrets');
 const require = createRequire(import.meta.url);
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const templatesDir = path.join(dirname, 'templates');
+
+const createTemplateTgz = (templateName: string): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const stream = tar.create(
+      {
+        gzip: true,
+        cwd: path.join(templatesDir, templateName),
+        portable: true,
+      },
+      ['.'],
+    ) as unknown as NodeJS.ReadableStream;
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+};
+
+const serveTemplates = () =>
+  ({
+    name: 'serve-templates',
+    enforce: 'pre',
+    configureServer(server) {
+      server.middlewares.use('/templates', async (req, res, next) => {
+        const match = req.url?.match(/^\/([^/]+)\.tar\.gz$/);
+        if (!match) return next();
+        const templateName = match[1];
+        const templatePath = path.join(templatesDir, templateName);
+        if (!fs.existsSync(templatePath)) return next();
+        try {
+          const buf = await createTemplateTgz(templateName);
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Content-Type', 'application/gzip');
+          res.setHeader('Content-Length', buf.length);
+          res.end(buf);
+        } catch (e) {
+          next(e);
+        }
+      });
+    },
+    async closeBundle() {
+      const entries = fs.readdirSync(templatesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const buf = await createTemplateTgz(entry.name);
+        const destDir = path.join(dirname, 'dist/templates');
+        fs.mkdirSync(destDir, { recursive: true });
+        fs.writeFileSync(path.join(destDir, `${entry.name}.tar.gz`), buf);
+      }
+    },
+  }) satisfies Plugin;
 
 const serveCli = () =>
   ({
@@ -154,6 +208,7 @@ export default defineConfig(({ mode, command }) => {
       react(),
       tailwindcss(),
       serviceWorker(),
+      serveTemplates(),
       serveCli(),
       visualizer() as PluginOption,
     ],
