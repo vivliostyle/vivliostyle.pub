@@ -145,8 +145,8 @@ catalogs:
       specifier: 3.2.4
       version: 3.2.4
     '@vivliostyle/cli':
-      specifier: 10.3.1
-      version: 10.3.1
+      specifier: 10.4.0
+      version: 10.4.0
     '@vivliostyle/theme-base':
       specifier: 2.0.0
       version: 2.0.0
@@ -342,7 +342,7 @@ importers:
         version: link:../theme-registry
       '@vivliostyle/cli':
         specifier: 'catalog:'
-        version: 10.3.1(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))
+        version: 10.4.0(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))
       buffer:
         specifier: 6.0.3
         version: 6.0.3(patch_hash=bf9ccbb02a8f6facb6ddac19adc719719f1da4c5736a6eca1b79710557a3e640)
@@ -706,10 +706,10 @@ importers:
         version: 3.7.2(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))
       '@vivliostyle/cli':
         specifier: 'catalog:'
-        version: 10.3.1(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))
+        version: 10.4.0(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))
       '@vivliostyle/theme-base':
         specifier: 'catalog:'
-        version: 2.0.0(@vivliostyle/cli@10.3.1(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1)))
+        version: 2.0.0(@vivliostyle/cli@10.4.0(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1)))
       '@vivliostyle/vfm':
         specifier: 'catalog:'
         version: 2.4.0
@@ -764,6 +764,9 @@ importers:
       tailwindcss-animate:
         specifier: 'catalog:'
         version: 1.0.7(tailwindcss@4.1.17)
+      tar:
+        specifier: 7.5.12
+        version: 7.5.12
       valibot:
         specifier: 'catalog:'
         version: 1.2.0(typescript@5.7.3)
@@ -3719,6 +3722,9 @@ packages:
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
 
+  '@u1f992/mupdf@1.27.0-patched.1':
+    resolution: {integrity: sha512-8M/9OteTc2ISddCin0VMojlHC3GJqnfjVm7A9HscyyTgO2jmE8aGRaSEe9pF/rJidoJ5mJR10sniouYGfgSvOQ==}
+
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
 
@@ -3770,8 +3776,8 @@ packages:
   '@vitest/utils@3.2.4':
     resolution: {integrity: sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA==}
 
-  '@vivliostyle/cli@10.3.1':
-    resolution: {integrity: sha512-0qC3ZAf5OEUmerAhhun+BwHGw3VDA+F9e2YucPrSocIywAAMlDyevQ3r9unTW7yEGp5NgdU4vb/EXjimKVmbJA==}
+  '@vivliostyle/cli@10.4.0':
+    resolution: {integrity: sha512-gCipiyqYfjW076pXVak7Sdlm6Xuf9BUiwrhyB2pqGwUGKvKLlOeKQjmW8VEijo7lNoLqnTD/n8Mu90I042HuQg==}
     engines: {node: ^20.0.0 || >=22.0.0}
     hasBin: true
     peerDependencies:
@@ -3803,8 +3809,8 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-  '@vivliostyle/vfm@2.5.0':
-    resolution: {integrity: sha512-YKVRx55MYGF/XF7oRCQaJHnzk0FjBMLEyp7IYXxWKMYZ51OP3HssfVPRSe+Lwv/FMNFvn/kwENXCfc0l8EKLvQ==}
+  '@vivliostyle/vfm@2.6.0':
+    resolution: {integrity: sha512-JWUUMiYHvel34rOcVaOdTCTvTrh/VY1CcxciZdOFai+f9/ifYrAaRvHrK6Hv5ucVIauH1YFHHl1qFIbL6LvG9g==}
     engines: {node: '>= 20'}
     hasBin: true
 
@@ -3861,6 +3867,9 @@ packages:
 
   ajv@8.17.1:
     resolution: {integrity: sha512-B/gBuNg5SiMTrPkC+A2+cW0RszwxYmn6VYxB/inlBStS5nx6xHIt/ehKRhIMhqusl7a8LjQoZnjCs5vhwxOQ1g==}
+
+  ajv@8.18.0:
+    resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
 
   ansi-escapes@7.0.0:
     resolution: {integrity: sha512-GdYO7a61mR0fOlAsvC9/rIHf7L96sBc6dEWzeOu+KAea5bZyQRPIpojrVoI4AXGJS/ycu/fBTdLrUkA4ODrvjw==}
@@ -4026,6 +4035,7 @@ packages:
   basic-ftp@5.1.0:
     resolution: {integrity: sha512-RkaJzeJKDbaDWTIPiJwubyljaEPwpVWkm9Rt5h9Nd6h7tEXTJ3VB4qxdZBioV7JO5yLUaOKwz7vDOzlncUsegw==}
     engines: {node: '>=10.0.0'}
+    deprecated: Security vulnerability fixed in 5.2.0, please upgrade
 
   bcp-47-match@2.0.3:
     resolution: {integrity: sha512-JtTezzbAibu8G0R9op9zb3vcWZd9JF6M0xOYGPn0fNCd7wOpRB1mU2mH9T8gaBGbAAyIIVgB2G7xG0GP98zMAQ==}
@@ -4557,11 +4567,12 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dompurify@3.2.5:
-    resolution: {integrity: sha512-mLPd29uoRe9HpvwP2TxClGQBzGXeEC/we/q+bFlmPPmj2p2Ugl3r6ATu/UU1v77DXNcehiBg9zsr1dREyA/dJQ==}
-
   dompurify@3.3.0:
     resolution: {integrity: sha512-r+f6MYR1gGN1eJv0TVQbhA7if/U7P87cdPl3HN5rikqaBSBxLiCb/b9O+2eG0cxz0ghyU+mU1QkbsOwERMYlWQ==}
+
+  dompurify@3.3.2:
+    resolution: {integrity: sha512-6obghkliLdmKa56xdbLOpUZ43pAR6xFy1uOrxBaIDjT+yaRuuybLjGS9eVBoSR/UPU5fq3OXClEHLJNGvbxKpQ==}
+    engines: {node: '>=20'}
 
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
@@ -4778,8 +4789,11 @@ packages:
   fast-wrap-ansi@0.1.3:
     resolution: {integrity: sha512-iLg8mLuZBztzm8jmY6/xjr+ci4WYo6eYgHAioTA1ElxkE1BJ9J4tPuDlnHaLfljkRZ2vYfP0CDIpCHBBag4InA==}
 
-  fast-xml-parser@5.3.4:
-    resolution: {integrity: sha512-EFd6afGmXlCx8H8WTZHhAoDaWaGyuIBoZJ2mknrNxug+aZKjkp0a0dlars9Izl+jF+7Gu1/5f/2h68cQpe0IiA==}
+  fast-xml-builder@1.1.4:
+    resolution: {integrity: sha512-f2jhpN4Eccy0/Uz9csxh3Nu6q4ErKxf0XIsasomfOihuSUa3/xw6w8dnOtCDgEItQFJG8KyXPzQXzcODDrrbOg==}
+
+  fast-xml-parser@5.5.10:
+    resolution: {integrity: sha512-go2J2xODMc32hT+4Xr/bBGXMaIoiCwrwp2mMtAvKyvEFW6S/v5Gn2pBmE4nvbwNjGhpcAiOwEv7R6/GZ6XRa9w==}
     hasBin: true
 
   fastest-stable-stringify@2.0.2:
@@ -4974,8 +4988,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  handlebars@4.7.8:
-    resolution: {integrity: sha512-vafaFqs8MZkRrSX7sFVUdo3ap/eNiLnb4IakshzvP56X5Nr1iGKAIqdX6tMlm6HcNRIkr6AxO5jFEoJzzpT8aQ==}
+  handlebars@4.7.9:
+    resolution: {integrity: sha512-4E71E0rpOaQuJR2A3xDZ+GM1HyWYv1clR58tC8emQNeQe3RH7MAzSbat+V0wG78LQBo6m6bzSG/L4pBuCsgnUQ==}
     engines: {node: '>=0.4.7'}
     hasBin: true
 
@@ -5243,14 +5257,6 @@ packages:
   interpret@1.4.0:
     resolution: {integrity: sha512-agE4QfB2Lkp9uICn7BAqoscw4SZP9kTE2hxiFI3jBPmXJfdqiahTbUuKGsMoN2GtqL9AxhYioAcVvgsb1HvRbA==}
     engines: {node: '>= 0.10'}
-
-  invert-kv@3.0.1:
-    resolution: {integrity: sha512-CYdFeFexxhv/Bcny+Q0BfOV+ltRlJcd4BBZBYFX/O0u4npJrgZtIcjokegtiSMAvlMTJ+Koq0GBCc//3bueQxw==}
-    engines: {node: '>=8'}
-
-  invert-kv@4.2.0:
-    resolution: {integrity: sha512-6veZJCvIUzuPAeYmmeAUTvlE1mOpvl33ZQoSBVvuWHJ1Ou5oMgAf95YDmK57+oLcSJrFWXfh/nQFYJl2uLOmrQ==}
-    engines: {node: '>=12'}
 
   ip-address@9.0.5:
     resolution: {integrity: sha512-zHtQzGojZXTwZTHQqra+ETKd4Sn3vgi7uBmlPoXVWZqYvuKmtI0l/VZTjqGmJY9x88GGOaZ9+G9ES8hC4T4X8g==}
@@ -5573,14 +5579,6 @@ packages:
   lazystream@1.0.1:
     resolution: {integrity: sha512-b94GiNHQNy6JNTrt5w6zNyffMrNkXZb3KTkCZJb2V1xaEGCk093vkZ2jk3tpaeP33/OiXC+WvK9AxUebnf5nbw==}
     engines: {node: '>= 0.6.3'}
-
-  lcid@3.1.1:
-    resolution: {integrity: sha512-M6T051+5QCGLBQb8id3hdvIW8+zeFV2FyBGFS9IEK5H9Wt4MueD4bW1eWikpHgZp+5xR3l5c8pZUkQsIA0BFZg==}
-    engines: {node: '>=8'}
-
-  lcid@5.0.0:
-    resolution: {integrity: sha512-i0bOkKz5k41apRs5rzFHp5ukmUtGm+owHXj2LwtEir6xxww96mRH1l5Q1denx44LFm5LVKIjXu8ZseqZv7Oa9g==}
-    engines: {node: '>=18.20'}
 
   leven@3.1.0:
     resolution: {integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A==}
@@ -6085,9 +6083,6 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  mupdf@1.26.4:
-    resolution: {integrity: sha512-lv+0KCowetjXu/80h1WKDsELnvHvt7zAE4cs3TC92gwbbJk8AJifMpPLRHMWFovvsWXdFZ6KKCGRds3EzA9TlQ==}
-
   mustache@4.2.0:
     resolution: {integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==}
     hasBin: true
@@ -6307,9 +6302,9 @@ packages:
   os-browserify@0.3.0:
     resolution: {integrity: sha512-gjcpUc3clBf9+210TRaDWbf+rZZZEshZ+DlXMRCeAjp0xhTrnQsKHypIy1J3d5hKdUzj69t708EHtU8P6bUn0A==}
 
-  os-locale@6.0.2:
-    resolution: {integrity: sha512-qIb8bzRqaN/vVqEYZ7lTAg6PonskO7xOmM7OClD28F6eFa4s5XGe4bGpHUHMoCHbNNuR0pDYFeSLiW5bnjWXIA==}
-    engines: {node: '>=12.20'}
+  os-locale@8.0.0:
+    resolution: {integrity: sha512-0hdyXRn0wSKMTHCo2CkPJdTKzIhg1Wb7DxJtkeD8M8rRXSwP2ZFRu4UiWBnkjPdRbL5X+AnUVXBE2SZOmkm3dg==}
+    engines: {node: '>=20'}
 
   outvariant@1.4.3:
     resolution: {integrity: sha512-+Sl2UErvtsoajRDKCE5/dBz4DIvHXQQnAxtQTF04OJxY0+DyZXSo5P5Bb7XYWOh81syohlYL24hbDwxedPUJCA==}
@@ -6402,6 +6397,10 @@ packages:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
     engines: {node: '>=8'}
 
+  path-expression-matcher@1.2.1:
+    resolution: {integrity: sha512-d7gQQmLvAKXKXE2GeP9apIGbMYKz88zWdsn/BN2HRWVQsDFdUY36WSLTY0Jvd4HWi7Fb30gQ62oAOzdgJA6fZw==}
+    engines: {node: '>=14.0.0'}
+
   path-is-absolute@1.0.1:
     resolution: {integrity: sha512-AVbw3UJ2e9bq64vSaS9Am0fje1Pa8pbGqTTsmXfaIiMpnr5DlDhfJOuLj9Sf95ZPVDAUerDfEk88MPmPe7UCQg==}
     engines: {node: '>=0.10.0'}
@@ -6455,6 +6454,10 @@ packages:
 
   picomatch@4.0.3:
     resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
+    engines: {node: '>=12'}
+
+  picomatch@4.0.4:
+    resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
   pidtree@0.6.0:
@@ -7264,8 +7267,8 @@ packages:
   strip-literal@3.0.0:
     resolution: {integrity: sha512-TcccoMhJOM3OebGhSBEmp3UZ2SfDMZUEBdRA/9ynfLi8yYajyWX3JiXArcJt4Umh4vISpspkQIY8ZZoCqjbviA==}
 
-  strnum@2.1.2:
-    resolution: {integrity: sha512-l63NF9y/cLROq/yqKXSLtcMeeyOfnSQlfMSlzFt/K73oIaD8DGaQWd7Z34X9GPiKqP5rbSh84Hl4bOlLcjiSrQ==}
+  strnum@2.2.2:
+    resolution: {integrity: sha512-DnR90I+jtXNSTXWdwrEy9FakW7UX+qUZg28gj5fk2vxxl7uS/3bpI4fjFYVmdK9etptYBPNkpahuQnEwhwECqA==}
 
   style-mod@4.1.2:
     resolution: {integrity: sha512-wnD1HyVqpJUI2+eKZ+eo1UwghftP6yuFheBqqe+bWCotBjC2K1YnteJILRMs3SM4V/0dLEW1SC27MWP5y+mwmw==}
@@ -7323,10 +7326,9 @@ packages:
     engines: {node: '>=10'}
     deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
-  tar@7.5.6:
-    resolution: {integrity: sha512-xqUeu2JAIJpXyvskvU3uvQW8PAmHrtXp2KDuMJwQqW8Sqq0CaZBAQ+dKS3RBXVhU4wC5NjAdKrmh84241gO9cA==}
+  tar@7.5.12:
+    resolution: {integrity: sha512-9TsuLcdhOn4XztcQqhNyq1KOwOOED/3k58JAvtULiYqbO8B/0IBAAIE1hj0Svmm58k27TmcigyDI0deMlgG3uw==}
     engines: {node: '>=18'}
-    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   temp-dir@2.0.0:
     resolution: {integrity: sha512-aoBAniQmmwtcKp/7BzsH8Cxzv8OL736p7v1ihGb5e9DJ9kTwGWHrQrVB5+lfVDzfGrdRzXch+ig7LHaY1JTOrg==}
@@ -8932,7 +8934,7 @@ snapshots:
 
   '@bluwy/giget-core@0.1.3':
     dependencies:
-      tar: 7.5.6
+      tar: 7.5.12
 
   '@clack/core@1.0.0-alpha.6':
     dependencies:
@@ -11271,6 +11273,8 @@ snapshots:
       '@types/node': 22.10.7
     optional: true
 
+  '@u1f992/mupdf@1.27.0-patched.1': {}
+
   '@ungap/structured-clone@1.3.0': {}
 
   '@vitejs/plugin-react-swc@3.7.2(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))':
@@ -11352,7 +11356,7 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
-  '@vivliostyle/cli@10.3.1(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))':
+  '@vivliostyle/cli@10.4.0(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))':
     dependencies:
       '@babel/code-frame': 7.26.2
       '@bluwy/giget-core': 0.1.3
@@ -11363,10 +11367,10 @@ snapshots:
       '@npmcli/arborist': 9.1.7
       '@puppeteer/browsers': 2.10.5
       '@vivliostyle/jsdom': 25.0.1-vivliostyle-cli.1(@napi-rs/canvas@0.1.69)
-      '@vivliostyle/vfm': 2.5.0
+      '@vivliostyle/vfm': 2.6.0
       '@vivliostyle/viewer': 2.40.0
-      ajv: 8.17.1
-      ajv-formats: 3.0.1(ajv@8.17.1)
+      ajv: 8.18.0
+      ajv-formats: 3.0.1(ajv@8.18.0)
       archiver: 7.0.1
       bcp-47-match: 2.0.3
       change-case: 5.4.4
@@ -11374,24 +11378,24 @@ snapshots:
       commander: 13.1.0
       debug: 4.4.0
       decamelize: 6.0.0
-      dompurify: 3.2.5
+      dompurify: 3.3.2
       escape-string-regexp: 5.0.0
       fast-wrap-ansi: 0.1.3
-      fast-xml-parser: 5.3.4
+      fast-xml-builder: 1.1.4
+      fast-xml-parser: 5.5.10
       fs-extra: 11.2.0
       github-slugger: 2.0.0
-      handlebars: 4.7.8
+      handlebars: 4.7.9
       hast-util-to-html: 9.0.5
       hastscript: 9.0.1
-      lcid: 5.0.0
       mime-types: 3.0.1
-      mupdf: 1.26.4
+      mupdf: '@u1f992/mupdf@1.27.0-patched.1'
       node-fetch-native: 1.6.7
       node-stream-zip: 1.15.0
       npm-package-arg: 12.0.2
-      os-locale: 6.0.2
+      os-locale: 8.0.0
       pdf-lib: 1.17.1
-      picomatch: 4.0.2
+      picomatch: 4.0.4
       press-ready: 4.0.3
       puppeteer-core: 24.27.0
       resolve-pkg: 2.0.0
@@ -11455,9 +11459,9 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@vivliostyle/theme-base@2.0.0(@vivliostyle/cli@10.3.1(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1)))':
+  '@vivliostyle/theme-base@2.0.0(@vivliostyle/cli@10.4.0(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1)))':
     optionalDependencies:
-      '@vivliostyle/cli': 10.3.1(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))
+      '@vivliostyle/cli': 10.4.0(typescript@5.7.3)(vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1))
 
   '@vivliostyle/vfm@2.4.0':
     dependencies:
@@ -11497,7 +11501,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vivliostyle/vfm@2.5.0':
+  '@vivliostyle/vfm@2.6.0':
     dependencies:
       '@types/hast': 2.3.10
       '@types/mdast': 3.0.15
@@ -11572,11 +11576,18 @@ snapshots:
       clean-stack: 2.2.0
       indent-string: 4.0.0
 
-  ajv-formats@3.0.1(ajv@8.17.1):
+  ajv-formats@3.0.1(ajv@8.18.0):
     optionalDependencies:
-      ajv: 8.17.1
+      ajv: 8.18.0
 
   ajv@8.17.1:
+    dependencies:
+      fast-deep-equal: 3.1.3
+      fast-uri: 3.0.6
+      json-schema-traverse: 1.0.0
+      require-from-string: 2.0.2
+
+  ajv@8.18.0:
     dependencies:
       fast-deep-equal: 3.1.3
       fast-uri: 3.0.6
@@ -12327,11 +12338,11 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dompurify@3.2.5:
+  dompurify@3.3.0:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
-  dompurify@3.3.0:
+  dompurify@3.3.2:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -12622,9 +12633,15 @@ snapshots:
     dependencies:
       fast-string-width: 1.1.0
 
-  fast-xml-parser@5.3.4:
+  fast-xml-builder@1.1.4:
     dependencies:
-      strnum: 2.1.2
+      path-expression-matcher: 1.2.1
+
+  fast-xml-parser@5.5.10:
+    dependencies:
+      fast-xml-builder: 1.1.4
+      path-expression-matcher: 1.2.1
+      strnum: 2.2.2
 
   fastest-stable-stringify@2.0.2: {}
 
@@ -12643,6 +12660,10 @@ snapshots:
   fdir@6.4.4(picomatch@4.0.3):
     optionalDependencies:
       picomatch: 4.0.3
+
+  fdir@6.4.4(picomatch@4.0.4):
+    optionalDependencies:
+      picomatch: 4.0.4
 
   fflate@0.8.2: {}
 
@@ -12848,7 +12869,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  handlebars@4.7.8:
+  handlebars@4.7.9:
     dependencies:
       minimist: 1.2.8
       neo-async: 2.6.2
@@ -13211,10 +13232,6 @@ snapshots:
 
   interpret@1.4.0: {}
 
-  invert-kv@3.0.1: {}
-
-  invert-kv@4.2.0: {}
-
   ip-address@9.0.5:
     dependencies:
       jsbn: 1.1.0
@@ -13495,14 +13512,6 @@ snapshots:
   lazystream@1.0.1:
     dependencies:
       readable-stream: 2.3.8
-
-  lcid@3.1.1:
-    dependencies:
-      invert-kv: 3.0.1
-
-  lcid@5.0.0:
-    dependencies:
-      invert-kv: 4.2.0
 
   leven@3.1.0: {}
 
@@ -14202,8 +14211,6 @@ snapshots:
 
   ms@2.1.3: {}
 
-  mupdf@1.26.4: {}
-
   mustache@4.2.0: {}
 
   nano-css@5.6.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
@@ -14259,7 +14266,7 @@ snapshots:
       nopt: 9.0.0
       proc-log: 6.1.0
       semver: 7.7.3
-      tar: 7.5.6
+      tar: 7.5.12
       tinyglobby: 0.2.14
       which: 6.0.0
     transitivePeerDependencies:
@@ -14488,9 +14495,7 @@ snapshots:
 
   os-browserify@0.3.0: {}
 
-  os-locale@6.0.2:
-    dependencies:
-      lcid: 3.1.1
+  os-locale@8.0.0: {}
 
   outvariant@1.4.3: {}
 
@@ -14585,7 +14590,7 @@ snapshots:
       promise-retry: 2.0.1
       sigstore: 4.1.0
       ssri: 13.0.0
-      tar: 7.5.6
+      tar: 7.5.12
     transitivePeerDependencies:
       - supports-color
 
@@ -14633,6 +14638,8 @@ snapshots:
 
   path-exists@4.0.0: {}
 
+  path-expression-matcher@1.2.1: {}
+
   path-is-absolute@1.0.1: {}
 
   path-key@3.1.1: {}
@@ -14679,6 +14686,8 @@ snapshots:
   picomatch@4.0.2: {}
 
   picomatch@4.0.3: {}
+
+  picomatch@4.0.4: {}
 
   pidtree@0.6.0: {}
 
@@ -15717,7 +15726,7 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
-  strnum@2.1.2: {}
+  strnum@2.2.2: {}
 
   style-mod@4.1.2: {}
 
@@ -15788,7 +15797,7 @@ snapshots:
       mkdirp: 1.0.4
       yallist: 4.0.0
 
-  tar@7.5.6:
+  tar@7.5.12:
     dependencies:
       '@isaacs/fs-minipass': 4.0.1
       chownr: 3.0.0
@@ -15851,8 +15860,8 @@ snapshots:
 
   tinyglobby@0.2.13:
     dependencies:
-      fdir: 6.4.4(picomatch@4.0.3)
-      picomatch: 4.0.3
+      fdir: 6.4.4(picomatch@4.0.4)
+      picomatch: 4.0.4
 
   tinyglobby@0.2.14:
     dependencies:
