@@ -1,12 +1,13 @@
 import * as Comlink from 'comlink';
 import { invariant } from 'outvariant';
+import { use } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
-import { $sandboxes } from '../stores/accessors';
-import type { ProjectId } from '../stores/proxies/project';
+import { $project } from '../stores/project';
+import { $sandbox, createCliWorkerResolver } from '../stores/sandbox';
 
-const initializedMap: Map<ProjectId, boolean> = new Map();
+let initialized = false;
 
 declare global {
   interface Window {
@@ -20,13 +21,11 @@ if (import.meta.env.DEV) {
   window.__debug ??= {};
 }
 
-function init(iframe: HTMLIFrameElement, projectId: ProjectId) {
-  const sandbox = $sandboxes.value[projectId];
-  invariant(sandbox, 'Sandbox not found: %s', projectId);
-  if (initializedMap.get(projectId)) {
+function init(iframe: HTMLIFrameElement) {
+  if (initialized) {
     return;
   }
-  const cliWorkerResolver = sandbox.cli.createRemoteResolver();
+  const cliWorkerResolver = createCliWorkerResolver();
   const cb = async (event: MessageEvent) => {
     if (event.data.command !== 'bind') {
       return;
@@ -47,7 +46,7 @@ function init(iframe: HTMLIFrameElement, projectId: ProjectId) {
       Comlink.expose(themeRegistry, messagePort);
     }
   };
-  initializedMap.set(projectId, true);
+  initialized = true;
   window.addEventListener('message', cb);
 
   const observer = new MutationObserver((mutations) => {
@@ -59,7 +58,7 @@ function init(iframe: HTMLIFrameElement, projectId: ProjectId) {
         window.__debug.cli = undefined;
       }
       cliWorkerResolver.reset();
-      initializedMap.delete(projectId);
+      initialized = false;
       window.removeEventListener('message', cb);
       observer.disconnect();
     }
@@ -67,28 +66,19 @@ function init(iframe: HTMLIFrameElement, projectId: ProjectId) {
   observer.observe(document.body, { childList: true });
 }
 
-function IframeSandbox({ projectId }: { projectId: ProjectId }) {
-  const sandbox = useSnapshot($sandboxes).value[projectId];
-  invariant(sandbox, 'Sandbox not found: %s', projectId);
-
-  return (
-    <iframe
-      ref={(el) => init(el as HTMLIFrameElement, projectId)}
-      title="Sandbox"
-      src={`${sandbox.iframeOrigin}/sandbox`}
-      style={{ display: 'none' }}
-      sandbox="allow-same-origin allow-scripts"
-    />
-  );
-}
-
-export function SandboxPortal() {
-  const sandboxes = useSnapshot($sandboxes);
+export function Sandbox() {
+  use($project.setupPromise);
+  const sandboxSnap = useSnapshot($sandbox);
+  invariant(sandboxSnap.sandboxOrigin, 'Sandbox is not initialized');
 
   return createPortal(
-    Object.keys(sandboxes.value).map((projectId) => (
-      <IframeSandbox key={projectId} projectId={projectId as ProjectId} />
-    )),
+    <iframe
+      ref={init}
+      title="Sandbox"
+      src={`${sandboxSnap.sandboxOrigin}/sandbox`}
+      style={{ display: 'none' }}
+      sandbox="allow-same-origin allow-scripts"
+    />,
     document.body,
   );
 }

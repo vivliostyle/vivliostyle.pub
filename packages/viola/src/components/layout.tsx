@@ -1,15 +1,12 @@
 import { useRouter } from '@tanstack/react-router';
-import { invariant } from 'outvariant';
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
-import { $ui } from '../stores/accessors';
-import type { PaneContent } from '../stores/proxies/ui';
-import { Pane, panes } from './pane';
-import { PaneContext } from './panes/util';
-import { SandboxPortal } from './sandbox-portal';
+import { $ui, type PaneContent } from '../stores/ui';
+import { Pane } from './pane';
+import { Sandbox } from './sandbox';
 import { SideMenu } from './side-menu';
 
 function DedicatedModal() {
@@ -52,33 +49,20 @@ function DedicatedModal() {
     }
   }, [uiSnap.dedicatedModal]);
 
-  if (!modalContent) {
-    return null;
-  }
-
-  const { type, ...props } = modalContent;
-  const pane = panes[type];
-  invariant(pane, 'Unknown pane: %s', type);
-
-  type Props = PanePropertyMap[typeof type];
-  const Title = pane.title as React.ComponentType<Props>;
-
   return (
-    <PaneContext.Provider value={{ ...pane, props, hideTitle: true }}>
+    modalContent && (
       <Dialog open={open} onOpenChange={closeModal}>
         <DialogContent className="max-w-4xl p-0" onAnimationEnd={purgeModal}>
           <div className="size-full max-h-svh overflow-auto grid gap-4 p-6">
             <DialogHeader>
-              <DialogTitle>
-                <Title {...props} />
-              </DialogTitle>
+              <DialogTitle>{modalContent.title()}</DialogTitle>
             </DialogHeader>
 
             <Pane content={modalContent} />
           </div>
         </DialogContent>
       </Dialog>
-    </PaneContext.Provider>
+    )
   );
 }
 
@@ -102,7 +86,9 @@ export function Layout(_: { children?: React.ReactNode }) {
       </div>
 
       <DedicatedModal />
-      <SandboxPortal />
+      <Suspense>
+        <Sandbox />
+      </Suspense>
     </SidebarProvider>
   );
 }

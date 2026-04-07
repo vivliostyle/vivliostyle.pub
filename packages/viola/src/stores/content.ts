@@ -1,9 +1,7 @@
 import type { Editor } from '@tiptap/core';
 import { sep } from 'pathe';
-import { proxy, ref } from 'valtio';
+import { proxy } from 'valtio';
 import { proxyMap } from 'valtio/utils';
-
-import type { Project } from './project';
 
 declare const contentIdBrand: unique symbol;
 export type ContentId = string & { [contentIdBrand]: never };
@@ -20,19 +18,9 @@ export type HierarchicalReadingOrder = [
   ...(ContentId | HierarchicalReadingOrder)[],
 ];
 
-export class Content {
-  static create(project: Project) {
-    return proxy(new Content(project));
-  }
-
-  files = proxyMap<ContentId, FileContent>();
-  readingOrder: ContentId[] = [];
-
-  protected project: Project;
-
-  protected constructor(project: Project) {
-    this.project = ref(project);
-  }
+export const $content = proxy({
+  files: proxyMap<ContentId, FileContent>(),
+  readingOrder: [] as ContentId[],
 
   get hierarchicalReadingOrder(): HierarchicalReadingOrder {
     return this.readingOrder.reduce(
@@ -59,7 +47,7 @@ export class Content {
       },
       ['.'] as HierarchicalReadingOrder,
     );
-  }
+  },
 
   getFileByFilename(filename: string): [ContentId, FileContent] | undefined {
     for (const [contentId, file] of this.files.entries()) {
@@ -67,5 +55,5 @@ export class Content {
         return [contentId, file];
       }
     }
-  }
-}
+  },
+});

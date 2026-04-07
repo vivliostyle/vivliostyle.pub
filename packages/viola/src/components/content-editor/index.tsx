@@ -1,12 +1,12 @@
 import { EditorContent, EditorContext, useCurrentEditor } from '@tiptap/react';
 import { invariant } from 'outvariant';
 import type React from 'react';
-import { use, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
-import { $content, $theme } from '../../stores/accessors';
-import type { ContentId } from '../../stores/proxies/content';
+import { $content, type ContentId } from '../../stores/content';
+import { $theme } from '../../stores/theme';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
 
@@ -76,17 +76,15 @@ export function EditArea() {
 }
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
-  const contentSnap = useSnapshot($content).valueOrThrow();
-  const themeSnap = useSnapshot($theme).valueOrThrow();
+  const contentSnap = useSnapshot($content);
+  const themeSnap = useSnapshot($theme);
   const file = contentSnap.files.get(contentId);
   invariant(file, `Editor not found for contentId: ${contentId}`);
-  const installedTheme =
-    themeSnap.installPromise && use(themeSnap.installPromise);
 
   return (
     <EditorContext.Provider value={{ editor: file.editor }}>
       <EditorStyleContainer
-        bundledCss={installedTheme?.bundledCss ?? ''}
+        bundledCss={themeSnap.bundledCss ?? ''}
         customCss={themeSnap.customCss ?? ''}
       >
         <EditArea />

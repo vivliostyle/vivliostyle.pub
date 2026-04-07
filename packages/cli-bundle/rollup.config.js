@@ -65,15 +65,10 @@ const workerConfig = defineConfig({
             '../src/stubs/node/process',
           ),
         },
-        {
-          find: 'buffer/',
-          replacement: require.resolve('buffer'),
-        },
         ...Object.entries({
           ...stdLibBrowser,
           ...Object.fromEntries(
             [
-              'buffer',
               'child_process',
               'crypto',
               'dns',
@@ -84,7 +79,6 @@ const workerConfig = defineConfig({
               'path',
               'perf_hooks',
               'process',
-              'stream',
               'util',
               'v8',
               'worker_threads',
@@ -133,40 +127,20 @@ const workerConfig = defineConfig({
             '../src/stubs/@npmcli/arborist',
           ),
         },
-        {
-          find: 'tinyexec',
-          replacement: path.resolve(
-            fileURLToPath(import.meta.url),
-            '../src/stubs/tinyexec',
-          ),
-        },
       ],
     }),
-    commonjs({
-      extensions: ['.js', '.ts'],
-      transformMixedEsModules: true,
-    }),
+    commonjs(),
     nodeResolve({
       browser: true,
       preferBuiltins: false,
     }),
     json(),
     inject({
-      globalThis: path.resolve(
-        fileURLToPath(import.meta.url),
-        '../src/stubs/global-this.ts',
-      ),
       process: path.resolve(
         fileURLToPath(import.meta.url),
         '../src/stubs/node/process.ts',
       ),
-      Buffer: [
-        path.resolve(
-          fileURLToPath(import.meta.url),
-          '../src/stubs/node/buffer.ts',
-        ),
-        'Buffer',
-      ],
+      Buffer: [stdLibBrowser.buffer, 'Buffer'],
       setImmediate: ['process', 'nextTick'],
     }),
     replace({
@@ -200,7 +174,7 @@ const workerConfig = defineConfig({
           );
           return JSON.stringify(volume);
         })(),
-        __nodeVersion__: JSON.stringify('24.11.1'),
+        __nodeVersion__: JSON.stringify('22.13.0'),
       },
       preventAssignment: true,
     }),
