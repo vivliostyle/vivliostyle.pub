@@ -5,7 +5,7 @@ import * as React from 'react';
 import { cn } from './lib/utils';
 
 const buttonVariants = cva(
-  'relative cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -38,30 +38,15 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
-  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    { className, variant, size, asChild = false, disabled, loading, ...props },
-    ref,
-  ) => {
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';
-    const isDisabled = disabled || loading;
-
     return (
       <Comp
-        className={cn(
-          buttonVariants({ variant, size, className }),
-          '*:data-[slot=loading-ui]:absolute',
-          loading
-            ? '*:not-data-[slot=loading-ui]:opacity-0'
-            : '*:data-[slot=loading-ui]:opacity-0',
-        )}
+        className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        disabled={(!asChild && isDisabled) || undefined}
-        aria-disabled={(asChild && isDisabled) || undefined}
-        aria-busy={loading || undefined}
         {...props}
       />
     );

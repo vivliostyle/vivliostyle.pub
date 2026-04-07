@@ -35,7 +35,6 @@ import {
 import {
   BookOpen,
   CirclePlus,
-  FilePlus,
   MoreHorizontal,
   Palette,
   Printer,
@@ -56,7 +55,6 @@ import {
   SidebarSeparator,
 } from '@v/ui/sidebar';
 import VivliostyleLogo from '../assets/vivliostyle-logo.svg';
-import { $content, $project, $projects } from '../stores/accessors';
 import {
   createContentFile,
   deleteContentFile,
@@ -68,10 +66,12 @@ import {
   exportWebPub,
 } from '../stores/actions/export-project';
 import { printPdf } from '../stores/actions/print-pdf';
-import type {
-  ContentId,
-  HierarchicalReadingOrder,
-} from '../stores/proxies/content';
+import {
+  $content,
+  type ContentId,
+  type HierarchicalReadingOrder,
+} from '../stores/content';
+import { $project } from '../stores/project';
 
 const DraggingContentContext = createContext<ContentId | null>(null);
 
@@ -90,13 +90,6 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
-        <DropdownMenuItem asChild>
-          <Link to="/new-project">
-            <FilePlus />
-            <span>New Project</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/preview">
             <Printer />
@@ -151,7 +144,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
 }
 
 function TopMenuSection() {
-  const projectSnap = useSnapshot($project).valueOrThrow();
+  const projectSnap = useSnapshot($project);
   return (
     <SidebarMenu>
       <div className={cn('flex items-center gap-0.5')}>
@@ -222,7 +215,7 @@ function FileTreeItem({
     name: string;
   }
 >) {
-  const content = useSnapshot($content).valueOrThrow();
+  const content = useSnapshot($content);
   const draggingContentId = useContext(DraggingContentContext);
   const sortable = typeof item === 'string' && useSortable({ id: item });
 
@@ -278,7 +271,7 @@ function FileTreeItem({
 
 function FileTreeDraggingItem() {
   const draggingContentId = useContext(DraggingContentContext);
-  const content = useSnapshot($content).valueOrThrow();
+  const content = useSnapshot($content);
   const file = draggingContentId && content.files.get(draggingContentId);
 
   if (!file) {
@@ -324,7 +317,7 @@ function FileTreeGroup({ tree }: { tree: HierarchicalReadingOrder }) {
 }
 
 function FileTree() {
-  const content = useSnapshot($content).valueOrThrow();
+  const content = useSnapshot($content);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, {
@@ -387,11 +380,6 @@ function FileTree() {
 }
 
 export function SideMenu() {
-  const projects = useSnapshot($projects);
-
-  if (!projects.currentProjectId) {
-    return <Sidebar />;
-  }
   return (
     <Sidebar>
       <SidebarHeader>

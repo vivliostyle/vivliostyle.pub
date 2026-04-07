@@ -8,7 +8,7 @@
     "build": "turbo build",
     "check": "biome check .",
     "dev": "turbo dev",
-    "fix": "biome check --write --unsafe .",
+    "fix": "biome check --write .",
     "prepare": "husky",
     "test": "turbo test"
   },
@@ -27,8 +27,7 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "vite@6.3.5": "patches/vite@6.3.5.patch",
-      "buffer@6.0.3": "patches/buffer@6.0.3.patch"
+      "buffer": "patches/buffer.patch"
     },
     "onlyBuiltDependencies": [
       "@biomejs/biome",

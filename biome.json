@@ -35,8 +35,7 @@
       "**",
       "!**/packages/cli-bundle/src/stubs/rollup/**/*",
       "!**/vivliostyle-pub/**/*",
-      "!**/routeTree.gen.ts",
-      "!**/templates/**/*"
+      "!**/routeTree.gen.ts"
     ]
   },
   "formatter": {

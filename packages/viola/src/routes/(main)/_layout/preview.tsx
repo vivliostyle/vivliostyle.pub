@@ -1,20 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { ref } from 'valtio';
 
 import { generateId } from '../../../libs/generate-id';
-import { $ui } from '../../../stores/accessors';
-import { restoreProjects } from '../../../stores/actions/restore-projects';
+import { $ui } from '../../../stores/ui';
 
 export const Route = createFileRoute('/(main)/_layout/preview')({
   component: () => null,
-  beforeLoad: async ({ preload }) => {
-    if (preload) {
-      return;
-    }
-    await restoreProjects();
+  onEnter: () => {
     $ui.tabs = [
       {
         id: generateId(),
         type: 'preview',
+        title: ref(() => <>Preview</>),
       },
     ];
   },

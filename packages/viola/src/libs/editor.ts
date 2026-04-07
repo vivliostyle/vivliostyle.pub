@@ -1,13 +1,14 @@
 import { Editor, type Extensions } from '@tiptap/core';
 import { Placeholder } from '@tiptap/extensions';
 import * as idb from 'idb';
+import { join } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
 
 import { PubExtensions } from '@v/tiptap-extensions';
 import { debounce } from '../libs/debounce';
-import { $content, $sandbox } from '../stores/accessors';
-import type { ContentId } from '../stores/proxies/content';
+import { $content, type ContentId } from '../stores/content';
+import { $sandbox } from '../stores/sandbox';
 
 // @ts-ignore
 async function _setupPersistence({
@@ -88,10 +89,8 @@ async function _setupPersistence({
 }
 
 const saveContent = debounce(
-  async ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
-    const $$content = $content.valueOrThrow();
-    const $$sandbox = $sandbox.valueOrThrow();
-    const file = $$content.files.get(contentId);
+  ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
+    const file = $content.files.get(contentId);
     if (!file) {
       return;
     }
@@ -102,9 +101,9 @@ const saveContent = debounce(
         .find((s) => s.trim())
         ?.trim() || '';
     const markdown = editor.getMarkdown();
-    $$sandbox.files[file.filename] = ref(
-      new Blob([markdown], { type: 'text/markdown' }),
-    );
+    $sandbox.files[
+      join($sandbox.vivliostyleConfig.entryContext || '', file.filename)
+    ] = ref(new Blob([markdown], { type: 'text/markdown' }));
   },
   1000,
   { trailing: true },
