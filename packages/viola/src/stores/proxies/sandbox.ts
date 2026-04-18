@@ -30,12 +30,12 @@ export class Sandbox {
     blank: {
       title: 'Blank Book Template',
       description: 'A minimal template to start from scratch.',
-      source: `${origin}/templates/minimal.tar.gz`,
+      source: `${origin}/_templates/minimal.tar.gz`,
     },
     basic: {
       title: 'Basic Book Template',
       description: 'A simple template with common sections for a book.',
-      source: `${origin}/templates/basic.tar.gz`,
+      source: `${origin}/_templates/basic.tar.gz`,
     },
   } as const;
 
