@@ -5,7 +5,7 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: cross-origin
 
-/_cli/*
+/_*
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Headers: Origin, Content-Type, Accept, Range
   Cross-Origin-Embedder-Policy: credentialless

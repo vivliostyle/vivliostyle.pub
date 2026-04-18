@@ -42,7 +42,7 @@ const serveTemplates = () =>
     name: 'serve-templates',
     enforce: 'pre',
     configureServer(server) {
-      server.middlewares.use('/templates', async (req, res, next) => {
+      server.middlewares.use('/_templates', async (req, res, next) => {
         const match = req.url?.match(/^\/([^/]+)\.tar\.gz$/);
         if (!match) return next();
         const templateName = match[1];
@@ -64,7 +64,7 @@ const serveTemplates = () =>
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         const buf = await createTemplateTgz(entry.name);
-        const destDir = path.join(dirname, 'dist/templates');
+        const destDir = path.join(dirname, 'dist/_templates');
         fs.mkdirSync(destDir, { recursive: true });
         fs.writeFileSync(path.join(destDir, `${entry.name}.tar.gz`), buf);
       }
