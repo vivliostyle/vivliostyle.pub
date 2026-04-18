@@ -1,10 +1,10 @@
 https://github.com/feross/buffer/pull/314
 
 diff --git a/index.js b/index.js
-index 609cf3113940d6811fd9798e27e483e460ff6761..cde695e28ee3a8bdc0941f0bdecc1eb07b9126d3 100644
+index 7a0e9c2a123bc9d26c20bb3de4a3c4e49b24ee40..de0b7f961188305c9bb89d8c8e852208ec660ea3 100644
 --- a/index.js
 +++ b/index.js
-@@ -378,6 +378,7 @@ Buffer.isEncoding = function isEncoding (encoding) {
+@@ -376,6 +376,7 @@ Buffer.isEncoding = function isEncoding (encoding) {
      case 'ascii':
      case 'latin1':
      case 'binary':
@@ -12,45 +12,45 @@ index 609cf3113940d6811fd9798e27e483e460ff6761..cde695e28ee3a8bdc0941f0bdecc1eb0
      case 'base64':
      case 'ucs2':
      case 'ucs-2':
-@@ -532,8 +533,9 @@ function slowToString (encoding, start, end) {
+@@ -531,8 +532,9 @@ function slowToString (encoding, start, end) {
        case 'binary':
          return latin1Slice(this, start, end)
- 
+
 +      case 'base64url':
        case 'base64':
 -        return base64Slice(this, start, end)
 +        return base64Slice(this, start, end, encoding)
- 
+
        case 'ucs2':
        case 'ucs-2':
 @@ -857,8 +859,9 @@ function asciiWrite (buf, string, offset, length) {
    return blitBuffer(asciiToBytes(string), buf, offset, length)
  }
- 
+
 -function base64Write (buf, string, offset, length) {
 -  return blitBuffer(base64ToBytes(string), buf, offset, length)
 +function base64Write (buf, string, offset, length, encoding) {
 +  const b64 = encoding === 'base64url' ? base64urlToBase64(string) : string
 +  return blitBuffer(base64ToBytes(b64), buf, offset, length)
  }
- 
+
  function ucs2Write (buf, string, offset, length) {
 @@ -916,9 +919,10 @@ Buffer.prototype.write = function write (string, offset, length, encoding) {
        case 'binary':
          return asciiWrite(this, string, offset, length)
- 
+
 +      case 'base64url':
        case 'base64':
          // Warning: maxLength not taken into account in base64Write
 -        return base64Write(this, string, offset, length)
 +        return base64Write(this, string, offset, length, encoding)
- 
+
        case 'ucs2':
        case 'ucs-2':
 @@ -941,12 +945,14 @@ Buffer.prototype.toJSON = function toJSON () {
    }
  }
- 
+
 -function base64Slice (buf, start, end) {
 +function base64Slice (buf, start, end, encoding) {
 +  let b64
@@ -63,12 +63,12 @@ index 609cf3113940d6811fd9798e27e483e460ff6761..cde695e28ee3a8bdc0941f0bdecc1eb0
    }
 +  return encoding === 'base64url' ? base64urlFromBase64(b64) : b64
  }
- 
+
  function utf8Slice (buf, start, end) {
-@@ -1658,6 +1664,23 @@ Buffer.prototype.fill = function fill (val, start, end, encoding) {
- 
- var INVALID_BASE64_RE = /[^+/0-9A-Za-z-_]/g
- 
+@@ -1937,6 +1943,23 @@ function boundsError (value, length, type) {
+
+ const INVALID_BASE64_RE = /[^+/0-9A-Za-z-_]/g
+
 +const BASE64_CHAR_62 = '+'
 +const BASE64_CHAR_63 = '/'
 +const BASE64URL_CHAR_62 = '-'

@@ -1,0 +1,85 @@
+diff --git a/dist/node/chunks/dep-DBxKXgDP.js b/dist/node/chunks/dep-DBxKXgDP.js
+index 2cd82a2f105df2ac39d49cc8c8f787325d882f81..23371e87d2e4acfe289cac770a042df2649229a3 100644
+--- a/dist/node/chunks/dep-DBxKXgDP.js
++++ b/dist/node/chunks/dep-DBxKXgDP.js
+@@ -17,7 +17,7 @@ import childProcess$2, { exec, execFile, execSync } from 'node:child_process';
+ import { createServer as createServer$3, STATUS_CODES, get as get$2 } from 'node:http';
+ import { createServer as createServer$2, get as get$1 } from 'node:https';
+ import require$$0$3 from 'tty';
+-import require$$1 from 'util';
++import require$$1_ from 'util';
+ import require$$4$1 from 'net';
+ import require$$0$7 from 'events';
+ import require$$0$5 from 'url';
+@@ -5969,7 +5969,7 @@ function requireCommon () {
+ 
+ (function (module, exports) {
+ 	const tty = require$$0$3;
+-	const util = require$$1;
++	const util = require$$1_;
+ 
+ 	/**
+ 	 * This is the Node.js implementation of `debug()`.
+@@ -17483,7 +17483,7 @@ var debugExports = debug$a.exports;
+ 
+ (function (module, exports) {
+ 	var tty = require$$0$3;
+-	var util = require$$1;
++	var util = require$$1_;
+ 
+ 	/**
+ 	 * This is the Node.js implementation of `debug()`.
+@@ -19695,7 +19695,7 @@ var chokidar = {};
+ const fs$5 = require$$0$4;
+ const { Readable } = require$$0$8;
+ const sysPath$3 = require$$0$2;
+-const { promisify: promisify$3 } = require$$1;
++const { promisify: promisify$3 } = require$$1_;
+ const picomatch$1 = picomatch$2;
+ 
+ const readdir$1 = promisify$3(fs$5.readdir);
+@@ -20803,7 +20803,7 @@ var toRegexRange_1 = toRegexRange$1;
+  * Licensed under the MIT License.
+  */
+ 
+-const util = require$$1;
++const util = require$$1_;
+ const toRegexRange = toRegexRange_1;
+ 
+ const isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
+@@ -22078,7 +22078,7 @@ var constants$1 = {};
+ 
+ const fs$4 = require$$0$4;
+ const sysPath$2 = require$$0$2;
+-const { promisify: promisify$2 } = require$$1;
++const { promisify: promisify$2 } = require$$1_;
+ const isBinaryPath = isBinaryPath$1;
+ const {
+   isWindows: isWindows$2,
+@@ -22723,7 +22723,7 @@ var fseventsHandler = {exports: {}};
+ 
+ const fs$3 = require$$0$4;
+ const sysPath$1 = require$$0$2;
+-const { promisify: promisify$1 } = require$$1;
++const { promisify: promisify$1 } = require$$1_;
+ 
+ let fsevents;
+ try {
+@@ -23252,7 +23252,7 @@ var fseventsHandlerExports = fseventsHandler.exports;
+ const { EventEmitter: EventEmitter$2 } = require$$0$7;
+ const fs$2 = require$$0$4;
+ const sysPath = require$$0$2;
+-const { promisify } = require$$1;
++const { promisify } = require$$1_;
+ const readdirp = readdirp_1;
+ const anymatch = anymatchExports.default;
+ const globParent = globParent$1;
+@@ -34534,7 +34534,7 @@ var wsIncoming = {
+ 
+ 	}
+ 
+-	require$$1.inherits(ProxyServer, EE3);
++	require$$1_.inherits(ProxyServer, EE3);
+ 
+ 	ProxyServer.prototype.onError = function (err) {
+ 	  //

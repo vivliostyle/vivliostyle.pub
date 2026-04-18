@@ -1,18 +1,19 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { ref } from 'valtio';
 
 import { generateId } from '../../../../libs/generate-id';
-import { $content } from '../../../../stores/content';
-import { $project } from '../../../../stores/project';
-import { $ui } from '../../../../stores/ui';
+import { $content, $project, $ui } from '../../../../stores/accessors';
+import { restoreProjects } from '../../../../stores/actions/restore-projects';
 
 export const Route = createFileRoute('/(main)/_layout/edit/$')({
   beforeLoad: async ({ params, preload }) => {
     if (preload) {
       return;
     }
-    await $project.setupPromise;
-    const result = $content.getFileByFilename(params._splat || '');
+    await restoreProjects();
+    await $project.valueOrThrow().setupPromise;
+    const result = $content
+      .valueOrThrow()
+      .getFileByFilename(params._splat || '');
     const contentId = result?.[0];
     if (!contentId) {
       throw redirect({ to: '/' });
@@ -27,7 +28,6 @@ export const Route = createFileRoute('/(main)/_layout/edit/$')({
         id: generateId(),
         type: 'edit',
         contentId,
-        title: ref(() => <>Editor</>),
       },
     ];
   },
