@@ -36,7 +36,7 @@ export async function buildRequestInit(request: Request): Promise<RequestInit> {
 type ServeFunction = (
   url: string,
   init: RequestInit,
-) => Promise<[BodyInit, ResponseInit]>;
+) => Promise<ConstructorParameters<typeof Response>>;
 
 export async function serveViaComlink(
   serve: ServeFunction,
