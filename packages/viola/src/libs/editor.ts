@@ -6,10 +6,14 @@ import { ref } from 'valtio';
 import * as Y from 'yjs';
 
 import { PubExtensions } from '@v/tiptap-extensions';
+import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { debounce } from '../libs/debounce';
 import { $content, $sandbox } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
 import { SandboxFile } from '../stores/proxies/sandbox';
+import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
+
+import './editor/inline-menu.media';
 
 // @ts-ignore
 async function _setupPersistence({
@@ -137,6 +141,17 @@ export async function setupEditor({
     }),
     Placeholder.configure({
       placeholder: 'Start typing...',
+    }),
+    InlineTrigger.configure({
+      triggers: getAllTriggers(),
+      isMenuOpen: () => inlineMenuState.trigger !== null,
+      onDismiss: () => inlineMenuState.closeInlineMenu(),
+      onTrigger: (_editor, trigger, from, coords) => {
+        inlineMenuState.trigger = trigger;
+        inlineMenuState.contentId = contentId;
+        inlineMenuState.from = from;
+        inlineMenuState.coords = coords;
+      },
     }),
     // Collaboration.configure({
     //   document: doc,
