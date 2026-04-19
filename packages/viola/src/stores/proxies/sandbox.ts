@@ -1,5 +1,6 @@
+import { CborDecoder } from '@jsonjoy.com/json-pack/lib/cbor';
 import type { BuildTask } from '@vivliostyle/cli/schema';
-import { basename, dirname, extname, join, relative, sep } from 'pathe';
+import { basename, dirname, extname, join, sep } from 'pathe';
 import { type INTERNAL_Op, proxy, ref, subscribe } from 'valtio';
 import { deepClone, subscribeKey } from 'valtio/utils';
 
@@ -12,6 +13,23 @@ interface Tree<T> {
   [node]: T;
   [key: string]: Tree<T>;
 }
+
+type SnapshotNode = FolderNode | FileNode | SymlinkNode | UnknownNode;
+type FolderNode = [
+  type: 0,
+  meta: object,
+  entries: {
+    [child: string]: SnapshotNode;
+  },
+];
+type FileNode = [type: 1, meta: object, data: Uint8Array];
+type SymlinkNode = [
+  type: 2,
+  meta: {
+    target: string;
+  },
+];
+type UnknownNode = null;
 
 const origin = `https://${import.meta.env.VITE_APP_HOSTNAME}${location.port ? `:${location.port}` : ''}`;
 
@@ -240,41 +258,60 @@ export class Sandbox {
 
   async saveMemoryToFileSystem() {
     const cli = await this.cli.createRemotePromise();
-    const data = await cli.toJSON('/workdir');
+    const cbor = await cli.toBinarySnapshot({ path: '/workdir' });
+    const rootNode = new CborDecoder().decode(cbor) as SnapshotNode;
 
     const dirHandleTreeCache = {
       [node]: this.projectDirectoryHandle,
     };
 
-    for (const [absFilename, content] of Object.entries(data)) {
-      if (content === null) {
-        continue;
+    const traverse = async (snapshot: SnapshotNode, path = '') => {
+      if (!snapshot) {
+        return;
       }
-      const filename = relative('/workdir', absFilename);
-      const [parentDirHandle, basename] =
-        await this.traverseFileDirectoryHandle({
-          filename,
-          create: true,
-          dirHandleTreeCache,
-        });
-      const fileHandle = await parentDirHandle.getFileHandle(basename, {
-        create: true,
-      });
-      const writable = await fileHandle.createWritable();
-      const binary = new TextEncoder().encode(content);
-      await writable.write(binary);
-      await writable.close();
+      switch (snapshot[0]) {
+        case 0 /* Folder */: {
+          const [, , entries] = snapshot;
+          for (const [name, entry] of Object.entries(entries)) {
+            await traverse(entry, join(path, name));
+          }
+          break;
+        }
+        case 1 /* File */: {
+          const [, , data] = snapshot;
+          const buffer = data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength,
+          ) as ArrayBuffer;
+          const [parentDirHandle, basename] =
+            await this.traverseFileDirectoryHandle({
+              filename: path,
+              create: true,
+              dirHandleTreeCache,
+            });
+          const fileHandle = await parentDirHandle.getFileHandle(basename, {
+            create: true,
+          });
+          const writable = await fileHandle.createWritable();
+          await writable.write(buffer);
+          await writable.close();
 
-      // FIXME: Get proper MIME type
-      const mimeType =
-        {
-          css: 'text/css',
-          json: 'application/json',
-          md: 'text/markdown',
-          html: 'text/html',
-        }[extname(filename).slice(1)] || 'application/octet-stream';
-      this.files[filename] = ref(new Blob([binary], { type: mimeType }));
-    }
+          // FIXME: Get proper MIME type
+          const mimeType =
+            {
+              css: 'text/css',
+              json: 'application/json',
+              md: 'text/markdown',
+              html: 'text/html',
+            }[extname(path).slice(1)] || 'application/octet-stream';
+          this.files[path] = ref(new Blob([buffer], { type: mimeType }));
+          break;
+        }
+      }
+    };
+    await traverse(rootNode);
+    // Wait the subscriber callback ends
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
   }
 
   protected async saveToFileSystem(

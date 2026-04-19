@@ -19,6 +19,7 @@
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/modifiers": "catalog:",
     "@dnd-kit/sortable": "catalog:",
+    "@jsonjoy.com/json-pack": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/router-devtools": "catalog:",
