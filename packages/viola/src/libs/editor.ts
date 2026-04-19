@@ -125,7 +125,7 @@ export async function setupEditor({
 
   const extensions = [
     PubExtensions.configure({
-      basePath: filename ? dirname(filename) : null,
+      basePath: filename && dirname(filename),
     }),
     Placeholder.configure({
       placeholder: 'Start typing...',

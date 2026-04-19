@@ -4,37 +4,35 @@ import * as Comlink from 'comlink';
 
 const self = globalThis as unknown as ServiceWorkerGlobalScope;
 
-self.addEventListener('install', (event: ExtendableEvent) => {
-  event.waitUntil(self.skipWaiting());
-});
+export function setupSwIframe() {
+  self.addEventListener('install', (event: ExtendableEvent) => {
+    event.waitUntil(self.skipWaiting());
+  });
 
-self.addEventListener('activate', (event: ExtendableEvent) => {
-  event.waitUntil(self.clients.claim());
-});
+  self.addEventListener('activate', (event: ExtendableEvent) => {
+    event.waitUntil(self.clients.claim());
+  });
 
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-  if (
-    location.origin !== url.origin ||
-    !location.hostname.split('.')[0].startsWith('sandbox-') ||
-    url.pathname.startsWith('/_cli/')
-  ) {
-    return;
-  }
-  if (request.mode === 'navigate') {
-    return event.respondWith(handleNavigate(event));
-  }
+  self.addEventListener('fetch', (event) => {
+    const { request } = event;
+    const url = new URL(request.url);
+    if (location.origin !== url.origin || url.pathname.startsWith('/_cli/')) {
+      return;
+    }
+    if (request.mode === 'navigate') {
+      return event.respondWith(handleNavigate(event));
+    }
 
-  if (
-    ['/__vivliostyle-viewer/', '/vivliostyle/'].some((base) =>
-      url.pathname.startsWith(base),
-    ) ||
-    url.pathname === '/@vivliostyle:viewer:client'
-  ) {
-    return event.respondWith(handleRequest(event));
-  }
-});
+    if (
+      ['/__vivliostyle-viewer/', '/vivliostyle/'].some((base) =>
+        url.pathname.startsWith(base),
+      ) ||
+      url.pathname === '/@vivliostyle:viewer:client'
+    ) {
+      return event.respondWith(handleRequest(event));
+    }
+  });
+}
 
 const channel = new BroadcastChannel('worker:cli');
 const cli = Comlink.wrap<typeof import('@v/cli-bundle')>(channel);
