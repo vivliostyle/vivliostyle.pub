@@ -1,7 +1,7 @@
 import { Editor, type Extensions } from '@tiptap/core';
 import { Placeholder } from '@tiptap/extensions';
 import * as idb from 'idb';
-import { dirname } from 'pathe';
+import { dirname, relative } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
 
@@ -9,6 +9,7 @@ import { PubExtensions } from '@v/tiptap-extensions';
 import { debounce } from '../libs/debounce';
 import { $content, $sandbox } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
+import { SandboxFile } from '../stores/proxies/sandbox';
 
 // @ts-ignore
 async function _setupPersistence({
@@ -104,7 +105,7 @@ const saveContent = debounce(
         ?.trim() || '';
     const markdown = editor.getMarkdown();
     $$sandbox.files[file.filename] = ref(
-      new Blob([markdown], { type: 'text/markdown' }),
+      new SandboxFile('text/markdown', markdown),
     );
   },
   1000,
@@ -114,18 +115,25 @@ const saveContent = debounce(
 export async function setupEditor({
   contentId,
   filename,
+  entryContext,
   initialFile,
 }: {
   contentId: ContentId;
   filename?: string;
-  initialFile?: Blob;
+  entryContext?: string;
+  initialFile?: SandboxFile;
 }) {
+  let basePath = filename && relative(entryContext || '', dirname(filename));
+  if (basePath?.startsWith('.')) {
+    basePath = undefined;
+  }
+
   // const doc = new Y.Doc();
   // await setupPersistence({ doc, contentId });
 
   const extensions = [
     PubExtensions.configure({
-      basePath: filename && dirname(filename),
+      basePath,
     }),
     Placeholder.configure({
       placeholder: 'Start typing...',

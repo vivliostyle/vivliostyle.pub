@@ -43,6 +43,52 @@ export const sandboxes = proxy({
   value: {} as Record<ProjectId, Sandbox>,
 });
 
+export class SandboxFile {
+  public type: string;
+  public bytes: Promise<Uint8Array>;
+
+  constructor(file: File);
+  constructor(type: string, bytes: Uint8Array);
+  constructor(type: string, text: string);
+  constructor(
+    ...args:
+      | [file: File]
+      | [type: string, bytes: Uint8Array]
+      | [type: string, text: string]
+  ) {
+    if (args.length === 1) {
+      this.type = args[0].type;
+      this.bytes = args[0].bytes();
+    } else {
+      this.type = args[0];
+      this.bytes =
+        typeof args[1] === 'string'
+          ? Promise.resolve(new TextEncoder().encode(args[1]))
+          : Promise.resolve(args[1]);
+    }
+  }
+
+  text() {
+    return this.bytes.then((bytes) => new TextDecoder().decode(bytes));
+  }
+
+  buffer() {
+    return this.bytes.then(
+      (bytes) =>
+        bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer,
+    );
+  }
+
+  blob() {
+    return this.buffer().then((buffer) => {
+      return new Blob([buffer], { type: this.type });
+    });
+  }
+}
+
 export class Sandbox {
   static officialTemplates = {
     blank: {
@@ -122,7 +168,7 @@ export class Sandbox {
 
   iframeOrigin: string;
   projectDirectoryHandle: FileSystemDirectoryHandle;
-  files: Record<string, ReturnType<typeof ref<Blob>>> = {};
+  files: Record<string, ReturnType<typeof ref<SandboxFile>>> = {};
   cli = Cli.create(this);
 
   protected writableVivliostyleConfig = deepClone(initialVivliostyleConfig);
@@ -151,9 +197,10 @@ export class Sandbox {
   ) {
     callback(this.writableVivliostyleConfig);
     this.files['vivliostyle.config.json'] = ref(
-      new Blob([JSON.stringify(this.writableVivliostyleConfig, null, 2)], {
-        type: 'application/json',
-      }),
+      new SandboxFile(
+        'application/json',
+        JSON.stringify(this.writableVivliostyleConfig, null, 2),
+      ),
     );
   }
 
@@ -218,7 +265,7 @@ export class Sandbox {
         'vivliostyle.config.json',
       );
       const file = await configFileHandle.getFile();
-      newFiles['vivliostyle.config.json'] = ref(file);
+      newFiles['vivliostyle.config.json'] = ref(new SandboxFile(file));
       configJson = await file.text();
     } catch {
       throw new Error('Project does not exist');
@@ -230,7 +277,7 @@ export class Sandbox {
       ignore: [/^node_modules/, /^\.vivliostyle/],
       handle: async (name, fileHandle) => {
         const file = await fileHandle.getFile();
-        newFiles[name] = ref(file);
+        newFiles[name] = ref(new SandboxFile(file));
       },
     });
 
@@ -253,7 +300,7 @@ export class Sandbox {
       config.entry = entry;
       config.theme = [themePackageName, './style.css'];
     });
-    this.files['style.css'] = ref(new Blob([defaultCss], { type: 'text/css' }));
+    this.files['style.css'] = ref(new SandboxFile('text/css', defaultCss));
   }
 
   async saveMemoryToFileSystem() {
@@ -304,7 +351,9 @@ export class Sandbox {
               md: 'text/markdown',
               html: 'text/html',
             }[extname(path).slice(1)] || 'application/octet-stream';
-          this.files[path] = ref(new Blob([buffer], { type: mimeType }));
+          this.files[path] = ref(
+            new SandboxFile(mimeType, new Uint8Array(buffer)),
+          );
           break;
         }
       }
@@ -341,10 +390,10 @@ export class Sandbox {
         continue;
       }
       if (op[0] === 'set') {
-        if (op[2] === op[3] || !(op[2] instanceof Blob)) {
+        if (op[2] === op[3] || !(op[2] instanceof SandboxFile)) {
           continue;
         }
-        updates[op[1][0]] = new Uint8Array(await op[2].arrayBuffer());
+        updates[op[1][0]] = await op[2].bytes;
       }
       if (op[0] === 'delete') {
         updates[op[1][0]] = null;

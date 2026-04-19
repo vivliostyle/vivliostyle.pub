@@ -2,16 +2,18 @@
 
 import * as Comlink from 'comlink';
 
+import type { ProjectChannel } from '../stores/proxies/project';
+import {
+  buildRequestInit,
+  createHeadResponse,
+  serveViaComlink,
+  setupSwLifecycle,
+} from './sw-utils';
+
 const self = globalThis as unknown as ServiceWorkerGlobalScope;
 
 export function setupSwHost() {
-  self.addEventListener('install', (event: ExtendableEvent) => {
-    event.waitUntil(self.skipWaiting());
-  });
-
-  self.addEventListener('activate', (event: ExtendableEvent) => {
-    event.waitUntil(self.clients.claim());
-  });
+  setupSwLifecycle();
 
   self.addEventListener('fetch', (event) => {
     const { request } = event;
@@ -24,6 +26,20 @@ export function setupSwHost() {
       return;
     }
 
-    // TODO
+    if (url.pathname.startsWith('/vivliostyle/')) {
+      return event.respondWith(handleRequest(event));
+    }
   });
+}
+
+const channel = new BroadcastChannel('host:project');
+const cli = Comlink.wrap<ProjectChannel>(channel);
+
+async function handleRequest(event: FetchEvent) {
+  const { request } = event;
+  if (request.method === 'HEAD') {
+    return createHeadResponse();
+  }
+  const requestInit = await buildRequestInit(request);
+  return serveViaComlink(cli.serve, request.url, requestInit);
 }

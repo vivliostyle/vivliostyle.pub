@@ -73,7 +73,11 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           const { src, ...rest } = HTMLAttributes;
           let resolvedSrc = src;
           if (src && !/^(https?:)?\/\//.test(src)) {
-            resolvedSrc = join(this.storage.basePath ?? '', src);
+            resolvedSrc = join(
+              '/vivliostyle',
+              this.storage.basePath ?? '',
+              src,
+            );
           }
           return [
             'img',

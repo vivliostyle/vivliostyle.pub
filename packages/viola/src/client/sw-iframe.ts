@@ -2,16 +2,17 @@
 
 import * as Comlink from 'comlink';
 
+import {
+  buildRequestInit,
+  createHeadResponse,
+  serveViaComlink,
+  setupSwLifecycle,
+} from './sw-utils';
+
 const self = globalThis as unknown as ServiceWorkerGlobalScope;
 
 export function setupSwIframe() {
-  self.addEventListener('install', (event: ExtendableEvent) => {
-    event.waitUntil(self.skipWaiting());
-  });
-
-  self.addEventListener('activate', (event: ExtendableEvent) => {
-    event.waitUntil(self.clients.claim());
-  });
+  setupSwLifecycle();
 
   self.addEventListener('fetch', (event) => {
     const { request } = event;
@@ -86,39 +87,9 @@ async function handleRequest(event: FetchEvent) {
     return fetch(url, { mode: 'no-cors' });
   }
 
-  const requestInit: RequestInit = {
-    headers: Object.fromEntries(request.headers.entries()),
-    method: request.method,
-  };
-  if (
-    request.method === 'POST' ||
-    request.method === 'PUT' ||
-    request.method === 'PATCH'
-  ) {
-    requestInit.body = await request.arrayBuffer();
-  }
   if (request.method === 'HEAD') {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        'Cache-Control': 'no-store',
-        'Cross-Origin-Embedder-Policy': 'credentialless',
-        'Cross-Origin-Opener-Policy': 'same-origin',
-        'Cross-Origin-Resource-Policy': 'cross-origin',
-      },
-    });
+    return createHeadResponse();
   }
-
-  try {
-    const ret = await Promise.race([
-      cli.serve(request.url, requestInit),
-      new Promise<never>((_, reject) =>
-        setTimeout(reject, 5000, new Error(`Request timeout: ${request.url}`)),
-      ),
-    ]);
-    return new Response(...ret);
-  } catch (error) {
-    console.error(error);
-    return new Response('', { status: 500 });
-  }
+  const requestInit = await buildRequestInit(request);
+  return serveViaComlink(cli.serve, request.url, requestInit);
 }
