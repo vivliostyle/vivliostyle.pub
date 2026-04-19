@@ -1,6 +1,7 @@
 import { Editor, type Extensions } from '@tiptap/core';
 import { Placeholder } from '@tiptap/extensions';
 import * as idb from 'idb';
+import { dirname } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
 
@@ -112,16 +113,20 @@ const saveContent = debounce(
 
 export async function setupEditor({
   contentId,
+  filename,
   initialFile,
 }: {
   contentId: ContentId;
+  filename?: string;
   initialFile?: Blob;
 }) {
   // const doc = new Y.Doc();
   // await setupPersistence({ doc, contentId });
 
   const extensions = [
-    PubExtensions.configure(),
+    PubExtensions.configure({
+      basePath: filename ? dirname(filename) : null,
+    }),
     Placeholder.configure({
       placeholder: 'Start typing...',
     }),

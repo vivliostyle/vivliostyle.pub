@@ -38,6 +38,7 @@
     "@v/config": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
+    "pathe": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },

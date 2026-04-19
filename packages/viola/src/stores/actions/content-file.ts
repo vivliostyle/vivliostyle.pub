@@ -43,7 +43,7 @@ export async function createContentFile({
     format,
     filename,
     summary: '',
-    editor: ref(await setupEditor({ contentId })),
+    editor: ref(await setupEditor({ contentId, filename })),
   });
   $$content.readingOrder.splice(index, 0, contentId);
   return contentId;

@@ -135,7 +135,11 @@ export class Project {
         continue;
       }
       const contentId = generateId<ContentId>();
-      const editor = await setupEditor({ contentId, initialFile: content });
+      const editor = await setupEditor({
+        contentId,
+        filename,
+        initialFile: content,
+      });
       const summary =
         editor
           .getText({ blockSeparator: '\n' })

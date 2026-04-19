@@ -1,4 +1,4 @@
-import { Extension } from '@tiptap/core';
+import { Extension, mergeAttributes } from '@tiptap/core';
 import { Blockquote } from '@tiptap/extension-blockquote';
 import { Bold } from '@tiptap/extension-bold';
 import { BulletList } from '@tiptap/extension-bullet-list';
@@ -19,11 +19,26 @@ import { Text } from '@tiptap/extension-text';
 import { Underline } from '@tiptap/extension-underline';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
+import { join } from 'pathe';
 
-export const PubExtensions = Extension.create({
+export interface PubExtensionConfig {
+  basePath?: string | undefined;
+}
+
+declare module '@tiptap/core' {
+  interface Storage {
+    image: {
+      basePath?: string | undefined;
+    };
+  }
+}
+
+export const PubExtensions = Extension.create<PubExtensionConfig>({
   name: 'pubExtensions',
 
   addExtensions() {
+    const { basePath } = this.options;
+
     return [
       // Starter kit extensions
       Bold.configure({}),
@@ -50,7 +65,25 @@ export const PubExtensions = Extension.create({
       // TrailingNode.configure({}),
 
       FileHandler.configure({}),
-      Image.configure({}),
+      Image.extend({
+        addStorage() {
+          return { basePath };
+        },
+        renderHTML({ HTMLAttributes }) {
+          const { src, ...rest } = HTMLAttributes;
+          let resolvedSrc = src;
+          if (src && !/^(https?:)?\/\//.test(src)) {
+            resolvedSrc = join(this.storage.basePath ?? '', src);
+          }
+          return [
+            'img',
+            mergeAttributes(this.options.HTMLAttributes, {
+              ...rest,
+              src: resolvedSrc,
+            }),
+          ];
+        },
+      }).configure({}),
       Markdown.configure({}),
     ];
   },
