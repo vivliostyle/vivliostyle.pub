@@ -12,6 +12,7 @@ import { $content, $sandbox } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
 import { SandboxFile } from '../stores/proxies/sandbox';
 import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
+import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
 
 import './editor/inline-menu.media';
@@ -144,6 +145,18 @@ export async function setupEditor({
       },
       onFilePaste: (editor, files) => {
         insertImageFiles({ editor, contentId, files });
+      },
+      onDrop: (editor, payload, pos) => {
+        switch (payload.type) {
+          case 'asset':
+            insertExistingAsset({
+              editor,
+              contentId,
+              assetPath: payload.path,
+              pos,
+            });
+            return;
+        }
       },
     }),
     Placeholder.configure({

@@ -4,6 +4,7 @@ import { basename, dirname, extname, join, sep } from 'pathe';
 import { type INTERNAL_Op, proxy, ref, subscribe } from 'valtio';
 import { deepClone, subscribeKey } from 'valtio/utils';
 
+import { generateId } from '../../libs/generate-id';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { ProjectId } from './project';
@@ -38,6 +39,42 @@ const defaultCss = /* css */ `:root {
 }`;
 
 const initialVivliostyleConfig = { entry: [] } satisfies BuildTask as BuildTask;
+
+export type MediaCategory = 'image' | 'font' | 'audio' | 'video';
+
+export interface MediaAsset {
+  path: string;
+  filename: string;
+  category: MediaCategory;
+  mimeType: string;
+}
+
+const MEDIA_EXTENSIONS: Record<MediaCategory, readonly string[]> = {
+  image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
+  font: ['woff', 'woff2', 'ttf', 'otf'],
+  audio: ['mp3', 'ogg', 'wav', 'm4a'],
+  video: ['mp4', 'webm', 'mov'],
+};
+
+const MIME_BY_EXT: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
+  m4a: 'audio/mp4',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+};
 
 export const sandboxes = proxy({
   value: {} as Record<ProjectId, Sandbox>,
@@ -166,9 +203,25 @@ export class Sandbox {
     return sandbox;
   }
 
+  static categorizeAsset(path: string): MediaCategory | null {
+    const ext = extname(path).slice(1).toLowerCase();
+    if (!ext) return null;
+    for (const [category, exts] of Object.entries(MEDIA_EXTENSIONS) as [
+      MediaCategory,
+      readonly string[],
+    ][]) {
+      if (exts.includes(ext)) return category;
+    }
+    return null;
+  }
+
+  static getMediaAccept(category: MediaCategory): string {
+    return MEDIA_EXTENSIONS[category].map((ext) => `.${ext}`).join(',');
+  }
+
   iframeOrigin: string;
   projectDirectoryHandle: FileSystemDirectoryHandle;
-  files: Record<string, ReturnType<typeof ref<SandboxFile>>> = {};
+  files: Record<string, ReturnType<typeof ref<SandboxFile>>> = proxy({});
   cli = Cli.create(this);
 
   protected writableVivliostyleConfig = deepClone(initialVivliostyleConfig);
@@ -202,6 +255,35 @@ export class Sandbox {
         JSON.stringify(this.writableVivliostyleConfig, null, 2),
       ),
     );
+  }
+
+  get mediaAssets(): MediaAsset[] {
+    const assets: MediaAsset[] = [];
+    for (const path of Object.keys(this.files)) {
+      const category = Sandbox.categorizeAsset(path);
+      if (!category) continue;
+      const file = this.files[path];
+      assets.push({
+        path,
+        filename: basename(path),
+        category,
+        mimeType: file.type,
+      });
+    }
+    assets.sort((a, b) => a.path.localeCompare(b.path));
+    return assets;
+  }
+
+  async saveMediaAsset(file: File): Promise<string> {
+    const entryContext = this.vivliostyleConfig.entryContext || '';
+    const ext = extname(file.name).replace(/^\./, '').toLowerCase() || 'bin';
+    const id = generateId();
+    const savePath = join(entryContext, 'assets', `${id}.${ext}`);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const mimeType =
+      file.type || MIME_BY_EXT[ext] || 'application/octet-stream';
+    this.files[savePath] = ref(new SandboxFile(mimeType, bytes));
+    return savePath;
   }
 
   protected async readFileSystemRecursive({

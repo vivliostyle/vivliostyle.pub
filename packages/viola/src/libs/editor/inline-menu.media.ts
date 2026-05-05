@@ -1,4 +1,5 @@
 import { ImageIcon } from '@v/ui/icon';
+import { Sandbox } from '../../stores/proxies/sandbox';
 import { openFilePicker } from '../open-file-picker';
 import { registerInlineMenuPlugin } from './inline-menu';
 import { insertImageFiles } from './insert-image';
@@ -12,7 +13,9 @@ registerInlineMenuPlugin({
       label: 'Insert Image',
       icon: ImageIcon,
       onSelect: async ({ contentId, editor, from }) => {
-        const files = await openFilePicker({ accept: 'image/*' });
+        const files = await openFilePicker({
+          accept: Sandbox.getMediaAccept('image'),
+        });
         if (files.length === 0) {
           return;
         }

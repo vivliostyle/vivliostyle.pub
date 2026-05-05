@@ -20,7 +20,19 @@ import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import { join } from 'pathe';
 
+import {
+  CustomDragHandler,
+  type CustomDragPayload,
+} from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
+
+export {
+  type AssetDragPayload,
+  CUSTOM_DRAG_MIME_NAME,
+  type CustomDragPayload,
+  parseCustomDragPayload,
+  serializeCustomDragPayload,
+} from './custom-drag-handler';
 
 export const IMAGE_MIME_TYPES = [
   'image/png',
@@ -34,6 +46,7 @@ export interface PubExtensionConfig {
   basePath?: string | undefined;
   onFileDrop?: (editor: Editor, files: File[], pos: number) => void;
   onFilePaste?: (editor: Editor, files: File[]) => void;
+  onDrop?: (editor: Editor, payload: CustomDragPayload, pos: number) => void;
 }
 
 declare module '@tiptap/core' {
@@ -48,7 +61,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
   name: 'pubExtensions',
 
   addExtensions() {
-    const { basePath, onFileDrop, onFilePaste } = this.options;
+    const { basePath, onFileDrop, onFilePaste, onDrop } = this.options;
 
     return [
       // Starter kit extensions
@@ -80,6 +93,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
         onDrop: onFileDrop,
         onPaste: onFilePaste,
       }),
+      CustomDragHandler.configure({ onDrop }),
       Image.extend({
         addStorage() {
           return { basePath };
