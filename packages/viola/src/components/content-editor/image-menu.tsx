@@ -1,24 +1,24 @@
-import {
-  autoUpdate,
-  computePosition,
-  flip,
-  hide,
-  offset,
-  type VirtualElement,
-} from '@floating-ui/react-dom';
 import type { Editor } from '@tiptap/core';
 import { NodeSelection } from '@tiptap/pm/state';
 import { useCurrentEditor } from '@tiptap/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@v/ui/button';
 import { Trash2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
+import { useContainerRelativeRect } from '../../hooks/use-container-relative-rect';
+
+const IMAGE_MENU_OFFSET_VAR = '--image-menu-offset';
 
 interface ImageState {
   from: number;
   to: number;
   alt: string;
+}
+
+interface ImageMenuProps {
+  containerRef: RefObject<HTMLDivElement | null>;
 }
 
 function getSelectedImage(editor: Editor): ImageState | null {
@@ -37,13 +37,9 @@ function getSelectedImage(editor: Editor): ImageState | null {
   };
 }
 
-export function ImageMenu() {
+export function ImageMenu({ containerRef }: ImageMenuProps) {
   const { editor } = useCurrentEditor();
   const [state, setState] = useState<ImageState | null>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
-    null,
-  );
-  const menuRef = useRef<HTMLDivElement>(null);
   const altInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -75,50 +71,14 @@ export function ImageMenu() {
     };
   }, [editor]);
 
-  useEffect(() => {
-    if (!editor || !state || !menuRef.current) {
-      setCoords(null);
-      return;
-    }
-    const menuEl = menuRef.current;
-    const { from, to } = state;
-    const reference: VirtualElement = {
-      getBoundingClientRect() {
-        const start = editor.view.coordsAtPos(from);
-        const end = editor.view.coordsAtPos(to);
-        const top = Math.min(start.top, end.top);
-        const bottom = Math.max(start.bottom, end.bottom);
-        const left = Math.min(start.left, end.left);
-        const right = Math.max(start.right, end.right);
-        return {
-          top,
-          bottom,
-          left,
-          right,
-          x: left,
-          y: top,
-          width: right - left,
-          height: bottom - top,
-          toJSON() {
-            return this;
-          },
-        };
-      },
-      contextElement: editor.view.dom,
-    };
-    async function update() {
-      const result = await computePosition(reference, menuEl, {
-        placement: 'bottom-start',
-        middleware: [offset(4), flip(), hide()],
-      });
-      if (result.middlewareData.hide?.referenceHidden) {
-        setCoords(null);
-        return;
-      }
-      setCoords({ top: result.y, left: result.x });
-    }
-    return autoUpdate(reference, menuEl, update);
+  // Resolve the actual image DOM node so the shared hook can measure it
+  // (and re-measure via ResizeObserver on async image load).
+  const imageDom = useMemo(() => {
+    if (!editor || !state) return null;
+    const dom = editor.view.nodeDOM(state.from);
+    return dom instanceof HTMLElement ? dom : null;
   }, [editor, state]);
+  const rect = useContainerRelativeRect(containerRef, imageDom);
 
   const handleAltBlur = useCallback(() => {
     if (!editor || !altInputRef.current || !state) {
@@ -134,7 +94,11 @@ export function ImageMenu() {
     ) {
       return;
     }
-    editor.chain().updateAttributes('image', { alt: value }).run();
+    editor
+      .chain()
+      .updateAttributes('image', { alt: value })
+      .setNodeSelection(state.from)
+      .run();
   }, [editor, state]);
 
   const handleDelete = useCallback(() => {
@@ -144,42 +108,62 @@ export function ImageMenu() {
     editor.chain().focus().deleteSelection().run();
   }, [editor]);
 
-  if (!editor || !state) {
+  if (!editor || !state || !rect) {
     return null;
   }
 
   return (
     <div
-      ref={menuRef}
-      style={{
-        position: 'fixed',
-        top: coords?.top ?? 0,
-        left: coords?.left ?? 0,
-        visibility: coords ? 'visible' : 'hidden',
-        zIndex: 50,
-      }}
-      className="flex items-center gap-1 rounded-md border bg-popover p-1 shadow-md"
+      style={
+        {
+          position: 'absolute',
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          pointerEvents: 'none',
+          zIndex: 50,
+          textAlign: 'center',
+          [IMAGE_MENU_OFFSET_VAR]: '4px',
+        } as React.CSSProperties
+      }
     >
-      <Input
-        key={`${state.from}-${state.to}`}
-        ref={altInputRef}
-        defaultValue={state.alt}
-        onBlur={handleAltBlur}
-        placeholder="Alt text"
-        className="h-7 w-48"
-        aria-label="Alt text"
-      />
-      <Button
-        type="button"
-        size="icon"
-        variant="ghost"
-        className="h-7 w-7"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={handleDelete}
-        aria-label="Delete image"
+      {/* Spacer matching the image height so the sticky menu naturally
+          settles at the image's bottom edge. */}
+      <div style={{ height: rect.height, pointerEvents: 'none' }} aria-hidden />
+      {/* Sticky menu sticks to the viewport bottom while the image is
+          partially scrolled past, then settles back below the image. */}
+      <div
+        role="toolbar"
+        aria-label="Image actions"
+        style={{
+          position: 'sticky',
+          bottom: `var(${IMAGE_MENU_OFFSET_VAR})`,
+          marginTop: `var(${IMAGE_MENU_OFFSET_VAR})`,
+          pointerEvents: 'auto',
+        }}
+        className="inline-flex items-center gap-1 rounded-md border bg-popover p-1 shadow-md"
       >
-        <Trash2 />
-      </Button>
+        <Input
+          key={`${state.from}-${state.to}`}
+          ref={altInputRef}
+          defaultValue={state.alt}
+          onBlur={handleAltBlur}
+          placeholder="Alt text"
+          className="h-7 w-48"
+          aria-label="Alt text"
+        />
+        <Button
+          type="button"
+          size="icon"
+          variant="destructive"
+          className="h-7 w-7"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleDelete}
+          aria-label="Delete image"
+        >
+          <Trash2 />
+        </Button>
+      </div>
     </div>
   );
 }

@@ -84,17 +84,20 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   invariant(file, `Editor not found for contentId: ${contentId}`);
   const installedTheme =
     themeSnap.installPromise && use(themeSnap.installPromise);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   return (
     <EditorContext.Provider value={{ editor: file.editor }}>
-      <EditorStyleContainer
-        bundledCss={installedTheme?.bundledCss ?? ''}
-        customCss={themeSnap.customCss ?? ''}
-      >
-        <EditArea />
-      </EditorStyleContainer>
-      <InlineMenu />
-      <ImageMenu />
+      <div ref={wrapperRef} className="relative h-full">
+        <EditorStyleContainer
+          bundledCss={installedTheme?.bundledCss ?? ''}
+          customCss={themeSnap.customCss ?? ''}
+        >
+          <EditArea />
+        </EditorStyleContainer>
+        <InlineMenu containerRef={wrapperRef} />
+        <ImageMenu containerRef={wrapperRef} />
+      </div>
     </EditorContext.Provider>
   );
 }

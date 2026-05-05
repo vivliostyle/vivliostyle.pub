@@ -1,187 +1,191 @@
-import {
-  autoUpdate,
-  computePosition,
-  hide,
-  type VirtualElement,
-} from '@floating-ui/react-dom';
-import { useCallback, useEffect, useRef } from 'react';
+import type { RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@v/ui/dropdown';
+import { cn } from '@v/ui/lib/utils';
+import { useContainerRelativeRect } from '../../hooks/use-container-relative-rect';
 import {
   getItemsForTrigger,
   inlineMenuState,
 } from '../../libs/editor/inline-menu';
 import { $content } from '../../stores/accessors';
 
-const MENU_KEYS = ['ArrowUp', 'ArrowDown', 'Enter', 'Tab'];
+interface InlineMenuProps {
+  containerRef: RefObject<HTMLDivElement | null>;
+}
 
-export function InlineMenu() {
+export function InlineMenu({ containerRef }: InlineMenuProps) {
   const snap = useSnapshot(inlineMenuState);
-
   const isOpen =
     snap.trigger !== null && snap.coords !== null && snap.contentId !== null;
-
-  const triggerRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!isOpen || !triggerRef.current) return;
-    const triggerEl = triggerRef.current;
-    const { contentId } = inlineMenuState;
-    if (!contentId) return;
-    const editor = $content.valueOrThrow().files.get(contentId)?.editor;
-    if (!editor) return;
-
-    const reference: VirtualElement = {
-      getBoundingClientRect() {
-        const { from } = inlineMenuState;
-        const { top, bottom, left } = editor.view.coordsAtPos(from);
-        return {
-          width: 0,
-          height: bottom - top,
-          x: left,
-          y: top,
-          top,
-          bottom,
-          left,
-          right: left,
-          toJSON() {
-            return this;
-          },
-        };
-      },
-      contextElement: editor.view.dom,
-    };
-
-    async function update() {
-      const rect = reference.getBoundingClientRect();
-      inlineMenuState.coords = {
-        top: rect.top,
-        bottom: rect.bottom,
-        left: rect.left,
-      };
-
-      const { middlewareData } = await computePosition(reference, triggerEl, {
-        middleware: [hide()],
-      });
-      if (middlewareData.hide?.referenceHidden) {
-        inlineMenuState.closeInlineMenu();
-      }
-    }
-
-    return autoUpdate(reference, triggerEl, update);
-  }, [isOpen]);
-
-  // Capture keydown events to close the menu on Escape, and prevent it from
-  // reaching Radix's DismissableLayer.
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      const { contentId, from } = inlineMenuState;
-      inlineMenuState.closeInlineMenu();
-      if (!contentId) return;
-      const editor = $content.valueOrThrow().files.get(contentId)?.editor;
-      editor
-        ?.chain()
-        .focus()
-        .setTextSelection(from + 1)
-        .run();
-    }
-    window.addEventListener('keydown', handleEscape, { capture: true });
-    return () =>
-      window.removeEventListener('keydown', handleEscape, { capture: true });
-  }, [isOpen]);
-
-  const handleMenuKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (MENU_KEYS.includes(e.key)) return;
-
-    const { contentId, from } = inlineMenuState;
-    if (!contentId) return;
-    const editor = $content.valueOrThrow().files.get(contentId)?.editor;
-    if (!editor) return;
-
-    e.preventDefault();
-    inlineMenuState.closeInlineMenu();
-
-    if (e.key === 'Backspace') {
-      editor
-        .chain()
-        .focus()
-        .deleteRange({ from, to: from + 1 })
-        .run();
-      return;
-    }
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      editor.chain().focus().insertContent(e.key).run();
-      return;
-    }
-    editor.commands.focus();
-  }, []);
-
   const items = snap.trigger ? getItemsForTrigger(snap.trigger) : [];
 
-  return (
-    <DropdownMenu
-      open={isOpen && items.length > 0}
-      onOpenChange={(open) => {
-        if (open) return;
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const positionSource = useMemo(
+    () =>
+      isOpen && snap.coords
+        ? { top: snap.coords.bottom, left: snap.coords.left }
+        : null,
+    [isOpen, snap.coords],
+  );
+  const pos = useContainerRelativeRect(containerRef, positionSource);
+
+  // Reset active highlight whenever a new menu opens.
+  useEffect(() => {
+    if (isOpen) setActiveIndex(0);
+  }, [isOpen]);
+
+  // Auto-close when menu scrolls out of viewport.
+  useEffect(() => {
+    if (!isOpen || !pos || !menuRef.current) return;
+    console.log('Observing inline menu visibility');
+    const el = menuRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) {
+            inlineMenuState.closeInlineMenu();
+          }
+        }
+      },
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isOpen, pos]);
+
+  // Click outside closes the menu.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) {
         inlineMenuState.closeInlineMenu();
+      }
+    };
+    window.addEventListener('mousedown', handleMouseDown);
+    return () => window.removeEventListener('mousedown', handleMouseDown);
+  }, [isOpen]);
+
+  const selectItem = useCallback((index: number) => {
+    const { contentId, from, trigger } = inlineMenuState;
+    if (!contentId || !trigger) return;
+    const editor = $content.valueOrThrow().files.get(contentId)?.editor;
+    if (!editor) return;
+    const list = getItemsForTrigger(trigger);
+    const item = list[index];
+    if (!item) return;
+    inlineMenuState.closeInlineMenu();
+    item.onSelect({
+      editor,
+      from,
+      contentId,
+      close: () => inlineMenuState.closeInlineMenu(),
+    });
+  }, []);
+
+  // Keyboard navigation. We intercept events at the window level (capture)
+  // so that the editor never sees the keys we handle, while still allowing
+  // unhandled keys (e.g. plain typing) to fall through to the editor.
+  useEffect(() => {
+    if (!isOpen || items.length === 0) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      const { contentId, from } = inlineMenuState;
+      if (!contentId) return;
+      const editor = $content.valueOrThrow().files.get(contentId)?.editor;
+      if (!editor) return;
+
+      switch (e.key) {
+        case 'Escape':
+          e.preventDefault();
+          e.stopPropagation();
+          inlineMenuState.closeInlineMenu();
+          editor
+            .chain()
+            .focus()
+            .setTextSelection(from + 1)
+            .run();
+          return;
+        case 'ArrowDown':
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveIndex((i) => (i + 1) % items.length);
+          return;
+        case 'ArrowUp':
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveIndex((i) => (i - 1 + items.length) % items.length);
+          return;
+        case 'Enter':
+        case 'Tab':
+          e.preventDefault();
+          e.stopPropagation();
+          selectItem(activeIndex);
+          return;
+        case 'Backspace':
+          e.preventDefault();
+          e.stopPropagation();
+          inlineMenuState.closeInlineMenu();
+          editor
+            .chain()
+            .focus()
+            .deleteRange({ from, to: from + 1 })
+            .run();
+          return;
+        default:
+          if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            inlineMenuState.closeInlineMenu();
+            editor.chain().focus().insertContent(e.key).run();
+          }
+      }
+    };
+
+    window.addEventListener('keydown', handleKey, { capture: true });
+    return () =>
+      window.removeEventListener('keydown', handleKey, { capture: true });
+  }, [isOpen, items, activeIndex, selectItem]);
+
+  if (!isOpen || items.length === 0 || !pos) {
+    return null;
+  }
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      style={{
+        position: 'absolute',
+        top: pos.top,
+        left: pos.left,
+        zIndex: 50,
       }}
-      modal={false}
+      className="min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
     >
-      <DropdownMenuTrigger asChild>
-        <span
-          ref={triggerRef}
-          style={{
-            position: 'fixed',
-            top: snap.coords?.bottom ?? 0,
-            left: snap.coords?.left ?? 0,
-            width: 0,
-            height: 0,
-            pointerEvents: 'none',
-          }}
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        sideOffset={0}
-        disablePortal
-        onCloseAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={handleMenuKeyDown}
-      >
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <DropdownMenuItem
-              key={item.id}
-              onSelect={() => {
-                const { contentId, from } = inlineMenuState;
-                if (!contentId) return;
-                const editor = $content
-                  .valueOrThrow()
-                  .files.get(contentId)?.editor;
-                if (!editor) return;
-                item.onSelect({
-                  editor,
-                  from,
-                  contentId,
-                  close: () => inlineMenuState.closeInlineMenu(),
-                });
-              }}
-            >
-              {Icon && <Icon />}
-              {item.label}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      {items.map((item, i) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="menuitem"
+            className={cn(
+              'flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none',
+              i === activeIndex && 'bg-accent text-accent-foreground',
+            )}
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseEnter={() => setActiveIndex(i)}
+            onClick={() => selectItem(i)}
+          >
+            {Icon && <Icon className="size-4" />}
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
