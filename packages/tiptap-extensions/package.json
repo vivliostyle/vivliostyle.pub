@@ -19,7 +19,6 @@
     "@tiptap/extension-code": "catalog:",
     "@tiptap/extension-code-block": "catalog:",
     "@tiptap/extension-document": "catalog:",
-    "@tiptap/extension-file-handler": "catalog:",
     "@tiptap/extension-hard-break": "catalog:",
     "@tiptap/extension-heading": "catalog:",
     "@tiptap/extension-horizontal-rule": "catalog:",

@@ -12,6 +12,7 @@ import { $content, $sandbox } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
 import { SandboxFile } from '../stores/proxies/sandbox';
 import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
+import { insertImageFiles } from './editor/insert-image';
 
 import './editor/inline-menu.media';
 
@@ -138,6 +139,12 @@ export async function setupEditor({
   const extensions = [
     PubExtensions.configure({
       basePath,
+      onFileDrop: (editor, files, pos) => {
+        insertImageFiles({ editor, contentId, files, pos });
+      },
+      onFilePaste: (editor, files) => {
+        insertImageFiles({ editor, contentId, files });
+      },
     }),
     Placeholder.configure({
       placeholder: 'Start typing...',

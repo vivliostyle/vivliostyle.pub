@@ -84,9 +84,6 @@ catalogs:
     '@tiptap/extension-document':
       specifier: 3.11.1
       version: 3.11.1
-    '@tiptap/extension-file-handler':
-      specifier: 3.11.1
-      version: 3.11.1
     '@tiptap/extension-hard-break':
       specifier: 3.11.1
       version: 3.11.1
@@ -493,9 +490,6 @@ importers:
       '@tiptap/extension-document':
         specifier: 'catalog:'
         version: 3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1))
-      '@tiptap/extension-file-handler':
-        specifier: 'catalog:'
-        version: 3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1))(@tiptap/extension-text-style@3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1)))(@tiptap/pm@3.11.1)
       '@tiptap/extension-hard-break':
         specifier: 'catalog:'
         version: 3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1))
@@ -3613,13 +3607,6 @@ packages:
     resolution: {integrity: sha512-Px8T7Kv8EEiFpM/h13Rro8HoynrlK8zA3u3ekHq/FBSTXnPtqPAUYNx/DUhIrLs3eWWJ8+P0Onm+sVLZmaLMug==}
     peerDependencies:
       '@tiptap/core': ^3.11.1
-
-  '@tiptap/extension-file-handler@3.11.1':
-    resolution: {integrity: sha512-jhoN5cwk+PyrPxR84nYQyDUaJl54V6jP3FpD7zb11JIVcTICZGdgdzmJn5WySWC2JqjFIZvHqoUYVmlz75vAww==}
-    peerDependencies:
-      '@tiptap/core': ^3.11.1
-      '@tiptap/extension-text-style': ^3.11.1
-      '@tiptap/pm': ^3.11.1
 
   '@tiptap/extension-floating-menu@3.11.1':
     resolution: {integrity: sha512-HGF04KhDn1oAD+2/zStSWeGIgR41l/raf64h/Rwkvde5Sf2g3BPRW4M1ESS6e2Rjw74Kwa4/xNO6CzZNid6yRg==}
@@ -11292,12 +11279,6 @@ snapshots:
   '@tiptap/extension-document@3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1))':
     dependencies:
       '@tiptap/core': 3.11.1(@tiptap/pm@3.11.1)
-
-  '@tiptap/extension-file-handler@3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1))(@tiptap/extension-text-style@3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1)))(@tiptap/pm@3.11.1)':
-    dependencies:
-      '@tiptap/core': 3.11.1(@tiptap/pm@3.11.1)
-      '@tiptap/extension-text-style': 3.11.1(@tiptap/core@3.11.1(@tiptap/pm@3.11.1))
-      '@tiptap/pm': 3.11.1
 
   '@tiptap/extension-floating-menu@3.11.1(@floating-ui/dom@1.7.6)(@tiptap/core@3.11.1(@tiptap/pm@3.11.1))(@tiptap/pm@3.11.1)':
     dependencies:

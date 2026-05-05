@@ -1,11 +1,10 @@
-import { Extension, mergeAttributes } from '@tiptap/core';
+import { type Editor, Extension, mergeAttributes } from '@tiptap/core';
 import { Blockquote } from '@tiptap/extension-blockquote';
 import { Bold } from '@tiptap/extension-bold';
 import { BulletList } from '@tiptap/extension-bullet-list';
 import { Code } from '@tiptap/extension-code';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import { Document } from '@tiptap/extension-document';
-import { FileHandler } from '@tiptap/extension-file-handler';
 import { HardBreak } from '@tiptap/extension-hard-break';
 import { Heading } from '@tiptap/extension-heading';
 import { HorizontalRule } from '@tiptap/extension-horizontal-rule';
@@ -21,8 +20,20 @@ import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import { join } from 'pathe';
 
+import { FileMediaHandler } from './file-media-handler';
+
+export const IMAGE_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+];
+
 export interface PubExtensionConfig {
   basePath?: string | undefined;
+  onFileDrop?: (editor: Editor, files: File[], pos: number) => void;
+  onFilePaste?: (editor: Editor, files: File[]) => void;
 }
 
 declare module '@tiptap/core' {
@@ -37,7 +48,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
   name: 'pubExtensions',
 
   addExtensions() {
-    const { basePath } = this.options;
+    const { basePath, onFileDrop, onFilePaste } = this.options;
 
     return [
       // Starter kit extensions
@@ -64,7 +75,11 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       Underline.configure({}),
       // TrailingNode.configure({}),
 
-      FileHandler.configure({}),
+      FileMediaHandler.configure({
+        allowedMimeTypes: IMAGE_MIME_TYPES,
+        onDrop: onFileDrop,
+        onPaste: onFilePaste,
+      }),
       Image.extend({
         addStorage() {
           return { basePath };
