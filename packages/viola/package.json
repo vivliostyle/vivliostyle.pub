@@ -17,6 +17,7 @@
     "@codemirror/state": "catalog:",
     "@codemirror/view": "catalog:",
     "@dnd-kit/core": "catalog:",
+    "@floating-ui/react-dom": "catalog:",
     "@dnd-kit/modifiers": "catalog:",
     "@dnd-kit/sortable": "catalog:",
     "@jsonjoy.com/json-pack": "catalog:",

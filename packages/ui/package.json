@@ -10,6 +10,7 @@
     "./*": "./src/*.tsx"
   },
   "devDependencies": {
+    "@floating-ui/react-dom": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@v/config": "workspace:*",
