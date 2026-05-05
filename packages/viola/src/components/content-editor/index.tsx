@@ -9,6 +9,7 @@ import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
+import { ImageMenu } from './image-menu';
 import { InlineMenu } from './inline-menu';
 
 function ShadowContent({
@@ -93,6 +94,7 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
         <EditArea />
       </EditorStyleContainer>
       <InlineMenu />
+      <ImageMenu />
     </EditorContext.Provider>
   );
 }
