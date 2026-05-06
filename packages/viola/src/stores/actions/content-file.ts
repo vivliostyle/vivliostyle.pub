@@ -7,6 +7,7 @@ import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
 import { $content, $sandbox, $ui } from '../accessors';
 import type { ContentId } from '../proxies/content';
+import { SandboxFile } from '../proxies/sandbox';
 
 export async function createContentFile({
   format,
@@ -18,9 +19,9 @@ export async function createContentFile({
   const $$content = $content.valueOrThrow();
   const $$sandbox = $sandbox.valueOrThrow();
   const prevFile = insertAfter && $$content.files.get(insertAfter);
-  const entryCotnext = $$sandbox.vivliostyleConfig.entryContext || '';
+  const entryContext = $$sandbox.vivliostyleConfig.entryContext || '';
   const prevFileDir =
-    prevFile && relative(entryCotnext, dirname(prevFile.filename));
+    prevFile && relative(entryContext, dirname(prevFile.filename));
   const contentId = generateId<ContentId>();
   const extname = '.md';
   const basename = `${generateRandomName()}${extname}`;
@@ -28,12 +29,12 @@ export async function createContentFile({
     prevFileDir && !prevFileDir.startsWith('.') ? prevFileDir : '',
     basename,
   );
-  const filename = join(entryCotnext, entryPath);
+  const filename = join(entryContext, entryPath);
   const index =
     ((insertAfter && $$content.readingOrder.indexOf(insertAfter)) ?? -1) + 1;
 
   // update sandbox
-  $$sandbox.files[filename] = ref(new Blob([], { type: 'text/markdown' }));
+  $$sandbox.files[filename] = ref(new SandboxFile('text/markdown', ''));
   $$sandbox.updateVivliostyleConfig((config) => {
     config.entry = [config.entry].flat().toSpliced(index, 0, entryPath);
   });
@@ -43,7 +44,7 @@ export async function createContentFile({
     format,
     filename,
     summary: '',
-    editor: ref(await setupEditor({ contentId })),
+    editor: ref(await setupEditor({ contentId, filename, entryContext })),
   });
   $$content.readingOrder.splice(index, 0, contentId);
   return contentId;

@@ -36,6 +36,7 @@ import {
   BookOpen,
   CirclePlus,
   FilePlus,
+  ImageIcon,
   MoreHorizontal,
   Palette,
   Printer,
@@ -137,6 +138,12 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
           <Link to="/bibliography">
             <BookOpen />
             <span>Bibliography</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/media">
+            <ImageIcon />
+            <span>Media</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

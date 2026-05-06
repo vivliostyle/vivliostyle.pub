@@ -9,6 +9,8 @@ import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
+import { ImageMenu } from './image-menu';
+import { InlineMenu } from './inline-menu';
 
 function ShadowContent({
   children,
@@ -82,15 +84,20 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   invariant(file, `Editor not found for contentId: ${contentId}`);
   const installedTheme =
     themeSnap.installPromise && use(themeSnap.installPromise);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   return (
     <EditorContext.Provider value={{ editor: file.editor }}>
-      <EditorStyleContainer
-        bundledCss={installedTheme?.bundledCss ?? ''}
-        customCss={themeSnap.customCss ?? ''}
-      >
-        <EditArea />
-      </EditorStyleContainer>
+      <div ref={wrapperRef} className="relative h-full">
+        <EditorStyleContainer
+          bundledCss={installedTheme?.bundledCss ?? ''}
+          customCss={themeSnap.customCss ?? ''}
+        >
+          <EditArea />
+        </EditorStyleContainer>
+        <InlineMenu containerRef={wrapperRef} />
+        <ImageMenu containerRef={wrapperRef} />
+      </div>
     </EditorContext.Provider>
   );
 }

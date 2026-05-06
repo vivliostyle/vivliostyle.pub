@@ -1,8 +1,10 @@
+import { CborDecoder } from '@jsonjoy.com/json-pack/lib/cbor';
 import type { BuildTask } from '@vivliostyle/cli/schema';
-import { basename, dirname, extname, join, relative, sep } from 'pathe';
+import { basename, dirname, extname, join, sep } from 'pathe';
 import { type INTERNAL_Op, proxy, ref, subscribe } from 'valtio';
 import { deepClone, subscribeKey } from 'valtio/utils';
 
+import { generateId } from '../../libs/generate-id';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { ProjectId } from './project';
@@ -13,6 +15,23 @@ interface Tree<T> {
   [key: string]: Tree<T>;
 }
 
+type SnapshotNode = FolderNode | FileNode | SymlinkNode | UnknownNode;
+type FolderNode = [
+  type: 0,
+  meta: object,
+  entries: {
+    [child: string]: SnapshotNode;
+  },
+];
+type FileNode = [type: 1, meta: object, data: Uint8Array];
+type SymlinkNode = [
+  type: 2,
+  meta: {
+    target: string;
+  },
+];
+type UnknownNode = null;
+
 const origin = `https://${import.meta.env.VITE_APP_HOSTNAME}${location.port ? `:${location.port}` : ''}`;
 
 const defaultCss = /* css */ `:root {
@@ -21,9 +40,91 @@ const defaultCss = /* css */ `:root {
 
 const initialVivliostyleConfig = { entry: [] } satisfies BuildTask as BuildTask;
 
+export type MediaCategory = 'image' | 'font' | 'audio' | 'video';
+
+export interface MediaAsset {
+  path: string;
+  filename: string;
+  category: MediaCategory;
+  mimeType: string;
+}
+
+const MEDIA_EXTENSIONS: Record<MediaCategory, readonly string[]> = {
+  image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
+  font: ['woff', 'woff2', 'ttf', 'otf'],
+  audio: ['mp3', 'ogg', 'wav', 'm4a'],
+  video: ['mp4', 'webm', 'mov'],
+};
+
+const MIME_BY_EXT: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
+  m4a: 'audio/mp4',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+};
+
 export const sandboxes = proxy({
   value: {} as Record<ProjectId, Sandbox>,
 });
+
+export class SandboxFile {
+  public type: string;
+  public bytes: Promise<Uint8Array>;
+
+  constructor(file: File);
+  constructor(type: string, bytes: Uint8Array);
+  constructor(type: string, text: string);
+  constructor(
+    ...args:
+      | [file: File]
+      | [type: string, bytes: Uint8Array]
+      | [type: string, text: string]
+  ) {
+    if (args.length === 1) {
+      this.type = args[0].type;
+      this.bytes = args[0].bytes();
+    } else {
+      this.type = args[0];
+      this.bytes =
+        typeof args[1] === 'string'
+          ? Promise.resolve(new TextEncoder().encode(args[1]))
+          : Promise.resolve(args[1]);
+    }
+  }
+
+  text() {
+    return this.bytes.then((bytes) => new TextDecoder().decode(bytes));
+  }
+
+  buffer() {
+    return this.bytes.then(
+      (bytes) =>
+        bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer,
+    );
+  }
+
+  blob() {
+    return this.buffer().then((buffer) => {
+      return new Blob([buffer], { type: this.type });
+    });
+  }
+}
 
 export class Sandbox {
   static officialTemplates = {
@@ -102,9 +203,29 @@ export class Sandbox {
     return sandbox;
   }
 
+  static categorizeAsset(path: string): MediaCategory | null {
+    const ext = extname(path).slice(1).toLowerCase();
+    if (!ext) return null;
+    for (const [category, exts] of Object.entries(MEDIA_EXTENSIONS) as [
+      MediaCategory,
+      readonly string[],
+    ][]) {
+      if (exts.includes(ext)) return category;
+    }
+    return null;
+  }
+
+  static getMediaAccept(category: MediaCategory): string {
+    return MEDIA_EXTENSIONS[category].map((ext) => `.${ext}`).join(',');
+  }
+
+  static getMimeTypeByExtension(ext: string): string | undefined {
+    return MIME_BY_EXT[ext.toLowerCase()];
+  }
+
   iframeOrigin: string;
   projectDirectoryHandle: FileSystemDirectoryHandle;
-  files: Record<string, ReturnType<typeof ref<Blob>>> = {};
+  files: Record<string, ReturnType<typeof ref<SandboxFile>>> = proxy({});
   cli = Cli.create(this);
 
   protected writableVivliostyleConfig = deepClone(initialVivliostyleConfig);
@@ -133,10 +254,42 @@ export class Sandbox {
   ) {
     callback(this.writableVivliostyleConfig);
     this.files['vivliostyle.config.json'] = ref(
-      new Blob([JSON.stringify(this.writableVivliostyleConfig, null, 2)], {
-        type: 'application/json',
-      }),
+      new SandboxFile(
+        'application/json',
+        JSON.stringify(this.writableVivliostyleConfig, null, 2),
+      ),
     );
+  }
+
+  get mediaAssets(): MediaAsset[] {
+    const assets: MediaAsset[] = [];
+    for (const path of Object.keys(this.files)) {
+      const category = Sandbox.categorizeAsset(path);
+      if (!category) continue;
+      const file = this.files[path];
+      assets.push({
+        path,
+        filename: basename(path),
+        category,
+        mimeType: file.type,
+      });
+    }
+    assets.sort((a, b) => a.path.localeCompare(b.path));
+    return assets;
+  }
+
+  async saveMediaAsset(file: File): Promise<string> {
+    const entryContext = this.vivliostyleConfig.entryContext || '';
+    const ext = extname(file.name).replace(/^\./, '').toLowerCase() || 'bin';
+    const id = generateId();
+    const savePath = join(entryContext, 'assets', `${id}.${ext}`);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const mimeType =
+      file.type ||
+      Sandbox.getMimeTypeByExtension(ext) ||
+      'application/octet-stream';
+    this.files[savePath] = ref(new SandboxFile(mimeType, bytes));
+    return savePath;
   }
 
   protected async readFileSystemRecursive({
@@ -200,7 +353,7 @@ export class Sandbox {
         'vivliostyle.config.json',
       );
       const file = await configFileHandle.getFile();
-      newFiles['vivliostyle.config.json'] = ref(file);
+      newFiles['vivliostyle.config.json'] = ref(new SandboxFile(file));
       configJson = await file.text();
     } catch {
       throw new Error('Project does not exist');
@@ -212,7 +365,7 @@ export class Sandbox {
       ignore: [/^node_modules/, /^\.vivliostyle/],
       handle: async (name, fileHandle) => {
         const file = await fileHandle.getFile();
-        newFiles[name] = ref(file);
+        newFiles[name] = ref(new SandboxFile(file));
       },
     });
 
@@ -235,46 +388,67 @@ export class Sandbox {
       config.entry = entry;
       config.theme = [themePackageName, './style.css'];
     });
-    this.files['style.css'] = ref(new Blob([defaultCss], { type: 'text/css' }));
+    this.files['style.css'] = ref(new SandboxFile('text/css', defaultCss));
   }
 
   async saveMemoryToFileSystem() {
     const cli = await this.cli.createRemotePromise();
-    const data = await cli.toJSON('/workdir');
+    const cbor = await cli.toBinarySnapshot({ path: '/workdir' });
+    const rootNode = new CborDecoder().decode(cbor) as SnapshotNode;
 
     const dirHandleTreeCache = {
       [node]: this.projectDirectoryHandle,
     };
 
-    for (const [absFilename, content] of Object.entries(data)) {
-      if (content === null) {
-        continue;
+    const traverse = async (snapshot: SnapshotNode, path = '') => {
+      if (!snapshot) {
+        return;
       }
-      const filename = relative('/workdir', absFilename);
-      const [parentDirHandle, basename] =
-        await this.traverseFileDirectoryHandle({
-          filename,
-          create: true,
-          dirHandleTreeCache,
-        });
-      const fileHandle = await parentDirHandle.getFileHandle(basename, {
-        create: true,
-      });
-      const writable = await fileHandle.createWritable();
-      const binary = new TextEncoder().encode(content);
-      await writable.write(binary);
-      await writable.close();
+      switch (snapshot[0]) {
+        case 0 /* Folder */: {
+          const [, , entries] = snapshot;
+          for (const [name, entry] of Object.entries(entries)) {
+            await traverse(entry, join(path, name));
+          }
+          break;
+        }
+        case 1 /* File */: {
+          const [, , data] = snapshot;
+          const buffer = data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength,
+          ) as ArrayBuffer;
+          const [parentDirHandle, basename] =
+            await this.traverseFileDirectoryHandle({
+              filename: path,
+              create: true,
+              dirHandleTreeCache,
+            });
+          const fileHandle = await parentDirHandle.getFileHandle(basename, {
+            create: true,
+          });
+          const writable = await fileHandle.createWritable();
+          await writable.write(buffer);
+          await writable.close();
 
-      // FIXME: Get proper MIME type
-      const mimeType =
-        {
-          css: 'text/css',
-          json: 'application/json',
-          md: 'text/markdown',
-          html: 'text/html',
-        }[extname(filename).slice(1)] || 'application/octet-stream';
-      this.files[filename] = ref(new Blob([binary], { type: mimeType }));
-    }
+          // FIXME: Get proper MIME type
+          const mimeType =
+            {
+              css: 'text/css',
+              json: 'application/json',
+              md: 'text/markdown',
+              html: 'text/html',
+            }[extname(path).slice(1)] || 'application/octet-stream';
+          this.files[path] = ref(
+            new SandboxFile(mimeType, new Uint8Array(buffer)),
+          );
+          break;
+        }
+      }
+    };
+    await traverse(rootNode);
+    // Wait the subscriber callback ends
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
   }
 
   protected async saveToFileSystem(
@@ -304,10 +478,10 @@ export class Sandbox {
         continue;
       }
       if (op[0] === 'set') {
-        if (op[2] === op[3] || !(op[2] instanceof Blob)) {
+        if (op[2] === op[3] || !(op[2] instanceof SandboxFile)) {
           continue;
         }
-        updates[op[1][0]] = new Uint8Array(await op[2].arrayBuffer());
+        updates[op[1][0]] = await op[2].bytes;
       }
       if (op[0] === 'delete') {
         updates[op[1][0]] = null;

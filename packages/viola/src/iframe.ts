@@ -211,7 +211,7 @@ const setupWorker = ({
 async function init() {
   await setupWorker({
     initWorker: () =>
-      new Worker(new URL('../client/cli-worker.js', import.meta.url), {
+      new Worker(new URL('./client/cli-worker.js', import.meta.url), {
         name: 'worker:cli',
         type: 'module',
       }),

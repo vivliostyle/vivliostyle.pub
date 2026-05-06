@@ -22,6 +22,7 @@
     "@tiptap/extension-hard-break": "catalog:",
     "@tiptap/extension-heading": "catalog:",
     "@tiptap/extension-horizontal-rule": "catalog:",
+    "@tiptap/extension-image": "catalog:",
     "@tiptap/extension-italic": "catalog:",
     "@tiptap/extension-link": "catalog:",
     "@tiptap/extension-list": "catalog:",
@@ -36,6 +37,7 @@
     "@v/config": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
+    "pathe": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },

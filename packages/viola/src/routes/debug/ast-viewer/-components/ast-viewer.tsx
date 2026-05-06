@@ -14,11 +14,14 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import { useDebounce } from 'react-use';
+import { ref } from 'valtio';
 
 import { PubExtensions } from '@v/tiptap-extensions';
+import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { cn } from '@v/ui/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@v/ui/tabs';
 import CodeEditor from '../../../../components/code-editor';
@@ -26,6 +29,16 @@ import {
   EditArea,
   EditorStyleContainer,
 } from '../../../../components/content-editor';
+import { ImageMenu } from '../../../../components/content-editor/image-menu';
+import { InlineMenu } from '../../../../components/content-editor/inline-menu';
+import { createObjectUrlImageSaver } from '../../../../libs/editor/image-saver';
+import {
+  getAllTriggers,
+  inlineMenuState,
+} from '../../../../libs/editor/inline-menu';
+import { insertImageFiles } from '../../../../libs/editor/insert-image';
+
+import '../../../../libs/editor/inline-menu.media';
 
 type AstTabType = 'tree' | 'html' | 'json';
 
@@ -47,6 +60,9 @@ export const defaultAstViewerContext: AstViewerContext = {
   css: `:root {
   --vs-font-family: var(--font-sans);
   --vs--monospace-font-family: var(--font-mono);
+}
+img, video {
+  max-width: 100%;
 }\n`,
   selectingAstTab: 'tree',
 };
@@ -60,15 +76,35 @@ const deferMs = 200;
 export function RichEditorPane() {
   const context = useContext(AstViewerContext);
   const [contentInEditor, setContentInEditor] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     content: context.markdown,
     extensions: [
-      PubExtensions.configure(),
+      PubExtensions.configure({
+        imageSaver: createObjectUrlImageSaver(),
+        onFileDrop: (editor, files, pos) => {
+          insertImageFiles({ editor, files, pos });
+        },
+        onFilePaste: (editor, files) => {
+          insertImageFiles({ editor, files });
+        },
+      }),
       Placeholder.configure({
         placeholder: 'Start typing...',
       }),
       UndoRedo.configure({}),
+      InlineTrigger.configure({
+        triggers: getAllTriggers(),
+        isMenuOpen: () => inlineMenuState.trigger !== null,
+        onDismiss: () => inlineMenuState.closeInlineMenu(),
+        onTrigger: (editor, trigger, from, coords) => {
+          inlineMenuState.trigger = trigger;
+          inlineMenuState.editor = ref(editor);
+          inlineMenuState.from = from;
+          inlineMenuState.coords = coords;
+        },
+      }),
     ],
     onMount: ({ editor }) => {
       editor.once('update', () => {
@@ -104,9 +140,13 @@ export function RichEditorPane() {
 
   return (
     <EditorContext.Provider value={{ editor }}>
-      <EditorStyleContainer customCss={context.css}>
-        <EditArea />
-      </EditorStyleContainer>
+      <div ref={wrapperRef} className="relative h-full">
+        <EditorStyleContainer customCss={context.css}>
+          <EditArea />
+        </EditorStyleContainer>
+        <InlineMenu containerRef={wrapperRef} />
+        <ImageMenu containerRef={wrapperRef} />
+      </div>
     </EditorContext.Provider>
   );
 }

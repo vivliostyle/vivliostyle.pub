@@ -1,5 +1,6 @@
 import { LANGUAGES } from '@vivliostyle/cli/constants';
-import { join } from 'pathe';
+import * as Comlink from 'comlink';
+import { join, relative } from 'pathe';
 import { proxy, ref, subscribe } from 'valtio';
 import { deepClone } from 'valtio/utils';
 
@@ -135,7 +136,12 @@ export class Project {
         continue;
       }
       const contentId = generateId<ContentId>();
-      const editor = await setupEditor({ contentId, initialFile: content });
+      const editor = await setupEditor({
+        contentId,
+        filename,
+        entryContext,
+        initialFile: content,
+      });
       const summary =
         editor
           .getText({ blockSeparator: '\n' })
@@ -193,3 +199,40 @@ export class Project {
     });
   }
 }
+
+export interface ProjectChannel {
+  serve: (url: string, init: RequestInit) => Promise<[BodyInit, ResponseInit]>;
+}
+
+const channel = new BroadcastChannel('host:project');
+Comlink.expose(
+  {
+    async serve(url: string, _init: RequestInit) {
+      const { pathname } = new URL(url);
+      const project =
+        projects.currentProjectId && projects.value[projects.currentProjectId];
+      if (!project) {
+        return ['', { status: 404 }];
+      }
+      const sandbox = await project.sandboxPromise;
+      const entryContext = sandbox.vivliostyleConfig.entryContext || '';
+      const filename = join(entryContext, relative('/vivliostyle', pathname));
+      const content = sandbox.files[filename];
+      if (!content) {
+        return ['', { status: 404 }];
+      }
+      const contentType = content.type || 'application/octet-stream';
+      return [
+        await content.buffer(),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'no-store',
+          },
+        },
+      ];
+    },
+  } satisfies ProjectChannel,
+  channel,
+);

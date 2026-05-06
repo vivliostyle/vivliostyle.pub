@@ -8,6 +8,7 @@ import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { usePromiseState } from '../../hooks/use-promise-state';
 import { $sandbox, $theme } from '../../stores/accessors';
+import { SandboxFile } from '../../stores/proxies/sandbox';
 import { Theme } from '../../stores/proxies/theme';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -66,7 +67,7 @@ function Content(_: ThemePaneProperty) {
     () => {
       $theme.valueOrThrow().customCss = customCss;
       $sandbox.valueOrThrow().files['style.css'] = ref(
-        new Blob([customCss], { type: 'text/css' }),
+        new SandboxFile('text/css', customCss),
       );
     },
     1000,

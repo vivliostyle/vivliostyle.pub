@@ -13,7 +13,13 @@ import { initialize } from 'esbuild-wasm/lib/browser.js';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
 import { fs, vol } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
-import { toSnapshotSync } from 'memfs/lib/snapshot';
+import {
+  fromBinarySnapshot as _fromBinarySnapshot,
+  toBinarySnapshot as _toBinarySnapshot,
+  type AsyncSnapshotOptions,
+  type SnapshotNode,
+  toSnapshotSync,
+} from 'memfs/lib/snapshot';
 import type { MockResponse, RequestMethod } from 'node-mocks-http';
 import { createServer, type HotPayload, type ViteDevServer } from 'vite';
 
@@ -221,6 +227,26 @@ export async function setupTemplate(options: VivliostyleInlineConfig) {
     installDependencies: false,
   });
 }
+
+export type CborUint8Array<T> = Uint8Array & {
+  __BRAND__: 'cbor';
+  __TYPE__: T;
+};
+
+export const fromBinarySnapshot = (
+  uint8: Uint8Array,
+  options: Omit<AsyncSnapshotOptions, 'fs'>,
+) =>
+  _fromBinarySnapshot(uint8 as CborUint8Array<SnapshotNode>, {
+    ...options,
+    fs: fs.promises,
+  });
+
+export const toBinarySnapshot = (options: Omit<AsyncSnapshotOptions, 'fs'>) =>
+  _toBinarySnapshot({
+    ...options,
+    fs: fs.promises,
+  }) as Promise<Uint8Array>;
 
 export const read = (...args: Parameters<typeof fs.promises.readFile>) =>
   fs.promises.readFile(...args);

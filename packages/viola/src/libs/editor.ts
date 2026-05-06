@@ -1,13 +1,22 @@
 import { Editor, type Extensions } from '@tiptap/core';
 import { Placeholder } from '@tiptap/extensions';
 import * as idb from 'idb';
+import { dirname, relative } from 'pathe';
 import { ref } from 'valtio';
 import * as Y from 'yjs';
 
 import { PubExtensions } from '@v/tiptap-extensions';
+import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { debounce } from '../libs/debounce';
 import { $content, $sandbox } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
+import { SandboxFile } from '../stores/proxies/sandbox';
+import { createSandboxImageSaver } from './editor/image-saver';
+import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
+import { insertExistingAsset } from './editor/insert-asset';
+import { insertImageFiles } from './editor/insert-image';
+
+import './editor/inline-menu.media';
 
 // @ts-ignore
 async function _setupPersistence({
@@ -103,7 +112,7 @@ const saveContent = debounce(
         ?.trim() || '';
     const markdown = editor.getMarkdown();
     $$sandbox.files[file.filename] = ref(
-      new Blob([markdown], { type: 'text/markdown' }),
+      new SandboxFile('text/markdown', markdown),
     );
   },
   1000,
@@ -112,18 +121,60 @@ const saveContent = debounce(
 
 export async function setupEditor({
   contentId,
+  filename,
+  entryContext,
   initialFile,
 }: {
   contentId: ContentId;
-  initialFile?: Blob;
+  filename?: string;
+  entryContext?: string;
+  initialFile?: SandboxFile;
 }) {
+  const fileDir = filename ? dirname(filename) : '';
+  let basePath = filename && relative(entryContext || '', dirname(filename));
+  if (basePath?.startsWith('.')) {
+    basePath = undefined;
+  }
+
   // const doc = new Y.Doc();
   // await setupPersistence({ doc, contentId });
 
   const extensions = [
-    PubExtensions.configure(),
+    PubExtensions.configure({
+      basePath,
+      fileDir,
+      imageSaver: createSandboxImageSaver({ fileDir }),
+      onFileDrop: (editor, files, pos) => {
+        insertImageFiles({ editor, files, pos });
+      },
+      onFilePaste: (editor, files) => {
+        insertImageFiles({ editor, files });
+      },
+      onDrop: (editor, payload, pos) => {
+        switch (payload.type) {
+          case 'asset':
+            insertExistingAsset({
+              editor,
+              assetPath: payload.path,
+              pos,
+            });
+            return;
+        }
+      },
+    }),
     Placeholder.configure({
       placeholder: 'Start typing...',
+    }),
+    InlineTrigger.configure({
+      triggers: getAllTriggers(),
+      isMenuOpen: () => inlineMenuState.trigger !== null,
+      onDismiss: () => inlineMenuState.closeInlineMenu(),
+      onTrigger: (editor, trigger, from, coords) => {
+        inlineMenuState.trigger = trigger;
+        inlineMenuState.editor = ref(editor);
+        inlineMenuState.from = from;
+        inlineMenuState.coords = coords;
+      },
     }),
     // Collaboration.configure({
     //   document: doc,
