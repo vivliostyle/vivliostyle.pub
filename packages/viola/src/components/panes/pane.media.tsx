@@ -12,6 +12,7 @@ import { Upload } from '@v/ui/icon';
 import { openFilePicker } from '../../libs/open-file-picker';
 import { $project, $sandbox } from '../../stores/accessors';
 import { type MediaAsset, Sandbox } from '../../stores/proxies/sandbox';
+import { ImageDropZone } from './media/image-drop-zone';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
 type MediaPaneProperty = object;
@@ -25,11 +26,13 @@ declare global {
 export const Pane = createPane<MediaPaneProperty>({
   title: () => 'Media',
   content: (props) => (
-    <ScrollOverflow>
-      <PaneContainer>
-        <Content {...props} />
-      </PaneContainer>
-    </ScrollOverflow>
+    <ImageDropZone label="Images drop zone">
+      <ScrollOverflow>
+        <PaneContainer>
+          <Content {...props} />
+        </PaneContainer>
+      </ScrollOverflow>
+    </ImageDropZone>
   ),
 });
 
@@ -64,8 +67,8 @@ function Content(_: MediaPaneProperty) {
       </div>
       {images.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">
-          No images yet. Upload from the button above or drag images into the
-          editor.
+          No images yet. Upload from the button above, drag images into the
+          editor, or drop image files here.
         </p>
       ) : (
         <ul className="grid grid-cols-3 gap-3">
