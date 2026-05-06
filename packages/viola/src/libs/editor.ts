@@ -11,6 +11,7 @@ import { debounce } from '../libs/debounce';
 import { $content, $sandbox } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
 import { SandboxFile } from '../stores/proxies/sandbox';
+import { createSandboxImageSaver } from './editor/image-saver';
 import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
 import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
@@ -129,6 +130,7 @@ export async function setupEditor({
   entryContext?: string;
   initialFile?: SandboxFile;
 }) {
+  const fileDir = filename ? dirname(filename) : '';
   let basePath = filename && relative(entryContext || '', dirname(filename));
   if (basePath?.startsWith('.')) {
     basePath = undefined;
@@ -140,18 +142,19 @@ export async function setupEditor({
   const extensions = [
     PubExtensions.configure({
       basePath,
+      fileDir,
+      imageSaver: createSandboxImageSaver({ fileDir }),
       onFileDrop: (editor, files, pos) => {
-        insertImageFiles({ editor, contentId, files, pos });
+        insertImageFiles({ editor, files, pos });
       },
       onFilePaste: (editor, files) => {
-        insertImageFiles({ editor, contentId, files });
+        insertImageFiles({ editor, files });
       },
       onDrop: (editor, payload, pos) => {
         switch (payload.type) {
           case 'asset':
             insertExistingAsset({
               editor,
-              contentId,
               assetPath: payload.path,
               pos,
             });
@@ -166,9 +169,9 @@ export async function setupEditor({
       triggers: getAllTriggers(),
       isMenuOpen: () => inlineMenuState.trigger !== null,
       onDismiss: () => inlineMenuState.closeInlineMenu(),
-      onTrigger: (_editor, trigger, from, coords) => {
+      onTrigger: (editor, trigger, from, coords) => {
         inlineMenuState.trigger = trigger;
-        inlineMenuState.contentId = contentId;
+        inlineMenuState.editor = ref(editor);
         inlineMenuState.from = from;
         inlineMenuState.coords = coords;
       },

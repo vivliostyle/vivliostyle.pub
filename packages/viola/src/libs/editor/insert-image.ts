@@ -1,15 +1,7 @@
 import type { Editor } from '@tiptap/core';
-import { dirname, extname, join, relative } from 'pathe';
-import { ref } from 'valtio';
-
-import { $content, $sandbox } from '../../stores/accessors';
-import type { ContentId } from '../../stores/proxies/content';
-import { SandboxFile } from '../../stores/proxies/sandbox';
-import { generateId } from '../generate-id';
 
 export interface InsertImageFilesOptions {
   editor: Editor;
-  contentId: ContentId;
   files: File[];
   range?: { from: number; to: number };
   pos?: number;
@@ -17,13 +9,12 @@ export interface InsertImageFilesOptions {
 
 export async function insertImageFiles({
   editor,
-  contentId,
   files,
   range,
   pos,
 }: InsertImageFilesOptions): Promise<void> {
-  const fileContent = $content.valueOrThrow().files.get(contentId);
-  if (!fileContent) {
+  const saver = editor.storage.pubExtensions?.imageSaver;
+  if (!saver) {
     return;
   }
 
@@ -32,20 +23,10 @@ export async function insertImageFiles({
     return;
   }
 
-  const $$sandbox = $sandbox.valueOrThrow();
-  const dir = dirname(fileContent.filename);
-
   const sources: string[] = [];
   for (const file of images) {
-    const ext = extname(file.name).replace(/^\./, '') || 'png';
-    const id = generateId();
-    const savePath = join(dir, 'assets', `${id}.${ext}`);
-    const relSrc = relative(dir, savePath);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    $$sandbox.files[savePath] = ref(
-      new SandboxFile(file.type || `image/${ext}`, bytes),
-    );
-    sources.push(relSrc);
+    const { src } = await saver.saveImage(file);
+    sources.push(src);
   }
 
   let chain = editor.chain().focus();

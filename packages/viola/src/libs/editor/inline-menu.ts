@@ -2,12 +2,9 @@ import type { Editor } from '@tiptap/core';
 import type { ComponentType } from 'react';
 import { proxy } from 'valtio';
 
-import type { ContentId } from '../../stores/proxies/content';
-
 export interface InlineMenuSelectContext {
   editor: Editor;
   from: number;
-  contentId: ContentId;
   close: () => void;
 }
 
@@ -28,12 +25,12 @@ export const inlineMenuPlugins: InlineMenuPlugin[] = [];
 
 export const inlineMenuState = proxy({
   trigger: null as string | null,
-  contentId: null as ContentId | null,
+  editor: null as Editor | null,
   from: 0,
   coords: null as { top: number; bottom: number; left: number } | null,
   closeInlineMenu() {
     this.trigger = null;
-    this.contentId = null;
+    this.editor = null;
     this.coords = null;
   },
 });

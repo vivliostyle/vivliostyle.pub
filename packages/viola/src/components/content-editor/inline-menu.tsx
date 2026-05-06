@@ -8,7 +8,6 @@ import {
   getItemsForTrigger,
   inlineMenuState,
 } from '../../libs/editor/inline-menu';
-import { $content } from '../../stores/accessors';
 
 interface InlineMenuProps {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -17,7 +16,7 @@ interface InlineMenuProps {
 export function InlineMenu({ containerRef }: InlineMenuProps) {
   const snap = useSnapshot(inlineMenuState);
   const isOpen =
-    snap.trigger !== null && snap.coords !== null && snap.contentId !== null;
+    snap.trigger !== null && snap.coords !== null && snap.editor !== null;
   const items = snap.trigger ? getItemsForTrigger(snap.trigger) : [];
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -70,10 +69,8 @@ export function InlineMenu({ containerRef }: InlineMenuProps) {
   }, [isOpen]);
 
   const selectItem = useCallback((index: number) => {
-    const { contentId, from, trigger } = inlineMenuState;
-    if (!contentId || !trigger) return;
-    const editor = $content.valueOrThrow().files.get(contentId)?.editor;
-    if (!editor) return;
+    const { editor, from, trigger } = inlineMenuState;
+    if (!editor || !trigger) return;
     const list = getItemsForTrigger(trigger);
     const item = list[index];
     if (!item) return;
@@ -81,7 +78,6 @@ export function InlineMenu({ containerRef }: InlineMenuProps) {
     item.onSelect({
       editor,
       from,
-      contentId,
       close: () => inlineMenuState.closeInlineMenu(),
     });
   }, []);
@@ -93,9 +89,7 @@ export function InlineMenu({ containerRef }: InlineMenuProps) {
     if (!isOpen || items.length === 0) return;
 
     const handleKey = (e: KeyboardEvent) => {
-      const { contentId, from } = inlineMenuState;
-      if (!contentId) return;
-      const editor = $content.valueOrThrow().files.get(contentId)?.editor;
+      const { editor, from } = inlineMenuState;
       if (!editor) return;
 
       switch (e.key) {

@@ -1,20 +1,16 @@
 import type { Editor } from '@tiptap/core';
-import { dirname, relative } from 'pathe';
+import { relative } from 'pathe';
 
-import { $content } from '../../stores/accessors';
-import type { ContentId } from '../../stores/proxies/content';
 import { Sandbox } from '../../stores/proxies/sandbox';
 
 export interface InsertExistingAssetOptions {
   editor: Editor;
-  contentId: ContentId;
   assetPath: string;
   pos?: number;
 }
 
 export function insertExistingAsset({
   editor,
-  contentId,
   assetPath,
   pos,
 }: InsertExistingAssetOptions): void {
@@ -22,12 +18,11 @@ export function insertExistingAsset({
   if (category !== 'image') {
     return;
   }
-  const fileContent = $content.valueOrThrow().files.get(contentId);
-  if (!fileContent) {
+  const fileDir = editor.storage.pubExtensions?.fileDir;
+  if (fileDir === undefined) {
     return;
   }
-  const dir = dirname(fileContent.filename);
-  const relSrc = relative(dir, assetPath);
+  const relSrc = relative(fileDir, assetPath);
 
   let chain = editor.chain().focus();
   if (pos !== undefined) {

@@ -12,7 +12,7 @@ registerInlineMenuPlugin({
       id: 'image',
       label: 'Insert Image',
       icon: ImageIcon,
-      onSelect: async ({ contentId, editor, from }) => {
+      onSelect: async ({ editor, from }) => {
         const files = await openFilePicker({
           accept: Sandbox.getMediaAccept('image'),
         });
@@ -21,7 +21,6 @@ registerInlineMenuPlugin({
         }
         await insertImageFiles({
           editor,
-          contentId,
           files,
           range: { from, to: from + 1 },
         });

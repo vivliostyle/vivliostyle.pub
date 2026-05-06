@@ -42,8 +42,14 @@ export const IMAGE_MIME_TYPES = [
   'image/svg+xml',
 ];
 
+export interface ImageSaver {
+  saveImage(file: File): Promise<{ src: string }>;
+}
+
 export interface PubExtensionConfig {
   basePath?: string | undefined;
+  fileDir?: string | undefined;
+  imageSaver?: ImageSaver | undefined;
   onFileDrop?: (editor: Editor, files: File[], pos: number) => void;
   onFilePaste?: (editor: Editor, files: File[]) => void;
   onDrop?: (editor: Editor, payload: CustomDragPayload, pos: number) => void;
@@ -54,11 +60,27 @@ declare module '@tiptap/core' {
     image: {
       basePath?: string | undefined;
     };
+    pubExtensions: {
+      fileDir?: string | undefined;
+      imageSaver?: ImageSaver | undefined;
+    };
   }
 }
 
+// Matches absolute URLs that should bypass the in-app /vivliostyle/* prefix:
+// any explicit scheme (http:, https:, blob:, data:, file:, ...) or a
+// protocol-relative URL.
+const ABSOLUTE_URL_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+
 export const PubExtensions = Extension.create<PubExtensionConfig>({
   name: 'pubExtensions',
+
+  addStorage() {
+    return {
+      fileDir: this.options.fileDir,
+      imageSaver: this.options.imageSaver,
+    };
+  },
 
   addExtensions() {
     const { basePath, onFileDrop, onFilePaste, onDrop } = this.options;
@@ -101,7 +123,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
         renderHTML({ HTMLAttributes }) {
           const { src, ...rest } = HTMLAttributes;
           let resolvedSrc = src;
-          if (src && !/^(https?:)?\/\//.test(src)) {
+          if (src && !ABSOLUTE_URL_RE.test(src)) {
             resolvedSrc = join(
               '/vivliostyle',
               this.storage.basePath ?? '',
