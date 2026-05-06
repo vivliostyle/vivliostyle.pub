@@ -219,6 +219,10 @@ export class Sandbox {
     return MEDIA_EXTENSIONS[category].map((ext) => `.${ext}`).join(',');
   }
 
+  static getMimeTypeByExtension(ext: string): string | undefined {
+    return MIME_BY_EXT[ext.toLowerCase()];
+  }
+
   iframeOrigin: string;
   projectDirectoryHandle: FileSystemDirectoryHandle;
   files: Record<string, ReturnType<typeof ref<SandboxFile>>> = proxy({});
@@ -281,7 +285,9 @@ export class Sandbox {
     const savePath = join(entryContext, 'assets', `${id}.${ext}`);
     const bytes = new Uint8Array(await file.arrayBuffer());
     const mimeType =
-      file.type || MIME_BY_EXT[ext] || 'application/octet-stream';
+      file.type ||
+      Sandbox.getMimeTypeByExtension(ext) ||
+      'application/octet-stream';
     this.files[savePath] = ref(new SandboxFile(mimeType, bytes));
     return savePath;
   }

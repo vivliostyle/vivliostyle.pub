@@ -39,7 +39,6 @@ export function InlineMenu({ containerRef }: InlineMenuProps) {
   // Auto-close when menu scrolls out of viewport.
   useEffect(() => {
     if (!isOpen || !pos || !menuRef.current) return;
-    console.log('Observing inline menu visibility');
     const el = menuRef.current;
     const observer = new IntersectionObserver(
       (entries) => {

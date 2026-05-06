@@ -3,7 +3,7 @@ import { ref } from 'valtio';
 
 import type { ImageSaver } from '@v/tiptap-extensions';
 import { $sandbox } from '../../stores/accessors';
-import { SandboxFile } from '../../stores/proxies/sandbox';
+import { Sandbox, SandboxFile } from '../../stores/proxies/sandbox';
 import { generateId } from '../generate-id';
 
 export function createSandboxImageSaver({
@@ -18,8 +18,12 @@ export function createSandboxImageSaver({
       const savePath = join(fileDir, 'assets', `${id}.${ext}`);
       const relSrc = relative(fileDir, savePath);
       const bytes = new Uint8Array(await file.arrayBuffer());
+      const mimeType =
+        file.type ||
+        Sandbox.getMimeTypeByExtension(ext) ||
+        'application/octet-stream';
       $sandbox.valueOrThrow().files[savePath] = ref(
-        new SandboxFile(file.type || `image/${ext}`, bytes),
+        new SandboxFile(mimeType, bytes),
       );
       return { src: relSrc };
     },
