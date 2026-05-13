@@ -34,6 +34,7 @@ import {
 } from '@v/ui/dropdown';
 import {
   BookOpen,
+  ChevronDown,
   CirclePlus,
   FilePlus,
   ImageIcon,
@@ -130,10 +131,18 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
 }
 
 function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
+  const projectSnap = useSnapshot($project).valueOrThrow();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
+        <DropdownMenuLabel
+          inset
+          className={cn('text-xs text-muted-foreground max-w-120 truncate')}
+        >
+          {projectSnap.bibliography.title || 'Untitled'}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/bibliography">
             <BookOpen />
@@ -161,21 +170,29 @@ function TopMenuSection() {
   const projectSnap = useSnapshot($project).valueOrThrow();
   return (
     <SidebarMenu>
-      <div className={cn('flex items-center gap-0.5')}>
+      <div className={cn('flex items-center gap-1.5')}>
         <ApplicationDropdownMenu>
-          <Button variant="ghost" size="icon" className={cn('h-10 w-10 p-2')}>
-            <img src={VivliostyleLogo} alt="" />
-            <div className="sr-only">Open workspace menu</div>
+          <Button
+            variant="ghost"
+            className={cn('h-10 px-1.5 gap-1 shrink-0')}
+            aria-label="Open workspace menu"
+          >
+            <img src={VivliostyleLogo} alt="" className="size-6" />
+            <ChevronDown className="size-3 opacity-60" aria-hidden />
           </Button>
         </ApplicationDropdownMenu>
         <ProjectDropdownMenu>
           <SidebarMenuButton
+            tooltip="Open project menu"
             className={cn(
-              'font-semibold px-0.5',
+              'font-semibold px-1.5 min-w-0 py-1.5',
               !projectSnap.bibliography.title && 'text-muted-foreground',
             )}
           >
-            <span>{projectSnap.bibliography.title || 'Untitled'}</span>
+            <span className="min-w-0 flex-1 line-clamp-2 wrap-break-word">
+              {projectSnap.bibliography.title || 'Untitled'}
+            </span>
+            <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
           </SidebarMenuButton>
         </ProjectDropdownMenu>
       </div>
