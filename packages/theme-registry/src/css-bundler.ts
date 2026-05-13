@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import init, * as lightningCss from 'lightningcss-wasm';
 import wasmUrl from 'lightningcss-wasm/lightningcss_node.wasm?url';
 

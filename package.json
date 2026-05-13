@@ -10,7 +10,8 @@
     "dev": "turbo dev",
     "fix": "biome check --write --unsafe .",
     "prepare": "husky",
-    "test": "turbo test"
+    "test": "turbo test",
+    "typecheck": "turbo typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

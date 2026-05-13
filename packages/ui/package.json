@@ -9,6 +9,9 @@
     "./*.css": "./src/*.css",
     "./*": "./src/*.tsx"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
     "@floating-ui/react-dom": "catalog:",
     "@types/react": "catalog:",
