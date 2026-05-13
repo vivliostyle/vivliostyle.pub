@@ -447,6 +447,9 @@ importers:
       semver:
         specifier: 'catalog:'
         version: 7.7.1
+      vite:
+        specifier: 'catalog:'
+        version: 6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1)
 
   packages/tiptap-extensions:
     dependencies:
@@ -12954,10 +12957,6 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.2
 
-  fdir@6.4.4(picomatch@4.0.3):
-    optionalDependencies:
-      picomatch: 4.0.3
-
   fdir@6.4.4(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
@@ -16658,8 +16657,8 @@ snapshots:
   vite@6.3.5(patch_hash=f2bda8a745602e0e18f050ccc7c978c24e26450f353eaf97ffd58bc667779785)(@types/node@22.10.7)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.43.1)(tsx@4.19.3)(yaml@2.6.1):
     dependencies:
       esbuild: 0.25.0
-      fdir: 6.4.4(picomatch@4.0.3)
-      picomatch: 4.0.3
+      fdir: 6.4.4(picomatch@4.0.4)
+      picomatch: 4.0.4
       postcss: 8.5.3
       rollup: 4.57.1
       tinyglobby: 0.2.14

@@ -8,6 +8,9 @@
     ".": "./src/index.ts",
     "./*": "./src/*.ts"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
     "@andrewbranch/untar.js": "catalog:",
     "@types/semver": "catalog:",
@@ -15,6 +18,7 @@
     "fflate": "catalog:",
     "lightningcss-wasm": "catalog:",
     "outvariant": "catalog:",
-    "semver": "catalog:"
+    "semver": "catalog:",
+    "vite": "catalog:"
   }
 }
