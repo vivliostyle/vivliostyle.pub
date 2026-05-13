@@ -14,7 +14,7 @@ You can try the development version of Vivliostyle Pub at: https://alpha.vivlios
 4. You can start typing in the editor. To insert a heading, type `# Heading` and press Enter. To insert a paragraph, just type your text and press Enter.
 5. You can check the page preview in the right pane.
 6. Click "Vivliostyle Pub" menu in the top left corner to open the submenu:
-    - Bibliography
+    - Title and metadata
       - Book metadata settings such as title and author
       - Table of Contents settings
     - Customize theme
