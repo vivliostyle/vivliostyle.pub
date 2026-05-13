@@ -40,7 +40,7 @@ declare global {
 }
 
 export const Pane = createPane<BibliographyPaneProperty>({
-  title: () => 'Bibliography',
+  title: () => 'Title and metadata',
   content: (props) => (
     <ScrollOverflow>
       <PaneContainer>

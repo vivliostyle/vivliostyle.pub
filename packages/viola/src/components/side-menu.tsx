@@ -137,7 +137,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
         <DropdownMenuItem asChild>
           <Link to="/bibliography">
             <BookOpen />
-            <span>Bibliography</span>
+            <span>Title and metadata</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
