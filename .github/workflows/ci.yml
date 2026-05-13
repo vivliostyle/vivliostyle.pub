@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  merge_group:
+    types: [checks_requested]
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
+      - run: pnpm test
+
+  typecheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
+      - run: pnpm typecheck
