@@ -12,7 +12,6 @@ export const {
   deprecate,
   format,
   // styleText,
-  // formatWithOptions,
   // getCallSite,
   // getCallSites,
   // getSystemErrorMap,
@@ -44,7 +43,6 @@ export const {
   // transferableAbortController,
   // aborted,
   types,
-  // parseEnv,
   // parseArgs,
   // TextDecoder,
   // TextEncoder,
@@ -64,6 +62,17 @@ const ansi = new RegExp(
     '[\\dA-PR-TZcf-nq-uy=><~]))',
   'g',
 );
+// `util.formatWithOptions` and `util.parseEnv` aren't shipped by the polyfill
+// `util` package. Vite 8 only uses them in code paths we never reach (env-file
+// loading happens in the host process; `formatWithOptions` is for terminal
+// styling). Provide minimal shims so the bundle resolves.
+export const formatWithOptions = (
+  _options: unknown,
+  ...args: unknown[]
+): string => format(...args);
+
+export const parseEnv = (_content: string): Record<string, string> => ({});
+
 export const stripVTControlCharacters = (str: string) => {
   if (typeof str !== 'string') {
     throw new TypeError(

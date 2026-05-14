@@ -75,7 +75,13 @@ describe('cli-bundle build artifact', () => {
 
   it('emits the WebAssembly assets next to the bundle', () => {
     expect(fs.existsSync(path.join(distRoot, 'esbuild.wasm'))).toBe(true);
-    expect(fs.existsSync(path.join(distRoot, 'bindings_wasm_bg.wasm'))).toBe(
+    expect(
+      fs.existsSync(path.join(distRoot, 'rolldown-binding.wasm32-wasi.wasm')),
+    ).toBe(true);
+  });
+
+  it('emits the rolldown wasi worker entry', () => {
+    expect(fs.existsSync(path.join(distRoot, 'rolldown-wasi-worker.js'))).toBe(
       true,
     );
   });

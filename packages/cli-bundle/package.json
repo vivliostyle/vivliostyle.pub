@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "build": "rolldown -c",
-    "build:rollup-wasm": "cd src/stubs/rollup && npm install --ignore-scripts && npm run build:wasm",
     "build:viewer-resource": "tsx scripts/build-viewer-resource.ts",
     "dev": "rolldown -c -w",
     "test": "vitest run",
@@ -21,6 +20,7 @@
   "devDependencies": {
     "@mswjs/interceptors": "0.38.6",
     "@npmcli/arborist": "7.5.4",
+    "@rolldown/browser": "catalog:",
     "@types/connect": "3.4.38",
     "@types/node": "catalog:",
     "@types/npm-package-arg": "6.1.4",

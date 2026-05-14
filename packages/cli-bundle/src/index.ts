@@ -23,8 +23,6 @@ import {
 import type { MockResponse, RequestMethod } from 'node-mocks-http';
 import { createServer, type HotPayload, type ViteDevServer } from 'vite';
 
-// @ts-expect-error: Resolved by rollup plugin
-import initRollup from '#rollup-wasm-bindings';
 import { createMocks } from './http';
 import { vsCustomHmrPlugin } from './vite-plugin';
 
@@ -43,10 +41,7 @@ function sendHotPayload(payload: HotPayload) {
 let server: ViteDevServer | undefined;
 
 export async function setupServer() {
-  await Promise.all([
-    initialize({ wasmURL: '/_cli/esbuild.wasm' }),
-    initRollup({ module_or_path: '/_cli/bindings_wasm_bg.wasm' }),
-  ]);
+  await initialize({ wasmURL: '/_cli/esbuild.wasm' });
   server = await createServer({
     root: '/workdir',
     appType: 'custom',

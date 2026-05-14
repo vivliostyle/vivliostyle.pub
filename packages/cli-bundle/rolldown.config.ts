@@ -64,6 +64,10 @@ const buildVolume = () =>
 const stubPath = (segment: string) =>
   path.resolve(__dirname, 'src/stubs/node', segment);
 
+const rolldownBrowserDir = path.dirname(
+  require.resolve('@rolldown/browser/package.json'),
+);
+
 const aliasMap: Record<string, string> = {
   // https://github.com/nodejs/readable-stream/issues/540
   // https://github.com/nodejs/readable-stream/commit/b733ae549e674b639a2528ddfd5394b6b8bb9bb4
@@ -100,6 +104,56 @@ const aliasMap: Record<string, string> = {
   'terminal-link': path.resolve(__dirname, 'src/stubs/terminal-link'),
   '@npmcli/arborist': path.resolve(__dirname, 'src/stubs/@npmcli/arborist'),
   tinyexec: path.resolve(__dirname, 'src/stubs/tinyexec'),
+};
+
+// Vite 8 imports `rolldown` and its subpaths internally for prebundle/build.
+// Redirect them to the `@rolldown/browser` files, which ship a WASM-backed
+// binding so the worker can run rolldown without a native node module.
+// We return absolute paths so the resolver doesn't try to re-resolve a bare
+// specifier (which would fail for `./utils` etc. since `@rolldown/browser`
+// doesn't expose those subpath exports). The `*.browser.mjs` variants are
+// the right entry points for the worker bundle.
+const rolldownToBrowserMap: Record<string, string> = {
+  rolldown: path.join(rolldownBrowserDir, 'dist/index.browser.mjs'),
+  'rolldown/parseAst': path.join(
+    rolldownBrowserDir,
+    'dist/parse-ast-index.mjs',
+  ),
+  'rolldown/filter': path.join(rolldownBrowserDir, 'dist/filter-index.mjs'),
+  'rolldown/plugins': path.join(
+    rolldownBrowserDir,
+    'dist/plugins-index.browser.mjs',
+  ),
+  'rolldown/experimental': path.join(
+    rolldownBrowserDir,
+    'dist/experimental-index.browser.mjs',
+  ),
+  'rolldown/utils': path.join(
+    rolldownBrowserDir,
+    'dist/utils-index.browser.mjs',
+  ),
+};
+
+const redirectRolldownToBrowserPlugin: Plugin = {
+  name: 'redirect-rolldown-to-browser',
+  resolveId(id) {
+    if (rolldownToBrowserMap[id]) {
+      return rolldownToBrowserMap[id];
+    }
+    // `dist/parse-ast-index.mjs`, `dist/filter-index.mjs`, and other non-browser
+    // subpath entries pull in `dist/shared/*.mjs` files that import the Node
+    // CommonJS binding (`rolldown-binding.wasi.cjs`). At runtime in a browser
+    // worker that file would call `require('node:wasi')` and crash. Redirect
+    // it to the WASM-backed browser binding, which exposes the same NAPI
+    // symbols.
+    if (id.endsWith('rolldown-binding.wasi.cjs')) {
+      return path.join(
+        rolldownBrowserDir,
+        'dist/rolldown-binding.wasi-browser.js',
+      );
+    }
+    return null;
+  },
 };
 
 // Replaces `import.meta.url` / `.env` / `.require` MemberExpression AST nodes.
@@ -180,34 +234,48 @@ const resolveImportMetaPlugin: Plugin = {
   },
 };
 
-const resolveRollupBrowserWasmPlugin: Plugin = {
-  name: 'resolve-rollup-browser-wasm',
-  resolveId(id) {
-    if (id === '#rollup-wasm-bindings') {
-      return path.resolve(__dirname, 'src/stubs/rollup/wasm/bindings_wasm.js');
-    }
-    return null;
+// emnapi (used by `@rolldown/browser`'s WASM binding) detects "Node-vs-browser"
+// by reading `process.versions.node` and then drives Workers via Node's
+// `worker.on(...)` API, which doesn't exist on browser Workers. We can't just
+// hide `process.versions.node` because vite's bundled `chunks/node.js` calls
+// `.split(".")` on it. Force the env flag false in the emnapi files so the
+// browser code path always wins.
+const patchEmnapiEnvDetectionPlugin: Plugin = {
+  name: 'patch-emnapi-env-detection',
+  transform: {
+    filter: { id: /[\\/]@emnapi[\\/](?:core|wasi-threads)[\\/]dist[\\/]/ },
+    handler(code) {
+      return code.replace(
+        /var\s+ENVIRONMENT_IS_NODE\s*=\s*typeof process[\s\S]*?process\.versions\.node\s*===\s*['"]string['"];/g,
+        'var ENVIRONMENT_IS_NODE = false;',
+      );
+    },
   },
-  load(id) {
-    if (/\/rollup\/dist\/native\.js$/.test(id)) {
-      return {
-        code: `const {
-  parse,
-  xxhashBase64Url,
-  xxhashBase36,
-  xxhashBase16
-} = require('#rollup-wasm-bindings');
+};
 
-exports.parse = parse;
-exports.parseAsync = async (code, allowReturnOutsideFunction, _signal) =>
-  parse(code, allowReturnOutsideFunction);
-exports.xxhashBase64Url = xxhashBase64Url;
-exports.xxhashBase36 = xxhashBase36;
-exports.xxhashBase16 = xxhashBase16;
-`,
-      };
-    }
-    return null;
+// `@rolldown/browser/dist/rolldown-binding.wasi-browser.js` self-loads the WASM
+// and spawns its WASI worker via `import.meta.url`. Once we bundle the file,
+// the resolved virtual URL (filled in by `resolveImportMetaPlugin`) points at
+// `file:///workdir/...` and `fetch` rejects it. Patch the two URL constructions
+// before the import-meta pass runs so the bundled binding fetches our copies
+// served from `/_cli/`. Resolve against `self.location.href` so the URL is
+// absolute even when the worker was spawned from a blob: URL (the relative
+// form fails URL parsing because `blob:` has no path-absolute base).
+const patchRolldownBindingPlugin: Plugin = {
+  name: 'patch-rolldown-binding',
+  transform: {
+    filter: { id: /[\\/]rolldown-binding\.wasi-browser\.js$/ },
+    handler(code) {
+      return code
+        .replace(
+          /new URL\(['"]\.\/rolldown-binding\.wasm32-wasi\.wasm['"], import\.meta\.url\)\.href/,
+          'new URL("/_cli/rolldown-binding.wasm32-wasi.wasm", self.location.href).href',
+        )
+        .replace(
+          /new URL\(['"]\.\/wasi-worker-browser\.mjs['"], import\.meta\.url\)/,
+          'new URL("/_cli/rolldown-wasi-worker.js", self.location.href)',
+        );
+    },
   },
 };
 
@@ -221,9 +289,9 @@ const copyWasmFilePlugin: Plugin = {
     });
     this.emitFile({
       type: 'asset',
-      fileName: 'bindings_wasm_bg.wasm',
+      fileName: 'rolldown-binding.wasm32-wasi.wasm',
       source: fs.readFileSync(
-        path.resolve(__dirname, 'src/stubs/rollup/wasm/bindings_wasm_bg.wasm'),
+        path.join(rolldownBrowserDir, 'dist/rolldown-binding.wasm32-wasi.wasm'),
       ),
     });
   },
@@ -303,15 +371,30 @@ const workerConfig = defineConfig({
       // through our stub.
       global: 'globalThis',
       __volume__: JSON.stringify(buildVolume()),
-      __nodeVersion__: JSON.stringify('24.11.1'),
     },
   },
   plugins: [
+    // Order matters: patch out the import-meta-based URLs in
+    // rolldown-binding.wasi-browser.js *before* `resolveImportMetaPlugin`
+    // rewrites the same expression into a virtual file:// URL.
+    patchRolldownBindingPlugin,
+    patchEmnapiEnvDetectionPlugin,
+    redirectRolldownToBrowserPlugin,
     resolveImportMetaPlugin,
-    resolveRollupBrowserWasmPlugin,
     copyWasmFilePlugin,
     visualizer() as Plugin,
   ],
+});
+
+const rolldownWorkerConfig = defineConfig({
+  input: path.join(rolldownBrowserDir, 'dist/wasi-worker-browser.mjs'),
+  output: {
+    file: 'dist/rolldown-wasi-worker.js',
+    format: 'es',
+    inlineDynamicImports: true,
+  },
+  platform: 'browser',
+  plugins: [patchEmnapiEnvDetectionPlugin],
 });
 
 const dtsConfig = defineConfig({
@@ -352,4 +435,9 @@ const clientConfig = defineConfig({
   plugins: [resolveViteClientPlugin],
 });
 
-export default defineConfig([workerConfig, dtsConfig, clientConfig]);
+export default defineConfig([
+  workerConfig,
+  dtsConfig,
+  clientConfig,
+  rolldownWorkerConfig,
+]);
