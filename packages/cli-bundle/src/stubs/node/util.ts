@@ -1,57 +1,16 @@
-// @ts-expect-error
-import util from '../../../node_modules/util';
+// Re-export everything from unenv's util polyfill: it ships real implementations
+// of `format` / `formatWithOptions` / `inspect` / `promisify` / `inherits` /
+// `deprecate` / `MIMEType` / `MIMEParams` / `TextDecoder` / `TextEncoder` and
+// the legacy type predicates (isArray / isBoolean / isBuffer / ...).
+//
+// `parseEnv` and `stripVTControlCharacters` are `notImplemented` in unenv but
+// referenced statically (vite's logger imports `stripVTControlCharacters`,
+// vite's env-file path imports `parseEnv`), so we provide minimal shims.
+import unenvUtil from 'unenv/node/util';
 
-export default util;
-export const {
-  // _errnoException,
-  // _exceptionWithHostPort,
-  _extend,
-  callbackify,
-  // debug,
-  debuglog,
-  deprecate,
-  format,
-  // styleText,
-  // getCallSite,
-  // getCallSites,
-  // getSystemErrorMap,
-  // getSystemErrorName,
-  // getSystemErrorMessage,
-  inherits,
-  inspect,
-  isArray,
-  isBoolean,
-  isBuffer,
-  // isDeepStrictEqual,
-  isNull,
-  isNullOrUndefined,
-  isNumber,
-  isString,
-  isSymbol,
-  isUndefined,
-  isRegExp,
-  isObject,
-  isDate,
-  isError,
-  isFunction,
-  isPrimitive,
-  log,
-  promisify,
-  // stripVTControlCharacters,
-  // toUSVString,
-  // transferableAbortSignal,
-  // transferableAbortController,
-  // aborted,
-  types,
-  // parseArgs,
-  // TextDecoder,
-  // TextEncoder,
-  // MIMEType,
-  // MIMEParams,
-} = util;
+export * from 'unenv/node/util';
 
-export const TextDecoder = globalThis.TextDecoder;
-export const TextEncoder = globalThis.TextEncoder;
+export const parseEnv = (_content: string): Record<string, string> => ({});
 
 const ansi = new RegExp(
   '[\\u001B\\u009B][[\\]()#;?]*' +
@@ -62,17 +21,6 @@ const ansi = new RegExp(
     '[\\dA-PR-TZcf-nq-uy=><~]))',
   'g',
 );
-// `util.formatWithOptions` and `util.parseEnv` aren't shipped by the polyfill
-// `util` package. Vite 8 only uses them in code paths we never reach (env-file
-// loading happens in the host process; `formatWithOptions` is for terminal
-// styling). Provide minimal shims so the bundle resolves.
-export const formatWithOptions = (
-  _options: unknown,
-  ...args: unknown[]
-): string => format(...args);
-
-export const parseEnv = (_content: string): Record<string, string> => ({});
-
 export const stripVTControlCharacters = (str: string) => {
   if (typeof str !== 'string') {
     throw new TypeError(
@@ -80,4 +28,10 @@ export const stripVTControlCharacters = (str: string) => {
     );
   }
   return str.replace(ansi, '');
+};
+
+export default {
+  ...unenvUtil,
+  parseEnv,
+  stripVTControlCharacters,
 };

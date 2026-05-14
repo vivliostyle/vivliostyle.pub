@@ -55,9 +55,11 @@ catalog:
   '@vivliostyle/theme-base': 2.0.0
   '@vivliostyle/vfm': 2.4.0
   base-x: 5.0.1
+  browserify-zlib: 0.2.0
   bunshi: 2.2.0
   comlink: 4.4.2
   dompurify: 3.3.0
+  create-hash: 1.2.0
   fflate: 0.8.2
   html-react-parser: 5.2.10
   husky: 9.1.7
@@ -83,6 +85,7 @@ catalog:
   tsx: 4.19.3
   turbo: 2.3.3
   typescript: 5.7.3
+  unenv: 2.0.0-rc.24
   valibot: 1.2.0
   valtio: 2.1.4
   valtio-reactive: 0.1.2

@@ -1,3 +1,4 @@
+import './stubs/install-process-global';
 import './volume';
 
 import path from 'node:path';

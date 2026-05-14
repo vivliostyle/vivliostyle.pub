@@ -1,12 +1,11 @@
-import _process from './node/process';
-
 // Resolve the real global object via `Function`; the bundler-time `inject`
 // pass rewrites every literal `globalThis` identifier into the default import
 // of *this* file, so writing it directly here would create a self-reference.
 const root = new Function('return globalThis')() as typeof globalThis;
 
-// @ts-ignore
-root.process = _process;
+// `globalThis.process` is set by `src/stubs/install-process-global.ts` (loaded
+// first from `src/index.ts`); we don't reassign it here to avoid a circular
+// init with unenv's `process` env probe.
 
 // Vite 8's bundled chunks call `setTimeout(...).unref()` to opt timers out of
 // keeping the event loop alive. Browsers return a numeric timer id with no

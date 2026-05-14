@@ -1,21 +1,39 @@
-// @ts-expect-error
-import api from 'stream-http';
+// Re-export everything from unenv's http polyfill, but override `createServer`
+// and `Server` because vite's `createServer` internally calls `http.createServer`
+// only to register listeners — the actual request flow goes through connect's
+// `app.handle(req, res)` from our `serve()` wrapper, not a real HTTP listener.
+// unenv's `notImplemented` would throw immediately and break setupServer.
+import unenvHttp from 'unenv/node/http';
 
-// @ts-expect-error
-export * from 'stream-http';
+export * from 'unenv/node/http';
 
-const noop = () => {};
-export const createServer = () => {
-  return {
-    on: noop,
-    listen: noop,
-  };
-};
+class FakeServer {
+  listen() {
+    return this;
+  }
+  close() {
+    return this;
+  }
+  on() {
+    return this;
+  }
+  off() {
+    return this;
+  }
+  emit() {
+    return false;
+  }
+  address() {
+    return null;
+  }
+}
 
-export class Server {}
+export const Server = FakeServer as unknown as typeof unenvHttp.Server;
+export const createServer = () =>
+  new FakeServer() as unknown as InstanceType<typeof unenvHttp.Server>;
 
 export default {
-  ...api,
-  createServer,
+  ...unenvHttp,
   Server,
+  createServer,
 };

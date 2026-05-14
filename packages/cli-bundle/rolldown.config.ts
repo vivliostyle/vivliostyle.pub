@@ -4,12 +4,12 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { nodeExternalModules } from '@vivliostyle/cli/node-modules';
 import MagicString from 'magic-string';
-import stdLibBrowser from 'node-stdlib-browser';
 import { packageDirectorySync } from 'pkg-dir';
 import { defineConfig, type Plugin } from 'rolldown';
 import { parseAst } from 'rolldown/parseAst';
 import { dts } from 'rolldown-plugin-dts';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { defineEnv } from 'unenv';
 
 const require = createRequire(import.meta.url);
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -68,38 +68,113 @@ const rolldownBrowserDir = path.dirname(
   require.resolve('@rolldown/browser/package.json'),
 );
 
+// Node 26 treats every `assert/*` path as the `node:assert` builtin namespace,
+// so `require.resolve('assert/...')` always fails. The npm `assert` package's
+// directory is reachable through any of its dependencies — pick a known one.
+const assertPkgDir = (() => {
+  const consumer = path.dirname(require.resolve('util-deprecate/package.json'));
+  // `util-deprecate` and `assert` are both under the same .pnpm store; locate
+  // assert by scanning siblings.
+  const pnpm = path.resolve(consumer, '../../..');
+  const matches = fs
+    .readdirSync(pnpm)
+    .filter((name) => name.startsWith('assert@'))
+    .map((name) => path.join(pnpm, name, 'node_modules', 'assert'))
+    .filter((p) => fs.existsSync(path.join(p, 'package.json')));
+  if (matches.length === 0) {
+    throw new Error('Cannot locate npm `assert` package directory');
+  }
+  return matches[0];
+})();
+
+// Base alias map from unenv: every Node builtin (`node:fs` / `fs` / etc.) maps
+// to a `unenv/node/*` polyfill that prefers Web standards (Web Crypto, Web
+// Streams, Web Worker) and falls back to `notImplemented` (lazy throw) for
+// fundamentally non-browser APIs. We layer specific overrides on top below
+// where we need different behavior than unenv ships.
+const { env: unenvEnv } = defineEnv({
+  nodeCompat: true,
+  // unenv's npmShims rewrite `whatwg-url`/`node-fetch`/`debug`/... to
+  // thin wrappers. jsdom (bundled inside @vivliostyle/cli) hard-depends on
+  // whatwg-url's `install` method, which the shim doesn't expose — keep the
+  // real packages.
+  npmShims: false,
+  resolve: true,
+});
+
+const aliasOverrides = Object.fromEntries(
+  // Modules where unenv's polyfill isn't sufficient for our worker:
+  // - module: vite calls `createRequire(import.meta.url)("crypto")` synchronously;
+  //   unenv's createRequire is `notImplemented`. Phase 2's builtinMap-backed
+  //   stub is required.
+  // - crypto: unenv stubs `createHash`/`hash` as `notImplemented`. We override
+  //   with a hash-wasm-backed sync implementation.
+  // - fs: the cli-bundle worker is memfs-backed by design; unenv's in-memory fs
+  //   would overwrite that.
+  // - worker_threads: unenv's `Worker` class is a EventEmitter stub with
+  //   no-op `postMessage`. We need real `globalThis.Worker` for `@rolldown/browser`'s
+  //   WASI worker pool.
+  // - child_process: unenv throws on call; we keep a silent noop because some
+  //   vivliostyle/cli code statically references these but never invokes them.
+  // - util: unenv ships most APIs but `parseEnv` and `stripVTControlCharacters`
+  //   are `notImplemented`. We re-export unenv and override those two.
+  // - buffer: unenv's `isUtf8` is `notImplemented`; we keep a real implementation.
+  // - stream: unenv's `Stream`/`PassThrough`/`pipeline`/`finished` etc. are
+  //   `notImplemented`. vite's bundled `ws` and memfs use them, so route to the
+  //   readable-stream package directly.
+  [
+    'module',
+    'crypto',
+    'fs',
+    'http',
+    'worker_threads',
+    'child_process',
+    'util',
+    'buffer',
+  ].flatMap((name) => [
+    [name, stubPath(name)],
+    [`node:${name}`, stubPath(name)],
+  ]),
+);
+
 const aliasMap: Record<string, string> = {
+  ...unenvEnv.alias,
+  ...aliasOverrides,
+  // memfs lives behind `fs.ts`; route the `fs/promises` subpath to memfs too
+  // so callers using `import * as fsp from 'fs/promises'` see the same vfs.
+  'fs/promises': path.resolve(stubPath('fs'), 'promises'),
+  'node:fs/promises': path.resolve(stubPath('fs'), 'promises'),
+  stream: require.resolve('readable-stream/lib/stream'),
+  'node:stream': require.resolve('readable-stream/lib/stream'),
+  // unenv ships a class-based EventEmitter, but readable-stream calls
+  // `Stream.call(this)` (prototype-style super-init) on it. Use the npm
+  // `events` polyfill instead — it's a function-based EventEmitter that
+  // accepts both `new` and `.call(this)`.
+  events: require.resolve('events/'),
+  'node:events': require.resolve('events/'),
+  // unenv's npm shim wraps `inherits` as `{ default: fn }`. The bundled
+  // readable-stream code (CJS) expects `require('inherits')` to be the
+  // function itself, so route to the original CJS package.
+  inherits: require.resolve('inherits/inherits_browser.js'),
+  // unenv's zlib is mostly notImplemented; vivliostyle/cli's EPUB packing
+  // path needs real createGzip/Inflate. Use the small browserify-zlib polyfill.
+  zlib: require.resolve('browserify-zlib'),
+  'node:zlib': require.resolve('browserify-zlib'),
+  // unenv ships `notImplemented` for `string_decoder.StringDecoder`; the npm
+  // package implements it natively for browsers.
+  string_decoder: require.resolve('string_decoder'),
+  'node:string_decoder': require.resolve('string_decoder'),
+  // unenv's assert exposes named functions but is class/namespace-shaped, so
+  // `assert(cond)` (callable form used by browserify-zlib) fails. Route to the
+  // npm `assert` package whose `module.exports = ok` pattern keeps it callable.
+  // Resolve via packageDirectorySync because Node intercepts every `assert/*`
+  // path as a builtin namespace.
+  assert: path.join(assertPkgDir, 'build/assert.js'),
+  'node:assert': path.join(assertPkgDir, 'build/assert.js'),
   // https://github.com/nodejs/readable-stream/issues/540
-  // https://github.com/nodejs/readable-stream/commit/b733ae549e674b639a2528ddfd5394b6b8bb9bb4
-  'process/': stubPath('process'),
-  // resolve to the npm `buffer` package's entry — `require.resolve('buffer')`
-  // would return the Node builtin name, which Rolldown can't follow.
-  'buffer/': require.resolve('buffer/index.js'),
-  ...stdLibBrowser,
-  ...Object.fromEntries(
-    [
-      'buffer',
-      'child_process',
-      'crypto',
-      'dns',
-      'fs',
-      'http',
-      'module',
-      'os',
-      'path',
-      'perf_hooks',
-      'process',
-      'stream',
-      'util',
-      'v8',
-      'worker_threads',
-    ].flatMap((name) => [
-      [name, stubPath(name)],
-      [`node:${name}`, stubPath(name)],
-    ]),
-  ),
+  'process/': unenvEnv.alias.process,
   esbuild: 'esbuild-wasm/lib/browser.js',
-  upath: stdLibBrowser.path,
+  upath: unenvEnv.alias.path,
   'graceful-fs': stubPath('fs'),
   'terminal-link': path.resolve(__dirname, 'src/stubs/terminal-link'),
   '@npmcli/arborist': path.resolve(__dirname, 'src/stubs/@npmcli/arborist'),
@@ -358,17 +433,20 @@ const workerConfig = defineConfig({
   },
   transform: {
     inject: {
+      // unenv's preset injects `process` (unenv/node/process), `Buffer`
+      // (node:buffer's Buffer), `setImmediate`/`clearImmediate` (node:timers),
+      // and `global` (unenv/polyfill/globalthis). The aliases above route
+      // those bare-builtin imports through our overrides where applicable.
+      ...unenvEnv.inject,
+      // We need our own globalThis stub on top of unenv's so that
+      // `setTimeout(...).unref()` calls (vite 8) get a Node-shaped Timeout.
       globalThis: path.resolve(__dirname, 'src/stubs/global-this.ts'),
-      process: path.resolve(__dirname, 'src/stubs/node/process.ts'),
-      Buffer: [path.resolve(__dirname, 'src/stubs/node/buffer.ts'), 'Buffer'],
-      setImmediate: ['process', 'nextTick'],
     },
     define: {
       'require.resolve': 'null',
-      // Some node-targeted shims (e.g. crypto-browserify → randombytes) reference
-      // the bare identifier `global`. Browser workers don't expose it, so map it
-      // onto `globalThis`; the `inject` pass below then routes `globalThis`
-      // through our stub.
+      // Some Node-targeted shims still reference the bare identifier `global`.
+      // Browser workers don't expose it, so map it onto `globalThis`; the
+      // `inject` pass above then routes `globalThis` through our stub.
       global: 'globalThis',
       __volume__: JSON.stringify(buildVolume()),
     },
