@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "rollup -c",
+    "build": "rolldown -c",
     "build:rollup-wasm": "cd src/stubs/rollup && npm install --ignore-scripts && npm run build:wasm",
     "build:viewer-resource": "tsx scripts/build-viewer-resource.ts",
-    "dev": "rollup -c -w --no-watch.clearScreen",
+    "dev": "rolldown -c -w",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "exports": {
@@ -20,13 +21,6 @@
   "devDependencies": {
     "@mswjs/interceptors": "0.38.6",
     "@npmcli/arborist": "7.5.4",
-    "@rollup/plugin-alias": "5.1.1",
-    "@rollup/plugin-commonjs": "28.0.2",
-    "@rollup/plugin-inject": "5.0.5",
-    "@rollup/plugin-json": "6.1.0",
-    "@rollup/plugin-node-resolve": "16.0.0",
-    "@rollup/plugin-replace": "6.0.2",
-    "@rollup/plugin-typescript": "12.1.2",
     "@types/connect": "3.4.38",
     "@types/node": "catalog:",
     "@types/npm-package-arg": "6.1.4",
@@ -50,13 +44,15 @@
     "path-browserify": "1.0.1",
     "pkg-dir": "8.0.0",
     "readable-stream": "4.7.0",
-    "rollup": "4.34.5",
-    "rollup-plugin-dts": "6.2.1",
+    "rolldown": "catalog:",
+    "rolldown-plugin-dts": "catalog:",
     "rollup-plugin-visualizer": "catalog:",
     "semver": "catalog:",
     "stream-http": "3.2.0",
     "tsx": "catalog:",
+    "typescript": "catalog:",
     "util": "0.12.5",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

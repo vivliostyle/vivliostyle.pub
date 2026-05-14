@@ -43,6 +43,11 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["coverage/**"]
     },
+    "@v/cli-bundle#test": {
+      "dependsOn": ["@v/cli-bundle#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
