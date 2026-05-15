@@ -1,6 +1,4 @@
 import './stubs/install-process-global';
-import './volume';
-
 import path from 'node:path';
 import type stream from 'node:stream';
 import {
@@ -26,6 +24,7 @@ import { createServer, type HotPayload, type ViteDevServer } from 'vite';
 
 import { createMocks } from './http';
 import { vsCustomHmrPlugin } from './vite-plugin';
+import { restoreBundledNodeModules } from './volume';
 
 const commonHeaders = {
   'cache-control': 'no-store',
@@ -237,6 +236,7 @@ export async function setupTemplate(options: VivliostyleInlineConfig) {
     projectPath: '.',
     installDependencies: false,
   });
+  restoreBundledNodeModules();
 }
 
 export type CborUint8Array<T> = Uint8Array & {
