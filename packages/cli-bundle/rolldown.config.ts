@@ -68,25 +68,6 @@ const rolldownBrowserDir = path.dirname(
   require.resolve('@rolldown/browser/package.json'),
 );
 
-// Node 26 treats every `assert/*` path as the `node:assert` builtin namespace,
-// so `require.resolve('assert/...')` always fails. The npm `assert` package's
-// directory is reachable through any of its dependencies — pick a known one.
-const assertPkgDir = (() => {
-  const consumer = path.dirname(require.resolve('util-deprecate/package.json'));
-  // `util-deprecate` and `assert` are both under the same .pnpm store; locate
-  // assert by scanning siblings.
-  const pnpm = path.resolve(consumer, '../../..');
-  const matches = fs
-    .readdirSync(pnpm)
-    .filter((name) => name.startsWith('assert@'))
-    .map((name) => path.join(pnpm, name, 'node_modules', 'assert'))
-    .filter((p) => fs.existsSync(path.join(p, 'package.json')));
-  if (matches.length === 0) {
-    throw new Error('Cannot locate npm `assert` package directory');
-  }
-  return matches[0];
-})();
-
 // Base alias map from unenv: every Node builtin (`node:fs` / `fs` / etc.) maps
 // to a `unenv/node/*` polyfill that prefers Web standards (Web Crypto, Web
 // Streams, Web Worker) and falls back to `notImplemented` (lazy throw) for
@@ -164,13 +145,6 @@ const aliasMap: Record<string, string> = {
   // package implements it natively for browsers.
   string_decoder: require.resolve('string_decoder'),
   'node:string_decoder': require.resolve('string_decoder'),
-  // unenv's assert exposes named functions but is class/namespace-shaped, so
-  // `assert(cond)` (callable form used by browserify-zlib) fails. Route to the
-  // npm `assert` package whose `module.exports = ok` pattern keeps it callable.
-  // Resolve via packageDirectorySync because Node intercepts every `assert/*`
-  // path as a builtin namespace.
-  assert: path.join(assertPkgDir, 'build/assert.js'),
-  'node:assert': path.join(assertPkgDir, 'build/assert.js'),
   // https://github.com/nodejs/readable-stream/issues/540
   'process/': unenvEnv.alias.process,
   upath: unenvEnv.alias.path,
