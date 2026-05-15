@@ -18,7 +18,7 @@
     }
   },
   "devDependencies": {
-    "@mswjs/interceptors": "0.38.6",
+    "@mswjs/interceptors": "0.41.9",
     "@npmcli/arborist": "7.5.4",
     "@rolldown/browser": "catalog:",
     "@types/connect": "3.4.38",
