@@ -145,6 +145,13 @@ const aliasMap: Record<string, string> = {
   // package implements it natively for browsers.
   string_decoder: require.resolve('string_decoder'),
   'node:string_decoder': require.resolve('string_decoder'),
+  // unenv's assert is ESM; rolldown's __toCommonJS converts it to a plain object,
+  // so `require('assert')(cond)` (callable form used by browserify-zlib's binding.js)
+  // throws "assert is not a function". The CJS stub uses `module.exports = ok` so
+  // __toCommonJS returns the callable function directly via the "module.exports"
+  // own-property fast path.
+  assert: stubPath('assert.js'),
+  'node:assert': stubPath('assert.js'),
   // https://github.com/nodejs/readable-stream/issues/540
   'process/': unenvEnv.alias.process,
   upath: unenvEnv.alias.path,

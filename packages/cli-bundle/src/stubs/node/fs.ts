@@ -1,4 +1,12 @@
-import { fs } from 'memfs';
+import { fs, vol } from 'memfs';
+
+// Rolldown places @vivliostyle/cli's chunks ~400K lines before volume.ts in the
+// bundle. Those chunks run IIFEs that call readFileSync('/workdir/node_modules/
+// @vivliostyle/cli/package.json') and '@vivliostyle/viewer/package.json' at
+// module-init time. Pre-populate the virtual filesystem here — fs.ts is placed
+// early (before @vivliostyle/cli) because every Node built-in that uses the fs
+// depends on it transitively.
+vol.fromJSON(__volume__);
 
 export default fs;
 
