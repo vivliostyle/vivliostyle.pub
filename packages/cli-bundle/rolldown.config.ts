@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { nodeExternalModules } from '@vivliostyle/cli/node-modules';
 import MagicString from 'magic-string';
-import { packageDirectorySync } from 'pkg-dir';
+import { packageDirectorySync } from 'package-directory';
 import { defineConfig, type Plugin } from 'rolldown';
 import { parseAst } from 'rolldown/parseAst';
 import { dts } from 'rolldown-plugin-dts';

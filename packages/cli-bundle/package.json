@@ -42,7 +42,7 @@
     "node-mocks-http": "1.17.2",
     "npm-package-arg": "11.0.3",
     "picomatch": "catalog:",
-    "pkg-dir": "8.0.0",
+    "package-directory": "8.2.0",
     "readable-stream": "4.7.0",
     "rolldown": "catalog:",
     "rolldown-plugin-dts": "catalog:",
