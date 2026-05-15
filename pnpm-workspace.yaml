@@ -62,7 +62,7 @@ catalog:
   dompurify: 3.4.3
   create-hash: 1.2.0
   fflate: 0.8.2
-  html-react-parser: 5.2.10
+  html-react-parser: 6.1.0
   husky: 9.1.7
   lightningcss-wasm: 1.32.0
   lint-staged: 15.4.1
