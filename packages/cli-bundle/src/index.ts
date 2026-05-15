@@ -1,5 +1,4 @@
-import './volume';
-
+import './stubs/install-process-global';
 import path from 'node:path';
 import type stream from 'node:stream';
 import {
@@ -9,7 +8,6 @@ import {
 } from '@vivliostyle/cli';
 import type { VivliostyleInlineConfig } from '@vivliostyle/cli/schema';
 import connect from 'connect';
-import { initialize } from 'esbuild-wasm/lib/browser.js';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
 import { fs, vol } from 'memfs';
 import { toTreeSync } from 'memfs/lib/print';
@@ -21,12 +19,12 @@ import {
   toSnapshotSync,
 } from 'memfs/lib/snapshot';
 import type { MockResponse, RequestMethod } from 'node-mocks-http';
+import { transform } from 'rolldown/experimental';
 import { createServer, type HotPayload, type ViteDevServer } from 'vite';
 
-// @ts-expect-error: Resolved by rollup plugin
-import initRollup from '#rollup-wasm-bindings';
 import { createMocks } from './http';
 import { vsCustomHmrPlugin } from './vite-plugin';
+import { restoreBundledNodeModules } from './volume';
 
 const commonHeaders = {
   'cache-control': 'no-store',
@@ -43,10 +41,22 @@ function sendHotPayload(payload: HotPayload) {
 let server: ViteDevServer | undefined;
 
 export async function setupServer() {
-  await Promise.all([
-    initialize({ wasmURL: '/_cli/esbuild.wasm' }),
-    initRollup({ module_or_path: '/_cli/bindings_wasm_bg.wasm' }),
-  ]);
+  // The @rolldown/browser WASI binding finishes its top-level await
+  // (`init_rolldown_binding_wasi_browser`) when the napi instance exists,
+  // but the WASI Worker (`/_cli/rolldown-wasi-worker.js`) is spawned
+  // lazily on the first `pthread_create` from WASM and is still loading
+  // when control returns. If the dev server starts accepting requests
+  // before that worker is ready, the first sync transform call (vite's
+  // CSS pipeline driving `builtin:oxc-runtime`) blocks on `Atomics.wait`
+  // against an unnotified SharedArrayBuffer and our `serve()` calls
+  // eventually time out to a 500.
+  //
+  // Driving any *async* napi API through rolldown forces the same
+  // pthread spawn but doesn't park the JS thread, so the spawn / load
+  // / first-`loaded` round-trip can complete and the returned promise
+  // settles only after the worker is fully usable. A throwaway transform
+  // is the smallest such call.
+  await transform('warmup.js', '');
   server = await createServer({
     root: '/workdir',
     appType: 'custom',
@@ -226,6 +236,7 @@ export async function setupTemplate(options: VivliostyleInlineConfig) {
     projectPath: '.',
     installDependencies: false,
   });
+  restoreBundledNodeModules();
 }
 
 export type CborUint8Array<T> = Uint8Array & {

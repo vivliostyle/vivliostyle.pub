@@ -191,7 +191,7 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           main: path.resolve(dirname, 'index.html'),
           iframe: path.resolve(dirname, 'iframe.html'),

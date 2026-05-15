@@ -1,3 +1,0 @@
-[submodule "packages/cli-bundle/src/stubs/rollup"]
-	path = packages/cli-bundle/src/stubs/rollup
-	url = https://github.com/rollup/rollup.git

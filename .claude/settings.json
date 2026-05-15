@@ -1,0 +1,10 @@
+{
+  "sandbox": {
+    "filesystem": {
+      "allowRead": [
+        "./secrets/.env",
+        "./secrets/certs/**"
+      ]
+    }
+  }
+}

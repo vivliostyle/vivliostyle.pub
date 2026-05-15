@@ -7,24 +7,12 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "dist/**"]
     },
-    "build:rollup-wasm": {
-      "inputs": [
-        "src/stubs/rollup/rust/**",
-        "!src/stubs/rollup/rust/target/**",
-        "src/stubs/rollup/src/**"
-      ],
-      "outputs": ["src/stubs/rollup/wasm/**"]
-    },
     "build:viewer-resource": {
       "inputs": [],
       "outputs": ["dist/viewer/**"]
     },
     "@v/cli-bundle#build": {
-      "dependsOn": [
-        "^build",
-        "@v/cli-bundle#build:rollup-wasm",
-        "@v/cli-bundle#build:viewer-resource"
-      ],
+      "dependsOn": ["^build", "@v/cli-bundle#build:viewer-resource"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
@@ -42,6 +30,11 @@
     "test": {
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["coverage/**"]
+    },
+    "@v/cli-bundle#test": {
+      "dependsOn": ["@v/cli-bundle#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": []
     },
     "typecheck": {
       "dependsOn": ["^build"],
