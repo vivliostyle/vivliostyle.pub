@@ -105,7 +105,5 @@ export const {
   _toUnixTimestamp,
 } = fs;
 
-// @ts-expect-error
 realpath.native = realpath;
-// @ts-expect-error
 realpathSync.native = realpathSync;
