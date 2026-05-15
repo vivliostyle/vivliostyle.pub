@@ -315,6 +315,19 @@ const resolveImportMetaPlugin: Plugin = {
 // hide `process.versions.node` because vite's bundled `chunks/node.js` calls
 // `.split(".")` on it. Force the env flag false in the emnapi files so the
 // browser code path always wins.
+//
+// The flag is defined twice in `@emnapi/core/dist/emnapi-core.js` (top-level
+// and inside `createNapiModule`) and once in `@emnapi/wasi-threads/dist/
+// wasi-threads.js`; all three sites match the same regex. The Node-only
+// branch we want to skip is the cluster of `worker.on('message' | 'error' |
+// 'detachedExit', …)` and `worker.ref()/unref()` calls in thread-manager.ts,
+// which crash on a browser `Worker` produced by `globalThis.Worker`.
+//
+// Upstream sources (the dist files are bundled from these):
+//   https://github.com/toyobayashi/emnapi/blob/main/packages/wasi-threads/src/util.ts
+//     — defines `ENVIRONMENT_IS_NODE`
+//   https://github.com/toyobayashi/emnapi/blob/main/packages/wasi-threads/src/thread-manager.ts
+//     — the `if (ENVIRONMENT_IS_NODE)` blocks we need to skip
 const patchEmnapiEnvDetectionPlugin: Plugin = {
   name: 'patch-emnapi-env-detection',
   transform: {
@@ -336,6 +349,15 @@ const patchEmnapiEnvDetectionPlugin: Plugin = {
 // served from `/_cli/`. Resolve against `self.location.href` so the URL is
 // absolute even when the worker was spawned from a blob: URL (the relative
 // form fails URL parsing because `blob:` has no path-absolute base).
+//
+// The two patched lines correspond to `__wasmUrl` and the `onCreateWorker()`
+// `new Worker(...)` call in the npm artifact (lines 20 and 41 of the
+// generated file at the time of writing). The artifact is emitted by
+// `napi build` from these template strings:
+//   https://github.com/napi-rs/napi-rs/blob/main/cli/src/api/templates/load-wasi-template.ts
+//     — emits `*.wasi-browser.js`, including the two `new URL(..., import.meta.url)` calls
+//   https://github.com/napi-rs/napi-rs/blob/main/cli/src/api/templates/wasi-worker-template.ts
+//     — emits `wasi-worker-browser.mjs` (the worker entry the second URL points at)
 const patchRolldownBindingPlugin: Plugin = {
   name: 'patch-rolldown-binding',
   transform: {
@@ -409,7 +431,9 @@ const resolveViteClientPlugin: Plugin = {
       .replace(`__HMR_TIMEOUT__`, escapeReplacement(30000))
       .replace(`__HMR_ENABLE_OVERLAY__`, escapeReplacement(true))
       .replace(`__HMR_CONFIG_NAME__`, escapeReplacement('vite.config.ts'))
-      .replace(`__WS_TOKEN__`, escapeReplacement('dummy'));
+      .replace(`__WS_TOKEN__`, escapeReplacement('dummy'))
+      .replace(`__SERVER_FORWARD_CONSOLE__`, escapeReplacement(false))
+      .replaceAll(`__BUNDLED_DEV__`, escapeReplacement(false));
   },
 };
 

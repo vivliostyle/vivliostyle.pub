@@ -28,6 +28,7 @@ function Content(_: PreviewPaneProperty) {
       src={url}
       className="size-full"
       sandbox="allow-same-origin allow-scripts allow-modals"
+      allow="cross-origin-isolated"
     />
   );
 }

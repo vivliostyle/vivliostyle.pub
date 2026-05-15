@@ -216,6 +216,9 @@ catalogs:
     pathe:
       specifier: 2.0.3
       version: 2.0.3
+    picomatch:
+      specifier: 4.0.4
+      version: 4.0.4
     pnpm:
       specifier: 10.23.0
       version: 10.23.0
@@ -337,6 +340,9 @@ importers:
       '@types/npmcli__arborist':
         specifier: 6.3.0
         version: 6.3.0
+      '@types/picomatch':
+        specifier: 4.0.3
+        version: 4.0.3
       '@types/semver':
         specifier: 'catalog:'
         version: 7.5.8
@@ -379,6 +385,9 @@ importers:
       npm-package-arg:
         specifier: 11.0.3
         version: 11.0.3
+      picomatch:
+        specifier: 'catalog:'
+        version: 4.0.4
       pkg-dir:
         specifier: 8.0.0
         version: 8.0.0
@@ -3914,6 +3923,9 @@ packages:
   '@types/parse5@5.0.3':
     resolution: {integrity: sha512-kUNnecmtkunAoQ3CnjmMkzNU/gtxG8guhi+Fk2U/kOpIKjIMKnXGp4IJCgQJrXSgMsWYimYG4TGjz/UzbGEBTw==}
 
+  '@types/picomatch@4.0.3':
+    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
+
   '@types/react-dom@19.1.2':
     resolution: {integrity: sha512-XGJkWF41Qq305SKWEILa1O8vzhb3aOo3ogBlSmiqNko/WmRb6QIaweuZCXjKygVDXpzXb5wyxKTSOsmkuqj+Qw==}
     peerDependencies:
@@ -6575,10 +6587,6 @@ packages:
   picomatch@2.3.1:
     resolution: {integrity: sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA==}
     engines: {node: '>=8.6'}
-
-  picomatch@4.0.3:
-    resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
-    engines: {node: '>=12'}
 
   picomatch@4.0.4:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
@@ -11579,6 +11587,8 @@ snapshots:
 
   '@types/parse5@5.0.3': {}
 
+  '@types/picomatch@4.0.3': {}
+
   '@types/react-dom@19.1.2(@types/react@19.1.1)':
     dependencies:
       '@types/react': 19.1.1
@@ -14822,8 +14832,6 @@ snapshots:
 
   picomatch@2.3.1: {}
 
-  picomatch@4.0.3: {}
-
   picomatch@4.0.4: {}
 
   pidtree@0.6.0: {}
@@ -15417,7 +15425,7 @@ snapshots:
   rollup-plugin-visualizer@6.0.3(rolldown@1.0.1)(rollup@2.79.2):
     dependencies:
       open: 8.4.2
-      picomatch: 4.0.3
+      picomatch: 4.0.4
       source-map: 0.7.4
       yargs: 17.7.2
     optionalDependencies:
@@ -15427,7 +15435,7 @@ snapshots:
   rollup-plugin-visualizer@6.0.3(rolldown@1.0.1)(rollup@4.57.1):
     dependencies:
       open: 8.4.2
-      picomatch: 4.0.3
+      picomatch: 4.0.4
       source-map: 0.7.4
       yargs: 17.7.2
     optionalDependencies:

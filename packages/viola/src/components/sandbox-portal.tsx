@@ -78,6 +78,7 @@ function IframeSandbox({ projectId }: { projectId: ProjectId }) {
       src={`${sandbox.iframeOrigin}/sandbox`}
       style={{ display: 'none' }}
       sandbox="allow-same-origin allow-scripts"
+      allow="cross-origin-isolated"
     />
   );
 }
