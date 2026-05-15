@@ -12,6 +12,13 @@ This file provides guidance to AI coding agents (Claude Code, GitHub Copilot, Cu
 
 If you encounter a sandbox restriction that blocks legitimate work, surface it to the user and let them decide — don't silently retry with the sandbox disabled.
 
+> **Note on pnpm:** the repo's `.npmrc` is tuned so that `pnpm install` (and every other pnpm command) completes inside the sandbox:
+>
+> - `store-dir` / `cache-dir` / `state-dir` are pinned to `./.pnpm-store`, `./.pnpm-cache`, `./.pnpm-state` (in-repo, sandbox-writable). Don't relocate them back to the home directory.
+> - `virtual-store-dir` is `${PNPM_VIRTUAL_STORE_DIR:-node_modules/.pnpm}`. Some npm packages (e.g. `iconv-lite`) ship a `.idea/codeStyles/...` directory in their tarball; some agent sandboxes block writes anywhere under `.idea/**` to protect IDE config. Setting `PNPM_VIRTUAL_STORE_DIR` to a sandbox-writable temp path (e.g. `/tmp/claude/vsp-vstore` or `$TMPDIR/vsp-vstore`) moves the package extraction (including those `.idea` paths) outside `node_modules` and the sandbox's protected scope.
+>
+> Claude Code agents auto-inherit `PNPM_VIRTUAL_STORE_DIR=/tmp/claude/vsp-vstore` via this repo's `.claude/settings.json`. Other agent harnesses must export it manually before running `pnpm install`. CI and human shells leave it unset and fall back to the default in-`node_modules` virtual store.
+
 ## Repository overview
 
 Vivliostyle Pub is a browser-based book authoring/editing/publishing app built on the [Vivliostyle](https://vivliostyle.org/) CSS typesetting engine. The entire Vivliostyle CLI toolchain (including a Vite dev server) runs **inside a Web Worker in the browser**, with no backend — the project is deployed as static assets to Cloudflare Workers.
@@ -87,7 +94,7 @@ All responses set COEP `credentialless` + COOP `same-origin` + CORP `cross-origi
   4. `dist/rolldown-wasi-worker.js` + `dist/rolldown-binding.wasm32-wasi.wasm` — WASI worker for `@rolldown/browser`.
   - `src/stubs/` — hand-written Node builtin shims layered on top of `unenv`. Look here first when fixing browser-incompat bugs.
   - `src/volume.ts` — pre-populates the memfs `node_modules` from `__volume__` (injected by Rolldown's `define`); `restoreBundledNodeModules()` re-installs them after `setupTemplate` wipes `/workdir`.
-  - `scripts/build-viewer-resource.ts` — copies the `@vivliostyle/viewer` static assets into `dist/viewer/` for the iframe SW to proxy.
+  - `scripts/build-viewer-resource.ts` — copies the `@vivliostyle/viewer` static assets into `dist/viewer/` for the iframe SW to proxy. Invoked via `node --import tsx` (not the `tsx` CLI) because the tsx CLI binds a Unix domain socket at `/tmp/tsx-<uid>/` for IPC, which some sandboxes block. `@vivliostyle/viewer` is declared as a direct dep of `@v/cli-bundle` so this script can `require.resolve` it under pnpm's isolated layout.
 
 - **`packages/theme-registry/`** (`@v/theme-registry`) — in-browser npm theme fetcher: hits `registry.npmjs.org`, untars `.tgz`s with `@andrewbranch/untar.js`, and bundles theme CSS using `lightningcss-wasm`.
 

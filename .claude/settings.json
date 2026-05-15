@@ -1,9 +1,15 @@
 {
+  "env": {
+    "PNPM_VIRTUAL_STORE_DIR": "/tmp/claude/vsp-vstore"
+  },
   "sandbox": {
     "filesystem": {
       "allowRead": [
         "./secrets/.env",
         "./secrets/certs/**"
+      ],
+      "allowWrite": [
+        "**/.idea/**"
       ]
     }
   }

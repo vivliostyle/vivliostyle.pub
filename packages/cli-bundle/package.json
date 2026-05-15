@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "rolldown -c",
-    "build:viewer-resource": "tsx scripts/build-viewer-resource.ts",
+    "build:viewer-resource": "node --import tsx scripts/build-viewer-resource.ts",
     "dev": "rolldown -c -w",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -32,6 +32,7 @@
     "@v/config": "workspace:*",
     "@v/theme-registry": "workspace:*",
     "@vivliostyle/cli": "catalog:",
+    "@vivliostyle/viewer": "catalog:",
     "browserify-zlib": "catalog:",
     "comlink": "catalog:",
     "connect": "3.7.0",

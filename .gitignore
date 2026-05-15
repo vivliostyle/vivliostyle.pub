@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .pnpm-store
+.pnpm-cache
+.pnpm-state
 
 # Editor directories and files
 .vscode/*
