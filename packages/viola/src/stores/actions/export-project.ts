@@ -9,7 +9,7 @@ function downloadFile({
   mimeType: string;
   content: Uint8Array;
 }) {
-  const blob = new Blob([content], { type: mimeType });
+  const blob = new Blob([new Uint8Array(content)], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
