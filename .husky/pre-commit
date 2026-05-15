@@ -1,2 +1,2 @@
-lint-staged --no-stash
+lint-staged --no-stash --no-hide-partially-staged
 pnpm check

@@ -65,7 +65,7 @@ catalog:
   html-react-parser: 6.1.0
   husky: 9.1.7
   lightningcss-wasm: 1.32.0
-  lint-staged: 15.4.1
+  lint-staged: 17.0.4
   magic-string: 0.30.21
   '@jsonjoy.com/fs-print': 4.57.2
   '@jsonjoy.com/fs-snapshot': 4.57.2
