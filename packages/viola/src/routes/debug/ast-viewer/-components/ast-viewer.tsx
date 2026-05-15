@@ -221,7 +221,6 @@ export function VfmPreviewPane() {
 
   return (
     <EditorStyleContainer customCss={context.css}>
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Sanitized above */}
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </EditorStyleContainer>
   );
@@ -307,7 +306,6 @@ function AstTreeValue({ value }: { value: unknown }) {
         <span className="text-neutral-400">[</span>
         <ul className="ms-1 ps-5 border-s">
           {value.map((v, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: FIXME
             <li key={i}>
               <AstTreeItem value={v} />
             </li>

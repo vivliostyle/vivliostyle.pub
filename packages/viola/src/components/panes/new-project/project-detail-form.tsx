@@ -88,7 +88,6 @@ function LanguageSelect({ children }: React.PropsWithChildren) {
     <div className="grid gap-2">
       {children}
       <Popover open={open} onOpenChange={setOpen}>
-        {/** biome-ignore lint/a11y/useSemanticElements: Combobox with search */}
         <PopoverTrigger
           role="combobox"
           className={cn(

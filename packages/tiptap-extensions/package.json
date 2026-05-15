@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@handlewithcare/remark-prosemirror": "0.1.5",
-    "prosemirror-model": "1.25.1",
+    "prosemirror-model": "1.25.5",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "remark-stringify": "11.0.0",

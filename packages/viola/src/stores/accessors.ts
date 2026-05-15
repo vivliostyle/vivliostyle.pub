@@ -6,9 +6,7 @@ import { draftProjectId, projects } from './proxies/project';
 import { sandboxes } from './proxies/sandbox';
 import { ui } from './proxies/ui';
 
-export { projects as $projects };
-export { sandboxes as $sandboxes };
-export { ui as $ui };
+export { projects as $projects, sandboxes as $sandboxes, ui as $ui };
 
 function createProxyGetter<S extends unknown[], T>(
   dependencies: S,

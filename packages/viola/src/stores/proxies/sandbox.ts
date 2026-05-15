@@ -405,45 +405,47 @@ export class Sandbox {
         return;
       }
       switch (snapshot[0]) {
-        case 0 /* Folder */: {
-          const [, , entries] = snapshot;
-          for (const [name, entry] of Object.entries(entries)) {
-            await traverse(entry, join(path, name));
+        case 0 /* Folder */:
+          {
+            const [, , entries] = snapshot;
+            for (const [name, entry] of Object.entries(entries)) {
+              await traverse(entry, join(path, name));
+            }
+            break;
           }
-          break;
-        }
-        case 1 /* File */: {
-          const [, , data] = snapshot;
-          const buffer = data.buffer.slice(
-            data.byteOffset,
-            data.byteOffset + data.byteLength,
-          ) as ArrayBuffer;
-          const [parentDirHandle, basename] =
-            await this.traverseFileDirectoryHandle({
-              filename: path,
+        case 1 /* File */:
+          {
+            const [, , data] = snapshot;
+            const buffer = data.buffer.slice(
+              data.byteOffset,
+              data.byteOffset + data.byteLength,
+            ) as ArrayBuffer;
+            const [parentDirHandle, basename] =
+              await this.traverseFileDirectoryHandle({
+                filename: path,
+                create: true,
+                dirHandleTreeCache,
+              });
+            const fileHandle = await parentDirHandle.getFileHandle(basename, {
               create: true,
-              dirHandleTreeCache,
             });
-          const fileHandle = await parentDirHandle.getFileHandle(basename, {
-            create: true,
-          });
-          const writable = await fileHandle.createWritable();
-          await writable.write(buffer);
-          await writable.close();
+            const writable = await fileHandle.createWritable();
+            await writable.write(buffer);
+            await writable.close();
 
-          // FIXME: Get proper MIME type
-          const mimeType =
-            {
-              css: 'text/css',
-              json: 'application/json',
-              md: 'text/markdown',
-              html: 'text/html',
-            }[extname(path).slice(1)] || 'application/octet-stream';
-          this.files[path] = ref(
-            new SandboxFile(mimeType, new Uint8Array(buffer)),
-          );
-          break;
-        }
+            // FIXME: Get proper MIME type
+            const mimeType =
+              {
+                css: 'text/css',
+                json: 'application/json',
+                md: 'text/markdown',
+                html: 'text/html',
+              }[extname(path).slice(1)] || 'application/octet-stream';
+            this.files[path] = ref(
+              new SandboxFile(mimeType, new Uint8Array(buffer)),
+            );
+            break;
+          }
       }
     };
     await traverse(rootNode);

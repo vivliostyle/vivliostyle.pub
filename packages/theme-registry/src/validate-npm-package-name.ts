@@ -88,11 +88,11 @@ const done = (warnings: string[], errors: string[]) => {
     errors: errors,
   };
   if (!result.warnings.length) {
-    // @ts-ignore
+    // @ts-expect-error
     delete result.warnings;
   }
   if (!result.errors.length) {
-    // @ts-ignore
+    // @ts-expect-error
     delete result.errors;
   }
   return result;

@@ -8,163 +8,200 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { createFileRoute } from '@tanstack/react-router'
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as mainLayoutRouteImport } from './routes/(main)/_layout'
+import { Route as DebugAstViewerIndexRouteImport } from './routes/debug/ast-viewer/index'
+import { Route as mainLayoutIndexRouteImport } from './routes/(main)/_layout/index'
+import { Route as mainLayoutThemeRouteImport } from './routes/(main)/_layout/theme'
+import { Route as mainLayoutPreviewRouteImport } from './routes/(main)/_layout/preview'
+import { Route as mainLayoutNewProjectRouteImport } from './routes/(main)/_layout/new-project'
+import { Route as mainLayoutMediaRouteImport } from './routes/(main)/_layout/media'
+import { Route as mainLayoutBibliographyRouteImport } from './routes/(main)/_layout/bibliography'
+import { Route as mainLayoutEditSplatRouteImport } from './routes/(main)/_layout/edit/$'
 
-// Import Routes
-
-import { Route as rootRoute } from './routes/__root'
-import { Route as mainLayoutImport } from './routes/(main)/_layout'
-import { Route as DebugAstViewerIndexImport } from './routes/debug/ast-viewer/index'
-import { Route as mainLayoutIndexImport } from './routes/(main)/_layout/index'
-import { Route as mainLayoutThemeImport } from './routes/(main)/_layout/theme'
-import { Route as mainLayoutPreviewImport } from './routes/(main)/_layout/preview'
-import { Route as mainLayoutNewProjectImport } from './routes/(main)/_layout/new-project'
-import { Route as mainLayoutMediaImport } from './routes/(main)/_layout/media'
-import { Route as mainLayoutBibliographyImport } from './routes/(main)/_layout/bibliography'
-import { Route as mainLayoutEditSplatImport } from './routes/(main)/_layout/edit/$'
-
-// Create Virtual Routes
-
-const mainImport = createFileRoute('/(main)')()
-
-// Create/Update Routes
-
-const mainRoute = mainImport.update({
-  id: '/(main)',
-  getParentRoute: () => rootRoute,
+const mainLayoutRoute = mainLayoutRouteImport.update({
+  id: '/(main)/_layout',
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const mainLayoutRoute = mainLayoutImport.update({
-  id: '/_layout',
-  getParentRoute: () => mainRoute,
-} as any)
-
-const DebugAstViewerIndexRoute = DebugAstViewerIndexImport.update({
+const DebugAstViewerIndexRoute = DebugAstViewerIndexRouteImport.update({
   id: '/debug/ast-viewer/',
   path: '/debug/ast-viewer/',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const mainLayoutIndexRoute = mainLayoutIndexImport.update({
+const mainLayoutIndexRoute = mainLayoutIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-
-const mainLayoutThemeRoute = mainLayoutThemeImport.update({
+const mainLayoutThemeRoute = mainLayoutThemeRouteImport.update({
   id: '/theme',
   path: '/theme',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-
-const mainLayoutPreviewRoute = mainLayoutPreviewImport.update({
+const mainLayoutPreviewRoute = mainLayoutPreviewRouteImport.update({
   id: '/preview',
   path: '/preview',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-
-const mainLayoutNewProjectRoute = mainLayoutNewProjectImport.update({
+const mainLayoutNewProjectRoute = mainLayoutNewProjectRouteImport.update({
   id: '/new-project',
   path: '/new-project',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-
-const mainLayoutMediaRoute = mainLayoutMediaImport.update({
+const mainLayoutMediaRoute = mainLayoutMediaRouteImport.update({
   id: '/media',
   path: '/media',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-
-const mainLayoutBibliographyRoute = mainLayoutBibliographyImport.update({
+const mainLayoutBibliographyRoute = mainLayoutBibliographyRouteImport.update({
   id: '/bibliography',
   path: '/bibliography',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-
-const mainLayoutEditSplatRoute = mainLayoutEditSplatImport.update({
+const mainLayoutEditSplatRoute = mainLayoutEditSplatRouteImport.update({
   id: '/edit/$',
   path: '/edit/$',
   getParentRoute: () => mainLayoutRoute,
 } as any)
 
-// Populate the FileRoutesByPath interface
+export interface FileRoutesByFullPath {
+  '/bibliography': typeof mainLayoutBibliographyRoute
+  '/media': typeof mainLayoutMediaRoute
+  '/new-project': typeof mainLayoutNewProjectRoute
+  '/preview': typeof mainLayoutPreviewRoute
+  '/theme': typeof mainLayoutThemeRoute
+  '/': typeof mainLayoutIndexRoute
+  '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
+  '/edit/$': typeof mainLayoutEditSplatRoute
+}
+export interface FileRoutesByTo {
+  '/bibliography': typeof mainLayoutBibliographyRoute
+  '/media': typeof mainLayoutMediaRoute
+  '/new-project': typeof mainLayoutNewProjectRoute
+  '/preview': typeof mainLayoutPreviewRoute
+  '/theme': typeof mainLayoutThemeRoute
+  '/': typeof mainLayoutIndexRoute
+  '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
+  '/edit/$': typeof mainLayoutEditSplatRoute
+}
+export interface FileRoutesById {
+  __root__: typeof rootRouteImport
+  '/(main)/_layout': typeof mainLayoutRouteWithChildren
+  '/(main)/_layout/bibliography': typeof mainLayoutBibliographyRoute
+  '/(main)/_layout/media': typeof mainLayoutMediaRoute
+  '/(main)/_layout/new-project': typeof mainLayoutNewProjectRoute
+  '/(main)/_layout/preview': typeof mainLayoutPreviewRoute
+  '/(main)/_layout/theme': typeof mainLayoutThemeRoute
+  '/(main)/_layout/': typeof mainLayoutIndexRoute
+  '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
+  '/(main)/_layout/edit/$': typeof mainLayoutEditSplatRoute
+}
+export interface FileRouteTypes {
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/bibliography'
+    | '/media'
+    | '/new-project'
+    | '/preview'
+    | '/theme'
+    | '/'
+    | '/debug/ast-viewer/'
+    | '/edit/$'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/bibliography'
+    | '/media'
+    | '/new-project'
+    | '/preview'
+    | '/theme'
+    | '/'
+    | '/debug/ast-viewer'
+    | '/edit/$'
+  id:
+    | '__root__'
+    | '/(main)/_layout'
+    | '/(main)/_layout/bibliography'
+    | '/(main)/_layout/media'
+    | '/(main)/_layout/new-project'
+    | '/(main)/_layout/preview'
+    | '/(main)/_layout/theme'
+    | '/(main)/_layout/'
+    | '/debug/ast-viewer/'
+    | '/(main)/_layout/edit/$'
+  fileRoutesById: FileRoutesById
+}
+export interface RootRouteChildren {
+  mainLayoutRoute: typeof mainLayoutRouteWithChildren
+  DebugAstViewerIndexRoute: typeof DebugAstViewerIndexRoute
+}
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/(main)': {
-      id: '/(main)'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof mainImport
-      parentRoute: typeof rootRoute
-    }
     '/(main)/_layout': {
       id: '/(main)/_layout'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof mainLayoutImport
-      parentRoute: typeof mainRoute
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof mainLayoutRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/(main)/_layout/bibliography': {
-      id: '/(main)/_layout/bibliography'
-      path: '/bibliography'
-      fullPath: '/bibliography'
-      preLoaderRoute: typeof mainLayoutBibliographyImport
-      parentRoute: typeof mainLayoutImport
-    }
-    '/(main)/_layout/media': {
-      id: '/(main)/_layout/media'
-      path: '/media'
-      fullPath: '/media'
-      preLoaderRoute: typeof mainLayoutMediaImport
-      parentRoute: typeof mainLayoutImport
-    }
-    '/(main)/_layout/new-project': {
-      id: '/(main)/_layout/new-project'
-      path: '/new-project'
-      fullPath: '/new-project'
-      preLoaderRoute: typeof mainLayoutNewProjectImport
-      parentRoute: typeof mainLayoutImport
-    }
-    '/(main)/_layout/preview': {
-      id: '/(main)/_layout/preview'
-      path: '/preview'
-      fullPath: '/preview'
-      preLoaderRoute: typeof mainLayoutPreviewImport
-      parentRoute: typeof mainLayoutImport
-    }
-    '/(main)/_layout/theme': {
-      id: '/(main)/_layout/theme'
-      path: '/theme'
-      fullPath: '/theme'
-      preLoaderRoute: typeof mainLayoutThemeImport
-      parentRoute: typeof mainLayoutImport
+    '/debug/ast-viewer/': {
+      id: '/debug/ast-viewer/'
+      path: '/debug/ast-viewer'
+      fullPath: '/debug/ast-viewer/'
+      preLoaderRoute: typeof DebugAstViewerIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/(main)/_layout/': {
       id: '/(main)/_layout/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof mainLayoutIndexImport
-      parentRoute: typeof mainLayoutImport
+      preLoaderRoute: typeof mainLayoutIndexRouteImport
+      parentRoute: typeof mainLayoutRoute
     }
-    '/debug/ast-viewer/': {
-      id: '/debug/ast-viewer/'
-      path: '/debug/ast-viewer'
-      fullPath: '/debug/ast-viewer'
-      preLoaderRoute: typeof DebugAstViewerIndexImport
-      parentRoute: typeof rootRoute
+    '/(main)/_layout/theme': {
+      id: '/(main)/_layout/theme'
+      path: '/theme'
+      fullPath: '/theme'
+      preLoaderRoute: typeof mainLayoutThemeRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
+    '/(main)/_layout/preview': {
+      id: '/(main)/_layout/preview'
+      path: '/preview'
+      fullPath: '/preview'
+      preLoaderRoute: typeof mainLayoutPreviewRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
+    '/(main)/_layout/new-project': {
+      id: '/(main)/_layout/new-project'
+      path: '/new-project'
+      fullPath: '/new-project'
+      preLoaderRoute: typeof mainLayoutNewProjectRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
+    '/(main)/_layout/media': {
+      id: '/(main)/_layout/media'
+      path: '/media'
+      fullPath: '/media'
+      preLoaderRoute: typeof mainLayoutMediaRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
+    '/(main)/_layout/bibliography': {
+      id: '/(main)/_layout/bibliography'
+      path: '/bibliography'
+      fullPath: '/bibliography'
+      preLoaderRoute: typeof mainLayoutBibliographyRouteImport
+      parentRoute: typeof mainLayoutRoute
     }
     '/(main)/_layout/edit/$': {
       id: '/(main)/_layout/edit/$'
       path: '/edit/$'
       fullPath: '/edit/$'
-      preLoaderRoute: typeof mainLayoutEditSplatImport
-      parentRoute: typeof mainLayoutImport
+      preLoaderRoute: typeof mainLayoutEditSplatRouteImport
+      parentRoute: typeof mainLayoutRoute
     }
   }
 }
-
-// Create and export the route tree
 
 interface mainLayoutRouteChildren {
   mainLayoutBibliographyRoute: typeof mainLayoutBibliographyRoute
@@ -190,162 +227,10 @@ const mainLayoutRouteWithChildren = mainLayoutRoute._addFileChildren(
   mainLayoutRouteChildren,
 )
 
-interface mainRouteChildren {
-  mainLayoutRoute: typeof mainLayoutRouteWithChildren
-}
-
-const mainRouteChildren: mainRouteChildren = {
-  mainLayoutRoute: mainLayoutRouteWithChildren,
-}
-
-const mainRouteWithChildren = mainRoute._addFileChildren(mainRouteChildren)
-
-export interface FileRoutesByFullPath {
-  '/': typeof mainLayoutIndexRoute
-  '/bibliography': typeof mainLayoutBibliographyRoute
-  '/media': typeof mainLayoutMediaRoute
-  '/new-project': typeof mainLayoutNewProjectRoute
-  '/preview': typeof mainLayoutPreviewRoute
-  '/theme': typeof mainLayoutThemeRoute
-  '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
-  '/edit/$': typeof mainLayoutEditSplatRoute
-}
-
-export interface FileRoutesByTo {
-  '/bibliography': typeof mainLayoutBibliographyRoute
-  '/media': typeof mainLayoutMediaRoute
-  '/new-project': typeof mainLayoutNewProjectRoute
-  '/preview': typeof mainLayoutPreviewRoute
-  '/theme': typeof mainLayoutThemeRoute
-  '/': typeof mainLayoutIndexRoute
-  '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
-  '/edit/$': typeof mainLayoutEditSplatRoute
-}
-
-export interface FileRoutesById {
-  __root__: typeof rootRoute
-  '/(main)': typeof mainRouteWithChildren
-  '/(main)/_layout': typeof mainLayoutRouteWithChildren
-  '/(main)/_layout/bibliography': typeof mainLayoutBibliographyRoute
-  '/(main)/_layout/media': typeof mainLayoutMediaRoute
-  '/(main)/_layout/new-project': typeof mainLayoutNewProjectRoute
-  '/(main)/_layout/preview': typeof mainLayoutPreviewRoute
-  '/(main)/_layout/theme': typeof mainLayoutThemeRoute
-  '/(main)/_layout/': typeof mainLayoutIndexRoute
-  '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
-  '/(main)/_layout/edit/$': typeof mainLayoutEditSplatRoute
-}
-
-export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/bibliography'
-    | '/media'
-    | '/new-project'
-    | '/preview'
-    | '/theme'
-    | '/debug/ast-viewer'
-    | '/edit/$'
-  fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/bibliography'
-    | '/media'
-    | '/new-project'
-    | '/preview'
-    | '/theme'
-    | '/'
-    | '/debug/ast-viewer'
-    | '/edit/$'
-  id:
-    | '__root__'
-    | '/(main)'
-    | '/(main)/_layout'
-    | '/(main)/_layout/bibliography'
-    | '/(main)/_layout/media'
-    | '/(main)/_layout/new-project'
-    | '/(main)/_layout/preview'
-    | '/(main)/_layout/theme'
-    | '/(main)/_layout/'
-    | '/debug/ast-viewer/'
-    | '/(main)/_layout/edit/$'
-  fileRoutesById: FileRoutesById
-}
-
-export interface RootRouteChildren {
-  mainRoute: typeof mainRouteWithChildren
-  DebugAstViewerIndexRoute: typeof DebugAstViewerIndexRoute
-}
-
 const rootRouteChildren: RootRouteChildren = {
-  mainRoute: mainRouteWithChildren,
+  mainLayoutRoute: mainLayoutRouteWithChildren,
   DebugAstViewerIndexRoute: DebugAstViewerIndexRoute,
 }
-
-export const routeTree = rootRoute
+export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-/* ROUTE_MANIFEST_START
-{
-  "routes": {
-    "__root__": {
-      "filePath": "__root.tsx",
-      "children": [
-        "/(main)",
-        "/debug/ast-viewer/"
-      ]
-    },
-    "/(main)": {
-      "filePath": "(main)",
-      "children": [
-        "/(main)/_layout"
-      ]
-    },
-    "/(main)/_layout": {
-      "filePath": "(main)/_layout.tsx",
-      "parent": "/(main)",
-      "children": [
-        "/(main)/_layout/bibliography",
-        "/(main)/_layout/media",
-        "/(main)/_layout/new-project",
-        "/(main)/_layout/preview",
-        "/(main)/_layout/theme",
-        "/(main)/_layout/",
-        "/(main)/_layout/edit/$"
-      ]
-    },
-    "/(main)/_layout/bibliography": {
-      "filePath": "(main)/_layout/bibliography.tsx",
-      "parent": "/(main)/_layout"
-    },
-    "/(main)/_layout/media": {
-      "filePath": "(main)/_layout/media.tsx",
-      "parent": "/(main)/_layout"
-    },
-    "/(main)/_layout/new-project": {
-      "filePath": "(main)/_layout/new-project.tsx",
-      "parent": "/(main)/_layout"
-    },
-    "/(main)/_layout/preview": {
-      "filePath": "(main)/_layout/preview.tsx",
-      "parent": "/(main)/_layout"
-    },
-    "/(main)/_layout/theme": {
-      "filePath": "(main)/_layout/theme.tsx",
-      "parent": "/(main)/_layout"
-    },
-    "/(main)/_layout/": {
-      "filePath": "(main)/_layout/index.tsx",
-      "parent": "/(main)/_layout"
-    },
-    "/debug/ast-viewer/": {
-      "filePath": "debug/ast-viewer/index.tsx"
-    },
-    "/(main)/_layout/edit/$": {
-      "filePath": "(main)/_layout/edit/$.tsx",
-      "parent": "/(main)/_layout"
-    }
-  }
-}
-ROUTE_MANIFEST_END */

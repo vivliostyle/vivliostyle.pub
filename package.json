@@ -26,15 +26,5 @@
       "biome format --write --files-ignore-unknown=true --no-errors-on-unmatched"
     ]
   },
-  "pnpm": {
-    "patchedDependencies": {
-      "buffer@6.0.3": "patches/buffer@6.0.3.patch"
-    },
-    "onlyBuiltDependencies": [
-      "@biomejs/biome",
-      "@swc/core",
-      "esbuild"
-    ]
-  },
-  "packageManager": "pnpm@10.23.0"
+  "packageManager": "pnpm@11.1.2"
 }
