@@ -1,6 +1,15 @@
 packages:
   - packages/*
 
+patchedDependencies:
+  'buffer@6.0.3': patches/buffer@6.0.3.patch
+
+allowBuilds:
+  '@biomejs/biome': true
+  '@rolldown/browser': false
+  '@swc/core': true
+  esbuild: true
+
 catalog:
   '@andrewbranch/untar.js': 1.0.3
   '@biomejs/biome': 2.4.15
@@ -75,7 +84,7 @@ catalog:
   outvariant: 1.4.3
   pathe: 2.0.3
   picomatch: 4.0.4
-  pnpm: 10.23.0
+  pnpm: 11.1.2
   react: 19.2.6
   react-dom: 19.2.6
   react-use: 17.6.0
