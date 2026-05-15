@@ -24,7 +24,10 @@ catalog:
   '@dnd-kit/modifiers': 9.0.0
   '@dnd-kit/sortable': 10.0.0
   '@floating-ui/react-dom': 2.1.8
+  '@jsonjoy.com/fs-print': 4.57.2
+  '@jsonjoy.com/fs-snapshot': 4.57.2
   '@jsonjoy.com/json-pack': 18.23.0
+  '@rolldown/browser': 1.0.1
   '@tailwindcss/vite': 4.3.0
   '@tanstack/react-router': 1.169.2
   '@tanstack/router-devtools': 1.166.13
@@ -68,16 +71,14 @@ catalog:
   browserify-zlib: 0.2.0
   bunshi: 2.2.0
   comlink: 4.4.2
-  dompurify: 3.4.3
   create-hash: 1.2.0
+  dompurify: 3.4.3
   fflate: 0.8.2
   html-react-parser: 6.1.0
   husky: 9.1.7
   lightningcss-wasm: 1.32.0
   lint-staged: 17.0.4
   magic-string: 0.30.21
-  '@jsonjoy.com/fs-print': 4.57.2
-  '@jsonjoy.com/fs-snapshot': 4.57.2
   memfs: 4.57.2
   nanoid: 5.1.11
   nanoid-dictionary: 5.0.0
@@ -88,7 +89,6 @@ catalog:
   react: 19.2.6
   react-dom: 19.2.6
   react-use: 17.6.0
-  '@rolldown/browser': 1.0.1
   rolldown: 1.0.1
   rolldown-plugin-dts: 0.25.0
   rollup-plugin-visualizer: 7.0.1
