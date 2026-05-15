@@ -23,7 +23,7 @@ If you encounter a sandbox restriction that blocks legitimate work, surface it t
 
 Vivliostyle Pub is a browser-based book authoring/editing/publishing app built on the [Vivliostyle](https://vivliostyle.org/) CSS typesetting engine. The entire Vivliostyle CLI toolchain (including a Vite dev server) runs **inside a Web Worker in the browser**, with no backend — the project is deployed as static assets to Cloudflare Workers.
 
-This is a pnpm + Turbo monorepo. Node 24 + pnpm 10.
+This is a pnpm + Turbo monorepo. Node 24 + pnpm 11.
 
 ## Common commands
 
@@ -95,6 +95,7 @@ All responses set COEP `credentialless` + COOP `same-origin` + CORP `cross-origi
   - `src/stubs/` — hand-written Node builtin shims layered on top of `unenv`. Look here first when fixing browser-incompat bugs.
   - `src/volume.ts` — pre-populates the memfs `node_modules` from `__volume__` (injected by Rolldown's `define`); `restoreBundledNodeModules()` re-installs them after `setupTemplate` wipes `/workdir`.
   - `scripts/build-viewer-resource.ts` — copies the `@vivliostyle/viewer` static assets into `dist/viewer/` for the iframe SW to proxy. Invoked via `node --import tsx` (not the `tsx` CLI) because the tsx CLI binds a Unix domain socket at `/tmp/tsx-<uid>/` for IPC, which some sandboxes block. `@vivliostyle/viewer` is declared as a direct dep of `@v/cli-bundle` so this script can `require.resolve` it under pnpm's isolated layout.
+  - **Filesystem API** — beyond the build/serve lifecycle, the bundle also exports direct memfs operations so the host can sync project state across the Comlink boundary: `read` / `write` / `rm` (file ops), `fromJSON` / `toJSON` (memfs JSON-snapshot format), `fromBinarySnapshot` / `toBinarySnapshot` (CBOR binary snapshots via `@jsonjoy.com/fs-snapshot`), and `printTree` (debug tree via `@jsonjoy.com/fs-print`).
 
 - **`packages/theme-registry/`** (`@v/theme-registry`) — in-browser npm theme fetcher: hits `registry.npmjs.org`, untars `.tgz`s with `@andrewbranch/untar.js`, and bundles theme CSS using `lightningcss-wasm`.
 
@@ -115,13 +116,13 @@ All responses set COEP `credentialless` + COOP `same-origin` + CORP `cross-origi
 - `patchEmnapiEnvDetectionPlugin` — forces `ENVIRONMENT_IS_NODE = false` in `@emnapi/*` so the WASM binding doesn't take Node-only code paths.
 - `resolveViteClientPlugin` — inlines Vite's `client.mjs` / `env.mjs` with all `__DEFINES__` / `__HMR_*__` placeholders filled in (since the in-worker Vite never goes through Vite's normal client-injection pipeline).
 
-Tests (`src/index.test.ts`) validate the build artifact, not behavior: they parse `dist/index.js` with `rolldown/parseAst` and check that all expected exports exist. Booting the bundle in jsdom/happy-dom doesn't work (see comment in the file).
+Tests (`src/index.test.ts`) validate the build artifact, not behavior: they parse `dist/index.js` with `rolldown/parseAst` and check that all expected exports exist (`setupServer`, `teardownServer`, `serve`, `setupTemplate`, `buildEpub`, `buildWebPub`, `exportProjectZip`, `fromJSON`, `toJSON`, `read`, `write`, `rm`, `fromBinarySnapshot`, `toBinarySnapshot`, `printTree`, `webSocketConnect`). Booting the bundle in jsdom/happy-dom doesn't work (see comment in the file).
 
 ## Conventions
 
 - **Biome** (`biome.json`) is the only formatter/linter. Single quotes, semicolons, 2-space indent. Import order is enforced: URLs → protocol packages → third-party packages → blank line → `@v/*` and relative imports.
 - **pnpm catalog**: dependency versions are pinned in `pnpm-workspace.yaml`'s `catalog:` section, and packages reference them with `"catalog:"`. When upgrading a dep, edit the catalog (not the individual `package.json`).
-- **Patches**: `patches/buffer@6.0.3.patch` is applied via `pnpm.patchedDependencies`.
+- **Patches**: `patches/buffer@6.0.3.patch` is applied via `patchedDependencies` in `pnpm-workspace.yaml` (moved there from `package.json#pnpm.patchedDependencies` in pnpm 11). The `allowBuilds` key in the same file controls which packages may run install scripts.
 - **Husky pre-commit** runs `lint-staged` (Biome format) and `pnpm check`.
 - **Agent guidance lives only in this file.** No `.cursor/rules`, `.cursorrules`, or `.github/copilot-instructions.md` exist — `AGENTS.md` is a symlink to `CLAUDE.md` so every agent reads the same source. If you need to extend the guide, edit `CLAUDE.md`.
 
