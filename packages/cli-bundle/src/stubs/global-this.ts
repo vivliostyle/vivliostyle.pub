@@ -52,13 +52,13 @@ const wrapClear =
     if (typeof handle === 'number') return fn(handle);
     return fn(handle.__id__);
   };
-// @ts-ignore — runtime shape mismatch with the browser lib types is intentional
+// @ts-expect-error — runtime shape mismatch with the browser lib types is intentional
 root.setTimeout = wrapTimer(root.setTimeout.bind(root));
-// @ts-ignore
+// @ts-expect-error
 root.setInterval = wrapTimer(root.setInterval.bind(root));
-// @ts-ignore
+// @ts-expect-error
 root.clearTimeout = wrapClear(root.clearTimeout.bind(root));
-// @ts-ignore
+// @ts-expect-error
 root.clearInterval = wrapClear(root.clearInterval.bind(root));
 
 export default root;

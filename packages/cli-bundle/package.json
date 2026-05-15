@@ -18,6 +18,8 @@
     }
   },
   "devDependencies": {
+    "@jsonjoy.com/fs-print": "catalog:",
+    "@jsonjoy.com/fs-snapshot": "catalog:",
     "@mswjs/interceptors": "0.41.9",
     "@npmcli/arborist": "7.5.4",
     "@rolldown/browser": "catalog:",

@@ -393,10 +393,7 @@ function FileTree() {
           strategy={verticalListSortingStrategy}
         >
           <FileTreeGroup
-            tree={
-              // @ts-ignore: Type instantiation is excessively deep and possibly infinite.
-              content.hierarchicalReadingOrder as HierarchicalReadingOrder
-            }
+            tree={content.hierarchicalReadingOrder as HierarchicalReadingOrder}
           />
         </SortableContext>
         {createPortal(

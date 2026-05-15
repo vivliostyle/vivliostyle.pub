@@ -13,6 +13,5 @@ import unenvProcess from 'unenv/node/process';
 const root = new Function('return globalThis')() as typeof globalThis;
 
 if (!root.process) {
-  // @ts-ignore — unenv Process is structurally compatible with NodeJS.Process
   root.process = unenvProcess;
 }

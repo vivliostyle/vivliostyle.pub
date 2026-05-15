@@ -1,6 +1,14 @@
 import './stubs/install-process-global';
 import path from 'node:path';
 import type stream from 'node:stream';
+import { toTreeSync } from '@jsonjoy.com/fs-print';
+import {
+  fromBinarySnapshot as _fromBinarySnapshot,
+  toBinarySnapshot as _toBinarySnapshot,
+  type AsyncSnapshotOptions,
+  type SnapshotNode,
+  toSnapshotSync,
+} from '@jsonjoy.com/fs-snapshot';
 import {
   createVitePlugin,
   build as vivliostyleBuild,
@@ -10,14 +18,6 @@ import type { VivliostyleInlineConfig } from '@vivliostyle/cli/schema';
 import connect from 'connect';
 import { type Zippable, type ZippableFile, zipSync } from 'fflate';
 import { fs, vol } from 'memfs';
-import { toTreeSync } from 'memfs/lib/print';
-import {
-  fromBinarySnapshot as _fromBinarySnapshot,
-  toBinarySnapshot as _toBinarySnapshot,
-  type AsyncSnapshotOptions,
-  type SnapshotNode,
-  toSnapshotSync,
-} from 'memfs/lib/snapshot';
 import type { MockResponse, RequestMethod } from 'node-mocks-http';
 import { transform } from 'rolldown/experimental';
 import { createServer, type HotPayload, type ViteDevServer } from 'vite';
@@ -259,8 +259,10 @@ export const toBinarySnapshot = (options: Omit<AsyncSnapshotOptions, 'fs'>) =>
     fs: fs.promises,
   }) as Promise<Uint8Array>;
 
-export const read = (...args: Parameters<typeof fs.promises.readFile>) =>
-  fs.promises.readFile(...args);
+export const read = (
+  ...args: Parameters<typeof fs.promises.readFile>
+): Promise<string | Buffer> =>
+  fs.promises.readFile(...args) as Promise<string | Buffer>;
 export const write = (...args: Parameters<typeof fs.promises.writeFile>) =>
   fs.promises.writeFile(...args);
 export const rm = (...args: Parameters<typeof fs.promises.rm>) =>

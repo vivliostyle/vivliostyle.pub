@@ -107,6 +107,7 @@ export default function CodeEditor({
   );
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: CodeMirror manages contenteditable internally
     <div
       {...other}
       ref={editorContainerRef}

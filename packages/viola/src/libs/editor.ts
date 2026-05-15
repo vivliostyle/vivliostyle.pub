@@ -18,7 +18,7 @@ import { insertImageFiles } from './editor/insert-image';
 
 import './editor/inline-menu.media';
 
-// @ts-ignore
+// @ts-expect-error
 async function _setupPersistence({
   doc,
 }: {
