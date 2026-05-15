@@ -5,10 +5,10 @@ import { parseAst } from 'rolldown/parseAst';
 import { describe, expect, it } from 'vitest';
 
 // The cli-bundle output is a worker-only ESM that pulls in browser-targeted
-// shims (jsdom is the closest match but its TextEncoder/Uint8Array realms
-// trigger esbuild-wasm's invariant; happy-dom drops `XMLHttpRequest` for
-// node-mocks-http). Rather than booting the bundle, we verify it as a build
-// artifact: it must exist, parse, and re-export every documented entry.
+// shims; happy-dom drops `XMLHttpRequest` for node-mocks-http and jsdom
+// disagrees on TextEncoder/Uint8Array realms. Rather than booting the bundle,
+// we verify it as a build artifact: it must exist, parse, and re-export every
+// documented entry.
 
 const distRoot = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -74,7 +74,6 @@ describe('cli-bundle build artifact', () => {
   });
 
   it('emits the WebAssembly assets next to the bundle', () => {
-    expect(fs.existsSync(path.join(distRoot, 'esbuild.wasm'))).toBe(true);
     expect(
       fs.existsSync(path.join(distRoot, 'rolldown-binding.wasm32-wasi.wasm')),
     ).toBe(true);

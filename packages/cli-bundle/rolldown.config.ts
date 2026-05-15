@@ -173,7 +173,6 @@ const aliasMap: Record<string, string> = {
   'node:assert': path.join(assertPkgDir, 'build/assert.js'),
   // https://github.com/nodejs/readable-stream/issues/540
   'process/': unenvEnv.alias.process,
-  esbuild: 'esbuild-wasm/lib/browser.js',
   upath: unenvEnv.alias.path,
   'graceful-fs': stubPath('fs'),
   'terminal-link': path.resolve(__dirname, 'src/stubs/terminal-link'),
@@ -379,11 +378,6 @@ const patchRolldownBindingPlugin: Plugin = {
 const copyWasmFilePlugin: Plugin = {
   name: 'copy-wasm-file',
   generateBundle() {
-    this.emitFile({
-      type: 'asset',
-      fileName: 'esbuild.wasm',
-      source: fs.readFileSync(require.resolve('esbuild-wasm/esbuild.wasm')),
-    });
     this.emitFile({
       type: 'asset',
       fileName: 'rolldown-binding.wasm32-wasi.wasm',

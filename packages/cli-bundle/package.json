@@ -34,7 +34,6 @@
     "comlink": "catalog:",
     "connect": "3.7.0",
     "create-hash": "catalog:",
-    "esbuild-wasm": "0.25.0",
     "fflate": "catalog:",
     "magic-string": "catalog:",
     "memfs": "catalog:",
