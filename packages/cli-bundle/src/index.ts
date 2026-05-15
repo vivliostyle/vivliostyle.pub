@@ -95,28 +95,30 @@ function zipDirectory(pwd: string) {
       return;
     }
     switch (snapshot[0]) {
-      case 0 /* Folder */: {
-        const [, , entries] = snapshot;
-        return Object.fromEntries(
-          Object.entries(entries).flatMap(([name, entry]) => {
-            if (
-              path === '.' &&
-              (name.startsWith('.') || name === 'node_modules')
-            ) {
-              return [];
-            }
-            const value = toZippable(
-              entry,
-              [path, name].filter(Boolean).join('/'),
-            );
-            return value ? [[name, value]] : [];
-          }),
-        );
-      }
-      case 1 /* File */: {
-        const [, , data] = snapshot;
-        return data;
-      }
+      case 0 /* Folder */:
+        {
+          const [, , entries] = snapshot;
+          return Object.fromEntries(
+            Object.entries(entries).flatMap(([name, entry]) => {
+              if (
+                path === '.' &&
+                (name.startsWith('.') || name === 'node_modules')
+              ) {
+                return [];
+              }
+              const value = toZippable(
+                entry,
+                [path, name].filter(Boolean).join('/'),
+              );
+              return value ? [[name, value]] : [];
+            }),
+          );
+        }
+      case 1 /* File */:
+        {
+          const [, , data] = snapshot;
+          return data;
+        }
     }
   }
   const files = toZippable(out);
