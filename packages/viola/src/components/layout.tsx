@@ -28,7 +28,7 @@ function DedicatedModal() {
   useEffect(
     () =>
       router.subscribe('onBeforeLoad', ({ fromLocation, toLocation }) => {
-        if (fromLocation.pathname !== toLocation.pathname) {
+        if (fromLocation?.pathname !== toLocation.pathname) {
           setOpen(false);
           $ui.dedicatedModal = null;
         }

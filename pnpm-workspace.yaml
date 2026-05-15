@@ -17,9 +17,9 @@ catalog:
   '@floating-ui/react-dom': 2.1.8
   '@jsonjoy.com/json-pack': 18.23.0
   '@tailwindcss/vite': 4.3.0
-  '@tanstack/react-router': 1.97.1
-  '@tanstack/router-devtools': 1.97.1
-  '@tanstack/router-plugin': 1.97.1
+  '@tanstack/react-router': 1.169.2
+  '@tanstack/router-devtools': 1.166.13
+  '@tanstack/router-plugin': 1.167.35
   '@tiptap/core': 3.23.4
   '@tiptap/extension-blockquote': 3.23.4
   '@tiptap/extension-bold': 3.23.4
