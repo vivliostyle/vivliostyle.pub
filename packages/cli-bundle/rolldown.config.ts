@@ -417,7 +417,7 @@ const workerConfig = defineConfig({
   output: {
     file: 'dist/index.js',
     format: 'es',
-    inlineDynamicImports: true,
+    codeSplitting: false,
   },
   external: [
     ...nodeExternalModules,
@@ -468,7 +468,7 @@ const rolldownWorkerConfig = defineConfig({
   output: {
     file: 'dist/rolldown-wasi-worker.js',
     format: 'es',
-    inlineDynamicImports: true,
+    codeSplitting: false,
   },
   platform: 'browser',
   plugins: [patchEmnapiEnvDetectionPlugin],
