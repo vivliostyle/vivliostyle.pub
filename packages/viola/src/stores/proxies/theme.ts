@@ -1,10 +1,5 @@
 import { proxy, ref } from 'valtio';
 
-import {
-  buildTreeFromRegistry,
-  bundleCss,
-  fetchPackageContent,
-} from '@v/theme-registry';
 import type { Project } from './project';
 
 export interface ThemeInstallationResult {
@@ -44,6 +39,8 @@ export class Theme {
     this.installFailure = undefined;
     this.installPromise = (async () => {
       try {
+        const { buildTreeFromRegistry, bundleCss, fetchPackageContent } =
+          await import('@v/theme-registry');
         const tree = await buildTreeFromRegistry(specifier);
         await fetchPackageContent(tree);
 
