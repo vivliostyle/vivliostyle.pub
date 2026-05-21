@@ -7,6 +7,20 @@ export function generateId<T extends string>(): T {
   return nanoid() as T;
 }
 
+// `projectId` is used as a host label in the sandbox iframe subdomain,
+// where Chromium silently drops cross-origin-isolated for any character
+// outside lowercase alphanumerics (notably `_` and case-folded uppercase),
+// breaking `SharedArrayBuffer` in the CLI worker. Length 25 keeps ~129 bits
+// of entropy against this 36-char alphabet (≥ nanoid's default ~126).
+const projectIdNanoid = customAlphabet(
+  'abcdefghijklmnopqrstuvwxyz0123456789',
+  25,
+);
+
+export function generateProjectId<T extends string>(): T {
+  return projectIdNanoid() as T;
+}
+
 const getRandomAlphanumeric = customAlphabet(alphanumeric);
 
 export function generateRandomName(): string {
