@@ -1,7 +1,13 @@
 import { CborDecoder } from '@jsonjoy.com/json-pack/lib/cbor';
 import type { BuildTask } from '@vivliostyle/cli/schema';
 import { basename, extname, join } from 'pathe';
-import { type INTERNAL_Op, proxy, ref, subscribe } from 'valtio';
+import {
+  type INTERNAL_Op,
+  proxy,
+  ref,
+  subscribe,
+  unstable_enableOp,
+} from 'valtio';
 import { deepClone, subscribeKey } from 'valtio/utils';
 
 import { OPFSStorageProvider } from '@v/storage-providers';
@@ -9,6 +15,11 @@ import { generateId } from '../../libs/generate-id';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { ProjectId } from './project';
+
+// valtio 2.2+ requires opting into op delivery for `subscribe` callbacks.
+// `handleFileUpdate` below relies on the ops list to propagate file changes
+// to the OPFS storage provider and the CLI worker's memfs, so enable it.
+unstable_enableOp();
 
 type SnapshotNode = FolderNode | FileNode | SymlinkNode | UnknownNode;
 type FolderNode = [
