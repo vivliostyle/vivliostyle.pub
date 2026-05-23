@@ -8,9 +8,12 @@ export function generateId<T extends string>(): T {
 }
 
 // `projectId` is used in the sandbox iframe subdomain as `sandbox-${projectId}`.
-// Chromium silently drops cross-origin-isolated when the `projectId` portion
-// contains characters outside lowercase alphanumerics (notably `_` and
-// case-folded uppercase), breaking `SharedArrayBuffer` in the CLI worker.
+// Keep it safe for use inside a single DNS label: lowercase letters, digits,
+// and interior `-` are valid, while characters such as `_`, uppercase, and
+// other non-DNS-label characters can cause Chromium to drop
+// `cross-origin-isolated`, breaking `SharedArrayBuffer` in the CLI worker.
+// We intentionally generate the stricter lowercase-alphanumeric subset here
+// for maximum compatibility.
 // Length 25 keeps ~129 bits of entropy against this 36-char alphabet
 // (≥ nanoid's default ~126).
 const projectIdNanoid = customAlphabet(
