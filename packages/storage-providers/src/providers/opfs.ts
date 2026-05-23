@@ -43,11 +43,14 @@ export class OPFSStorageProvider implements StorageProvider {
   static async open(
     options: OPFSStorageProviderOptions & {
       subPath?: string;
+      create?: boolean;
     } = {},
   ): Promise<OPFSStorageProvider> {
     const root = await navigator.storage.getDirectory();
     const handle = options.subPath
-      ? await root.getDirectoryHandle(options.subPath, { create: true })
+      ? await root.getDirectoryHandle(options.subPath, {
+          create: options.create ?? true,
+        })
       : root;
     return new OPFSStorageProvider(handle, options);
   }

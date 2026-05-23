@@ -747,6 +747,9 @@ importers:
       '@v/config':
         specifier: workspace:*
         version: link:../config
+      '@v/storage-providers':
+        specifier: workspace:*
+        version: link:../storage-providers
       '@v/theme-registry':
         specifier: workspace:*
         version: link:../theme-registry
