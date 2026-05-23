@@ -146,7 +146,8 @@ export class OPFSStorageProvider implements StorageProvider {
       const file = await fileHandle.getFile();
       return new Uint8Array(await file.arrayBuffer());
     } catch (cause) {
-      throw new StorageNotFoundError(path, { cause });
+      if (cause instanceof StorageError) throw cause;
+      throw mapDomException(cause, path);
     }
   }
 
@@ -173,7 +174,8 @@ export class OPFSStorageProvider implements StorageProvider {
       });
       this.invalidateCachePath(path);
     } catch (cause) {
-      throw new StorageError(`Failed to remove ${path}`, { cause });
+      if (cause instanceof StorageError) throw cause;
+      throw mapDomException(cause, path);
     }
   }
 

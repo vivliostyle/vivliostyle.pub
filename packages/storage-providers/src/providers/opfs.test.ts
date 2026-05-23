@@ -208,6 +208,13 @@ describe('OPFSStorageProvider', () => {
         provider.write('a/child.txt', encode('x')),
       ).rejects.toBeInstanceOf(StorageConflictError);
     });
+
+    it('throws StorageConflictError when reading through a file-as-parent', async () => {
+      await provider.write('a', encode('I am a file'));
+      await expect(provider.read('a/child.txt')).rejects.toBeInstanceOf(
+        StorageConflictError,
+      );
+    });
   });
 
   describe('exists', () => {
@@ -237,10 +244,10 @@ describe('OPFSStorageProvider', () => {
       expect(await provider.exists('proj')).toBe(false);
     });
 
-    it('throws StorageError when removing a missing entry', async () => {
+    it('throws StorageNotFoundError when removing a missing entry', async () => {
       const provider = makeProvider();
       await expect(provider.remove('missing.txt')).rejects.toBeInstanceOf(
-        StorageError,
+        StorageNotFoundError,
       );
     });
   });
