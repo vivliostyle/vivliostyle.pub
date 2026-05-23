@@ -9,10 +9,12 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@v/config": "workspace:*",
-    "pathe": "catalog:"
+    "pathe": "catalog:",
+    "vitest": "catalog:"
   }
 }
