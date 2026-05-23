@@ -119,13 +119,18 @@ export class OPFSStorageProvider implements StorageProvider {
   }
 
   async exists(path: string): Promise<boolean> {
+    let parent: FileSystemDirectoryHandle;
+    let name: string;
     try {
-      const [parent, name] = await this.resolveParent(path, false);
+      [parent, name] = await this.resolveParent(path, false);
+    } catch {
+      return false;
+    }
+    try {
       await parent.getFileHandle(name);
       return true;
     } catch {
       try {
-        const [parent, name] = await this.resolveParent(path, false);
         await parent.getDirectoryHandle(name);
         return true;
       } catch {
@@ -153,7 +158,10 @@ export class OPFSStorageProvider implements StorageProvider {
     const [parent, name] = await this.resolveParent(path, true);
     const fileHandle = await parent.getFileHandle(name, { create: true });
     const writable = await fileHandle.createWritable();
-    await writable.write(new Blob([data as BlobPart]));
+    // FileSystemWritableFileStream accepts BufferSource directly; the cast
+    // widens Uint8Array<ArrayBufferLike> to satisfy TS expecting
+    // ArrayBufferView<ArrayBuffer>.
+    await writable.write(data as unknown as BufferSource);
     await writable.close();
   }
 
