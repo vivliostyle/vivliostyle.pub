@@ -1,6 +1,10 @@
 import { basename, dirname, join, sep } from 'pathe';
 
-import { StorageError, StorageNotFoundError } from '../errors';
+import {
+  StorageConflictError,
+  StorageError,
+  StorageNotFoundError,
+} from '../errors';
 import type {
   FileMeta,
   ListEntry,
@@ -24,6 +28,19 @@ interface DirTree {
 
 function normalize(path: string): string {
   return path.replace(/^\/+/, '');
+}
+
+function mapDomException(cause: unknown, path: string): StorageError {
+  if (cause instanceof DOMException) {
+    if (cause.name === 'NotFoundError') {
+      return new StorageNotFoundError(path, { cause });
+    }
+    if (cause.name === 'TypeMismatchError') {
+      return new StorageConflictError(path, { cause });
+    }
+    return new StorageError(`${cause.name}: ${path}`, { cause });
+  }
+  return new StorageError(`Failed at ${path}`, { cause });
 }
 
 export interface OPFSStorageProviderOptions {
@@ -93,7 +110,7 @@ export class OPFSStorageProvider implements StorageProvider {
           next = { [dirHandleSymbol]: handle } as DirTree;
           current[seg] = next;
         } catch (cause) {
-          throw new StorageNotFoundError(path, { cause });
+          throw mapDomException(cause, path);
         }
       }
       current = next;

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { StorageError, StorageNotFoundError } from '../errors';
+import {
+  StorageConflictError,
+  StorageError,
+  StorageNotFoundError,
+} from '../errors';
 import type { Snapshot } from '../types';
 import { OPFSStorageProvider } from './opfs';
 
@@ -196,6 +200,13 @@ describe('OPFSStorageProvider', () => {
       await expect(provider.read('missing.txt')).rejects.toBeInstanceOf(
         StorageNotFoundError,
       );
+    });
+
+    it('throws StorageConflictError when a parent segment is a file', async () => {
+      await provider.write('a', encode('I am a file, not a dir'));
+      await expect(
+        provider.write('a/child.txt', encode('x')),
+      ).rejects.toBeInstanceOf(StorageConflictError);
     });
   });
 
