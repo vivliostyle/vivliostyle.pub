@@ -37,6 +37,7 @@
     "@types/react-dom": "catalog:",
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
+    "@v/storage-providers": "workspace:*",
     "@v/theme-registry": "workspace:*",
     "@v/tiptap-extensions": "workspace:*",
     "@v/ui": "workspace:*",

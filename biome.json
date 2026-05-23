@@ -34,7 +34,6 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
-      "!**/.*",
       "!**/packages/cli-bundle/src/stubs/rollup/**/*",
       "!**/vivliostyle-pub/**/*",
       "!**/routeTree.gen.ts",

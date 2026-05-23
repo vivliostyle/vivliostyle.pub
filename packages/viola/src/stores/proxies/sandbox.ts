@@ -1,19 +1,25 @@
 import { CborDecoder } from '@jsonjoy.com/json-pack/lib/cbor';
 import type { BuildTask } from '@vivliostyle/cli/schema';
-import { basename, dirname, extname, join, sep } from 'pathe';
-import { type INTERNAL_Op, proxy, ref, subscribe } from 'valtio';
+import { basename, extname, join } from 'pathe';
+import {
+  type INTERNAL_Op,
+  proxy,
+  ref,
+  subscribe,
+  unstable_enableOp,
+} from 'valtio';
 import { deepClone, subscribeKey } from 'valtio/utils';
 
+import { OPFSStorageProvider } from '@v/storage-providers';
 import { generateId } from '../../libs/generate-id';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { ProjectId } from './project';
 
-const node = Symbol();
-interface Tree<T> {
-  [node]: T;
-  [key: string]: Tree<T>;
-}
+// valtio 2.2+ requires opting into op delivery for `subscribe` callbacks.
+// `handleFileUpdate` below relies on the ops list to propagate file changes
+// to the OPFS storage provider and the CLI worker's memfs, so enable it.
+unstable_enableOp();
 
 type SnapshotNode = FolderNode | FileNode | SymlinkNode | UnknownNode;
 type FolderNode = [
@@ -142,12 +148,12 @@ export class Sandbox {
 
   protected static create({
     projectId,
-    directoryHandle,
+    provider,
   }: {
     projectId: ProjectId;
-    directoryHandle: FileSystemDirectoryHandle;
+    provider: OPFSStorageProvider;
   }) {
-    const sandbox = proxy(new Sandbox({ projectId, directoryHandle }));
+    const sandbox = proxy(new Sandbox({ projectId, provider }));
     subscribe(sandbox.files, (ops) => sandbox.handleFileUpdate(ops));
     subscribeKey(sandbox.files, 'vivliostyle.config.json', async (blob) => {
       sandbox.writableVivliostyleConfig = JSON.parse(await blob.text());
@@ -158,9 +164,8 @@ export class Sandbox {
   }
 
   static async checkFilesystemExists({ projectId }: { projectId: ProjectId }) {
-    const root = await navigator.storage.getDirectory();
     try {
-      await root.getDirectoryHandle(projectId);
+      await OPFSStorageProvider.open({ subPath: projectId, create: false });
       return true;
     } catch {
       return false;
@@ -168,18 +173,14 @@ export class Sandbox {
   }
 
   static async createNewSandbox({ projectId }: { projectId: ProjectId }) {
-    const root = await navigator.storage.getDirectory();
+    const root = await OPFSStorageProvider.open();
     try {
-      await root.removeEntry(projectId, { recursive: true });
+      await root.remove(projectId, { recursive: true });
     } catch {
       // ignore
     }
-    const directoryHandle = ref(
-      await root.getDirectoryHandle(projectId, {
-        create: true,
-      }),
-    );
-    const sandbox = proxy(Sandbox.create({ projectId, directoryHandle }));
+    const provider = await OPFSStorageProvider.open({ subPath: projectId });
+    const sandbox = proxy(Sandbox.create({ projectId, provider }));
     await sandbox.initializeProjectFiles({
       themePackageName: '@vivliostyle/theme-base',
       entry: [],
@@ -192,13 +193,8 @@ export class Sandbox {
   }: {
     projectId: ProjectId;
   }) {
-    const root = await navigator.storage.getDirectory();
-    const directoryHandle = ref(
-      await root.getDirectoryHandle(projectId, {
-        create: true,
-      }),
-    );
-    const sandbox = proxy(Sandbox.create({ projectId, directoryHandle }));
+    const provider = await OPFSStorageProvider.open({ subPath: projectId });
+    const sandbox = proxy(Sandbox.create({ projectId, provider }));
     await sandbox.loadFromFileSystem();
     return sandbox;
   }
@@ -224,7 +220,7 @@ export class Sandbox {
   }
 
   iframeOrigin: string;
-  projectDirectoryHandle: FileSystemDirectoryHandle;
+  provider: OPFSStorageProvider;
   files: Record<string, ReturnType<typeof ref<SandboxFile>>> = proxy({});
   cli = Cli.create(this);
 
@@ -238,15 +234,15 @@ export class Sandbox {
 
   protected constructor({
     projectId,
-    directoryHandle,
+    provider,
   }: {
     projectId: ProjectId;
-    directoryHandle: FileSystemDirectoryHandle;
+    provider: OPFSStorageProvider;
   }) {
     const url = new URL(location.href);
     url.hostname = `sandbox-${projectId}.${url.hostname}`;
     this.iframeOrigin = url.origin;
-    this.projectDirectoryHandle = ref(directoryHandle);
+    this.provider = ref(provider);
   }
 
   updateVivliostyleConfig(
@@ -292,82 +288,33 @@ export class Sandbox {
     return savePath;
   }
 
-  protected async readFileSystemRecursive({
-    dirHandle,
-    handle,
-    ignore,
-  }: {
-    dirHandle: FileSystemDirectoryHandle;
-    handle: (name: string, file: FileSystemFileHandle) => Promise<void>;
-    ignore?: RegExp[];
-  }): Promise<void> {
-    const promises: Promise<void>[] = [];
-    async function traverse(
-      dir: FileSystemDirectoryHandle,
-      parent = '',
-    ): Promise<void> {
-      for await (const [name, entry] of dir.entries()) {
-        const subPath = join(parent, name);
-        if (ignore?.some((re) => re.test(subPath))) {
-          continue;
-        }
-        if (entry.kind === 'file') {
-          promises.push(handle(subPath, entry as FileSystemFileHandle));
-        } else if (entry.kind === 'directory') {
-          await traverse(entry as FileSystemDirectoryHandle, subPath);
-        }
-      }
-    }
-    await traverse(dirHandle);
-    await Promise.all(promises);
-  }
-
-  protected async traverseFileDirectoryHandle({
-    filename,
-    create,
-    dirHandleTreeCache = { [node]: this.projectDirectoryHandle },
-  }: {
-    filename: string;
-    create: boolean;
-    dirHandleTreeCache?: Tree<FileSystemDirectoryHandle>;
-  }): Promise<[parent: FileSystemDirectoryHandle, basename: string]> {
-    let current = dirHandleTreeCache;
-    const base = basename(filename);
-    for (const seg of dirname(filename).split(sep)) {
-      if (seg === '' || seg === '.') {
-        continue;
-      }
-      current[seg] ??= {
-        [node]: await current[node].getDirectoryHandle(seg, { create }),
-      };
-      current = current[seg];
-    }
-    return [current[node], base];
-  }
-
   async loadFromFileSystem() {
     const newFiles: typeof this.files = {};
-    let configJson: string;
+    let configBytes: Uint8Array;
     try {
-      const configFileHandle = await this.projectDirectoryHandle.getFileHandle(
-        'vivliostyle.config.json',
-      );
-      const file = await configFileHandle.getFile();
-      newFiles['vivliostyle.config.json'] = ref(new SandboxFile(file));
-      configJson = await file.text();
+      configBytes = await this.provider.read('vivliostyle.config.json');
     } catch {
       throw new Error('Project does not exist');
     }
-    this.writableVivliostyleConfig = JSON.parse(configJson);
+    newFiles['vivliostyle.config.json'] = ref(
+      new SandboxFile('application/json', configBytes),
+    );
+    this.writableVivliostyleConfig = JSON.parse(
+      new TextDecoder().decode(configBytes),
+    );
 
-    await this.readFileSystemRecursive({
-      dirHandle: this.projectDirectoryHandle,
+    const entries = await this.provider.list('', {
+      recursive: true,
       ignore: [/^node_modules/, /^\.vivliostyle/],
-      handle: async (name, fileHandle) => {
-        const file = await fileHandle.getFile();
-        newFiles[name] = ref(new SandboxFile(file));
-      },
     });
+    await Promise.all(
+      entries.map(async (entry) => {
+        if (entry.kind !== 'file') return;
+        if (entry.path === 'vivliostyle.config.json') return;
+        const bytes = await this.provider.read(entry.path);
+        newFiles[entry.path] = ref(new SandboxFile('', bytes));
+      }),
+    );
 
     for (const k in this.files) {
       delete this.files[k];
@@ -396,10 +343,6 @@ export class Sandbox {
     const cbor = await cli.toBinarySnapshot({ path: '/workdir' });
     const rootNode = new CborDecoder().decode(cbor) as SnapshotNode;
 
-    const dirHandleTreeCache = {
-      [node]: this.projectDirectoryHandle,
-    };
-
     const traverse = async (snapshot: SnapshotNode, path = '') => {
       if (!snapshot) {
         return;
@@ -416,23 +359,7 @@ export class Sandbox {
         case 1 /* File */:
           {
             const [, , data] = snapshot;
-            const buffer = data.buffer.slice(
-              data.byteOffset,
-              data.byteOffset + data.byteLength,
-            ) as ArrayBuffer;
-            const [parentDirHandle, basename] =
-              await this.traverseFileDirectoryHandle({
-                filename: path,
-                create: true,
-                dirHandleTreeCache,
-              });
-            const fileHandle = await parentDirHandle.getFileHandle(basename, {
-              create: true,
-            });
-            const writable = await fileHandle.createWritable();
-            await writable.write(buffer);
-            await writable.close();
-
+            await this.provider.write(path, data);
             // FIXME: Get proper MIME type
             const mimeType =
               {
@@ -441,9 +368,7 @@ export class Sandbox {
                 md: 'text/markdown',
                 html: 'text/html',
               }[extname(path).slice(1)] || 'application/octet-stream';
-            this.files[path] = ref(
-              new SandboxFile(mimeType, new Uint8Array(buffer)),
-            );
+            this.files[path] = ref(new SandboxFile(mimeType, data));
             break;
           }
       }
@@ -455,21 +380,16 @@ export class Sandbox {
 
   protected async saveToFileSystem(
     filename: string,
-    content: Uint8Array<ArrayBuffer> | null,
+    content: Uint8Array | null,
   ) {
-    const [parentDirHandle, basename] = await this.traverseFileDirectoryHandle({
-      filename,
-      create: !!content,
-    });
     if (content) {
-      const fileHandle = await parentDirHandle.getFileHandle(basename, {
-        create: true,
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(content);
-      await writable.close();
+      await this.provider.write(filename, content);
     } else {
-      await parentDirHandle.removeEntry(basename);
+      try {
+        await this.provider.remove(filename);
+      } catch {
+        // ignore missing entries (matches prior best-effort delete behavior)
+      }
     }
   }
 
@@ -494,10 +414,8 @@ export class Sandbox {
         const cli = await this.cli.createRemotePromise();
         await cli.fromJSON(updates, '/workdir');
       })(),
-      ...Object.entries(updates).map((e) =>
-        this.saveToFileSystem(
-          ...(e as [string, Uint8Array<ArrayBuffer> | null]),
-        ),
+      ...Object.entries(updates).map(([path, content]) =>
+        this.saveToFileSystem(path, content),
       ),
     ]);
   }

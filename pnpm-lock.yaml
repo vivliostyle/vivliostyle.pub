@@ -440,6 +440,18 @@ importers:
 
   packages/config: {}
 
+  packages/storage-providers:
+    devDependencies:
+      '@v/config':
+        specifier: workspace:*
+        version: link:../config
+      pathe:
+        specifier: 'catalog:'
+        version: 2.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.6(@types/node@25.8.0)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(vite@8.0.11(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0))
+
   packages/theme-registry:
     devDependencies:
       '@andrewbranch/untar.js':
@@ -738,6 +750,9 @@ importers:
       '@v/config':
         specifier: workspace:*
         version: link:../config
+      '@v/storage-providers':
+        specifier: workspace:*
+        version: link:../storage-providers
       '@v/theme-registry':
         specifier: workspace:*
         version: link:../theme-registry

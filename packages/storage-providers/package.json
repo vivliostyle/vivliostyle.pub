@@ -1,0 +1,20 @@
+{
+  "name": "@v/storage-providers",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@v/config": "workspace:*",
+    "pathe": "catalog:",
+    "vitest": "catalog:"
+  }
+}
