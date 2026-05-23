@@ -21,7 +21,7 @@ function detectBrowserLanguage(): string {
 declare const projectIdBrand: unique symbol;
 export type ProjectId = string & { [projectIdBrand]: never };
 
-export const draftProjectId: ProjectId = '__draft' as ProjectId;
+export const draftProjectId: ProjectId = 'draft' as ProjectId;
 
 const initialBibliographyState = {
   title: '',
