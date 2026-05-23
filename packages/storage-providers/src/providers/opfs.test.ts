@@ -420,6 +420,20 @@ describe('OPFSStorageProvider', () => {
       expect(decode(await provider.read('proj/new.txt'))).toBe('new');
     });
 
+    it('clears the root before restore when clean=true and path is empty', async () => {
+      const provider = makeProvider();
+      await provider.write('stale.txt', encode('stale'));
+      await provider.write('stale-dir/x.txt', encode('stale'));
+      const snap: Snapshot = {
+        format: 'memfs-json',
+        data: { '/fresh.txt': encode('fresh') },
+      };
+      await provider.restore('', snap, { clean: true });
+      expect(await provider.exists('stale.txt')).toBe(false);
+      expect(await provider.exists('stale-dir')).toBe(false);
+      expect(decode(await provider.read('fresh.txt'))).toBe('fresh');
+    });
+
     it('rejects restore with unsupported snapshot format', async () => {
       const provider = makeProvider();
       const snap = {

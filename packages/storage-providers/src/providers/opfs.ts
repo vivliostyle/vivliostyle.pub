@@ -315,10 +315,21 @@ export class OPFSStorageProvider implements StorageProvider {
       );
     }
     if (options?.clean) {
-      try {
-        await this.remove(path || '/', { recursive: true });
-      } catch {
-        // ignore (may not exist yet)
+      if (normalize(path) === '') {
+        const entries = await this.list('');
+        for (const entry of entries) {
+          try {
+            await this.remove(entry.path, { recursive: true });
+          } catch {
+            // ignore (entry may have been concurrently removed)
+          }
+        }
+      } else {
+        try {
+          await this.remove(path, { recursive: true });
+        } catch {
+          // ignore (may not exist yet)
+        }
       }
     }
     const prefix = normalize(path);
