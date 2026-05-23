@@ -440,6 +440,15 @@ importers:
 
   packages/config: {}
 
+  packages/storage-providers:
+    devDependencies:
+      '@v/config':
+        specifier: workspace:*
+        version: link:../config
+      pathe:
+        specifier: 'catalog:'
+        version: 2.0.3
+
   packages/theme-registry:
     devDependencies:
       '@andrewbranch/untar.js':
