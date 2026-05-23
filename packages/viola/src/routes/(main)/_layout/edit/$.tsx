@@ -1,7 +1,12 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
 import { generateId } from '../../../../libs/generate-id';
-import { $content, $project, $ui } from '../../../../stores/accessors';
+import {
+  $content,
+  $project,
+  $projects,
+  $ui,
+} from '../../../../stores/accessors';
 import { restoreProjects } from '../../../../stores/actions/restore-projects';
 
 export const Route = createFileRoute('/(main)/_layout/edit/$')({
@@ -10,6 +15,9 @@ export const Route = createFileRoute('/(main)/_layout/edit/$')({
       return;
     }
     await restoreProjects();
+    if (!$projects.currentProjectId) {
+      throw redirect({ to: '/' });
+    }
     await $project.valueOrThrow().setupPromise;
     const result = $content
       .valueOrThrow()
