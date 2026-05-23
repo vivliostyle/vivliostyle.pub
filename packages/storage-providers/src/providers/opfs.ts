@@ -146,9 +146,28 @@ export class OPFSStorageProvider implements StorageProvider {
       await parent.removeEntry(name, {
         recursive: options?.recursive ?? false,
       });
+      this.invalidateCachePath(path);
     } catch (cause) {
       throw new StorageError(`Failed to remove ${path}`, { cause });
     }
+  }
+
+  protected invalidateCachePath(path: string): void {
+    const normalized = normalize(path);
+    if (!normalized) {
+      for (const key of Object.keys(this.dirTreeCache)) {
+        delete this.dirTreeCache[key];
+      }
+      return;
+    }
+    let current: DirTree = this.dirTreeCache;
+    for (const seg of dirname(normalized).split(sep)) {
+      if (seg === '' || seg === '.') continue;
+      const next = current[seg];
+      if (!next) return;
+      current = next;
+    }
+    delete current[basename(normalized)];
   }
 
   async stat(path: string): Promise<FileMeta | null> {
@@ -279,9 +298,8 @@ export class OPFSStorageProvider implements StorageProvider {
       );
     }
     if (options?.clean) {
-      const [parent, name] = await this.resolveParent(path || '/', false);
       try {
-        await parent.removeEntry(name, { recursive: true });
+        await this.remove(path || '/', { recursive: true });
       } catch {
         // ignore (may not exist yet)
       }
