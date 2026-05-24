@@ -90,7 +90,7 @@ function AddNewFileButton({ children }: React.PropsWithChildren) {
 }
 
 function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
-  const projectSnap = useSnapshot($project).valueOrThrow();
+  const project = useSnapshot($project).value();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
@@ -109,29 +109,33 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
             <span>New Project</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link
-            to="/projects/$projectId/preview"
-            params={{ projectId: projectSnap.projectId }}
-          >
-            <Printer />
-            <span>Open Print Preview</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem inset onClick={printPdf}>
-          <span>Print PDF</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem inset onClick={exportEpub}>
-          <span>Export EPUB</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem inset onClick={exportWebPub}>
-          <span>Export Web Publication</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem inset onClick={exportProjectZip}>
-          <span>Export Vivliostyle Project files</span>
-        </DropdownMenuItem>
+        {project && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link
+                to="/projects/$projectId/preview"
+                params={{ projectId: project.projectId }}
+              >
+                <Printer />
+                <span>Open Print Preview</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem inset onClick={printPdf}>
+              <span>Print PDF</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem inset onClick={exportEpub}>
+              <span>Export EPUB</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem inset onClick={exportWebPub}>
+              <span>Export Web Publication</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem inset onClick={exportProjectZip}>
+              <span>Export Vivliostyle Project files</span>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel
           inset
@@ -190,7 +194,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
 }
 
 function TopMenuSection() {
-  const projectSnap = useSnapshot($project).valueOrThrow();
+  const project = useSnapshot($project).value();
   return (
     <SidebarMenu>
       <div className={cn('flex items-center gap-1.5')}>
@@ -204,20 +208,22 @@ function TopMenuSection() {
             <ChevronDown className="size-3 opacity-60" aria-hidden />
           </Button>
         </ApplicationDropdownMenu>
-        <ProjectDropdownMenu>
-          <SidebarMenuButton
-            tooltip="Open project menu"
-            className={cn(
-              'font-semibold px-1.5 min-w-0 py-1.5',
-              !projectSnap.bibliography.title && 'text-muted-foreground',
-            )}
-          >
-            <span className="min-w-0 flex-1 line-clamp-2 wrap-break-word">
-              {projectSnap.bibliography.title || 'Untitled'}
-            </span>
-            <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
-          </SidebarMenuButton>
-        </ProjectDropdownMenu>
+        {project && (
+          <ProjectDropdownMenu>
+            <SidebarMenuButton
+              tooltip="Open project menu"
+              className={cn(
+                'font-semibold px-1.5 min-w-0 py-1.5',
+                !project.bibliography.title && 'text-muted-foreground',
+              )}
+            >
+              <span className="min-w-0 flex-1 line-clamp-2 wrap-break-word">
+                {project.bibliography.title || 'Untitled'}
+              </span>
+              <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
+            </SidebarMenuButton>
+          </ProjectDropdownMenu>
+        )}
       </div>
     </SidebarMenu>
   );
@@ -441,27 +447,28 @@ function FileTree() {
 export function SideMenu() {
   const projects = useSnapshot($projects);
 
-  if (!projects.currentProjectId) {
-    return <Sidebar />;
-  }
   return (
     <Sidebar>
       <SidebarHeader>
         <TopMenuSection />
       </SidebarHeader>
-      <SidebarSeparator />
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <ContentMenuSection />
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <FileTree />
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+      {projects.currentProjectId && (
+        <>
+          <SidebarSeparator />
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <ContentMenuSection />
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <FileTree />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        </>
+      )}
     </Sidebar>
   );
 }
