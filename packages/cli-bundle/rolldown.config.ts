@@ -356,6 +356,28 @@ const patchRolldownBindingPlugin: Plugin = {
   },
 };
 
+// `parse-entities@2`'s package.json ships a `browser` field that swaps
+// `./decode-entity.js` (a static lookup table) for `./decode-entity.browser.js`,
+// which decodes via `document.createElement('i').innerHTML = '&...;'`. With
+// `platform: 'browser'` rolldown picks the browser variant, but the cli-bundle
+// runs in a Web Worker where `document` is undefined, so the markdown pipeline
+// throws `ReferenceError: document is not defined` as soon as it parses any
+// entity-bearing text. Replace the browser-variant module's body with the Node
+// version (pure JS lookup table), which works in workers.
+const undoParseEntitiesBrowserPlugin: Plugin = {
+  name: 'undo-parse-entities-browser',
+  load: {
+    filter: { id: /[\\/]parse-entities[\\/]decode-entity\.browser\.js$/ },
+    handler(id) {
+      const nodeVariant = id.replace(
+        /decode-entity\.browser\.js$/,
+        'decode-entity.js',
+      );
+      return fs.readFileSync(nodeVariant, 'utf8');
+    },
+  },
+};
+
 const copyWasmFilePlugin: Plugin = {
   name: 'copy-wasm-file',
   generateBundle() {
@@ -458,6 +480,7 @@ const workerConfig = defineConfig({
     patchEmnapiEnvDetectionPlugin,
     redirectRolldownToBrowserPlugin,
     resolveImportMetaPlugin,
+    undoParseEntitiesBrowserPlugin,
     copyWasmFilePlugin,
     visualizer() as Plugin,
   ],

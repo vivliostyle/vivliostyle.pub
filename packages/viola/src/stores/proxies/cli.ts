@@ -1,7 +1,6 @@
 import * as Comlink from 'comlink';
 import { proxy, ref } from 'valtio';
 
-import { awaiter } from '../../libs/awaiter';
 import type { Sandbox } from './sandbox';
 
 export type RemoteCli = Comlink.Remote<typeof import('@v/cli-bundle')>;
@@ -16,22 +15,20 @@ export class Cli {
   viewerIframeElement: HTMLIFrameElement | undefined;
 
   protected sandbox: Sandbox;
-  protected remoteAbortController: AbortController | undefined;
-  protected lazyRemotePromise: Promise<RemoteCli> | undefined;
+  protected remoteDeferred: PromiseWithResolvers<RemoteCli> | undefined;
   protected lazyViewerUrlPromise: Promise<string> | undefined;
 
   protected constructor(sandbox: Sandbox) {
     this.sandbox = ref(sandbox);
   }
 
-  createRemotePromise() {
-    this.remoteAbortController ??= ref(new AbortController());
-    this.lazyRemotePromise ??= awaiter({
-      getter: () => Cli.remoteMap.get(this.sandbox.iframeOrigin),
-      name: 'createRemoteResolver',
-      abortSignal: this.remoteAbortController.signal,
-    });
-    return this.lazyRemotePromise;
+  createRemotePromise(): Promise<RemoteCli> {
+    const existing = Cli.remoteMap.get(this.sandbox.iframeOrigin);
+    if (existing) {
+      return Promise.resolve(existing);
+    }
+    this.remoteDeferred ??= ref(Promise.withResolvers<RemoteCli>());
+    return this.remoteDeferred.promise;
   }
 
   createViewerUrlPromise() {
@@ -47,7 +44,8 @@ export class Cli {
     return {
       resolve: (value: RemoteCli) => {
         Cli.remoteMap.set(this.sandbox.iframeOrigin, value);
-        this.remoteAbortController = undefined;
+        this.remoteDeferred?.resolve(value);
+        this.remoteDeferred = undefined;
       },
       reset: () => {
         this.disposeRemote();
@@ -61,8 +59,8 @@ export class Cli {
       remote[Comlink.releaseProxy]();
       Cli.remoteMap.delete(this.sandbox.iframeOrigin);
     }
-    this.remoteAbortController?.abort();
-    this.lazyRemotePromise = undefined;
+    this.remoteDeferred?.reject(new Error('CLI remote disposed'));
+    this.remoteDeferred = undefined;
     this.lazyViewerUrlPromise = undefined;
   }
 

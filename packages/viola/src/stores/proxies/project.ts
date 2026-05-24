@@ -7,7 +7,7 @@ import { deepClone } from 'valtio/utils';
 import { setupEditor } from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
 import { Content, type ContentId } from './content';
-import { Sandbox } from './sandbox';
+import { Sandbox, SandboxFile } from './sandbox';
 import { Theme } from './theme';
 
 function detectBrowserLanguage(): string {
@@ -167,7 +167,13 @@ export class Project {
       });
     }
     this.content.readingOrder = readingOrder;
-    this.theme.customCss = await sandbox.files['style.css'].text();
+    const styleCss = sandbox.files['style.css'];
+    if (styleCss) {
+      this.theme.customCss = await styleCss.text();
+    } else {
+      this.theme.customCss = '';
+      sandbox.files['style.css'] = ref(new SandboxFile('text/css', ''));
+    }
     if (
       Array.isArray(sandbox.vivliostyleConfig.theme) &&
       sandbox.vivliostyleConfig.theme[0] in Theme.officialThemes
