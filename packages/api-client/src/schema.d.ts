@@ -337,9 +337,9 @@ export interface operations {
                     codeChallenge: string;
                     /**
                      * @default S256
-                     * @enum {string}
+                     * @constant
                      */
-                    codeChallengeMethod?: "S256" | "plain";
+                    codeChallengeMethod?: "S256";
                     scope?: string;
                     state?: string;
                     username: string;

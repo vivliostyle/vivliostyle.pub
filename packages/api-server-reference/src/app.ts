@@ -1,9 +1,15 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { createMiddleware } from 'hono/factory';
 import { openAPIRouteHandler } from 'hono-openapi';
 
 import { bearerAuth } from './auth-middleware';
-import { type Deps, defaultConfig, type ServerConfig } from './deps';
+import {
+  type AuthEnv,
+  type Deps,
+  defaultConfig,
+  type ServerConfig,
+} from './deps';
 import { openApiDocumentation } from './openapi';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
@@ -47,8 +53,16 @@ export function createApp(options: CreateAppOptions = {}) {
   // All project-scoped routes require a valid bearer token. Scoping the
   // middleware to the prefix (rather than `use('*')` inside each sub-app)
   // keeps it from leaking onto sibling routes such as `/openapi`.
-  app.use('/projects', bearerAuth(store));
-  app.use('/projects/*', bearerAuth(store));
+  const requireBearer = bearerAuth(store);
+  // The realtime WebSocket endpoint (/projects/:id/sync/ws, registered by the
+  // Node entrypoint) authenticates with a query-string token because browsers
+  // cannot set the Authorization header on a WebSocket handshake, so it must
+  // bypass this header-based guard.
+  const projectAuth = createMiddleware<AuthEnv>((c, next) =>
+    c.req.path.endsWith('/sync/ws') ? next() : requireBearer(c, next),
+  );
+  app.use('/projects', projectAuth);
+  app.use('/projects/*', projectAuth);
   app.route('/', projectRoutes(deps));
   app.route('/', fileRoutes(deps));
   app.route('/', attachmentRoutes(deps));

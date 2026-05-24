@@ -39,12 +39,9 @@ export function pkceChallengeS256(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
-export function verifyPkce(
-  verifier: string,
-  challenge: string,
-  method: 'S256' | 'plain',
-): boolean {
-  const computed = method === 'S256' ? pkceChallengeS256(verifier) : verifier;
+export function verifyPkce(verifier: string, challenge: string): boolean {
+  // OAuth 2.1 mandates S256; the `plain` method is intentionally unsupported.
+  const computed = pkceChallengeS256(verifier);
   const a = Buffer.from(computed);
   const b = Buffer.from(challenge);
   return a.length === b.length && timingSafeEqual(a, b);

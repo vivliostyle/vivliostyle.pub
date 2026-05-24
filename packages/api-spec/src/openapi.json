@@ -49,7 +49,9 @@
     "/.well-known/vivliostyle-pub": {
       "get": {
         "operationId": "getWellKnownVivliostylePub",
-        "tags": ["capabilities"],
+        "tags": [
+          "capabilities"
+        ],
         "summary": "Server capabilities and supported API versions.",
         "responses": {
           "200": {
@@ -84,10 +86,19 @@
                           "type": "boolean"
                         }
                       },
-                      "required": ["sync", "attachments", "oauth"]
+                      "required": [
+                        "sync",
+                        "attachments",
+                        "oauth"
+                      ]
                     }
                   },
-                  "required": ["name", "version", "apiVersions", "features"]
+                  "required": [
+                    "name",
+                    "version",
+                    "apiVersions",
+                    "features"
+                  ]
                 }
               }
             }
@@ -98,7 +109,9 @@
     "/auth/register": {
       "post": {
         "operationId": "postAuthRegister",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Register a new user (reference-server convenience).",
         "responses": {
           "201": {
@@ -115,7 +128,10 @@
                       "type": "string"
                     }
                   },
-                  "required": ["id", "username"]
+                  "required": [
+                    "id",
+                    "username"
+                  ]
                 }
               }
             }
@@ -134,7 +150,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -158,7 +176,10 @@
                     "maxLength": 256
                   }
                 },
-                "required": ["username", "password"]
+                "required": [
+                  "username",
+                  "password"
+                ]
               }
             }
           }
@@ -168,7 +189,9 @@
     "/oauth/authorize": {
       "post": {
         "operationId": "postOauthAuthorize",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Issue an authorization code (OAuth 2.1 + PKCE).",
         "description": "The reference server validates credentials inline in place of an interactive consent screen.",
         "responses": {
@@ -189,7 +212,10 @@
                       "type": "string"
                     }
                   },
-                  "required": ["code", "redirectUri"]
+                  "required": [
+                    "code",
+                    "redirectUri"
+                  ]
                 }
               }
             }
@@ -208,7 +234,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -232,8 +260,7 @@
                     "type": "string"
                   },
                   "codeChallengeMethod": {
-                    "enum": ["S256", "plain"],
-                    "type": "string",
+                    "const": "S256",
                     "default": "S256"
                   },
                   "scope": {
@@ -265,7 +292,9 @@
     "/oauth/token": {
       "post": {
         "operationId": "postOauthToken",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Exchange an authorization code or refresh token for tokens.",
         "responses": {
           "200": {
@@ -315,7 +344,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -368,7 +399,11 @@
                         "type": "string"
                       }
                     },
-                    "required": ["grantType", "refreshToken", "clientId"]
+                    "required": [
+                      "grantType",
+                      "refreshToken",
+                      "clientId"
+                    ]
                   }
                 ]
               }
@@ -380,7 +415,9 @@
     "/oauth/refresh": {
       "post": {
         "operationId": "postOauthRefresh",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Refresh tokens (rotating refresh token).",
         "responses": {
           "200": {
@@ -430,7 +467,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -450,7 +489,10 @@
                     "type": "string"
                   }
                 },
-                "required": ["refreshToken", "clientId"]
+                "required": [
+                  "refreshToken",
+                  "clientId"
+                ]
               }
             }
           }
@@ -460,7 +502,9 @@
     "/oauth/session": {
       "delete": {
         "operationId": "deleteOauthSession",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Revoke the caller's tokens.",
         "security": [
           {
@@ -485,7 +529,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -496,7 +542,9 @@
     "/oauth/userinfo": {
       "get": {
         "operationId": "getOauthUserinfo",
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Get the authenticated user.",
         "security": [
           {
@@ -518,7 +566,10 @@
                       "type": "string"
                     }
                   },
-                  "required": ["id", "username"]
+                  "required": [
+                    "id",
+                    "username"
+                  ]
                 }
               }
             }
@@ -537,7 +588,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -548,7 +601,9 @@
     "/projects": {
       "get": {
         "operationId": "getProjects",
-        "tags": ["projects"],
+        "tags": [
+          "projects"
+        ],
         "summary": "List the authenticated user's projects.",
         "security": [
           {
@@ -587,11 +642,17 @@
                             "type": "number"
                           }
                         },
-                        "required": ["id", "createdAt", "updatedAt"]
+                        "required": [
+                          "id",
+                          "createdAt",
+                          "updatedAt"
+                        ]
                       }
                     }
                   },
-                  "required": ["projects"]
+                  "required": [
+                    "projects"
+                  ]
                 }
               }
             }
@@ -600,7 +661,9 @@
       },
       "post": {
         "operationId": "postProjects",
-        "tags": ["projects"],
+        "tags": [
+          "projects"
+        ],
         "summary": "Create a project.",
         "security": [
           {
@@ -634,7 +697,11 @@
                       "type": "number"
                     }
                   },
-                  "required": ["id", "createdAt", "updatedAt"]
+                  "required": [
+                    "id",
+                    "createdAt",
+                    "updatedAt"
+                  ]
                 }
               }
             }
@@ -667,7 +734,9 @@
     "/projects/{id}": {
       "get": {
         "operationId": "getProjectsById",
-        "tags": ["projects"],
+        "tags": [
+          "projects"
+        ],
         "summary": "Get project metadata.",
         "security": [
           {
@@ -701,7 +770,11 @@
                       "type": "number"
                     }
                   },
-                  "required": ["id", "createdAt", "updatedAt"]
+                  "required": [
+                    "id",
+                    "createdAt",
+                    "updatedAt"
+                  ]
                 }
               }
             }
@@ -720,7 +793,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -739,7 +814,9 @@
       },
       "put": {
         "operationId": "putProjectsById",
-        "tags": ["projects"],
+        "tags": [
+          "projects"
+        ],
         "summary": "Update project metadata.",
         "security": [
           {
@@ -773,7 +850,11 @@
                       "type": "number"
                     }
                   },
-                  "required": ["id", "createdAt", "updatedAt"]
+                  "required": [
+                    "id",
+                    "createdAt",
+                    "updatedAt"
+                  ]
                 }
               }
             }
@@ -792,7 +873,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -833,7 +916,9 @@
       },
       "delete": {
         "operationId": "deleteProjectsById",
-        "tags": ["projects"],
+        "tags": [
+          "projects"
+        ],
         "summary": "Delete a project.",
         "security": [
           {
@@ -858,7 +943,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -879,7 +966,9 @@
     "/projects/{id}/files": {
       "get": {
         "operationId": "getProjectsByIdFiles",
-        "tags": ["files"],
+        "tags": [
+          "files"
+        ],
         "summary": "List files in a project.",
         "security": [
           {
@@ -912,11 +1001,18 @@
                             "type": "number"
                           }
                         },
-                        "required": ["path", "size", "contentType", "updatedAt"]
+                        "required": [
+                          "path",
+                          "size",
+                          "contentType",
+                          "updatedAt"
+                        ]
                       }
                     }
                   },
-                  "required": ["files"]
+                  "required": [
+                    "files"
+                  ]
                 }
               }
             }
@@ -935,7 +1031,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -956,7 +1054,9 @@
     "/projects/{id}/files/{path}": {
       "get": {
         "operationId": "getProjectsByIdFilesByPath",
-        "tags": ["files"],
+        "tags": [
+          "files"
+        ],
         "summary": "Read a file.",
         "security": [
           {
@@ -989,7 +1089,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -1016,7 +1118,9 @@
       },
       "put": {
         "operationId": "putProjectsByIdFilesByPath",
-        "tags": ["files"],
+        "tags": [
+          "files"
+        ],
         "summary": "Create or replace a file.",
         "security": [
           {
@@ -1051,7 +1155,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -1078,7 +1184,9 @@
       },
       "delete": {
         "operationId": "deleteProjectsByIdFilesByPath",
-        "tags": ["files"],
+        "tags": [
+          "files"
+        ],
         "summary": "Delete a file.",
         "security": [
           {
@@ -1103,7 +1211,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -1132,7 +1242,9 @@
     "/projects/{id}/attachments/{sha256}": {
       "get": {
         "operationId": "getProjectsByIdAttachmentsBySha256",
-        "tags": ["attachments"],
+        "tags": [
+          "attachments"
+        ],
         "summary": "Read a content-addressed attachment.",
         "security": [
           {
@@ -1165,7 +1277,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -1192,7 +1306,9 @@
       },
       "put": {
         "operationId": "putProjectsByIdAttachmentsBySha256",
-        "tags": ["attachments"],
+        "tags": [
+          "attachments"
+        ],
         "summary": "Upload a content-addressed attachment.",
         "description": "The request body must hash (SHA-256, hex) to the path parameter.",
         "security": [
@@ -1225,7 +1341,10 @@
                       "type": "number"
                     }
                   },
-                  "required": ["sha256", "size"]
+                  "required": [
+                    "sha256",
+                    "size"
+                  ]
                 }
               }
             }
@@ -1244,7 +1363,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -1263,7 +1384,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -1292,7 +1415,9 @@
     "/projects/{id}/sync": {
       "get": {
         "operationId": "getProjectsByIdSync",
-        "tags": ["sync"],
+        "tags": [
+          "sync"
+        ],
         "summary": "Fetch the Yjs update missing from the client state vector.",
         "security": [
           {
@@ -1344,7 +1469,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -1353,7 +1480,9 @@
       },
       "post": {
         "operationId": "postProjectsByIdSync",
-        "tags": ["sync"],
+        "tags": [
+          "sync"
+        ],
         "summary": "Apply a Yjs update and receive the merged diff in return.",
         "security": [
           {
@@ -1415,7 +1544,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["error"]
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }

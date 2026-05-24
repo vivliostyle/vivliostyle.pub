@@ -18,7 +18,7 @@ export const AuthorizeRequestSchema = v.object({
   clientId: v.string(),
   redirectUri: v.pipe(v.string(), v.url()),
   codeChallenge: v.string(),
-  codeChallengeMethod: v.optional(v.picklist(['S256', 'plain']), 'S256'),
+  codeChallengeMethod: v.optional(v.literal('S256'), 'S256'),
   scope: v.optional(v.string()),
   state: v.optional(v.string()),
   username: v.string(),

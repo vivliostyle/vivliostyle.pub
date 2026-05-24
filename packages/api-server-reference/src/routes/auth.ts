@@ -113,7 +113,6 @@ export function authRoutes({ store, config }: Deps) {
         clientId: body.clientId,
         redirectUri: body.redirectUri,
         codeChallenge: body.codeChallenge,
-        codeChallengeMethod: body.codeChallengeMethod,
         scope: body.scope,
         expiresAt: Date.now() + config.authCodeTtlMs,
       });
@@ -160,13 +159,7 @@ export function authRoutes({ store, config }: Deps) {
             400,
           );
         }
-        if (
-          !verifyPkce(
-            body.codeVerifier,
-            authCode.codeChallenge,
-            authCode.codeChallengeMethod,
-          )
-        ) {
+        if (!verifyPkce(body.codeVerifier, authCode.codeChallenge)) {
           return c.json(
             { error: 'invalid_grant', message: 'PKCE verification failed' },
             400,
@@ -178,7 +171,11 @@ export function authRoutes({ store, config }: Deps) {
         );
       }
       const refresh = store.takeRefreshToken(body.refreshToken);
-      if (!refresh || refresh.expiresAt < Date.now()) {
+      if (
+        !refresh ||
+        refresh.expiresAt < Date.now() ||
+        refresh.clientId !== body.clientId
+      ) {
         return c.json(
           { error: 'invalid_grant', message: 'refresh token invalid' },
           400,

@@ -61,19 +61,19 @@ export class AuthClient {
   private async post<T>(
     path: string,
     body: unknown,
-    accessToken?: string,
   ): Promise<{ status: number; data: T | undefined }> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      // Network failure: report a non-HTTP status so callers can distinguish
+      // it from a server rejection.
+      return { status: 0, data: undefined };
     }
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
     const data = res.ok ? ((await res.json()) as T) : undefined;
     return { status: res.status, data };
   }
@@ -134,11 +134,15 @@ export class AuthClient {
       refreshToken: current.refreshToken,
       clientId: this.clientId,
     });
-    if (!token.data) {
-      await this.store.clear();
-      return null;
+    if (token.data) {
+      return this.persist(token.data);
     }
-    return this.persist(token.data);
+    // Only discard credentials when the server definitively rejects the
+    // refresh token. Transient failures (network/5xx) keep them for a retry.
+    if (token.status === 400 || token.status === 401) {
+      await this.store.clear();
+    }
+    return null;
   }
 
   refresh(): Promise<StoredTokens | null> {
@@ -160,7 +164,17 @@ export class AuthClient {
       return current.accessToken;
     }
     const refreshed = await this.refresh();
-    return refreshed?.accessToken ?? null;
+    if (refreshed) {
+      return refreshed.accessToken;
+    }
+    // Refresh failed. On a transient failure the tokens are still present, so
+    // fall back to the current access token while it is genuinely valid (only
+    // the skew window has elapsed, not the real expiry).
+    const latest = await this.store.load();
+    if (latest && Date.now() < latest.accessTokenExpiresAt) {
+      return latest.accessToken;
+    }
+    return null;
   }
 
   /** Bound `() => Promise<string | null>` for use as an ApiClient token provider. */
@@ -185,16 +199,21 @@ export class AuthClient {
   async logout(): Promise<void> {
     const current = await this.store.load();
     if (current?.accessToken) {
-      await this.fetchImpl(`${this.baseUrl}/oauth/session`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${current.accessToken}` },
-      });
+      try {
+        await this.fetchImpl(`${this.baseUrl}/oauth/session`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${current.accessToken}` },
+        });
+      } catch {
+        // Best-effort revocation; clear local tokens regardless.
+      }
     }
     await this.store.clear();
   }
 
-  isAuthenticated(): Promise<boolean> {
-    return this.store.load().then((tokens) => tokens !== null);
+  /** True when a usable access token is available (refreshing if needed). */
+  async isAuthenticated(): Promise<boolean> {
+    return (await this.getAccessToken()) !== null;
   }
 }
 

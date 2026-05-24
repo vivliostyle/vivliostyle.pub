@@ -27,6 +27,7 @@ export class WebSocketSyncProvider extends BaseSyncProvider {
   private readonly origin = Symbol('websocket');
   private ws: WebSocket | undefined;
   private disposed = false;
+  private errored = false;
 
   constructor(options: WebSocketSyncOptions) {
     super();
@@ -76,6 +77,7 @@ export class WebSocketSyncProvider extends BaseSyncProvider {
 
   async connect(): Promise<void> {
     this.disposed = false;
+    this.errored = false;
     this.setStatus('connecting');
     const url = await this.resolveUrl();
     if (this.disposed) {
@@ -98,10 +100,13 @@ export class WebSocketSyncProvider extends BaseSyncProvider {
     });
     ws.addEventListener('close', () => {
       if (!this.disposed) {
-        this.setStatus('disconnected');
+        // A WebSocket error is always followed by close; preserve the error
+        // status instead of overwriting it with 'disconnected'.
+        this.setStatus(this.errored ? 'error' : 'disconnected');
       }
     });
     ws.addEventListener('error', () => {
+      this.errored = true;
       this.setStatus('error');
     });
   }

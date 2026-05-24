@@ -13,7 +13,6 @@ export interface AuthCode {
   clientId: string;
   redirectUri: string;
   codeChallenge: string;
-  codeChallengeMethod: 'S256' | 'plain';
   scope?: string;
   expiresAt: number;
 }
@@ -174,7 +173,12 @@ export class InMemoryStore implements Store {
   }
 
   findAccessToken(token: string): AccessToken | undefined {
-    return this.accessTokens.get(token);
+    const accessToken = this.accessTokens.get(token);
+    if (accessToken && accessToken.expiresAt < Date.now()) {
+      this.accessTokens.delete(token);
+      return undefined;
+    }
+    return accessToken;
   }
 
   listProjects(ownerId: string): ProjectRecord[] {

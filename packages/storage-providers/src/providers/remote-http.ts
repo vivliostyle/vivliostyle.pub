@@ -241,11 +241,13 @@ export class RemoteHttpStorageProvider implements StorageProvider {
         if (prefix && !file.path.startsWith(prefix)) {
           return;
         }
-        if (ignore.some((re) => re.test(file.path))) {
-          return;
-        }
         const rel = file.path.slice(prefix.length);
         if (!rel) {
+          return;
+        }
+        // Match OPFSStorageProvider: ignore patterns apply to the path
+        // relative to the snapshot base, not the project-root path.
+        if (ignore.some((re) => re.test(rel))) {
           return;
         }
         const bytes = await this.api.readFile(this.projectId, file.path);

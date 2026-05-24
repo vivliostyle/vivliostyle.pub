@@ -47,13 +47,17 @@ export function syncRoutes({ store, docs }: Deps) {
       if (!owns(c.get('userId'), projectId)) {
         return c.json({ error: 'not_found' }, 404);
       }
-      const update = docs.encodeStateAsUpdate(
-        projectId,
-        parseStateVector(c.req.query('sv')),
-      );
-      return c.body(toArrayBuffer(update), 200, {
-        'Content-Type': 'application/octet-stream',
-      });
+      try {
+        const update = docs.encodeStateAsUpdate(
+          projectId,
+          parseStateVector(c.req.query('sv')),
+        );
+        return c.body(toArrayBuffer(update), 200, {
+          'Content-Type': 'application/octet-stream',
+        });
+      } catch {
+        return c.json({ error: 'invalid_state_vector' }, 400);
+      }
     },
   );
 
@@ -84,16 +88,20 @@ export function syncRoutes({ store, docs }: Deps) {
         return c.json({ error: 'not_found' }, 404);
       }
       const update = new Uint8Array(await c.req.arrayBuffer());
-      if (update.byteLength > 0) {
-        docs.applyUpdate(projectId, update, 'http');
+      try {
+        if (update.byteLength > 0) {
+          docs.applyUpdate(projectId, update, 'http');
+        }
+        const diff = docs.encodeStateAsUpdate(
+          projectId,
+          parseStateVector(c.req.query('sv')),
+        );
+        return c.body(toArrayBuffer(diff), 200, {
+          'Content-Type': 'application/octet-stream',
+        });
+      } catch {
+        return c.json({ error: 'invalid_update' }, 400);
       }
-      const diff = docs.encodeStateAsUpdate(
-        projectId,
-        parseStateVector(c.req.query('sv')),
-      );
-      return c.body(toArrayBuffer(diff), 200, {
-        'Content-Type': 'application/octet-stream',
-      });
     },
   );
 

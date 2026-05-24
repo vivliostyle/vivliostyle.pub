@@ -153,7 +153,7 @@ export class ApiClient {
     const { error, response } = await this.client.DELETE('/projects/{id}', {
       params: { path: { id: projectId } },
     });
-    if (error) {
+    if (!response.ok) {
       throw new ApiError('Failed to delete project', response.status, error);
     }
   }
@@ -163,7 +163,7 @@ export class ApiClient {
       '/projects/{id}/files',
       { params: { path: { id: projectId } } },
     );
-    if (error || !data) {
+    if (!response.ok || !data) {
       throw new ApiError('Failed to list files', response.status, error);
     }
     return data.files;
