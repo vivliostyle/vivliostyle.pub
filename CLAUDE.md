@@ -56,6 +56,16 @@ Single-package and single-test invocations:
 
 The `secrets/` directory is gitignored, and agent sandboxes are configured to deny reads from it. Agents must not attempt to bypass that restriction.
 
+### Before starting the dev server
+
+Before running `pnpm dev` (or any other long-running server like `vite`/`wrangler dev`), always check whether the user already has one running. Examples of cheap checks:
+
+- `lsof -iTCP:5173 -sTCP:LISTEN` (or whichever port the server uses)
+- `ps -A | grep -E 'vite|wrangler'`
+- Ask the user if unsure.
+
+Spawning a second dev server on top of an existing one wastes the user's time, can cause port collisions, and may interfere with their in-progress browser session.
+
 ## Architecture
 
 ### Why this is unusual
