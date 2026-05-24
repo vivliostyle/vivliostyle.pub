@@ -10,7 +10,6 @@
   },
   "scripts": {
     "start": "node --import tsx src/server.ts",
-    "generate-spec": "node --import tsx scripts/generate-spec.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

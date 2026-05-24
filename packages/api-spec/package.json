@@ -9,6 +9,8 @@
     "./openapi.json": "./src/openapi.json"
   },
   "scripts": {
+    "build": "node --import tsx scripts/generate.ts",
+    "generate": "node --import tsx scripts/generate.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -16,6 +18,7 @@
     "@types/node": "catalog:",
     "@v/api-server-reference": "workspace:*",
     "@v/config": "workspace:*",
+    "tsx": "catalog:",
     "vitest": "catalog:"
   }
 }
