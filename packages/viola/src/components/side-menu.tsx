@@ -37,6 +37,7 @@ import {
   ChevronDown,
   CirclePlus,
   FilePlus,
+  FolderOpen,
   ImageIcon,
   MoreHorizontal,
   Palette,
@@ -92,6 +93,12 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
+        <DropdownMenuItem asChild>
+          <Link to="/">
+            <FolderOpen />
+            <span>Open Project</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link to="/new-project">
             <FilePlus />
