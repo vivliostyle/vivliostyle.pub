@@ -28,7 +28,6 @@ import { usePromiseState } from '../../../hooks/use-promise-state';
 import { generateProjectId } from '../../../libs/generate-id';
 import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
-import type { ProjectId } from '../../../stores/proxies/project';
 import { Theme } from '../../../stores/proxies/theme';
 import { TemplateStoreMolecule } from './store';
 
@@ -176,7 +175,7 @@ export function ProjectDetailForm() {
         }
         startTransition(async () => {
           await setupProjectFromDraft({
-            projectId: generateProjectId<ProjectId>(),
+            projectId: generateProjectId(),
             templateValue,
           });
           const project = $project.valueOrThrow();
