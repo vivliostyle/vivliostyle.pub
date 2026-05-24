@@ -12,12 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as mainLayoutRouteImport } from './routes/(main)/_layout'
 import { Route as DebugAstViewerIndexRouteImport } from './routes/debug/ast-viewer/index'
 import { Route as mainLayoutIndexRouteImport } from './routes/(main)/_layout/index'
-import { Route as mainLayoutThemeRouteImport } from './routes/(main)/_layout/theme'
-import { Route as mainLayoutPreviewRouteImport } from './routes/(main)/_layout/preview'
 import { Route as mainLayoutNewProjectRouteImport } from './routes/(main)/_layout/new-project'
-import { Route as mainLayoutMediaRouteImport } from './routes/(main)/_layout/media'
-import { Route as mainLayoutBibliographyRouteImport } from './routes/(main)/_layout/bibliography'
-import { Route as mainLayoutEditSplatRouteImport } from './routes/(main)/_layout/edit/$'
+import { Route as mainLayoutProjectsProjectIdIndexRouteImport } from './routes/(main)/_layout/projects/$projectId/index'
+import { Route as mainLayoutProjectsProjectIdThemeRouteImport } from './routes/(main)/_layout/projects/$projectId/theme'
+import { Route as mainLayoutProjectsProjectIdPreviewRouteImport } from './routes/(main)/_layout/projects/$projectId/preview'
+import { Route as mainLayoutProjectsProjectIdMediaRouteImport } from './routes/(main)/_layout/projects/$projectId/media'
+import { Route as mainLayoutProjectsProjectIdBibliographyRouteImport } from './routes/(main)/_layout/projects/$projectId/bibliography'
+import { Route as mainLayoutProjectsProjectIdEditSplatRouteImport } from './routes/(main)/_layout/projects/$projectId/edit/$'
 
 const mainLayoutRoute = mainLayoutRouteImport.update({
   id: '/(main)/_layout',
@@ -33,101 +34,118 @@ const mainLayoutIndexRoute = mainLayoutIndexRouteImport.update({
   path: '/',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-const mainLayoutThemeRoute = mainLayoutThemeRouteImport.update({
-  id: '/theme',
-  path: '/theme',
-  getParentRoute: () => mainLayoutRoute,
-} as any)
-const mainLayoutPreviewRoute = mainLayoutPreviewRouteImport.update({
-  id: '/preview',
-  path: '/preview',
-  getParentRoute: () => mainLayoutRoute,
-} as any)
 const mainLayoutNewProjectRoute = mainLayoutNewProjectRouteImport.update({
   id: '/new-project',
   path: '/new-project',
   getParentRoute: () => mainLayoutRoute,
 } as any)
-const mainLayoutMediaRoute = mainLayoutMediaRouteImport.update({
-  id: '/media',
-  path: '/media',
-  getParentRoute: () => mainLayoutRoute,
-} as any)
-const mainLayoutBibliographyRoute = mainLayoutBibliographyRouteImport.update({
-  id: '/bibliography',
-  path: '/bibliography',
-  getParentRoute: () => mainLayoutRoute,
-} as any)
-const mainLayoutEditSplatRoute = mainLayoutEditSplatRouteImport.update({
-  id: '/edit/$',
-  path: '/edit/$',
-  getParentRoute: () => mainLayoutRoute,
-} as any)
+const mainLayoutProjectsProjectIdIndexRoute =
+  mainLayoutProjectsProjectIdIndexRouteImport.update({
+    id: '/projects/$projectId/',
+    path: '/projects/$projectId/',
+    getParentRoute: () => mainLayoutRoute,
+  } as any)
+const mainLayoutProjectsProjectIdThemeRoute =
+  mainLayoutProjectsProjectIdThemeRouteImport.update({
+    id: '/projects/$projectId/theme',
+    path: '/projects/$projectId/theme',
+    getParentRoute: () => mainLayoutRoute,
+  } as any)
+const mainLayoutProjectsProjectIdPreviewRoute =
+  mainLayoutProjectsProjectIdPreviewRouteImport.update({
+    id: '/projects/$projectId/preview',
+    path: '/projects/$projectId/preview',
+    getParentRoute: () => mainLayoutRoute,
+  } as any)
+const mainLayoutProjectsProjectIdMediaRoute =
+  mainLayoutProjectsProjectIdMediaRouteImport.update({
+    id: '/projects/$projectId/media',
+    path: '/projects/$projectId/media',
+    getParentRoute: () => mainLayoutRoute,
+  } as any)
+const mainLayoutProjectsProjectIdBibliographyRoute =
+  mainLayoutProjectsProjectIdBibliographyRouteImport.update({
+    id: '/projects/$projectId/bibliography',
+    path: '/projects/$projectId/bibliography',
+    getParentRoute: () => mainLayoutRoute,
+  } as any)
+const mainLayoutProjectsProjectIdEditSplatRoute =
+  mainLayoutProjectsProjectIdEditSplatRouteImport.update({
+    id: '/projects/$projectId/edit/$',
+    path: '/projects/$projectId/edit/$',
+    getParentRoute: () => mainLayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/bibliography': typeof mainLayoutBibliographyRoute
-  '/media': typeof mainLayoutMediaRoute
   '/new-project': typeof mainLayoutNewProjectRoute
-  '/preview': typeof mainLayoutPreviewRoute
-  '/theme': typeof mainLayoutThemeRoute
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
-  '/edit/$': typeof mainLayoutEditSplatRoute
+  '/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
+  '/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
+  '/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
+  '/projects/$projectId/theme': typeof mainLayoutProjectsProjectIdThemeRoute
+  '/projects/$projectId/': typeof mainLayoutProjectsProjectIdIndexRoute
+  '/projects/$projectId/edit/$': typeof mainLayoutProjectsProjectIdEditSplatRoute
 }
 export interface FileRoutesByTo {
-  '/bibliography': typeof mainLayoutBibliographyRoute
-  '/media': typeof mainLayoutMediaRoute
   '/new-project': typeof mainLayoutNewProjectRoute
-  '/preview': typeof mainLayoutPreviewRoute
-  '/theme': typeof mainLayoutThemeRoute
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
-  '/edit/$': typeof mainLayoutEditSplatRoute
+  '/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
+  '/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
+  '/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
+  '/projects/$projectId/theme': typeof mainLayoutProjectsProjectIdThemeRoute
+  '/projects/$projectId': typeof mainLayoutProjectsProjectIdIndexRoute
+  '/projects/$projectId/edit/$': typeof mainLayoutProjectsProjectIdEditSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(main)/_layout': typeof mainLayoutRouteWithChildren
-  '/(main)/_layout/bibliography': typeof mainLayoutBibliographyRoute
-  '/(main)/_layout/media': typeof mainLayoutMediaRoute
   '/(main)/_layout/new-project': typeof mainLayoutNewProjectRoute
-  '/(main)/_layout/preview': typeof mainLayoutPreviewRoute
-  '/(main)/_layout/theme': typeof mainLayoutThemeRoute
   '/(main)/_layout/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
-  '/(main)/_layout/edit/$': typeof mainLayoutEditSplatRoute
+  '/(main)/_layout/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
+  '/(main)/_layout/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
+  '/(main)/_layout/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
+  '/(main)/_layout/projects/$projectId/theme': typeof mainLayoutProjectsProjectIdThemeRoute
+  '/(main)/_layout/projects/$projectId/': typeof mainLayoutProjectsProjectIdIndexRoute
+  '/(main)/_layout/projects/$projectId/edit/$': typeof mainLayoutProjectsProjectIdEditSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/bibliography'
-    | '/media'
     | '/new-project'
-    | '/preview'
-    | '/theme'
     | '/'
     | '/debug/ast-viewer/'
-    | '/edit/$'
+    | '/projects/$projectId/bibliography'
+    | '/projects/$projectId/media'
+    | '/projects/$projectId/preview'
+    | '/projects/$projectId/theme'
+    | '/projects/$projectId/'
+    | '/projects/$projectId/edit/$'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/bibliography'
-    | '/media'
     | '/new-project'
-    | '/preview'
-    | '/theme'
     | '/'
     | '/debug/ast-viewer'
-    | '/edit/$'
+    | '/projects/$projectId/bibliography'
+    | '/projects/$projectId/media'
+    | '/projects/$projectId/preview'
+    | '/projects/$projectId/theme'
+    | '/projects/$projectId'
+    | '/projects/$projectId/edit/$'
   id:
     | '__root__'
     | '/(main)/_layout'
-    | '/(main)/_layout/bibliography'
-    | '/(main)/_layout/media'
     | '/(main)/_layout/new-project'
-    | '/(main)/_layout/preview'
-    | '/(main)/_layout/theme'
     | '/(main)/_layout/'
     | '/debug/ast-viewer/'
-    | '/(main)/_layout/edit/$'
+    | '/(main)/_layout/projects/$projectId/bibliography'
+    | '/(main)/_layout/projects/$projectId/media'
+    | '/(main)/_layout/projects/$projectId/preview'
+    | '/(main)/_layout/projects/$projectId/theme'
+    | '/(main)/_layout/projects/$projectId/'
+    | '/(main)/_layout/projects/$projectId/edit/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -158,20 +176,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof mainLayoutIndexRouteImport
       parentRoute: typeof mainLayoutRoute
     }
-    '/(main)/_layout/theme': {
-      id: '/(main)/_layout/theme'
-      path: '/theme'
-      fullPath: '/theme'
-      preLoaderRoute: typeof mainLayoutThemeRouteImport
-      parentRoute: typeof mainLayoutRoute
-    }
-    '/(main)/_layout/preview': {
-      id: '/(main)/_layout/preview'
-      path: '/preview'
-      fullPath: '/preview'
-      preLoaderRoute: typeof mainLayoutPreviewRouteImport
-      parentRoute: typeof mainLayoutRoute
-    }
     '/(main)/_layout/new-project': {
       id: '/(main)/_layout/new-project'
       path: '/new-project'
@@ -179,48 +183,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof mainLayoutNewProjectRouteImport
       parentRoute: typeof mainLayoutRoute
     }
-    '/(main)/_layout/media': {
-      id: '/(main)/_layout/media'
-      path: '/media'
-      fullPath: '/media'
-      preLoaderRoute: typeof mainLayoutMediaRouteImport
+    '/(main)/_layout/projects/$projectId/': {
+      id: '/(main)/_layout/projects/$projectId/'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId/'
+      preLoaderRoute: typeof mainLayoutProjectsProjectIdIndexRouteImport
       parentRoute: typeof mainLayoutRoute
     }
-    '/(main)/_layout/bibliography': {
-      id: '/(main)/_layout/bibliography'
-      path: '/bibliography'
-      fullPath: '/bibliography'
-      preLoaderRoute: typeof mainLayoutBibliographyRouteImport
+    '/(main)/_layout/projects/$projectId/theme': {
+      id: '/(main)/_layout/projects/$projectId/theme'
+      path: '/projects/$projectId/theme'
+      fullPath: '/projects/$projectId/theme'
+      preLoaderRoute: typeof mainLayoutProjectsProjectIdThemeRouteImport
       parentRoute: typeof mainLayoutRoute
     }
-    '/(main)/_layout/edit/$': {
-      id: '/(main)/_layout/edit/$'
-      path: '/edit/$'
-      fullPath: '/edit/$'
-      preLoaderRoute: typeof mainLayoutEditSplatRouteImport
+    '/(main)/_layout/projects/$projectId/preview': {
+      id: '/(main)/_layout/projects/$projectId/preview'
+      path: '/projects/$projectId/preview'
+      fullPath: '/projects/$projectId/preview'
+      preLoaderRoute: typeof mainLayoutProjectsProjectIdPreviewRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
+    '/(main)/_layout/projects/$projectId/media': {
+      id: '/(main)/_layout/projects/$projectId/media'
+      path: '/projects/$projectId/media'
+      fullPath: '/projects/$projectId/media'
+      preLoaderRoute: typeof mainLayoutProjectsProjectIdMediaRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
+    '/(main)/_layout/projects/$projectId/bibliography': {
+      id: '/(main)/_layout/projects/$projectId/bibliography'
+      path: '/projects/$projectId/bibliography'
+      fullPath: '/projects/$projectId/bibliography'
+      preLoaderRoute: typeof mainLayoutProjectsProjectIdBibliographyRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
+    '/(main)/_layout/projects/$projectId/edit/$': {
+      id: '/(main)/_layout/projects/$projectId/edit/$'
+      path: '/projects/$projectId/edit/$'
+      fullPath: '/projects/$projectId/edit/$'
+      preLoaderRoute: typeof mainLayoutProjectsProjectIdEditSplatRouteImport
       parentRoute: typeof mainLayoutRoute
     }
   }
 }
 
 interface mainLayoutRouteChildren {
-  mainLayoutBibliographyRoute: typeof mainLayoutBibliographyRoute
-  mainLayoutMediaRoute: typeof mainLayoutMediaRoute
   mainLayoutNewProjectRoute: typeof mainLayoutNewProjectRoute
-  mainLayoutPreviewRoute: typeof mainLayoutPreviewRoute
-  mainLayoutThemeRoute: typeof mainLayoutThemeRoute
   mainLayoutIndexRoute: typeof mainLayoutIndexRoute
-  mainLayoutEditSplatRoute: typeof mainLayoutEditSplatRoute
+  mainLayoutProjectsProjectIdBibliographyRoute: typeof mainLayoutProjectsProjectIdBibliographyRoute
+  mainLayoutProjectsProjectIdMediaRoute: typeof mainLayoutProjectsProjectIdMediaRoute
+  mainLayoutProjectsProjectIdPreviewRoute: typeof mainLayoutProjectsProjectIdPreviewRoute
+  mainLayoutProjectsProjectIdThemeRoute: typeof mainLayoutProjectsProjectIdThemeRoute
+  mainLayoutProjectsProjectIdIndexRoute: typeof mainLayoutProjectsProjectIdIndexRoute
+  mainLayoutProjectsProjectIdEditSplatRoute: typeof mainLayoutProjectsProjectIdEditSplatRoute
 }
 
 const mainLayoutRouteChildren: mainLayoutRouteChildren = {
-  mainLayoutBibliographyRoute: mainLayoutBibliographyRoute,
-  mainLayoutMediaRoute: mainLayoutMediaRoute,
   mainLayoutNewProjectRoute: mainLayoutNewProjectRoute,
-  mainLayoutPreviewRoute: mainLayoutPreviewRoute,
-  mainLayoutThemeRoute: mainLayoutThemeRoute,
   mainLayoutIndexRoute: mainLayoutIndexRoute,
-  mainLayoutEditSplatRoute: mainLayoutEditSplatRoute,
+  mainLayoutProjectsProjectIdBibliographyRoute:
+    mainLayoutProjectsProjectIdBibliographyRoute,
+  mainLayoutProjectsProjectIdMediaRoute: mainLayoutProjectsProjectIdMediaRoute,
+  mainLayoutProjectsProjectIdPreviewRoute:
+    mainLayoutProjectsProjectIdPreviewRoute,
+  mainLayoutProjectsProjectIdThemeRoute: mainLayoutProjectsProjectIdThemeRoute,
+  mainLayoutProjectsProjectIdIndexRoute: mainLayoutProjectsProjectIdIndexRoute,
+  mainLayoutProjectsProjectIdEditSplatRoute:
+    mainLayoutProjectsProjectIdEditSplatRoute,
 }
 
 const mainLayoutRouteWithChildren = mainLayoutRoute._addFileChildren(

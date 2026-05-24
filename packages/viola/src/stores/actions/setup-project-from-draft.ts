@@ -4,6 +4,7 @@ import { deepClone } from 'valtio/utils';
 import { $draftProject, $projects } from '../accessors';
 import { Project, type ProjectId } from '../proxies/project';
 import { Sandbox } from '../proxies/sandbox';
+import { discoverProjects } from './discover-projects';
 
 export async function setupProjectFromDraft({
   projectId,
@@ -47,4 +48,5 @@ export async function setupProjectFromDraft({
   ]);
 
   $projects.currentProjectId = projectId;
+  await discoverProjects();
 }

@@ -35,8 +35,16 @@ const initialTocState = {
   sectionDepth: 0,
 };
 
+export interface ProjectEntry {
+  projectId: ProjectId;
+  title?: string;
+  author?: string;
+  updatedAt?: number;
+}
+
 export const projects = proxy({
   value: {} as Record<ProjectId, Project>,
+  entries: {} as Record<ProjectId, ProjectEntry>,
   currentProjectId: null as ProjectId | null,
 });
 

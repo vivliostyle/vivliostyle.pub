@@ -1,6 +1,8 @@
 import { customAlphabet, urlAlphabet } from 'nanoid';
 import { alphanumeric } from 'nanoid-dictionary';
 
+import type { ProjectId } from '../stores/proxies/project';
+
 const nanoid = customAlphabet(urlAlphabet);
 
 export function generateId<T extends string>(): T {
@@ -21,8 +23,8 @@ const projectIdNanoid = customAlphabet(
   25,
 );
 
-export function generateProjectId<T extends string>(): T {
-  return projectIdNanoid() as T;
+export function generateProjectId(): ProjectId {
+  return projectIdNanoid() as ProjectId;
 }
 
 const getRandomAlphanumeric = customAlphabet(alphanumeric);

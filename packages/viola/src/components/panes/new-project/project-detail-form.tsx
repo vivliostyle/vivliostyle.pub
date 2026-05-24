@@ -25,9 +25,9 @@ import { cn } from '@v/ui/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@v/ui/popover';
 import { useLiveInputField } from '../../../hooks/use-live-field';
 import { usePromiseState } from '../../../hooks/use-promise-state';
+import { generateProjectId } from '../../../libs/generate-id';
 import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
-import type { ProjectId } from '../../../stores/proxies/project';
 import { Theme } from '../../../stores/proxies/theme';
 import { TemplateStoreMolecule } from './store';
 
@@ -174,8 +174,9 @@ export function ProjectDetailForm() {
           return;
         }
         startTransition(async () => {
+          const projectId = generateProjectId();
           await setupProjectFromDraft({
-            projectId: 'alpha-v1' as ProjectId,
+            projectId,
             templateValue,
           });
           const project = $project.valueOrThrow();
@@ -183,8 +184,9 @@ export function ProjectDetailForm() {
           const file = project.content.files.get(contentId);
           invariant(file, 'First content file not found');
           navigate({
-            to: '/edit/$',
+            to: '/projects/$projectId/edit/$',
             params: {
+              projectId,
               _splat: file.filename,
             },
             replace: true,

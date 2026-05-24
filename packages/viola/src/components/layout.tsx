@@ -36,15 +36,12 @@ function DedicatedModal() {
     [router.subscribe],
   );
 
-  const closeModal = useCallback(
-    (open: boolean) => {
-      if (!open) {
-        setOpen(false);
-        router.history.back();
-      }
-    },
-    [router.history.back],
-  );
+  const closeModal = useCallback((open: boolean) => {
+    if (!open) {
+      setOpen(false);
+      $ui.dedicatedModal = null;
+    }
+  }, []);
 
   const purgeModal = useCallback(() => {
     if (!uiSnap.dedicatedModal) {
