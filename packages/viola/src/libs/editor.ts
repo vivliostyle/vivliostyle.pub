@@ -9,7 +9,7 @@ import * as Y from 'yjs';
 import { PubExtensions } from '@v/tiptap-extensions';
 import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { debounce } from '../libs/debounce';
-import { $content, $sandbox } from '../stores/accessors';
+import { $projects } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
 import type { ProjectId } from '../stores/proxies/project';
 import { SandboxFile } from '../stores/proxies/sandbox';
@@ -20,35 +20,6 @@ import { insertImageFiles } from './editor/insert-image';
 import { YUndoCursorFix } from './editor/y-undo-cursor-fix';
 
 import './editor/inline-menu.media';
-
-const saveContent = debounce(
-  async ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
-    // Collaboration hydration (loading persisted Yjs state) can emit updates
-    // before the owning project becomes current, so bail out instead of
-    // throwing when no project/sandbox is active yet.
-    const $$content = $content.value();
-    const $$sandbox = $sandbox.value();
-    if (!$$content || !$$sandbox) {
-      return;
-    }
-    const file = $$content.files.get(contentId);
-    if (!file) {
-      return;
-    }
-    file.summary =
-      editor
-        .getText({ blockSeparator: '\n' })
-        .split('\n')
-        .find((s) => s.trim())
-        ?.trim() || '';
-    const markdown = editor.getMarkdown();
-    $$sandbox.files[file.filename] = ref(
-      new SandboxFile('text/markdown', markdown),
-    );
-  },
-  1000,
-  { trailing: true },
-);
 
 function editorPersistenceKey(projectId: ProjectId, filename: string): string {
   return `viola:editor:${projectId}:${filename}`;
@@ -80,6 +51,35 @@ export async function setupEditor({
   const persistence = filename
     ? new IndexeddbPersistence(editorPersistenceKey(projectId, filename), doc)
     : undefined;
+
+  // Resolve the owning project via projectId rather than the current-project
+  // accessors so persisted-state hydration writes back to the right sandbox
+  // even when this project has not yet been made current.
+  const saveContent = debounce(
+    (editor: Editor) => {
+      const project = $projects.value[projectId];
+      const sandbox = project?.sandbox;
+      if (!project || !sandbox) {
+        return;
+      }
+      const file = project.content.files.get(contentId);
+      if (!file) {
+        return;
+      }
+      file.summary =
+        editor
+          .getText({ blockSeparator: '\n' })
+          .split('\n')
+          .find((s) => s.trim())
+          ?.trim() || '';
+      const markdown = editor.getMarkdown();
+      sandbox.files[file.filename] = ref(
+        new SandboxFile('text/markdown', markdown),
+      );
+    },
+    1000,
+    { trailing: true },
+  );
 
   const extensions = [
     PubExtensions.configure({
@@ -127,7 +127,7 @@ export async function setupEditor({
   const editor = new Editor({
     extensions,
     onUpdate: ({ editor }) => {
-      saveContent({ editor, contentId });
+      saveContent(editor);
     },
   });
 
