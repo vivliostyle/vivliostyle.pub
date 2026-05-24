@@ -17,6 +17,7 @@ import { createSandboxImageSaver } from './editor/image-saver';
 import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
 import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
+import { YUndoCursorFix } from './editor/y-undo-cursor-fix';
 
 import './editor/inline-menu.media';
 
@@ -120,6 +121,7 @@ export async function setupEditor({
     Collaboration.configure({
       document: doc,
     }),
+    YUndoCursorFix,
   ] satisfies Extensions;
 
   const editor = new Editor({

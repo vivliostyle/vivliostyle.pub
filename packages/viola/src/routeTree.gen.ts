@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DebugIndexRouteImport } from './routes/debug/index'
 import { Route as mainLayoutRouteImport } from './routes/(main)/_layout'
+import { Route as DebugIndexeddbPersistenceIndexRouteImport } from './routes/debug/indexeddb-persistence/index'
 import { Route as DebugAstViewerIndexRouteImport } from './routes/debug/ast-viewer/index'
 import { Route as mainLayoutIndexRouteImport } from './routes/(main)/_layout/index'
 import { Route as mainLayoutNewProjectRouteImport } from './routes/(main)/_layout/new-project'
@@ -20,10 +22,21 @@ import { Route as mainLayoutProjectsProjectIdMediaRouteImport } from './routes/(
 import { Route as mainLayoutProjectsProjectIdBibliographyRouteImport } from './routes/(main)/_layout/projects/$projectId/bibliography'
 import { Route as mainLayoutProjectsProjectIdEditSplatRouteImport } from './routes/(main)/_layout/projects/$projectId/edit/$'
 
+const DebugIndexRoute = DebugIndexRouteImport.update({
+  id: '/debug/',
+  path: '/debug/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const mainLayoutRoute = mainLayoutRouteImport.update({
   id: '/(main)/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DebugIndexeddbPersistenceIndexRoute =
+  DebugIndexeddbPersistenceIndexRouteImport.update({
+    id: '/debug/indexeddb-persistence/',
+    path: '/debug/indexeddb-persistence/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DebugAstViewerIndexRoute = DebugAstViewerIndexRouteImport.update({
   id: '/debug/ast-viewer/',
   path: '/debug/ast-viewer/',
@@ -77,9 +90,11 @@ const mainLayoutProjectsProjectIdEditSplatRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/debug/': typeof DebugIndexRoute
   '/new-project': typeof mainLayoutNewProjectRoute
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
+  '/debug/indexeddb-persistence/': typeof DebugIndexeddbPersistenceIndexRoute
   '/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
   '/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
   '/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
@@ -88,9 +103,11 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/edit/$': typeof mainLayoutProjectsProjectIdEditSplatRoute
 }
 export interface FileRoutesByTo {
+  '/debug': typeof DebugIndexRoute
   '/new-project': typeof mainLayoutNewProjectRoute
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
+  '/debug/indexeddb-persistence': typeof DebugIndexeddbPersistenceIndexRoute
   '/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
   '/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
   '/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
@@ -101,9 +118,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(main)/_layout': typeof mainLayoutRouteWithChildren
+  '/debug/': typeof DebugIndexRoute
   '/(main)/_layout/new-project': typeof mainLayoutNewProjectRoute
   '/(main)/_layout/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
+  '/debug/indexeddb-persistence/': typeof DebugIndexeddbPersistenceIndexRoute
   '/(main)/_layout/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
   '/(main)/_layout/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
   '/(main)/_layout/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
@@ -114,9 +133,11 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/debug/'
     | '/new-project'
     | '/'
     | '/debug/ast-viewer/'
+    | '/debug/indexeddb-persistence/'
     | '/projects/$projectId/bibliography'
     | '/projects/$projectId/media'
     | '/projects/$projectId/preview'
@@ -125,9 +146,11 @@ export interface FileRouteTypes {
     | '/projects/$projectId/edit/$'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/debug'
     | '/new-project'
     | '/'
     | '/debug/ast-viewer'
+    | '/debug/indexeddb-persistence'
     | '/projects/$projectId/bibliography'
     | '/projects/$projectId/media'
     | '/projects/$projectId/preview'
@@ -137,9 +160,11 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/(main)/_layout'
+    | '/debug/'
     | '/(main)/_layout/new-project'
     | '/(main)/_layout/'
     | '/debug/ast-viewer/'
+    | '/debug/indexeddb-persistence/'
     | '/(main)/_layout/projects/$projectId/bibliography'
     | '/(main)/_layout/projects/$projectId/media'
     | '/(main)/_layout/projects/$projectId/preview'
@@ -150,16 +175,32 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   mainLayoutRoute: typeof mainLayoutRouteWithChildren
+  DebugIndexRoute: typeof DebugIndexRoute
   DebugAstViewerIndexRoute: typeof DebugAstViewerIndexRoute
+  DebugIndexeddbPersistenceIndexRoute: typeof DebugIndexeddbPersistenceIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/debug/': {
+      id: '/debug/'
+      path: '/debug'
+      fullPath: '/debug/'
+      preLoaderRoute: typeof DebugIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(main)/_layout': {
       id: '/(main)/_layout'
       path: ''
       fullPath: ''
       preLoaderRoute: typeof mainLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/debug/indexeddb-persistence/': {
+      id: '/debug/indexeddb-persistence/'
+      path: '/debug/indexeddb-persistence'
+      fullPath: '/debug/indexeddb-persistence/'
+      preLoaderRoute: typeof DebugIndexeddbPersistenceIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/debug/ast-viewer/': {
@@ -259,7 +300,9 @@ const mainLayoutRouteWithChildren = mainLayoutRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   mainLayoutRoute: mainLayoutRouteWithChildren,
+  DebugIndexRoute: DebugIndexRoute,
   DebugAstViewerIndexRoute: DebugAstViewerIndexRoute,
+  DebugIndexeddbPersistenceIndexRoute: DebugIndexeddbPersistenceIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
