@@ -1,30 +1,31 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { generateId } from '../../../../libs/generate-id';
-import {
-  $content,
-  $project,
-  $projects,
-  $ui,
-} from '../../../../stores/accessors';
-import { restoreProjects } from '../../../../stores/actions/restore-projects';
+import { generateId } from '../../../../../../libs/generate-id';
+import { $content, $ui } from '../../../../../../stores/accessors';
+import { openProject } from '../../../../../../stores/actions/open-project';
+import type { ProjectId } from '../../../../../../stores/proxies/project';
 
-export const Route = createFileRoute('/(main)/_layout/edit/$')({
+export const Route = createFileRoute(
+  '/(main)/_layout/projects/$projectId/edit/$',
+)({
   beforeLoad: async ({ params, preload }) => {
     if (preload) {
       return;
     }
-    await restoreProjects();
-    if (!$projects.currentProjectId) {
+    try {
+      await openProject(params.projectId as ProjectId);
+    } catch {
       throw redirect({ to: '/' });
     }
-    await $project.valueOrThrow().setupPromise;
     const result = $content
       .valueOrThrow()
       .getFileByFilename(params._splat || '');
     const contentId = result?.[0];
     if (!contentId) {
-      throw redirect({ to: '/' });
+      throw redirect({
+        to: '/projects/$projectId',
+        params: { projectId: params.projectId },
+      });
     }
     if (
       $ui.tabs.some((tab) => tab.type === 'edit' && tab.contentId === contentId)

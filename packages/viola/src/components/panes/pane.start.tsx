@@ -1,12 +1,10 @@
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { invariant } from 'outvariant';
-import { useTransition } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Button } from '@v/ui/button';
 import { FilePlus } from '@v/ui/icon';
-import { $project, $projects } from '../../stores/accessors';
-import { openProject } from '../../stores/actions/open-project';
+import { $projects } from '../../stores/accessors';
 import type { ProjectId } from '../../stores/proxies/project';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -33,34 +31,13 @@ export const Pane = createPane<StartPaneProperty>({
 function ProjectListItem({ projectId }: { projectId: ProjectId }) {
   const projectsSnap = useSnapshot($projects);
   const entry = projectsSnap.entries[projectId];
-  const [isPending, startTransition] = useTransition();
-  const navigate = useNavigate();
-
-  const handleOpen = () => {
-    startTransition(async () => {
-      await openProject(projectId);
-      const project = $project.valueOrThrow();
-      const contentId = project.content.readingOrder[0];
-      const file = contentId ? project.content.files.get(contentId) : undefined;
-      if (file) {
-        navigate({
-          to: '/edit/$',
-          params: { _splat: file.filename },
-          replace: true,
-        });
-      } else {
-        navigate({ to: '/bibliography', replace: true });
-      }
-    });
-  };
 
   return (
     <li>
-      <button
-        type="button"
-        onClick={handleOpen}
-        disabled={isPending}
-        className="w-full text-left rounded-md border border-input px-4 py-3 hover:bg-accent transition-colors disabled:opacity-50"
+      <Link
+        to="/projects/$projectId"
+        params={{ projectId }}
+        className="block w-full text-left rounded-md border border-input px-4 py-3 hover:bg-accent transition-colors"
       >
         <div className="font-medium">{entry?.title || 'Untitled project'}</div>
         {entry?.author && (
@@ -69,7 +46,7 @@ function ProjectListItem({ projectId }: { projectId: ProjectId }) {
         <div className="text-xs text-muted-foreground mt-1 break-all">
           {projectId}
         </div>
-      </button>
+      </Link>
     </li>
   );
 }

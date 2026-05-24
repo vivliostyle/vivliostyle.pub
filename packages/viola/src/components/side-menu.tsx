@@ -89,6 +89,7 @@ function AddNewFileButton({ children }: React.PropsWithChildren) {
 }
 
 function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
+  const projectSnap = useSnapshot($project).valueOrThrow();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
@@ -107,7 +108,10 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/preview">
+          <Link
+            to="/projects/$projectId/preview"
+            params={{ projectId: projectSnap.projectId }}
+          >
             <Printer />
             <span>Open Print Preview</span>
           </Link>
@@ -151,19 +155,28 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/bibliography">
+          <Link
+            to="/projects/$projectId/bibliography"
+            params={{ projectId: projectSnap.projectId }}
+          >
             <BookOpen />
             <span>Title and metadata</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/media">
+          <Link
+            to="/projects/$projectId/media"
+            params={{ projectId: projectSnap.projectId }}
+          >
             <ImageIcon />
             <span>Media</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/theme">
+          <Link
+            to="/projects/$projectId/theme"
+            params={{ projectId: projectSnap.projectId }}
+          >
             <Palette />
             <span>Customize theme</span>
           </Link>
@@ -253,6 +266,7 @@ function FileTreeItem({
     name: string;
   }
 >) {
+  const projectSnap = useSnapshot($project).valueOrThrow();
   const content = useSnapshot($content).valueOrThrow();
   const draggingContentId = useContext(DraggingContentContext);
   const sortable = typeof item === 'string' && useSortable({ id: item });
@@ -286,7 +300,14 @@ function FileTreeItem({
         asChild
       >
         {file ? (
-          <Link to="/edit/$" params={{ _splat: file.filename }} replace>
+          <Link
+            to="/projects/$projectId/edit/$"
+            params={{
+              projectId: projectSnap.projectId,
+              _splat: file.filename,
+            }}
+            replace
+          >
             <span className={cn(!file?.summary && 'text-muted-foreground')}>
               {file?.summary || 'Empty file'}
             </span>

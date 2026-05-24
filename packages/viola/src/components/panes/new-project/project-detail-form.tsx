@@ -174,8 +174,9 @@ export function ProjectDetailForm() {
           return;
         }
         startTransition(async () => {
+          const projectId = generateProjectId();
           await setupProjectFromDraft({
-            projectId: generateProjectId(),
+            projectId,
             templateValue,
           });
           const project = $project.valueOrThrow();
@@ -183,8 +184,9 @@ export function ProjectDetailForm() {
           const file = project.content.files.get(contentId);
           invariant(file, 'First content file not found');
           navigate({
-            to: '/edit/$',
+            to: '/projects/$projectId/edit/$',
             params: {
+              projectId,
               _splat: file.filename,
             },
             replace: true,
