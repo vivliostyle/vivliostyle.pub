@@ -59,7 +59,8 @@ import {
   SidebarSeparator,
 } from '@v/ui/sidebar';
 import VivliostyleLogo from '../assets/vivliostyle-logo.svg';
-import { $content, $project, $projects } from '../stores/accessors';
+import { generateId } from '../libs/generate-id';
+import { $content, $project, $projects, $ui } from '../stores/accessors';
 import {
   createContentFile,
   deleteContentFile,
@@ -94,11 +95,13 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
-        <DropdownMenuItem asChild>
-          <Link to="/">
-            <FolderOpen />
-            <span>Open Project</span>
-          </Link>
+        <DropdownMenuItem
+          onClick={() => {
+            $ui.dedicatedModal = { id: generateId(), type: 'start' };
+          }}
+        >
+          <FolderOpen />
+          <span>Open Project</span>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link to="/new-project">

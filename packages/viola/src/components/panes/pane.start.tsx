@@ -17,7 +17,7 @@ declare global {
 }
 
 export const Pane = createPane<StartPaneProperty>({
-  title: () => 'Start',
+  title: () => 'Open project',
   content: (props) => (
     <ScrollOverflow>
       <PaneContainer>
@@ -58,15 +58,12 @@ function Content(_: StartPaneProperty) {
   return (
     <div className="grid gap-6">
       {projectIds.length > 0 ? (
-        <>
-          <p className="text-2xl pt-4">Open a project</p>
-          <ul className="grid gap-2">
-            {projectIds.map((projectId) => {
-              invariant(projectId, 'projectId is required');
-              return <ProjectListItem key={projectId} projectId={projectId} />;
-            })}
-          </ul>
-        </>
+        <ul className="grid gap-2">
+          {projectIds.map((projectId) => {
+            invariant(projectId, 'projectId is required');
+            return <ProjectListItem key={projectId} projectId={projectId} />;
+          })}
+        </ul>
       ) : (
         <p className="text-2xl py-8">Start writing your book.</p>
       )}
