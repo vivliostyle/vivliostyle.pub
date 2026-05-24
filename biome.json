@@ -38,6 +38,7 @@
       "!**/packages/cli-bundle/src/stubs/rollup/**/*",
       "!**/vivliostyle-pub/**/*",
       "!**/routeTree.gen.ts",
+      "!**/packages/api-client/src/schema.d.ts",
       "!**/templates/**/*",
       "!!**/secrets"
     ]
