@@ -1,130 +1,38 @@
 import { Editor, type Extensions } from '@tiptap/core';
+import { Collaboration } from '@tiptap/extension-collaboration';
 import { Placeholder } from '@tiptap/extensions';
-import * as idb from 'idb';
 import { dirname, relative } from 'pathe';
 import { ref } from 'valtio';
+import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 
 import { PubExtensions } from '@v/tiptap-extensions';
 import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { debounce } from '../libs/debounce';
-import { $content, $sandbox } from '../stores/accessors';
+import { $projects } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
+import type { ProjectId } from '../stores/proxies/project';
 import { SandboxFile } from '../stores/proxies/sandbox';
 import { createSandboxImageSaver } from './editor/image-saver';
 import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
 import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
+import { YUndoCursorFix } from './editor/y-undo-cursor-fix';
 
 import './editor/inline-menu.media';
 
-// @ts-expect-error
-async function _setupPersistence({
-  doc,
-}: {
-  doc: Y.Doc;
-  contentId: ContentId;
-}): Promise<void> {
-  const preferredTrimSize = 500;
-  const storeName = 'update';
-  // @ts-expect-error
-  const origin = this as unknown;
-  const db = await idb.openDB('viola:editor', 1, {
-    upgrade(db) {
-      db.createObjectStore(storeName, { autoIncrement: true });
-    },
-  });
-
-  let dbRef = 0;
-  let dbSize = 0;
-  fetchUpdate(true);
-
-  async function fetchUpdate(init = false) {
-    const tx = db.transaction(storeName, 'readwrite');
-    const updates = await tx.store.getAll(IDBKeyRange.lowerBound(dbRef, false));
-    if (init) {
-      await tx.store.add(Y.encodeStateAsUpdate(doc));
-    }
-    Y.transact(
-      doc,
-      () => {
-        for (const update of updates) {
-          Y.applyUpdate(doc, update);
-        }
-      },
-      origin,
-      false,
-    );
-    const lastKey = (await tx.store.openKeyCursor(null, 'prev'))?.key;
-    dbRef = ((lastKey as number) ?? 0) + 1;
-    dbSize = await tx.store.count();
-    await tx.done;
-  }
-
-  const storeState = debounce(
-    async function storeState() {
-      await fetchUpdate();
-      if (dbSize >= preferredTrimSize) {
-        const tx = db.transaction(storeName, 'readwrite');
-        await tx.store.add(Y.encodeStateAsUpdate(doc));
-        await tx.store.delete(IDBKeyRange.upperBound(dbRef, true));
-        dbSize = await tx.store.count();
-        await tx.done;
-      }
-    },
-    1000,
-    { trailing: true },
-  );
-
-  function onUpdate(update: Uint8Array, _origin: unknown) {
-    if (origin === _origin) {
-      return;
-    }
-    const tr = db.transaction(storeName, 'readwrite');
-    tr.store.add(update);
-    if (++dbSize >= preferredTrimSize) {
-      storeState();
-    }
-  }
-
-  function onDestroy() {
-    doc.off('update', onUpdate);
-    doc.off('destroy', onDestroy);
-  }
-
-  doc.on('update', onUpdate);
-  doc.on('destroy', onDestroy);
+function editorPersistenceKey(projectId: ProjectId, filename: string): string {
+  return `viola:editor:${projectId}:${filename}`;
 }
 
-const saveContent = debounce(
-  async ({ editor, contentId }: { editor: Editor; contentId: ContentId }) => {
-    const $$content = $content.valueOrThrow();
-    const $$sandbox = $sandbox.valueOrThrow();
-    const file = $$content.files.get(contentId);
-    if (!file) {
-      return;
-    }
-    file.summary =
-      editor
-        .getText({ blockSeparator: '\n' })
-        .split('\n')
-        .find((s) => s.trim())
-        ?.trim() || '';
-    const markdown = editor.getMarkdown();
-    $$sandbox.files[file.filename] = ref(
-      new SandboxFile('text/markdown', markdown),
-    );
-  },
-  1000,
-  { trailing: true },
-);
-
 export async function setupEditor({
+  projectId,
   contentId,
   filename,
   entryContext,
   initialFile,
 }: {
+  projectId: ProjectId;
   contentId: ContentId;
   filename?: string;
   entryContext?: string;
@@ -136,8 +44,42 @@ export async function setupEditor({
     basePath = undefined;
   }
 
-  // const doc = new Y.Doc();
-  // await setupPersistence({ doc, contentId });
+  const doc = new Y.Doc();
+  // Editor state is persisted to IndexedDB keyed by a stable project + file
+  // path. contentId is regenerated on every load, so it cannot serve as the
+  // persistence key.
+  const persistence = filename
+    ? new IndexeddbPersistence(editorPersistenceKey(projectId, filename), doc)
+    : undefined;
+
+  // Resolve the owning project via projectId rather than the current-project
+  // accessors so persisted-state hydration writes back to the right sandbox
+  // even when this project has not yet been made current.
+  const saveContent = debounce(
+    (editor: Editor) => {
+      const project = $projects.value[projectId];
+      const sandbox = project?.sandbox;
+      if (!project || !sandbox) {
+        return;
+      }
+      const file = project.content.files.get(contentId);
+      if (!file) {
+        return;
+      }
+      file.summary =
+        editor
+          .getText({ blockSeparator: '\n' })
+          .split('\n')
+          .find((s) => s.trim())
+          ?.trim() || '';
+      const markdown = editor.getMarkdown();
+      sandbox.files[file.filename] = ref(
+        new SandboxFile('text/markdown', markdown),
+      );
+    },
+    1000,
+    { trailing: true },
+  );
 
   const extensions = [
     PubExtensions.configure({
@@ -176,18 +118,40 @@ export async function setupEditor({
         inlineMenuState.coords = coords;
       },
     }),
-    // Collaboration.configure({
-    //   document: doc,
-    // }),
+    Collaboration.configure({
+      document: doc,
+    }),
+    YUndoCursorFix,
   ] satisfies Extensions;
 
-  const markdown = await initialFile?.text();
-  return new Editor({
+  const editor = new Editor({
     extensions,
-    content: markdown?.trim(),
-    contentType: 'markdown',
     onUpdate: ({ editor }) => {
-      saveContent({ editor, contentId });
+      saveContent(editor);
     },
   });
+
+  editor.on('destroy', () => {
+    persistence?.destroy();
+    doc.destroy();
+  });
+
+  // Load any previously persisted state first, then seed from the on-disk
+  // markdown only when this file has no editor history yet (first open).
+  // Seeding emits no update so it neither re-writes the source file nor
+  // requires the project to be the current one yet.
+  if (persistence) {
+    await persistence.whenSynced;
+  }
+  if (doc.getXmlFragment('default').length === 0) {
+    const markdown = (await initialFile?.text())?.trim();
+    if (markdown) {
+      editor.commands.setContent(markdown, {
+        contentType: 'markdown',
+        emitUpdate: false,
+      });
+    }
+  }
+
+  return editor;
 }

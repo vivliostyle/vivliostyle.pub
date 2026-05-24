@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 
 import { ThemeProvider } from '@v/ui/theme-provider';
+import './libs/polyfills';
 import { routeTree } from './routeTree.gen';
 import './main.css';
 

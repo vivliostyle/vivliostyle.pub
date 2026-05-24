@@ -145,6 +145,7 @@ export class Project {
       }
       const contentId = generateId<ContentId>();
       const editor = await setupEditor({
+        projectId: this.projectId,
         contentId,
         filename,
         entryContext,
