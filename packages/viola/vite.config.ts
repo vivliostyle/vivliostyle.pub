@@ -177,7 +177,7 @@ const serviceWorker = () => [
           swFilename,
           fs
             .readFileSync(swFilename, 'utf8')
-            .replace(/"__IFRAME_HTML__"/g, JSON.stringify(html)),
+            .replace(/(["'`])__IFRAME_HTML__\1/g, () => JSON.stringify(html)),
           'utf8',
         );
       },
