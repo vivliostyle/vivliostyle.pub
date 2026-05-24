@@ -5,7 +5,7 @@ import { ref } from 'valtio';
 
 import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
-import { $content, $sandbox, $ui } from '../accessors';
+import { $content, $project, $sandbox, $ui } from '../accessors';
 import type { ContentId } from '../proxies/content';
 import { SandboxFile } from '../proxies/sandbox';
 
@@ -18,6 +18,7 @@ export async function createContentFile({
 }): Promise<ContentId> {
   const $$content = $content.valueOrThrow();
   const $$sandbox = $sandbox.valueOrThrow();
+  const projectId = $project.valueOrThrow().projectId;
   const prevFile = insertAfter && $$content.files.get(insertAfter);
   const entryContext = $$sandbox.vivliostyleConfig.entryContext || '';
   const prevFileDir =
@@ -44,7 +45,9 @@ export async function createContentFile({
     format,
     filename,
     summary: '',
-    editor: ref(await setupEditor({ contentId, filename, entryContext })),
+    editor: ref(
+      await setupEditor({ projectId, contentId, filename, entryContext }),
+    ),
   });
   $$content.readingOrder.splice(index, 0, contentId);
   return contentId;
