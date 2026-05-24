@@ -1,0 +1,21 @@
+{
+  "name": "@v/api-spec",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./openapi.json": "./src/openapi.json"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@v/api-server-reference": "workspace:*",
+    "@v/config": "workspace:*",
+    "vitest": "catalog:"
+  }
+}

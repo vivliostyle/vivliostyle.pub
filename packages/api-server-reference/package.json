@@ -1,0 +1,37 @@
+{
+  "name": "@v/api-server-reference",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "start": "node --import tsx src/server.ts",
+    "generate-spec": "node --import tsx scripts/generate-spec.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@hono/node-server": "catalog:",
+    "@hono/node-ws": "catalog:",
+    "@hono/standard-validator": "catalog:",
+    "@standard-community/standard-json": "catalog:",
+    "@standard-community/standard-openapi": "catalog:",
+    "@types/json-schema": "catalog:",
+    "@types/node": "catalog:",
+    "@v/config": "workspace:*",
+    "@valibot/to-json-schema": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "lib0": "catalog:",
+    "openapi-types": "catalog:",
+    "tsx": "catalog:",
+    "valibot": "catalog:",
+    "vitest": "catalog:",
+    "y-protocols": "catalog:",
+    "yjs": "catalog:"
+  }
+}

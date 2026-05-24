@@ -1,0 +1,8 @@
+{
+  "extends": "@v/config/tsconfig.node.json",
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": ["src"]
+}
