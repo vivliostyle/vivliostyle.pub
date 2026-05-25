@@ -10,7 +10,7 @@ export async function createCloudProject(input: {
   if ($session.status !== 'authenticated') {
     throw new Error('Sign in to create a cloud project.');
   }
-  const record = await $session.apiClient.createProject(input);
+  const record = await $session.api.createProject(input);
   const entry: ProjectEntry = {
     projectId: record.id as ProjectId,
     source: 'remote',
@@ -26,7 +26,7 @@ export async function deleteCloudProject(projectId: ProjectId): Promise<void> {
   if ($session.status !== 'authenticated') {
     throw new Error('Sign in to delete a cloud project.');
   }
-  await $session.apiClient.deleteProject(projectId);
+  await $session.api.deleteProject(projectId);
   delete $projects.entries[projectId];
   await discoverProjects();
 }

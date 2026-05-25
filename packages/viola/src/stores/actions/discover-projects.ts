@@ -56,7 +56,7 @@ async function listRemoteProjects(): Promise<ProjectEntry[]> {
     return [];
   }
   try {
-    const records = await $session.apiClient.listProjects();
+    const records = await $session.api.listProjects();
     return records.map((r) => ({
       projectId: r.id as ProjectId,
       source: 'remote' as const,

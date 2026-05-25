@@ -43,10 +43,9 @@ export async function restoreSession(): Promise<void> {
   if ($session.status === 'authenticating') {
     return;
   }
-  $session.status = 'initializing';
-  $session.lastError = null;
+  $session.status = 'initial';
   try {
-    const user = await $session.authClient.getUser();
+    const user = await $session.auth.getUser();
     if (user) {
       $session.user = user;
       $session.status = 'authenticated';
@@ -65,10 +64,9 @@ export async function restoreSession(): Promise<void> {
 
 export async function login(username: string, password: string): Promise<void> {
   $session.status = 'authenticating';
-  $session.lastError = null;
   try {
-    await $session.authClient.login(username, password);
-    const user = await $session.authClient.getUser();
+    await $session.auth.login(username, password);
+    const user = await $session.auth.getUser();
     if (!user) {
       throw new SessionError('Logged in, but failed to load profile.');
     }
@@ -78,7 +76,6 @@ export async function login(username: string, password: string): Promise<void> {
     $session.user = null;
     $session.status = 'anonymous';
     const wrapped = describeAuthFailure(error, 'Login failed');
-    $session.lastError = wrapped.message;
     throw wrapped;
   }
   await discoverProjects().catch(() => {});
@@ -89,13 +86,11 @@ export async function register(
   password: string,
 ): Promise<void> {
   $session.status = 'authenticating';
-  $session.lastError = null;
   try {
-    await $session.authClient.register(username, password);
+    await $session.auth.register(username, password);
   } catch (error) {
     $session.status = 'anonymous';
     const wrapped = describeAuthFailure(error, 'Registration failed');
-    $session.lastError = wrapped.message;
     throw wrapped;
   }
   await login(username, password);
@@ -103,11 +98,10 @@ export async function register(
 
 export async function logout(): Promise<void> {
   try {
-    await $session.authClient.logout();
+    await $session.auth.logout();
   } finally {
     $session.user = null;
     $session.status = 'anonymous';
-    $session.lastError = null;
   }
   await discoverProjects().catch(() => {});
 }

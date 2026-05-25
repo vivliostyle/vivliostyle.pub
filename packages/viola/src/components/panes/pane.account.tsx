@@ -177,7 +177,7 @@ function SignedInView() {
 function Content(_: AccountPaneProps) {
   const sessionSnap = useSnapshot($session);
 
-  if (sessionSnap.status === 'initializing') {
+  if (sessionSnap.status === 'initial') {
     return (
       <div className="grid place-items-center py-8">
         <Loader2 className="animate-spin size-8 text-muted-foreground" />

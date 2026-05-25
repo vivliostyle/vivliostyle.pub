@@ -5,7 +5,7 @@ import { AuthClient, type AuthUser } from '@v/auth-client';
 import { IndexedDBTokenStore } from '../../libs/token-store';
 
 export type SessionStatus =
-  | 'initializing'
+  | 'initial'
   | 'anonymous'
   | 'authenticated'
   | 'authenticating';
@@ -44,16 +44,15 @@ const initialAuth = createAuthClient(initialBaseUrl);
 
 export const session = proxy({
   baseUrl: initialBaseUrl,
-  status: 'initializing' as SessionStatus,
+  status: 'initial' as SessionStatus,
   user: null as AuthUser | null,
-  authClient: ref(initialAuth),
-  apiClient: ref(createApiClient(initialBaseUrl, initialAuth)),
-  lastError: null as string | null,
+  auth: ref(initialAuth),
+  api: ref(createApiClient(initialBaseUrl, initialAuth)),
 });
 
 export function rebuildClients(baseUrl: string) {
   const auth = createAuthClient(baseUrl);
   session.baseUrl = baseUrl;
-  session.authClient = ref(auth);
-  session.apiClient = ref(createApiClient(baseUrl, auth));
+  session.auth = ref(auth);
+  session.api = ref(createApiClient(baseUrl, auth));
 }

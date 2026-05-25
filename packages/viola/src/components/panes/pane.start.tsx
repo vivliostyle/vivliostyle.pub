@@ -201,7 +201,7 @@ function Content(_: StartPaneProperty) {
       )}
 
       {sessionSnap.status !== 'authenticated' &&
-        sessionSnap.status !== 'initializing' && (
+        sessionSnap.status !== 'initial' && (
           <p className="text-xs text-muted-foreground">
             <Link to="/settings/account" className="hover:underline">
               Sign in
