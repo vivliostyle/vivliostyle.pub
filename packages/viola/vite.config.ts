@@ -125,7 +125,15 @@ const serveCli = () =>
     },
   }) satisfies Plugin;
 
-const serveApi = (): Plugin => {
+interface ServeApiOptions {
+  /**
+   * SQLite database path forwarded to `createApiDevServer`. When unset, the
+   * API uses an in-memory store and all data is lost on dev server restart.
+   */
+  sqlitePath?: string;
+}
+
+const serveApi = ({ sqlitePath }: ServeApiOptions = {}): Plugin => {
   let currentMiddleware:
     | ((
         req: import('node:http').IncomingMessage,
@@ -147,7 +155,7 @@ const serveApi = (): Plugin => {
         const mod = (await server.ssrLoadModule(
           '@v/api-server-reference/dev-server',
         )) as typeof import('@v/api-server-reference/dev-server');
-        return mod.createApiDevServer();
+        return mod.createApiDevServer({ sqlitePath });
       };
 
       let api = await loadApi();
@@ -175,6 +183,10 @@ const serveApi = (): Plugin => {
         clearTimeout(reloadTimer);
         reloadTimer = setTimeout(async () => {
           try {
+            // Close the previous instance's SQLite handle before building a
+            // new one. With a file path this would otherwise leak a
+            // connection per reload until the process exits.
+            api.close();
             server.moduleGraph.invalidateAll();
             api = await loadApi();
             currentMiddleware = api.middleware;
@@ -209,7 +221,7 @@ const serveApi = (): Plugin => {
           api.injectWebSocket(server.httpServer);
         }
         server.config.logger.info(
-          `  \x1b[32m➜\x1b[0m  API mounted at \x1b[36m${basePath}\x1b[0m`,
+          `  \x1b[32m➜\x1b[0m  API mounted at \x1b[36m${basePath}\x1b[0m  \x1b[2m[sqlite ${sqlitePath ?? ':memory:'}]\x1b[0m`,
         );
       };
     },
@@ -278,7 +290,7 @@ const serviceWorker = () => [
 
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
-  const env = loadEnv(mode, secretsDir);
+  const env = loadEnv(mode, secretsDir, ['VITE_', 'API_']);
 
   return {
     build: {
@@ -301,7 +313,11 @@ export default defineConfig(({ mode, command }) => {
       serviceWorker(),
       serveTemplates(),
       serveCli(),
-      serveApi(),
+      serveApi({
+        sqlitePath: env.API_SQLITE_PATH
+          ? path.resolve(getProjectRoot(), env.API_SQLITE_PATH)
+          : undefined,
+      }),
       visualizer() as PluginOption,
     ],
     server:

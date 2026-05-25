@@ -10,6 +10,7 @@ import { getRequestListener } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 
 import { type CreateAppOptions, createApp } from './app';
+import { SqliteStore } from './store';
 import { registerSyncWebSocket } from './sync-websocket';
 
 /**
@@ -28,6 +29,12 @@ export interface CreateApiDevServerOptions extends CreateAppOptions {
    * Defaults to `/api`. Trailing slashes are normalized away.
    */
   basePath?: string;
+  /**
+   * SQLite database path. When set, the dev server persists data to disk;
+   * when omitted, the default in-memory SQLite database is used (lost on
+   * restart). Ignored if `store` is supplied explicitly.
+   */
+  sqlitePath?: string;
 }
 
 export interface ApiDevServer {
@@ -44,6 +51,12 @@ export interface ApiDevServer {
   ) => void;
   /** Attach the WebSocket upgrade handler to the given http server. */
   injectWebSocket: (server: AnyHttpServer) => void;
+  /**
+   * Release resources owned by this instance. Currently closes the SQLite
+   * connection so hot-reloading the API module (which builds a fresh
+   * `ApiDevServer`) does not accumulate open database handles.
+   */
+  close: () => void;
 }
 
 /**
@@ -54,9 +67,10 @@ export interface ApiDevServer {
 export function createApiDevServer(
   options: CreateApiDevServerOptions = {},
 ): ApiDevServer {
-  const { basePath: rawBasePath = '/api', ...appOptions } = options;
+  const { basePath: rawBasePath = '/api', sqlitePath, ...appOptions } = options;
   const basePath = rawBasePath.replace(/\/+$/, '') || '/';
-  const { app, deps } = createApp(appOptions);
+  const store = appOptions.store ?? new SqliteStore({ path: sqlitePath });
+  const { app, deps } = createApp({ ...appOptions, store });
   const { injectWebSocket: honoInjectWebSocket, upgradeWebSocket } =
     createNodeWebSocket({ app });
   registerSyncWebSocket(app, deps, upgradeWebSocket);
@@ -101,6 +115,9 @@ export function createApiDevServer(
           proxy.emit('upgrade', req, socket, head);
         },
       );
+    },
+    close() {
+      store.close();
     },
   };
 }

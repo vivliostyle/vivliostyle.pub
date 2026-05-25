@@ -17,16 +17,19 @@ import { fileRoutes } from './routes/files';
 import { projectRoutes } from './routes/projects';
 import { syncRoutes } from './routes/sync';
 import { wellKnownRoutes } from './routes/well-known';
-import { InMemoryStore, type Store } from './store';
+import { SqliteStore } from './store';
 import { DocRegistry } from './sync-doc';
 
 export interface CreateAppOptions {
-  store?: Store;
+  store?: SqliteStore;
   config?: Partial<ServerConfig>;
 }
 
 export function createApp(options: CreateAppOptions = {}) {
-  const store = options.store ?? new InMemoryStore();
+  // Default to a fresh in-memory SQLite database (lost on process exit).
+  // Callers that want persistence pass an explicit `store` (e.g. a
+  // file-backed `SqliteStore`).
+  const store = options.store ?? new SqliteStore();
   const config: ServerConfig = { ...defaultConfig, ...options.config };
   const docs = new DocRegistry(store);
   const deps: Deps = { store, docs, config };

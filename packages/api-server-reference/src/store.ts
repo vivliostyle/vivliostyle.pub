@@ -1,3 +1,7 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
 import { generateId } from './crypto';
 import type { FileEntry, ProjectInput, ProjectRecord } from './schemas';
 
@@ -39,176 +43,358 @@ export interface StoredFile {
   updatedAt: number;
 }
 
-/**
- * Persistence boundary for the reference server. The in-memory implementation
- * below is the default; a production deployment can supply a SQLite-backed
- * implementation (e.g. Node's `node:sqlite`) without touching the routes.
- */
-export interface Store {
-  createUser(username: string, passwordHash: string): StoredUser;
-  findUserByUsername(username: string): StoredUser | undefined;
-  findUserById(id: string): StoredUser | undefined;
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS auth_codes (
+  code TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  scope TEXT,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  scope TEXT,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS access_tokens (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  scope TEXT,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL,
+  title TEXT,
+  author TEXT,
+  language TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS projects_owner_id_idx ON projects(owner_id);
+CREATE TABLE IF NOT EXISTS files (
+  project_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  data BLOB NOT NULL,
+  content_type TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (project_id, path)
+);
+CREATE TABLE IF NOT EXISTS attachments (
+  project_id TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  data BLOB NOT NULL,
+  PRIMARY KEY (project_id, sha256)
+);
+CREATE TABLE IF NOT EXISTS docs (
+  project_id TEXT PRIMARY KEY,
+  state BLOB NOT NULL
+);
+`;
 
-  saveAuthCode(code: AuthCode): void;
-  takeAuthCode(code: string): AuthCode | undefined;
+type Nullable<T> = T | null;
 
-  saveRefreshToken(token: RefreshToken): void;
-  takeRefreshToken(token: string): RefreshToken | undefined;
-  revokeUserTokens(userId: string): void;
-
-  saveAccessToken(token: AccessToken): void;
-  findAccessToken(token: string): AccessToken | undefined;
-
-  listProjects(ownerId: string): ProjectRecord[];
-  createProject(ownerId: string, input: ProjectInput): ProjectRecord;
-  getProject(ownerId: string, id: string): ProjectRecord | undefined;
-  updateProject(
-    ownerId: string,
-    id: string,
-    patch: ProjectInput,
-  ): ProjectRecord | undefined;
-  removeProject(ownerId: string, id: string): boolean;
-
-  listFiles(projectId: string): FileEntry[];
-  readFile(projectId: string, path: string): StoredFile | undefined;
-  writeFile(
-    projectId: string,
-    path: string,
-    data: Uint8Array,
-    contentType: string,
-  ): FileEntry;
-  removeFile(projectId: string, path: string): boolean;
-
-  readAttachment(projectId: string, sha256: string): Uint8Array | undefined;
-  writeAttachment(projectId: string, sha256: string, data: Uint8Array): void;
-
-  loadDocState(projectId: string): Uint8Array | undefined;
-  saveDocState(projectId: string, state: Uint8Array): void;
+interface UserRow {
+  id: string;
+  username: string;
+  password_hash: string;
 }
 
-interface ProjectRow extends ProjectRecord {
-  ownerId: string;
+interface AuthCodeRow {
+  code: string;
+  user_id: string;
+  client_id: string;
+  redirect_uri: string;
+  code_challenge: string;
+  scope: Nullable<string>;
+  expires_at: number;
 }
 
-function toPublicProject(row: ProjectRow): ProjectRecord {
-  const { ownerId: _ownerId, ...rest } = row;
-  return rest;
+interface RefreshTokenRow {
+  token: string;
+  user_id: string;
+  client_id: string;
+  scope: Nullable<string>;
+  expires_at: number;
 }
 
-function toFileEntry(file: StoredFile): FileEntry {
+interface AccessTokenRow {
+  token: string;
+  user_id: string;
+  scope: Nullable<string>;
+  expires_at: number;
+}
+
+interface ProjectRow {
+  id: string;
+  owner_id: string;
+  title: Nullable<string>;
+  author: Nullable<string>;
+  language: Nullable<string>;
+  created_at: number;
+  updated_at: number;
+}
+
+interface FileRow {
+  path: string;
+  data: Uint8Array;
+  content_type: string;
+  updated_at: number;
+}
+
+function toUser(row: UserRow): StoredUser {
   return {
-    path: file.path,
-    size: file.data.byteLength,
-    contentType: file.contentType,
-    updatedAt: file.updatedAt,
+    id: row.id,
+    username: row.username,
+    passwordHash: row.password_hash,
   };
 }
 
-export class InMemoryStore implements Store {
-  private users = new Map<string, StoredUser>();
-  private usernameIndex = new Map<string, string>();
-  private authCodes = new Map<string, AuthCode>();
-  private refreshTokens = new Map<string, RefreshToken>();
-  private accessTokens = new Map<string, AccessToken>();
-  private projects = new Map<string, ProjectRow>();
-  private files = new Map<string, Map<string, StoredFile>>();
-  private attachments = new Map<string, Map<string, Uint8Array>>();
-  private docs = new Map<string, Uint8Array>();
+function toAuthCode(row: AuthCodeRow): AuthCode {
+  return {
+    code: row.code,
+    userId: row.user_id,
+    clientId: row.client_id,
+    redirectUri: row.redirect_uri,
+    codeChallenge: row.code_challenge,
+    scope: row.scope ?? undefined,
+    expiresAt: row.expires_at,
+  };
+}
+
+function toRefreshToken(row: RefreshTokenRow): RefreshToken {
+  return {
+    token: row.token,
+    userId: row.user_id,
+    clientId: row.client_id,
+    scope: row.scope ?? undefined,
+    expiresAt: row.expires_at,
+  };
+}
+
+function toAccessToken(row: AccessTokenRow): AccessToken {
+  return {
+    token: row.token,
+    userId: row.user_id,
+    scope: row.scope ?? undefined,
+    expiresAt: row.expires_at,
+  };
+}
+
+function toProject(row: ProjectRow): ProjectRecord {
+  return {
+    id: row.id,
+    title: row.title ?? undefined,
+    author: row.author ?? undefined,
+    language: row.language ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toFile(row: FileRow): StoredFile {
+  return {
+    path: row.path,
+    data: row.data,
+    contentType: row.content_type,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toFileEntry(row: FileRow): FileEntry {
+  return {
+    path: row.path,
+    size: row.data.byteLength,
+    contentType: row.content_type,
+    updatedAt: row.updated_at,
+  };
+}
+
+export interface SqliteStoreOptions {
+  /**
+   * SQLite database location. Defaults to `:memory:` (ephemeral). Pass a file
+   * path for persistence across restarts.
+   */
+  path?: string;
+}
+
+/**
+ * Persistence layer for the reference server, backed by Node's built-in
+ * `node:sqlite` module. No native addon or external dependency required.
+ */
+export class SqliteStore {
+  private db: DatabaseSync;
+
+  constructor(options: SqliteStoreOptions = {}) {
+    const path = options.path?.trim() || ':memory:';
+    if (path !== ':memory:') {
+      // SQLite raises `SQLITE_CANTOPEN` if the parent directory is missing;
+      // create it eagerly so a freshly-cloned env can use any path the user
+      // configures without a separate setup step.
+      mkdirSync(dirname(path), { recursive: true });
+    }
+    this.db = new DatabaseSync(path);
+    this.db.exec('PRAGMA foreign_keys = ON');
+    this.db.exec(SCHEMA);
+  }
+
+  close(): void {
+    this.db.close();
+  }
 
   createUser(username: string, passwordHash: string): StoredUser {
     const user: StoredUser = { id: generateId(), username, passwordHash };
-    this.users.set(user.id, user);
-    this.usernameIndex.set(username, user.id);
+    this.db
+      .prepare(
+        'INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)',
+      )
+      .run(user.id, user.username, user.passwordHash);
     return user;
   }
 
   findUserByUsername(username: string): StoredUser | undefined {
-    const id = this.usernameIndex.get(username);
-    return id ? this.users.get(id) : undefined;
+    const row = this.db
+      .prepare('SELECT * FROM users WHERE username = ?')
+      .get(username) as UserRow | undefined;
+    return row ? toUser(row) : undefined;
   }
 
   findUserById(id: string): StoredUser | undefined {
-    return this.users.get(id);
+    const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(id) as
+      | UserRow
+      | undefined;
+    return row ? toUser(row) : undefined;
   }
 
   saveAuthCode(code: AuthCode): void {
-    this.authCodes.set(code.code, code);
+    this.db
+      .prepare(
+        `INSERT INTO auth_codes
+           (code, user_id, client_id, redirect_uri, code_challenge, scope, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        code.code,
+        code.userId,
+        code.clientId,
+        code.redirectUri,
+        code.codeChallenge,
+        code.scope ?? null,
+        code.expiresAt,
+      );
   }
 
   takeAuthCode(code: string): AuthCode | undefined {
-    const found = this.authCodes.get(code);
-    if (found) {
-      this.authCodes.delete(code);
-    }
-    return found;
+    const row = this.db
+      .prepare('SELECT * FROM auth_codes WHERE code = ?')
+      .get(code) as AuthCodeRow | undefined;
+    if (!row) return undefined;
+    this.db.prepare('DELETE FROM auth_codes WHERE code = ?').run(code);
+    return toAuthCode(row);
   }
 
   saveRefreshToken(token: RefreshToken): void {
-    this.refreshTokens.set(token.token, token);
+    this.db
+      .prepare(
+        `INSERT INTO refresh_tokens
+           (token, user_id, client_id, scope, expires_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        token.token,
+        token.userId,
+        token.clientId,
+        token.scope ?? null,
+        token.expiresAt,
+      );
   }
 
   takeRefreshToken(token: string): RefreshToken | undefined {
-    const found = this.refreshTokens.get(token);
-    if (found) {
-      this.refreshTokens.delete(token);
-    }
-    return found;
+    const row = this.db
+      .prepare('SELECT * FROM refresh_tokens WHERE token = ?')
+      .get(token) as RefreshTokenRow | undefined;
+    if (!row) return undefined;
+    this.db.prepare('DELETE FROM refresh_tokens WHERE token = ?').run(token);
+    return toRefreshToken(row);
   }
 
   revokeUserTokens(userId: string): void {
-    for (const [token, rt] of this.refreshTokens) {
-      if (rt.userId === userId) {
-        this.refreshTokens.delete(token);
-      }
-    }
-    for (const [token, at] of this.accessTokens) {
-      if (at.userId === userId) {
-        this.accessTokens.delete(token);
-      }
-    }
+    this.db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').run(userId);
+    this.db.prepare('DELETE FROM access_tokens WHERE user_id = ?').run(userId);
   }
 
   saveAccessToken(token: AccessToken): void {
-    this.accessTokens.set(token.token, token);
+    this.db
+      .prepare(
+        `INSERT INTO access_tokens (token, user_id, scope, expires_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(token.token, token.userId, token.scope ?? null, token.expiresAt);
   }
 
   findAccessToken(token: string): AccessToken | undefined {
-    const accessToken = this.accessTokens.get(token);
-    if (accessToken && accessToken.expiresAt < Date.now()) {
-      this.accessTokens.delete(token);
+    const row = this.db
+      .prepare('SELECT * FROM access_tokens WHERE token = ?')
+      .get(token) as AccessTokenRow | undefined;
+    if (!row) return undefined;
+    if (row.expires_at < Date.now()) {
+      this.db.prepare('DELETE FROM access_tokens WHERE token = ?').run(token);
       return undefined;
     }
-    return accessToken;
+    return toAccessToken(row);
   }
 
   listProjects(ownerId: string): ProjectRecord[] {
-    const result: ProjectRecord[] = [];
-    for (const row of this.projects.values()) {
-      if (row.ownerId === ownerId) {
-        result.push(toPublicProject(row));
-      }
-    }
-    return result.sort((a, b) => b.updatedAt - a.updatedAt);
+    const rows = this.db
+      .prepare(
+        'SELECT * FROM projects WHERE owner_id = ? ORDER BY updated_at DESC',
+      )
+      .all(ownerId) as unknown as ProjectRow[];
+    return rows.map(toProject);
   }
 
   createProject(ownerId: string, input: ProjectInput): ProjectRecord {
     const now = Date.now();
-    const row: ProjectRow = {
+    const record: ProjectRecord = {
       id: generateId(),
-      ownerId,
       title: input.title,
       author: input.author,
       language: input.language,
       createdAt: now,
       updatedAt: now,
     };
-    this.projects.set(row.id, row);
-    return toPublicProject(row);
+    this.db
+      .prepare(
+        `INSERT INTO projects
+           (id, owner_id, title, author, language, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        record.id,
+        ownerId,
+        record.title ?? null,
+        record.author ?? null,
+        record.language ?? null,
+        record.createdAt,
+        record.updatedAt,
+      );
+    return record;
   }
 
   getProject(ownerId: string, id: string): ProjectRecord | undefined {
-    const row = this.projects.get(id);
-    return row && row.ownerId === ownerId ? toPublicProject(row) : undefined;
+    const row = this.db
+      .prepare('SELECT * FROM projects WHERE id = ? AND owner_id = ?')
+      .get(id, ownerId) as ProjectRow | undefined;
+    return row ? toProject(row) : undefined;
   }
 
   updateProject(
@@ -216,47 +402,62 @@ export class InMemoryStore implements Store {
     id: string,
     patch: ProjectInput,
   ): ProjectRecord | undefined {
-    const row = this.projects.get(id);
-    if (!row || row.ownerId !== ownerId) {
-      return undefined;
-    }
-    if (patch.title !== undefined) {
-      row.title = patch.title;
-    }
-    if (patch.author !== undefined) {
-      row.author = patch.author;
-    }
-    if (patch.language !== undefined) {
-      row.language = patch.language;
-    }
-    row.updatedAt = Date.now();
-    return toPublicProject(row);
+    const row = this.db
+      .prepare('SELECT * FROM projects WHERE id = ? AND owner_id = ?')
+      .get(id, ownerId) as ProjectRow | undefined;
+    if (!row) return undefined;
+
+    const next = {
+      title: patch.title !== undefined ? patch.title : row.title,
+      author: patch.author !== undefined ? patch.author : row.author,
+      language: patch.language !== undefined ? patch.language : row.language,
+      updated_at: Date.now(),
+    };
+    this.db
+      .prepare(
+        `UPDATE projects
+           SET title = ?, author = ?, language = ?, updated_at = ?
+           WHERE id = ?`,
+      )
+      .run(
+        next.title ?? null,
+        next.author ?? null,
+        next.language ?? null,
+        next.updated_at,
+        id,
+      );
+    return toProject({ ...row, ...next });
   }
 
   removeProject(ownerId: string, id: string): boolean {
-    const row = this.projects.get(id);
-    if (!row || row.ownerId !== ownerId) {
-      return false;
-    }
-    this.projects.delete(id);
-    this.files.delete(id);
-    this.attachments.delete(id);
-    this.docs.delete(id);
+    const result = this.db
+      .prepare('DELETE FROM projects WHERE id = ? AND owner_id = ?')
+      .run(id, ownerId);
+    if (result.changes === 0) return false;
+    // Foreign keys aren't declared on the dependent tables (keeping the
+    // schema flat for portability), so clean up here.
+    this.db.prepare('DELETE FROM files WHERE project_id = ?').run(id);
+    this.db.prepare('DELETE FROM attachments WHERE project_id = ?').run(id);
+    this.db.prepare('DELETE FROM docs WHERE project_id = ?').run(id);
     return true;
   }
 
   listFiles(projectId: string): FileEntry[] {
-    const map = this.files.get(projectId);
-    if (!map) {
-      return [];
-    }
-    return [...map.values()]
-      .map(toFileEntry)
-      .sort((a, b) => a.path.localeCompare(b.path));
+    const rows = this.db
+      .prepare(
+        'SELECT path, data, content_type, updated_at FROM files WHERE project_id = ? ORDER BY path',
+      )
+      .all(projectId) as unknown as FileRow[];
+    return rows.map(toFileEntry);
   }
 
   readFile(projectId: string, path: string): StoredFile | undefined {
-    return this.files.get(projectId)?.get(path);
+    const row = this.db
+      .prepare(
+        'SELECT path, data, content_type, updated_at FROM files WHERE project_id = ? AND path = ?',
+      )
+      .get(projectId, path) as FileRow | undefined;
+    return row ? toFile(row) : undefined;
   }
 
   writeFile(
@@ -265,38 +466,64 @@ export class InMemoryStore implements Store {
     data: Uint8Array,
     contentType: string,
   ): FileEntry {
-    let map = this.files.get(projectId);
-    if (!map) {
-      map = new Map();
-      this.files.set(projectId, map);
-    }
-    const file: StoredFile = { path, data, contentType, updatedAt: Date.now() };
-    map.set(path, file);
-    return toFileEntry(file);
+    const updatedAt = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO files (project_id, path, data, content_type, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(project_id, path) DO UPDATE SET
+           data = excluded.data,
+           content_type = excluded.content_type,
+           updated_at = excluded.updated_at`,
+      )
+      .run(projectId, path, data, contentType, updatedAt);
+    return {
+      path,
+      size: data.byteLength,
+      contentType,
+      updatedAt,
+    };
   }
 
   removeFile(projectId: string, path: string): boolean {
-    return this.files.get(projectId)?.delete(path) ?? false;
+    const result = this.db
+      .prepare('DELETE FROM files WHERE project_id = ? AND path = ?')
+      .run(projectId, path);
+    return result.changes > 0;
   }
 
   readAttachment(projectId: string, sha256: string): Uint8Array | undefined {
-    return this.attachments.get(projectId)?.get(sha256);
+    const row = this.db
+      .prepare(
+        'SELECT data FROM attachments WHERE project_id = ? AND sha256 = ?',
+      )
+      .get(projectId, sha256) as { data: Uint8Array } | undefined;
+    return row?.data;
   }
 
   writeAttachment(projectId: string, sha256: string, data: Uint8Array): void {
-    let map = this.attachments.get(projectId);
-    if (!map) {
-      map = new Map();
-      this.attachments.set(projectId, map);
-    }
-    map.set(sha256, data);
+    this.db
+      .prepare(
+        `INSERT INTO attachments (project_id, sha256, data)
+         VALUES (?, ?, ?)
+         ON CONFLICT(project_id, sha256) DO UPDATE SET data = excluded.data`,
+      )
+      .run(projectId, sha256, data);
   }
 
   loadDocState(projectId: string): Uint8Array | undefined {
-    return this.docs.get(projectId);
+    const row = this.db
+      .prepare('SELECT state FROM docs WHERE project_id = ?')
+      .get(projectId) as { state: Uint8Array } | undefined;
+    return row?.state;
   }
 
   saveDocState(projectId: string, state: Uint8Array): void {
-    this.docs.set(projectId, state);
+    this.db
+      .prepare(
+        `INSERT INTO docs (project_id, state) VALUES (?, ?)
+         ON CONFLICT(project_id) DO UPDATE SET state = excluded.state`,
+      )
+      .run(projectId, state);
   }
 }

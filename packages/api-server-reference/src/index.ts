@@ -10,9 +10,9 @@ export * from './schemas';
 export {
   type AccessToken,
   type AuthCode,
-  InMemoryStore,
   type RefreshToken,
-  type Store,
+  SqliteStore,
+  type SqliteStoreOptions,
   type StoredFile,
   type StoredUser,
 } from './store';

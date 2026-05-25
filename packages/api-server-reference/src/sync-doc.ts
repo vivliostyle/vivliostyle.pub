@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
 
-import type { Store } from './store';
+import type { SqliteStore } from './store';
 
 export type DocUpdateListener = (update: Uint8Array, origin: unknown) => void;
 
@@ -13,7 +13,7 @@ export class DocRegistry {
   private docs = new Map<string, Y.Doc>();
   private listeners = new Map<string, Set<DocUpdateListener>>();
 
-  constructor(private store: Store) {}
+  constructor(private store: SqliteStore) {}
 
   get(projectId: string): Y.Doc {
     const existing = this.docs.get(projectId);

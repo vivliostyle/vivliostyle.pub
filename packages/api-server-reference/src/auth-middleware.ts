@@ -1,9 +1,9 @@
 import { createMiddleware } from 'hono/factory';
 
 import type { AuthEnv } from './deps';
-import type { Store } from './store';
+import type { SqliteStore } from './store';
 
-export function bearerAuth(store: Store) {
+export function bearerAuth(store: SqliteStore) {
   return createMiddleware<AuthEnv>(async (c, next) => {
     const header = c.req.header('Authorization');
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;

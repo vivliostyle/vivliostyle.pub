@@ -1,4 +1,4 @@
-import type { Store } from './store';
+import type { SqliteStore } from './store';
 import type { DocRegistry } from './sync-doc';
 
 export interface ServerConfig {
@@ -18,7 +18,7 @@ export const defaultConfig: ServerConfig = {
 };
 
 export interface Deps {
-  store: Store;
+  store: SqliteStore;
   docs: DocRegistry;
   config: ServerConfig;
 }
