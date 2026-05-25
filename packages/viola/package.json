@@ -35,6 +35,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@v/api-server-reference": "workspace:*",
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
     "@v/storage-providers": "workspace:*",

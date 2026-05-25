@@ -374,6 +374,9 @@ importers:
 
   packages/api-client:
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.8.0
       '@v/api-spec':
         specifier: workspace:*
         version: link:../api-spec
@@ -386,6 +389,9 @@ importers:
       openapi-typescript:
         specifier: 'catalog:'
         version: 7.13.0(typescript@6.0.3)
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -925,6 +931,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.14)
+      '@v/api-server-reference':
+        specifier: workspace:*
+        version: link:../api-server-reference
       '@v/cli-bundle':
         specifier: workspace:*
         version: link:../cli-bundle

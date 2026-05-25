@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "node --import tsx scripts/generate.ts",
+    "dev": "node --import tsx scripts/generate.ts --watch",
     "generate": "node --import tsx scripts/generate.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

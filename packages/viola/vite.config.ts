@@ -125,6 +125,97 @@ const serveCli = () =>
     },
   }) satisfies Plugin;
 
+const serveApi = (): Plugin => {
+  let currentMiddleware:
+    | ((
+        req: import('node:http').IncomingMessage,
+        res: import('node:http').ServerResponse,
+        next: (err?: unknown) => void,
+      ) => void)
+    | undefined;
+  let basePath = '/api';
+
+  return {
+    name: 'serve-api',
+    apply: 'serve',
+    async configureServer(server) {
+      // Use vite's own SSR loader. Vite's config-file loader uses Node's
+      // strict ESM resolution which rejects the extensionless TS imports
+      // used throughout `@v/api-server-reference`; the SSR loader runs
+      // through vite's plugin pipeline and resolves them correctly.
+      const loadApi = async () => {
+        const mod = (await server.ssrLoadModule(
+          '@v/api-server-reference/dev-server',
+        )) as typeof import('@v/api-server-reference/dev-server');
+        return mod.createApiDevServer();
+      };
+
+      let api = await loadApi();
+      currentMiddleware = api.middleware;
+      basePath = api.basePath;
+
+      // Single middleware registration that always delegates to the current
+      // API instance, so swapping the instance on reload doesn't double-
+      // register or leave dead handlers behind.
+      server.middlewares.use((req, res, next) => {
+        if (currentMiddleware) {
+          currentMiddleware(req, res, next);
+        } else {
+          next();
+        }
+      });
+
+      // Watch the reference server source. On change, invalidate vite's SSR
+      // module cache and rebuild the API instance so HTTP routes hot-reload.
+      // Vite's own watcher only fires for files inside its project root, so
+      // poll the external workspace package with `fs.watchFile` instead.
+      const apiSrc = path.resolve(dirname, '../api-server-reference/src');
+      let reloadTimer: NodeJS.Timeout | undefined;
+      const scheduleReload = (file: string) => {
+        clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(async () => {
+          try {
+            server.moduleGraph.invalidateAll();
+            api = await loadApi();
+            currentMiddleware = api.middleware;
+            server.config.logger.info(
+              `  \x1b[32m➜\x1b[0m  API reloaded (${path.relative(apiSrc, file)})`,
+            );
+          } catch (err) {
+            server.config.logger.error(
+              `  [api] reload failed: ${(err as Error).message}`,
+            );
+          }
+        }, 100);
+      };
+      const watchTree = (dir: string) => {
+        for (const entry of fs.readdirSync(dir)) {
+          const p = path.join(dir, entry);
+          const stat = fs.statSync(p);
+          if (stat.isDirectory()) {
+            watchTree(p);
+          } else if (p.endsWith('.ts') && !p.endsWith('.test.ts')) {
+            fs.watchFile(p, { interval: 200 }, () => scheduleReload(p));
+          }
+        }
+      };
+      watchTree(apiSrc);
+
+      // WebSocket upgrade has to be attached after vite binds `httpServer`,
+      // and only once: hono-ws's listener cannot be removed cleanly, so WS
+      // handlers do not hot-reload (HTTP routes do).
+      return () => {
+        if (server.httpServer) {
+          api.injectWebSocket(server.httpServer);
+        }
+        server.config.logger.info(
+          `  \x1b[32m➜\x1b[0m  API mounted at \x1b[36m${basePath}\x1b[0m`,
+        );
+      };
+    },
+  };
+};
+
 const serviceWorker = () => [
   VitePWA({
     strategies: 'injectManifest',
@@ -210,6 +301,7 @@ export default defineConfig(({ mode, command }) => {
       serviceWorker(),
       serveTemplates(),
       serveCli(),
+      serveApi(),
       visualizer() as PluginOption,
     ],
     server:

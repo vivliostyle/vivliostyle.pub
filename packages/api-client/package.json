@@ -9,15 +9,19 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "build": "openapi-typescript ../api-spec/src/openapi.yaml --output src/schema.d.ts",
+    "build": "node --import tsx scripts/generate.ts",
+    "dev": "node --import tsx scripts/generate.ts --watch",
+    "generate": "node --import tsx scripts/generate.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@v/api-spec": "workspace:*",
     "@v/config": "workspace:*",
     "openapi-fetch": "catalog:",
     "openapi-typescript": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

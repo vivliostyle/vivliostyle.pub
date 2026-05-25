@@ -6,7 +6,7 @@ export function openApiDocumentation(): GenerateSpecOptions['documentation'] {
     openapi: '3.1.0',
     info: {
       title: 'Vivliostyle Pub Sync API',
-      version: '1.0.0',
+      version: '0.1.0',
       description:
         'Open API for Vivliostyle Pub project sync, files, attachments, and OAuth 2.1 authentication. Generated from the reference implementation (@v/api-server-reference); do not edit by hand.',
     },
