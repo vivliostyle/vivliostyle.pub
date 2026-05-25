@@ -15,6 +15,7 @@ import { Route as DebugIndexeddbPersistenceIndexRouteImport } from './routes/deb
 import { Route as DebugAstViewerIndexRouteImport } from './routes/debug/ast-viewer/index'
 import { Route as mainLayoutIndexRouteImport } from './routes/(main)/_layout/index'
 import { Route as mainLayoutNewProjectRouteImport } from './routes/(main)/_layout/new-project'
+import { Route as mainLayoutSettingsAccountRouteImport } from './routes/(main)/_layout/settings/account'
 import { Route as mainLayoutProjectsProjectIdIndexRouteImport } from './routes/(main)/_layout/projects/$projectId/index'
 import { Route as mainLayoutProjectsProjectIdThemeRouteImport } from './routes/(main)/_layout/projects/$projectId/theme'
 import { Route as mainLayoutProjectsProjectIdPreviewRouteImport } from './routes/(main)/_layout/projects/$projectId/preview'
@@ -52,6 +53,12 @@ const mainLayoutNewProjectRoute = mainLayoutNewProjectRouteImport.update({
   path: '/new-project',
   getParentRoute: () => mainLayoutRoute,
 } as any)
+const mainLayoutSettingsAccountRoute =
+  mainLayoutSettingsAccountRouteImport.update({
+    id: '/settings/account',
+    path: '/settings/account',
+    getParentRoute: () => mainLayoutRoute,
+  } as any)
 const mainLayoutProjectsProjectIdIndexRoute =
   mainLayoutProjectsProjectIdIndexRouteImport.update({
     id: '/projects/$projectId/',
@@ -95,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
   '/debug/indexeddb-persistence/': typeof DebugIndexeddbPersistenceIndexRoute
+  '/settings/account': typeof mainLayoutSettingsAccountRoute
   '/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
   '/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
   '/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
@@ -108,6 +116,7 @@ export interface FileRoutesByTo {
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
   '/debug/indexeddb-persistence': typeof DebugIndexeddbPersistenceIndexRoute
+  '/settings/account': typeof mainLayoutSettingsAccountRoute
   '/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
   '/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
   '/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
@@ -123,6 +132,7 @@ export interface FileRoutesById {
   '/(main)/_layout/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
   '/debug/indexeddb-persistence/': typeof DebugIndexeddbPersistenceIndexRoute
+  '/(main)/_layout/settings/account': typeof mainLayoutSettingsAccountRoute
   '/(main)/_layout/projects/$projectId/bibliography': typeof mainLayoutProjectsProjectIdBibliographyRoute
   '/(main)/_layout/projects/$projectId/media': typeof mainLayoutProjectsProjectIdMediaRoute
   '/(main)/_layout/projects/$projectId/preview': typeof mainLayoutProjectsProjectIdPreviewRoute
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/'
     | '/debug/ast-viewer/'
     | '/debug/indexeddb-persistence/'
+    | '/settings/account'
     | '/projects/$projectId/bibliography'
     | '/projects/$projectId/media'
     | '/projects/$projectId/preview'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/'
     | '/debug/ast-viewer'
     | '/debug/indexeddb-persistence'
+    | '/settings/account'
     | '/projects/$projectId/bibliography'
     | '/projects/$projectId/media'
     | '/projects/$projectId/preview'
@@ -165,6 +177,7 @@ export interface FileRouteTypes {
     | '/(main)/_layout/'
     | '/debug/ast-viewer/'
     | '/debug/indexeddb-persistence/'
+    | '/(main)/_layout/settings/account'
     | '/(main)/_layout/projects/$projectId/bibliography'
     | '/(main)/_layout/projects/$projectId/media'
     | '/(main)/_layout/projects/$projectId/preview'
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof mainLayoutNewProjectRouteImport
       parentRoute: typeof mainLayoutRoute
     }
+    '/(main)/_layout/settings/account': {
+      id: '/(main)/_layout/settings/account'
+      path: '/settings/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof mainLayoutSettingsAccountRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
     '/(main)/_layout/projects/$projectId/': {
       id: '/(main)/_layout/projects/$projectId/'
       path: '/projects/$projectId'
@@ -272,6 +292,7 @@ declare module '@tanstack/react-router' {
 interface mainLayoutRouteChildren {
   mainLayoutNewProjectRoute: typeof mainLayoutNewProjectRoute
   mainLayoutIndexRoute: typeof mainLayoutIndexRoute
+  mainLayoutSettingsAccountRoute: typeof mainLayoutSettingsAccountRoute
   mainLayoutProjectsProjectIdBibliographyRoute: typeof mainLayoutProjectsProjectIdBibliographyRoute
   mainLayoutProjectsProjectIdMediaRoute: typeof mainLayoutProjectsProjectIdMediaRoute
   mainLayoutProjectsProjectIdPreviewRoute: typeof mainLayoutProjectsProjectIdPreviewRoute
@@ -283,6 +304,7 @@ interface mainLayoutRouteChildren {
 const mainLayoutRouteChildren: mainLayoutRouteChildren = {
   mainLayoutNewProjectRoute: mainLayoutNewProjectRoute,
   mainLayoutIndexRoute: mainLayoutIndexRoute,
+  mainLayoutSettingsAccountRoute: mainLayoutSettingsAccountRoute,
   mainLayoutProjectsProjectIdBibliographyRoute:
     mainLayoutProjectsProjectIdBibliographyRoute,
   mainLayoutProjectsProjectIdMediaRoute: mainLayoutProjectsProjectIdMediaRoute,

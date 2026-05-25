@@ -35,8 +35,11 @@ const initialTocState = {
   sectionDepth: 0,
 };
 
+export type ProjectSource = 'local' | 'remote';
+
 export interface ProjectEntry {
   projectId: ProjectId;
+  source: ProjectSource;
   title?: string;
   author?: string;
   updatedAt?: number;

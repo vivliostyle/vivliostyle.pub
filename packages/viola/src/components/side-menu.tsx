@@ -39,14 +39,17 @@ import {
   FilePlus,
   FolderOpen,
   ImageIcon,
+  LogIn,
   MoreHorizontal,
   Palette,
   Printer,
+  UserRound,
 } from '@v/ui/icon';
 import { cn } from '@v/ui/lib/utils';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -60,7 +63,13 @@ import {
 } from '@v/ui/sidebar';
 import VivliostyleLogo from '../assets/vivliostyle-logo.svg';
 import { generateId } from '../libs/generate-id';
-import { $content, $project, $projects, $ui } from '../stores/accessors';
+import {
+  $content,
+  $project,
+  $projects,
+  $session,
+  $ui,
+} from '../stores/accessors';
 import {
   createContentFile,
   deleteContentFile,
@@ -225,6 +234,51 @@ function TopMenuSection() {
           </ProjectDropdownMenu>
         )}
       </div>
+    </SidebarMenu>
+  );
+}
+
+function AccountMenuSection() {
+  const sessionSnap = useSnapshot($session);
+  const uiSnap = useSnapshot($ui);
+  const authed =
+    sessionSnap.status === 'authenticated' && sessionSnap.user !== null;
+  // Mirror Open Project: if the user is already in a pane, open Account in a
+  // dedicated modal so we don't tear down their current view. On the empty
+  // root, navigate to the route instead.
+  const hasOpenPane = uiSnap.tabs.some((tab) => tab.type !== 'start');
+
+  if (hasOpenPane) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            tooltip={authed ? 'Account' : 'Sign in'}
+            onClick={() => {
+              $ui.dedicatedModal = { id: generateId(), type: 'account' };
+            }}
+          >
+            {authed ? <UserRound /> : <LogIn />}
+            <span className="truncate">
+              {authed ? sessionSnap.user?.username : 'Sign in'}
+            </span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild tooltip={authed ? 'Account' : 'Sign in'}>
+          <Link to="/settings/account">
+            {authed ? <UserRound /> : <LogIn />}
+            <span className="truncate">
+              {authed ? sessionSnap.user?.username : 'Sign in'}
+            </span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
     </SidebarMenu>
   );
 }
@@ -452,23 +506,30 @@ export function SideMenu() {
       <SidebarHeader>
         <TopMenuSection />
       </SidebarHeader>
-      {projects.currentProjectId && (
-        <>
-          <SidebarSeparator />
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <ContentMenuSection />
-              </SidebarGroupContent>
-            </SidebarGroup>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <FileTree />
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-        </>
+      <SidebarSeparator />
+      {projects.currentProjectId ? (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <ContentMenuSection />
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <FileTree />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      ) : (
+        // Empty spacer so the footer stays pinned to the bottom of the
+        // sidebar even when no project is selected (SidebarContent is
+        // flex-1; without it, the footer rides up under the header).
+        <SidebarContent />
       )}
+      <SidebarSeparator />
+      <SidebarFooter>
+        <AccountMenuSection />
+      </SidebarFooter>
     </Sidebar>
   );
 }

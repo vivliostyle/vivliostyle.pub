@@ -931,9 +931,15 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.14)
+      '@v/api-client':
+        specifier: workspace:*
+        version: link:../api-client
       '@v/api-server-reference':
         specifier: workspace:*
         version: link:../api-server-reference
+      '@v/auth-client':
+        specifier: workspace:*
+        version: link:../auth-client
       '@v/cli-bundle':
         specifier: workspace:*
         version: link:../cli-bundle
