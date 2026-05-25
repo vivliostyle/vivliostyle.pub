@@ -1,0 +1,951 @@
+openapi: 3.1.0
+info:
+  title: Vivliostyle Pub Sync API
+  description: Open API for Vivliostyle Pub project sync, files, attachments, and
+    OAuth 2.1 authentication. Generated from the reference implementation
+    (@v/api-server-reference); do not edit by hand.
+  version: 1.0.0
+servers:
+  - url: /
+    description: Relative to the server origin
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+tags:
+  - name: auth
+    description: OAuth 2.1 + PKCE authentication
+  - name: projects
+    description: Project metadata
+  - name: files
+    description: Direct file access
+  - name: attachments
+    description: Content-addressed binary attachments
+  - name: sync
+    description: Yjs document sync (HTTP fallback)
+  - name: capabilities
+    description: Server capability discovery
+paths:
+  /.well-known/vivliostyle-pub:
+    get:
+      operationId: getWellKnownVivliostylePub
+      tags:
+        - capabilities
+      summary: Server capabilities and supported API versions.
+      responses:
+        "200":
+          description: Capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  version:
+                    type: string
+                  apiVersions:
+                    type: array
+                    items:
+                      type: string
+                  features:
+                    type: object
+                    properties:
+                      sync:
+                        type: boolean
+                      attachments:
+                        type: boolean
+                      oauth:
+                        type: boolean
+                    required:
+                      - sync
+                      - attachments
+                      - oauth
+                required:
+                  - name
+                  - version
+                  - apiVersions
+                  - features
+  /auth/register:
+    post:
+      operationId: postAuthRegister
+      tags:
+        - auth
+      summary: Register a new user (reference-server convenience).
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  username:
+                    type: string
+                required:
+                  - id
+                  - username
+        "409":
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 256
+              required:
+                - username
+                - password
+  /oauth/authorize:
+    post:
+      operationId: postOauthAuthorize
+      tags:
+        - auth
+      summary: Issue an authorization code (OAuth 2.1 + PKCE).
+      description: The reference server validates credentials inline in place of an
+        interactive consent screen.
+      responses:
+        "200":
+          description: Authorization code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                  state:
+                    type: string
+                  redirectUri:
+                    type: string
+                required:
+                  - code
+                  - redirectUri
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                clientId:
+                  type: string
+                redirectUri:
+                  type: string
+                  format: uri
+                codeChallenge:
+                  type: string
+                codeChallengeMethod:
+                  const: S256
+                  default: S256
+                scope:
+                  type: string
+                state:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - clientId
+                - redirectUri
+                - codeChallenge
+                - username
+                - password
+  /oauth/token:
+    post:
+      operationId: postOauthToken
+      tags:
+        - auth
+      summary: Exchange an authorization code or refresh token for tokens.
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  tokenType:
+                    const: Bearer
+                  expiresIn:
+                    type: number
+                  refreshToken:
+                    type: string
+                  scope:
+                    type: string
+                required:
+                  - accessToken
+                  - tokenType
+                  - expiresIn
+                  - refreshToken
+        "400":
+          description: Invalid grant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    grantType:
+                      const: authorization_code
+                    code:
+                      type: string
+                    codeVerifier:
+                      type: string
+                    redirectUri:
+                      type: string
+                      format: uri
+                    clientId:
+                      type: string
+                  required:
+                    - grantType
+                    - code
+                    - codeVerifier
+                    - redirectUri
+                    - clientId
+                - type: object
+                  properties:
+                    grantType:
+                      const: refresh_token
+                    refreshToken:
+                      type: string
+                    clientId:
+                      type: string
+                  required:
+                    - grantType
+                    - refreshToken
+                    - clientId
+  /oauth/refresh:
+    post:
+      operationId: postOauthRefresh
+      tags:
+        - auth
+      summary: Refresh tokens (rotating refresh token).
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  tokenType:
+                    const: Bearer
+                  expiresIn:
+                    type: number
+                  refreshToken:
+                    type: string
+                  scope:
+                    type: string
+                required:
+                  - accessToken
+                  - tokenType
+                  - expiresIn
+                  - refreshToken
+        "400":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                clientId:
+                  type: string
+              required:
+                - refreshToken
+                - clientId
+  /oauth/session:
+    delete:
+      operationId: deleteOauthSession
+      tags:
+        - auth
+      summary: Revoke the caller's tokens.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Revoked
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+  /oauth/userinfo:
+    get:
+      operationId: getOauthUserinfo
+      tags:
+        - auth
+      summary: Get the authenticated user.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  username:
+                    type: string
+                required:
+                  - id
+                  - username
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+  /projects:
+    get:
+      operationId: getProjects
+      tags:
+        - projects
+      summary: List the authenticated user's projects.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        author:
+                          type: string
+                        language:
+                          type: string
+                        createdAt:
+                          type: number
+                        updatedAt:
+                          type: number
+                      required:
+                        - id
+                        - createdAt
+                        - updatedAt
+                required:
+                  - projects
+    post:
+      operationId: postProjects
+      tags:
+        - projects
+      summary: Create a project.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  author:
+                    type: string
+                  language:
+                    type: string
+                  createdAt:
+                    type: number
+                  updatedAt:
+                    type: number
+                required:
+                  - id
+                  - createdAt
+                  - updatedAt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                author:
+                  type: string
+                language:
+                  type: string
+              required: []
+  /projects/{id}:
+    get:
+      operationId: getProjectsById
+      tags:
+        - projects
+      summary: Get project metadata.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  author:
+                    type: string
+                  language:
+                    type: string
+                  createdAt:
+                    type: number
+                  updatedAt:
+                    type: number
+                required:
+                  - id
+                  - createdAt
+                  - updatedAt
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+    put:
+      operationId: putProjectsById
+      tags:
+        - projects
+      summary: Update project metadata.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  author:
+                    type: string
+                  language:
+                    type: string
+                  createdAt:
+                    type: number
+                  updatedAt:
+                    type: number
+                required:
+                  - id
+                  - createdAt
+                  - updatedAt
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                author:
+                  type: string
+                language:
+                  type: string
+              required: []
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+    delete:
+      operationId: deleteProjectsById
+      tags:
+        - projects
+      summary: Delete a project.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+  /projects/{id}/files:
+    get:
+      operationId: getProjectsByIdFiles
+      tags:
+        - files
+      summary: List files in a project.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                        size:
+                          type: number
+                        contentType:
+                          type: string
+                        updatedAt:
+                          type: number
+                      required:
+                        - path
+                        - size
+                        - contentType
+                        - updatedAt
+                required:
+                  - files
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+  /projects/{id}/files/{path}:
+    get:
+      operationId: getProjectsByIdFilesByPath
+      tags:
+        - files
+      summary: Read a file.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File contents
+          content: &a1
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: path
+          required: true
+    put:
+      operationId: putProjectsByIdFilesByPath
+      tags:
+        - files
+      summary: Create or replace a file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        content: *a1
+      responses:
+        "204":
+          description: Saved
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: path
+          required: true
+    delete:
+      operationId: deleteProjectsByIdFilesByPath
+      tags:
+        - files
+      summary: Delete a file.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: path
+          required: true
+  /projects/{id}/attachments/{sha256}:
+    get:
+      operationId: getProjectsByIdAttachmentsBySha256
+      tags:
+        - attachments
+      summary: Read a content-addressed attachment.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Attachment bytes
+          content: *a1
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: sha256
+          required: true
+    put:
+      operationId: putProjectsByIdAttachmentsBySha256
+      tags:
+        - attachments
+      summary: Upload a content-addressed attachment.
+      description: The request body must hash (SHA-256, hex) to the path parameter.
+      security:
+        - bearerAuth: []
+      requestBody:
+        content: *a1
+      responses:
+        "201":
+          description: Stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sha256:
+                    type: string
+                  size:
+                    type: number
+                required:
+                  - sha256
+                  - size
+        "400":
+          description: Hash mismatch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: sha256
+          required: true
+  /projects/{id}/sync:
+    get:
+      operationId: getProjectsByIdSync
+      tags:
+        - sync
+      summary: Fetch the Yjs update missing from the client state vector.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sv
+          in: query
+          required: false
+          description: Client's base64url-encoded Yjs state vector.
+          schema:
+            type: string
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Yjs update
+          content: *a1
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+    post:
+      operationId: postProjectsByIdSync
+      tags:
+        - sync
+      summary: Apply a Yjs update and receive the merged diff in return.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sv
+          in: query
+          required: false
+          description: Client's base64url-encoded Yjs state vector.
+          schema:
+            type: string
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      requestBody:
+        content: *a1
+      responses:
+        "200":
+          description: Merged Yjs update
+          content: *a1
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error

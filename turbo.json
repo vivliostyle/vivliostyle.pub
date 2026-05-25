@@ -25,7 +25,7 @@
     },
     "@v/api-spec#build": {
       "dependsOn": ["^build"],
-      "outputs": ["src/openapi.json"]
+      "outputs": ["src/openapi.yaml"]
     },
     "@v/api-client#build": {
       "dependsOn": ["^build"],

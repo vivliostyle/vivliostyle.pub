@@ -6,13 +6,16 @@
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
-    "./openapi.json": "./src/openapi.json"
+    "./openapi.yaml": "./src/openapi.yaml"
   },
   "scripts": {
     "build": "node --import tsx scripts/generate.ts",
     "generate": "node --import tsx scripts/generate.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
