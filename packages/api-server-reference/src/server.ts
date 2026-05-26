@@ -2,9 +2,9 @@ import { serve } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 
 import { createApp } from './app';
-import { FileStore } from './file-store';
-import { SqliteStore } from './store';
-import { registerSyncWebSocket } from './sync-websocket';
+import { FileStore } from './storage/file-store';
+import { SqliteStore } from './storage/sqlite-store';
+import { registerSyncWebSocket } from './sync/websocket';
 
 // When either env var is unset the corresponding store falls back to in-memory
 // (SQLite `:memory:`, `@platformatic/vfs`'s `MemoryProvider`) and the data is

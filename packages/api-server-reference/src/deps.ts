@@ -1,6 +1,6 @@
-import type { FileStore } from './file-store';
-import type { SqliteStore } from './store';
-import type { DocRegistry } from './sync-doc';
+import type { FileStore } from './storage/file-store';
+import type { SqliteStore } from './storage/sqlite-store';
+import type { DocRegistry } from './sync/doc-registry';
 
 export interface ServerConfig {
   name: string;

@@ -3,7 +3,7 @@ import { describeRoute } from 'hono-openapi';
 
 import { sha256Hex } from '../crypto';
 import type { AuthEnv, Deps } from '../deps';
-import { binaryContent, jsonContent, toArrayBuffer } from '../route-helpers';
+import { binaryContent, jsonContent, toArrayBuffer } from '../http-helpers';
 import { AttachmentResultSchema, ErrorSchema } from '../schemas';
 
 export function attachmentRoutes({ store, files }: Deps) {

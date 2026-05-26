@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { describeRoute, validator } from 'hono-openapi';
 
 import type { AuthEnv, Deps } from '../deps';
-import { jsonContent } from '../route-helpers';
+import { jsonContent } from '../http-helpers';
 import {
   ErrorSchema,
   ProjectInputSchema,

@@ -10,7 +10,6 @@ import {
   defaultConfig,
   type ServerConfig,
 } from './deps';
-import { FileStore } from './file-store';
 import { openApiDocumentation, openApiReferencePage } from './openapi';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
@@ -18,8 +17,9 @@ import { fileRoutes } from './routes/files';
 import { projectRoutes } from './routes/projects';
 import { syncRoutes } from './routes/sync';
 import { wellKnownRoutes } from './routes/well-known';
-import { SqliteStore } from './store';
-import { DocRegistry } from './sync-doc';
+import { FileStore } from './storage/file-store';
+import { SqliteStore } from './storage/sqlite-store';
+import { DocRegistry } from './sync/doc-registry';
 
 export interface CreateAppOptions {
   store?: SqliteStore;

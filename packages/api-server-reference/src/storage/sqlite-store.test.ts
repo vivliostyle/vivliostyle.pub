@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 
-import { createApp } from './app';
-import { pkceChallengeS256 } from './crypto';
-import { SqliteStore } from './store';
+import { createApp } from '../app';
+import { pkceChallengeS256 } from '../crypto';
+import { SqliteStore } from './sqlite-store';
 
 describe('SqliteStore', () => {
   let store: SqliteStore;

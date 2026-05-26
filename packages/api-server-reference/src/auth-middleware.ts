@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 
 import type { AuthEnv } from './deps';
-import type { SqliteStore } from './store';
+import type { SqliteStore } from './storage/sqlite-store';
 
 export function bearerAuth(store: SqliteStore) {
   return createMiddleware<AuthEnv>(async (c, next) => {

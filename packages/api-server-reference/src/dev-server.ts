@@ -10,9 +10,9 @@ import { getRequestListener } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 
 import { type CreateAppOptions, createApp } from './app';
-import { FileStore } from './file-store';
-import { SqliteStore } from './store';
-import { registerSyncWebSocket } from './sync-websocket';
+import { FileStore } from './storage/file-store';
+import { SqliteStore } from './storage/sqlite-store';
+import { registerSyncWebSocket } from './sync/websocket';
 
 /**
  * Matches what `@hono/node-ws#injectWebSocket` accepts, which also covers

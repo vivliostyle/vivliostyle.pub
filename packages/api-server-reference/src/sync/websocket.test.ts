@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
 
-import { createApiDevServer } from './dev-server';
+import { createApiDevServer } from '../dev-server';
 
 const MESSAGE_SYNC = 0;
 

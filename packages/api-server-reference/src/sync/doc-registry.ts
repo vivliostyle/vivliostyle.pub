@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
 
-import type { SqliteStore } from './store';
+import type { SqliteStore } from '../storage/sqlite-store';
 
 export type DocUpdateListener = (update: Uint8Array, origin: unknown) => void;
 

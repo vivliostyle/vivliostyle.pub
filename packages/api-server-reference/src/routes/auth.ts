@@ -9,7 +9,7 @@ import {
   verifyPkce,
 } from '../crypto';
 import type { AuthEnv, Deps } from '../deps';
-import { jsonContent } from '../route-helpers';
+import { jsonContent } from '../http-helpers';
 import {
   AuthorizeRequestSchema,
   AuthorizeResponseSchema,

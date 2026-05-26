@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { describeRoute } from 'hono-openapi';
 
 import type { AuthEnv, Deps } from '../deps';
-import { binaryContent, jsonContent, toArrayBuffer } from '../route-helpers';
+import { binaryContent, jsonContent, toArrayBuffer } from '../http-helpers';
 import { ErrorSchema, FileListSchema } from '../schemas';
 
 export function fileRoutes({ store, files, docs }: Deps) {

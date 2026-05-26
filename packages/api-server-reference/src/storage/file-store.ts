@@ -2,7 +2,7 @@ import * as nodeFs from 'node:fs/promises';
 import { create as createVfs, type VirtualFileSystem } from '@platformatic/vfs';
 import { dirname, join, normalize } from 'pathe';
 
-import type { FileEntry } from './schemas';
+import type { FileEntry } from '../schemas';
 
 const MIME_BY_EXT: Record<string, string> = {
   md: 'text/markdown',

@@ -2,8 +2,8 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { generateId } from './crypto';
-import type { ProjectInput, ProjectRecord } from './schemas';
+import { generateId } from '../crypto';
+import type { ProjectInput, ProjectRecord } from '../schemas';
 
 export interface StoredUser {
   id: string;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 
-import { SqliteStore } from './store';
-import { DocRegistry } from './sync-doc';
+import { SqliteStore } from '../storage/sqlite-store';
+import { DocRegistry } from './doc-registry';
 
 describe('DocRegistry', () => {
   it('notifies subscribers when another connection applies an update', () => {

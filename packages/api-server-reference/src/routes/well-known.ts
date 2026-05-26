@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { describeRoute } from 'hono-openapi';
 
 import type { Deps } from '../deps';
-import { jsonContent } from '../route-helpers';
+import { jsonContent } from '../http-helpers';
 import { CapabilitiesSchema } from '../schemas';
 
 export function wellKnownRoutes({ config }: Deps) {
