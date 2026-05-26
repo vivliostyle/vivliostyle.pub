@@ -7,25 +7,62 @@ export function openApiDocumentation(): GenerateSpecOptions['documentation'] {
     info: {
       title: 'Vivliostyle Pub Sync API',
       version: '0.1.0',
-      description:
-        'Open API for Vivliostyle Pub project sync, files, attachments, and OAuth 2.1 authentication. Generated from the reference implementation (@v/api-server-reference); do not edit by hand.',
+      description: [
+        'The Vivliostyle Pub Sync API lets you sign in, manage your book',
+        'projects, and keep their contents synchronized across devices.',
+        '',
+        '- **Sign in** with OAuth 2.1 + PKCE to obtain a bearer token, then send it as `Authorization: Bearer <token>` on every other call.',
+        '- **Manage projects** — list, create, update, or delete the books on your account.',
+        '- **Read and write project files** — individual text/source files plus larger binary assets stored as attachments.',
+        '- **Sync collaboratively** — exchange document updates with other editors in realtime over WebSocket, or one-shot over HTTP.',
+        '',
+        'All endpoints except the ones under **auth** and **capabilities** require a valid bearer token.',
+      ].join('\n'),
     },
-    servers: [{ url: '/', description: 'Relative to the server origin' }],
+    servers: [
+      { url: '/', description: 'Same origin as this documentation page' },
+    ],
     components: {
       securitySchemes: {
-        bearerAuth: { type: 'http', scheme: 'bearer' },
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          description:
+            'Access token obtained from `POST /oauth/token`. Send it as `Authorization: Bearer <token>`.',
+        },
       },
     },
     tags: [
-      { name: 'auth', description: 'OAuth 2.1 + PKCE authentication' },
-      { name: 'projects', description: 'Project metadata' },
-      { name: 'files', description: 'Direct file access' },
+      {
+        name: 'auth',
+        description:
+          'Sign in and manage access tokens. Uses OAuth 2.1 with PKCE; the resulting bearer token authorizes every other endpoint.',
+      },
+      {
+        name: 'projects',
+        description:
+          'Create, list, update, and delete the book projects on your account. Each project is the container for its files, attachments, and collaborative-editing state.',
+      },
+      {
+        name: 'files',
+        description:
+          'Read and write the source files (Markdown, CSS, configuration, etc.) inside a project.',
+      },
       {
         name: 'attachments',
-        description: 'Content-addressed binary attachments',
+        description:
+          'Upload and fetch binary assets — such as images embedded in a book — addressed by their SHA-256 hash. Identical contents are stored only once.',
       },
-      { name: 'sync', description: 'Yjs document sync (HTTP fallback)' },
-      { name: 'capabilities', description: 'Server capability discovery' },
+      {
+        name: 'sync',
+        description:
+          'Exchange collaborative-editing updates for a project. The realtime channel is a WebSocket; these HTTP endpoints provide the same data for clients that cannot keep a socket open. Updates use the Yjs CRDT binary format.',
+      },
+      {
+        name: 'capabilities',
+        description:
+          'Discover the server name, version, and which optional features it supports.',
+      },
     ],
   };
 }

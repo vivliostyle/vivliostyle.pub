@@ -26,14 +26,17 @@ export function syncRoutes({ store, docs }: Deps) {
     '/projects/:id/sync',
     describeRoute({
       tags: ['sync'],
-      summary: 'Fetch the Yjs update missing from the client state vector.',
+      summary: 'Pull the latest document updates for a project.',
+      description:
+        'Returns the Yjs update needed to bring the caller up to date. If the `sv` query parameter is supplied, only the delta missing from that state vector is returned; otherwise the full document state is returned.',
       security: [{ bearerAuth: [] }],
       parameters: [
         {
           name: 'sv',
           in: 'query',
           required: false,
-          description: "Client's base64url-encoded Yjs state vector.",
+          description:
+            "The client's current Yjs state vector, encoded as base64url. Omit to receive the full document state.",
           schema: { type: 'string' },
         },
       ],
@@ -65,14 +68,17 @@ export function syncRoutes({ store, docs }: Deps) {
     '/projects/:id/sync',
     describeRoute({
       tags: ['sync'],
-      summary: 'Apply a Yjs update and receive the merged diff in return.',
+      summary: 'Push local document updates and pull remote updates back.',
+      description:
+        'Applies the Yjs update sent in the request body, then returns the update the caller still needs to converge with the server (filtered by the `sv` state vector when supplied). Send an empty body to pull-only.',
       security: [{ bearerAuth: [] }],
       parameters: [
         {
           name: 'sv',
           in: 'query',
           required: false,
-          description: "Client's base64url-encoded Yjs state vector.",
+          description:
+            "The client's current Yjs state vector, encoded as base64url. Omit to receive the full document state.",
           schema: { type: 'string' },
         },
       ],

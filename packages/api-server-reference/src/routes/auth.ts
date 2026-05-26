@@ -58,7 +58,9 @@ export function authRoutes({ store, config }: Deps) {
     '/auth/register',
     describeRoute({
       tags: ['auth'],
-      summary: 'Register a new user (reference-server convenience).',
+      summary: 'Create a new user account.',
+      description:
+        'Creates an account with the given username and password. Sign in via `/oauth/authorize` afterwards to obtain access tokens.',
       responses: {
         201: { description: 'Created', content: jsonContent(UserSchema) },
         409: {
@@ -85,9 +87,9 @@ export function authRoutes({ store, config }: Deps) {
     '/oauth/authorize',
     describeRoute({
       tags: ['auth'],
-      summary: 'Issue an authorization code (OAuth 2.1 + PKCE).',
+      summary: 'Sign in and receive an authorization code.',
       description:
-        'The reference server validates credentials inline in place of an interactive consent screen.',
+        'Verifies the username and password and returns a short-lived authorization code. Exchange it for tokens by calling `/oauth/token` with the matching PKCE verifier.',
       responses: {
         200: {
           description: 'Authorization code',
@@ -127,7 +129,10 @@ export function authRoutes({ store, config }: Deps) {
     '/oauth/token',
     describeRoute({
       tags: ['auth'],
-      summary: 'Exchange an authorization code or refresh token for tokens.',
+      summary:
+        'Exchange an authorization code or refresh token for an access token.',
+      description:
+        'Two grant types are supported: `authorization_code` (after `/oauth/authorize`) and `refresh_token` (to rotate an existing session).',
       responses: {
         200: {
           description: 'Tokens',
@@ -192,7 +197,9 @@ export function authRoutes({ store, config }: Deps) {
     '/oauth/refresh',
     describeRoute({
       tags: ['auth'],
-      summary: 'Refresh tokens (rotating refresh token).',
+      summary: 'Renew the access token using a refresh token.',
+      description:
+        'Returns a new access token and rotates the refresh token. The previous refresh token is invalidated.',
       responses: {
         200: {
           description: 'Tokens',
@@ -226,7 +233,9 @@ export function authRoutes({ store, config }: Deps) {
     '/oauth/session',
     describeRoute({
       tags: ['auth'],
-      summary: "Revoke the caller's tokens.",
+      summary: 'Sign out the current user.',
+      description:
+        'Revokes every access and refresh token issued to the signed-in user.',
       security: [{ bearerAuth: [] }],
       responses: {
         204: { description: 'Revoked' },
@@ -244,7 +253,7 @@ export function authRoutes({ store, config }: Deps) {
     '/oauth/userinfo',
     describeRoute({
       tags: ['auth'],
-      summary: 'Get the authenticated user.',
+      summary: 'Get the profile of the signed-in user.',
       security: [{ bearerAuth: [] }],
       responses: {
         200: { description: 'User', content: jsonContent(UserSchema) },
