@@ -57,6 +57,14 @@ export async function setupProjectFromDraft({
     projectId = generateProjectId();
     source = 'local';
     sandbox = await Sandbox.createNewSandbox({ projectId });
+    const entry: ProjectEntry = {
+      projectId,
+      source: 'local',
+      title: $$draftProject.bibliography.title || undefined,
+      author: $$draftProject.bibliography.author || undefined,
+      updatedAt: Date.now(),
+    };
+    $projects.entries[projectId] = entry;
   }
 
   const cli = await sandbox.cli.createRemotePromise();
