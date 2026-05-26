@@ -10,7 +10,8 @@ import {
   createCloudProject,
   deleteCloudProject,
 } from '../../stores/actions/cloud-project';
-import type { ProjectEntry } from '../../stores/proxies/project';
+import { deleteLocalProject } from '../../stores/actions/local-project';
+import type { ProjectEntry, ProjectId } from '../../stores/proxies/project';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
 type StartPaneProperty = object;
@@ -33,52 +34,84 @@ export const Pane = createPane<StartPaneProperty>({
   hideTitle: true,
 });
 
-function LocalProjectListItem({ entry }: { entry: ProjectEntry }) {
-  return (
-    <li>
-      <Link
-        to="/projects/$projectId"
-        params={{ projectId: entry.projectId }}
-        className="block w-full text-left rounded-md border border-input px-4 py-3 hover:bg-accent transition-colors"
-      >
-        <div className="font-medium">{entry.title || 'Untitled project'}</div>
-        {entry.author && (
-          <div className="text-sm text-muted-foreground">{entry.author}</div>
-        )}
-        <div className="text-xs text-muted-foreground mt-1 break-all">
-          {entry.projectId}
-        </div>
-      </Link>
-    </li>
-  );
-}
-
-function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
+function DeleteProjectButton({
+  ariaLabel,
+  confirmMessage,
+  onDelete,
+}: {
+  ariaLabel: string;
+  confirmMessage: string;
+  onDelete: () => Promise<void>;
+}) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const onDelete = async (e: React.MouseEvent) => {
-    // The delete button sits inside the navigation Link; stop the click from
-    // also triggering project open.
+  const onClick = async (e: React.MouseEvent) => {
+    // Nested inside the navigation Link; stop the click from opening the project.
     e.preventDefault();
     e.stopPropagation();
-    if (
-      !window.confirm(
-        `Delete cloud project "${entry.title || 'Untitled'}"? This cannot be undone.`,
-      )
-    ) {
+    if (!window.confirm(confirmMessage)) {
       return;
     }
     setDeleting(true);
     setError(null);
     try {
-      await deleteCloudProject(entry.projectId);
+      await onDelete();
     } catch {
       setError('Failed to delete project.');
       setDeleting(false);
     }
   };
 
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onClick}
+        disabled={deleting}
+        aria-label={ariaLabel}
+      >
+        {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
+      </Button>
+      {error && (
+        <p className="text-xs text-destructive mt-1" role="alert">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
+function LocalProjectListItem({ entry }: { entry: ProjectEntry }) {
+  return (
+    <li className="rounded-md border border-input hover:bg-accent transition-colors">
+      <Link
+        to="/projects/$projectId"
+        params={{ projectId: entry.projectId }}
+        className="block px-4 py-3 flex items-start gap-3"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="font-medium">{entry.title || 'Untitled project'}</div>
+          {entry.author && (
+            <div className="text-sm text-muted-foreground">{entry.author}</div>
+          )}
+          <div className="text-xs text-muted-foreground mt-1 break-all">
+            {entry.projectId}
+          </div>
+        </div>
+        <DeleteProjectButton
+          ariaLabel="Delete local project"
+          confirmMessage={`Delete local project "${entry.title || 'Untitled'}"? This cannot be undone.`}
+          onDelete={() => deleteLocalProject(entry.projectId as ProjectId)}
+        />
+      </Link>
+    </li>
+  );
+}
+
+function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
   return (
     <li className="rounded-md border border-input hover:bg-accent transition-colors">
       <Link
@@ -95,22 +128,12 @@ function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
           <div className="text-xs text-muted-foreground mt-1 break-all">
             {entry.projectId}
           </div>
-          {error && (
-            <p className="text-xs text-destructive mt-1" role="alert">
-              {error}
-            </p>
-          )}
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onDelete}
-          disabled={deleting}
-          aria-label="Delete cloud project"
-        >
-          {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
-        </Button>
+        <DeleteProjectButton
+          ariaLabel="Delete cloud project"
+          confirmMessage={`Delete cloud project "${entry.title || 'Untitled'}"? This cannot be undone.`}
+          onDelete={() => deleteCloudProject(entry.projectId)}
+        />
       </Link>
     </li>
   );

@@ -63,9 +63,8 @@ function isENOENT(err: unknown): boolean {
   return (err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
 }
 
-// Hand-written subset shared by `node:fs/promises` and `@platformatic/vfs`'s
-// promises API. Keeping this strictly a subset is what makes swapping to
-// `node:vfs` later a non-event.
+// Subset shared by `node:fs/promises` and `@platformatic/vfs`'s promises API,
+// so `node:vfs` can later replace either backend without touching callers.
 interface FsLike {
   readFile(path: string): Promise<Buffer>;
   writeFile(path: string, data: Buffer): Promise<void>;
@@ -87,11 +86,7 @@ interface FsLike {
 }
 
 export interface FileStoreOptions {
-  // When set, the on-disk layout under `basePath` is:
-  //   <basePath>/<projectId>/files/<relative path>
-  //   <basePath>/<projectId>/attachments/<sha256>
-  // When unset, files live in `@platformatic/vfs`'s `MemoryProvider` and are
-  // lost on process exit.
+  // Layout: `<basePath>/<projectId>/{files,attachments}/...`. Unset → in-memory.
   basePath?: string;
 }
 
@@ -102,9 +97,9 @@ export interface FileStoreFile {
   updatedAt: number;
 }
 
-// Content types are derived from the file extension on every read: we don't
-// write sidecar metadata so users pointing `API_PROJECT_FILE_PATH` at a real
-// directory can edit, version-control, and inspect those files directly.
+// No sidecar metadata: content types are re-derived from the file extension
+// on every read so users can edit / version-control the on-disk layout
+// directly.
 export class FileStore {
   private fs: FsLike;
   private root: string;
@@ -116,8 +111,8 @@ export class FileStore {
       this.root = normalize(options.basePath);
     } else {
       this.vfs = createVfs();
-      // The cast bridges `VirtualStats`/`VirtualDirent` to our `FsLike` shape:
-      // structurally compatible at runtime, but TypeScript can't unify them.
+      // `VirtualStats` / `VirtualDirent` are structurally compatible with the
+      // `FsLike` shape but TypeScript can't prove it.
       this.fs = this.vfs.promises as unknown as FsLike;
       this.root = '/';
     }

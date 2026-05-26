@@ -43,8 +43,8 @@ export async function setupProjectFromDraft({
       projectId,
       api: $session.api,
     });
-    // Seed the entries map ourselves: `discoverProjects()` runs after the
-    // template install finishes, so the start pane would otherwise be stale.
+    // Seeded eagerly so the start pane reflects the new project before the
+    // template install (and the trailing `discoverProjects()`) finishes.
     const entry: ProjectEntry = {
       projectId,
       source: 'remote',

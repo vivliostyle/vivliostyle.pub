@@ -2,10 +2,8 @@ import { AuthError } from '@v/auth-client';
 import { $session } from '../accessors';
 import { discoverProjects } from './discover-projects';
 
-// Await before reading `$session.status` if you might race the initial
-// `restoreSession()` call in `main.tsx` (otherwise status is `'initial'` and
-// sign-in-dependent decisions silently fall through). Re-assigned by
-// `restoreSession()`; never rejects.
+// Resolves once `restoreSession()` has settled `$session.status` out of
+// `'initial'`. Await it when racing the boot-time restoration.
 export let sessionReady: Promise<void> = Promise.resolve();
 
 export class SessionError extends Error {
