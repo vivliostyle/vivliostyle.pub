@@ -1,18 +1,22 @@
 import type { BuildTask } from '@vivliostyle/cli/schema';
 import { deepClone } from 'valtio/utils';
 
-import { $draftProject, $projects } from '../accessors';
-import { Project, type ProjectId } from '../proxies/project';
+import { generateProjectId } from '../../libs/generate-id';
+import { $draftProject, $projects, $session } from '../accessors';
+import { Project, type ProjectEntry, type ProjectId } from '../proxies/project';
 import { Sandbox } from '../proxies/sandbox';
 import { discoverProjects } from './discover-projects';
 
+export interface SetupProjectFromDraftResult {
+  projectId: ProjectId;
+  source: 'local' | 'remote';
+}
+
 export async function setupProjectFromDraft({
-  projectId,
   templateValue,
 }: {
-  projectId: ProjectId;
   templateValue: string;
-}) {
+}): Promise<SetupProjectFromDraftResult> {
   const $$draftProject = $draftProject.valueOrThrow();
   const template =
     Sandbox.officialTemplates[
@@ -20,7 +24,41 @@ export async function setupProjectFromDraft({
     ];
 
   $projects.currentProjectId = null;
-  const sandbox = await Sandbox.createNewSandbox({ projectId });
+
+  const useCloud = $session.status === 'authenticated';
+
+  let projectId: ProjectId;
+  let sandbox: Sandbox;
+  let source: 'local' | 'remote';
+
+  if (useCloud) {
+    const record = await $session.api.createProject({
+      title: $$draftProject.bibliography.title || undefined,
+      author: $$draftProject.bibliography.author || undefined,
+      language: $$draftProject.bibliography.language || undefined,
+    });
+    projectId = record.id as ProjectId;
+    source = 'remote';
+    sandbox = await Sandbox.createNewRemoteSandbox({
+      projectId,
+      api: $session.api,
+    });
+    // Seed the entries map ourselves: `discoverProjects()` runs after the
+    // template install finishes, so the start pane would otherwise be stale.
+    const entry: ProjectEntry = {
+      projectId,
+      source: 'remote',
+      title: record.title,
+      author: record.author,
+      updatedAt: record.updatedAt,
+    };
+    $projects.entries[projectId] = entry;
+  } else {
+    projectId = generateProjectId();
+    source = 'local';
+    sandbox = await Sandbox.createNewSandbox({ projectId });
+  }
+
   const cli = await sandbox.cli.createRemotePromise();
   const themePackageName =
     (await $$draftProject.theme.installPromise)?.packageName ??
@@ -49,4 +87,6 @@ export async function setupProjectFromDraft({
 
   $projects.currentProjectId = projectId;
   await discoverProjects();
+
+  return { projectId, source };
 }

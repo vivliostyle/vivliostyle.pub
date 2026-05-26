@@ -104,37 +104,12 @@ describe('SqliteStore', () => {
     expect(updated?.updatedAt).toBeGreaterThanOrEqual(p.updatedAt);
   });
 
-  it('cascades file/attachment/doc cleanup on project deletion', () => {
+  it('cascades doc-state cleanup on project deletion', () => {
     const p = store.createProject('owner', {});
-    store.writeFile(p.id, 'a.md', new Uint8Array([1, 2, 3]), 'text/markdown');
-    store.writeAttachment(p.id, 'sha', new Uint8Array([4, 5, 6]));
     store.saveDocState(p.id, new Uint8Array([7, 8, 9]));
 
     expect(store.removeProject('owner', p.id)).toBe(true);
-    expect(store.listFiles(p.id)).toEqual([]);
-    expect(store.readAttachment(p.id, 'sha')).toBeUndefined();
     expect(store.loadDocState(p.id)).toBeUndefined();
-  });
-
-  it('overwrites a file on duplicate path', () => {
-    const p = store.createProject('owner', {});
-    store.writeFile(p.id, 'a.md', new Uint8Array([1]), 'text/plain');
-    store.writeFile(p.id, 'a.md', new Uint8Array([2, 3]), 'text/markdown');
-    const f = store.readFile(p.id, 'a.md');
-    if (!f) throw new Error('file missing');
-    expect(f.contentType).toBe('text/markdown');
-    expect(Array.from(f.data)).toEqual([2, 3]);
-  });
-
-  it('preserves binary payload bytes through BLOB columns', () => {
-    const p = store.createProject('owner', {});
-    const payload = new Uint8Array(256);
-    for (let i = 0; i < 256; i += 1) payload[i] = i;
-    store.writeAttachment(p.id, 'sha', payload);
-    const back = store.readAttachment(p.id, 'sha');
-    if (!back) throw new Error('attachment missing');
-    expect(back.byteLength).toBe(256);
-    expect(Array.from(back)).toEqual(Array.from(payload));
   });
 });
 
@@ -237,15 +212,11 @@ describe('SqliteStore (file-backed)', () => {
     const first = new SqliteStore({ path: dbPath });
     const user = first.createUser('alice', 'hash');
     const project = first.createProject(user.id, { title: 'T' });
-    first.writeFile(project.id, 'a.md', new Uint8Array([1, 2, 3]), 'text/md');
     first.close();
 
     const second = new SqliteStore({ path: dbPath });
     expect(second.findUserByUsername('alice')?.id).toBe(user.id);
     expect(second.listProjects(user.id).map((p) => p.id)).toContain(project.id);
-    const file = second.readFile(project.id, 'a.md');
-    if (!file) throw new Error('file missing');
-    expect(Array.from(file.data)).toEqual([1, 2, 3]);
     second.close();
   });
 });

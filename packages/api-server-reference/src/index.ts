@@ -5,6 +5,11 @@ export {
   defaultConfig,
   type ServerConfig,
 } from './deps';
+export {
+  FileStore,
+  type FileStoreFile,
+  type FileStoreOptions,
+} from './file-store';
 export { generateSpec, openApiDocumentation } from './openapi';
 export * from './schemas';
 export {
@@ -13,7 +18,6 @@ export {
   type RefreshToken,
   SqliteStore,
   type SqliteStoreOptions,
-  type StoredFile,
   type StoredUser,
 } from './store';
 export { DocRegistry } from './sync-doc';

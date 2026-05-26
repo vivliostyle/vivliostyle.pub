@@ -10,7 +10,12 @@ import {
 } from 'valtio';
 import { deepClone, subscribeKey } from 'valtio/utils';
 
-import { OPFSStorageProvider } from '@v/storage-providers';
+import type { ApiClient } from '@v/api-client';
+import {
+  OPFSStorageProvider,
+  RemoteHttpStorageProvider,
+  type StorageProvider,
+} from '@v/storage-providers';
 import { generateId } from '../../libs/generate-id';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
@@ -151,7 +156,7 @@ export class Sandbox {
     provider,
   }: {
     projectId: ProjectId;
-    provider: OPFSStorageProvider;
+    provider: StorageProvider;
   }) {
     const sandbox = proxy(new Sandbox({ projectId, provider }));
     subscribe(sandbox.files, (ops) => sandbox.handleFileUpdate(ops));
@@ -199,6 +204,46 @@ export class Sandbox {
     return sandbox;
   }
 
+  static async createNewRemoteSandbox({
+    projectId,
+    api,
+  }: {
+    projectId: ProjectId;
+    api: ApiClient;
+  }) {
+    const provider = new RemoteHttpStorageProvider(api, projectId);
+    const sandbox = proxy(Sandbox.create({ projectId, provider }));
+    await sandbox.initializeProjectFiles({
+      themePackageName: '@vivliostyle/theme-base',
+      entry: [],
+    });
+    return sandbox;
+  }
+
+  static async createRemoteSandboxFromApi({
+    projectId,
+    api,
+  }: {
+    projectId: ProjectId;
+    api: ApiClient;
+  }) {
+    const provider = new RemoteHttpStorageProvider(api, projectId);
+    const sandbox = proxy(Sandbox.create({ projectId, provider }));
+    // An "empty" remote project (e.g. one created via the "Create an empty
+    // cloud project" button) has no vivliostyle.config.json yet, so
+    // `loadFromFileSystem` would throw. Seed it instead so the editor mounts.
+    const entries = await provider.list('', { recursive: true });
+    if (entries.length === 0) {
+      await sandbox.initializeProjectFiles({
+        themePackageName: '@vivliostyle/theme-base',
+        entry: [],
+      });
+    } else {
+      await sandbox.loadFromFileSystem();
+    }
+    return sandbox;
+  }
+
   static categorizeAsset(path: string): MediaCategory | null {
     const ext = extname(path).slice(1).toLowerCase();
     if (!ext) return null;
@@ -220,7 +265,7 @@ export class Sandbox {
   }
 
   iframeOrigin: string;
-  provider: OPFSStorageProvider;
+  provider: StorageProvider;
   files: Record<string, ReturnType<typeof ref<SandboxFile>>> = proxy({});
   cli = Cli.create(this);
 
@@ -237,7 +282,7 @@ export class Sandbox {
     provider,
   }: {
     projectId: ProjectId;
-    provider: OPFSStorageProvider;
+    provider: StorageProvider;
   }) {
     const url = new URL(location.href);
     url.hostname = `sandbox-${projectId}.${url.hostname}`;

@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { generateId } from './crypto';
-import type { FileEntry, ProjectInput, ProjectRecord } from './schemas';
+import type { ProjectInput, ProjectRecord } from './schemas';
 
 export interface StoredUser {
   id: string;
@@ -34,13 +34,6 @@ export interface AccessToken {
   userId: string;
   scope?: string;
   expiresAt: number;
-}
-
-export interface StoredFile {
-  path: string;
-  data: Uint8Array;
-  contentType: string;
-  updatedAt: number;
 }
 
 const SCHEMA = `
@@ -81,20 +74,6 @@ CREATE TABLE IF NOT EXISTS projects (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS projects_owner_id_idx ON projects(owner_id);
-CREATE TABLE IF NOT EXISTS files (
-  project_id TEXT NOT NULL,
-  path TEXT NOT NULL,
-  data BLOB NOT NULL,
-  content_type TEXT NOT NULL,
-  updated_at INTEGER NOT NULL,
-  PRIMARY KEY (project_id, path)
-);
-CREATE TABLE IF NOT EXISTS attachments (
-  project_id TEXT NOT NULL,
-  sha256 TEXT NOT NULL,
-  data BLOB NOT NULL,
-  PRIMARY KEY (project_id, sha256)
-);
 CREATE TABLE IF NOT EXISTS docs (
   project_id TEXT PRIMARY KEY,
   state BLOB NOT NULL
@@ -144,13 +123,6 @@ interface ProjectRow {
   updated_at: number;
 }
 
-interface FileRow {
-  path: string;
-  data: Uint8Array;
-  content_type: string;
-  updated_at: number;
-}
-
 function toUser(row: UserRow): StoredUser {
   return {
     id: row.id,
@@ -197,24 +169,6 @@ function toProject(row: ProjectRow): ProjectRecord {
     author: row.author ?? undefined,
     language: row.language ?? undefined,
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-function toFile(row: FileRow): StoredFile {
-  return {
-    path: row.path,
-    data: row.data,
-    contentType: row.content_type,
-    updatedAt: row.updated_at,
-  };
-}
-
-function toFileEntry(row: FileRow): FileEntry {
-  return {
-    path: row.path,
-    size: row.data.byteLength,
-    contentType: row.content_type,
     updatedAt: row.updated_at,
   };
 }
@@ -434,81 +388,11 @@ export class SqliteStore {
       .prepare('DELETE FROM projects WHERE id = ? AND owner_id = ?')
       .run(id, ownerId);
     if (result.changes === 0) return false;
-    // Foreign keys aren't declared on the dependent tables (keeping the
-    // schema flat for portability), so clean up here.
-    this.db.prepare('DELETE FROM files WHERE project_id = ?').run(id);
-    this.db.prepare('DELETE FROM attachments WHERE project_id = ?').run(id);
+    // No FK cascade on `docs` (schema kept flat for portability). Files /
+    // attachments live on the filesystem, cascaded by `projectRoutes` via
+    // `FileStore.removeProject`.
     this.db.prepare('DELETE FROM docs WHERE project_id = ?').run(id);
     return true;
-  }
-
-  listFiles(projectId: string): FileEntry[] {
-    const rows = this.db
-      .prepare(
-        'SELECT path, data, content_type, updated_at FROM files WHERE project_id = ? ORDER BY path',
-      )
-      .all(projectId) as unknown as FileRow[];
-    return rows.map(toFileEntry);
-  }
-
-  readFile(projectId: string, path: string): StoredFile | undefined {
-    const row = this.db
-      .prepare(
-        'SELECT path, data, content_type, updated_at FROM files WHERE project_id = ? AND path = ?',
-      )
-      .get(projectId, path) as FileRow | undefined;
-    return row ? toFile(row) : undefined;
-  }
-
-  writeFile(
-    projectId: string,
-    path: string,
-    data: Uint8Array,
-    contentType: string,
-  ): FileEntry {
-    const updatedAt = Date.now();
-    this.db
-      .prepare(
-        `INSERT INTO files (project_id, path, data, content_type, updated_at)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(project_id, path) DO UPDATE SET
-           data = excluded.data,
-           content_type = excluded.content_type,
-           updated_at = excluded.updated_at`,
-      )
-      .run(projectId, path, data, contentType, updatedAt);
-    return {
-      path,
-      size: data.byteLength,
-      contentType,
-      updatedAt,
-    };
-  }
-
-  removeFile(projectId: string, path: string): boolean {
-    const result = this.db
-      .prepare('DELETE FROM files WHERE project_id = ? AND path = ?')
-      .run(projectId, path);
-    return result.changes > 0;
-  }
-
-  readAttachment(projectId: string, sha256: string): Uint8Array | undefined {
-    const row = this.db
-      .prepare(
-        'SELECT data FROM attachments WHERE project_id = ? AND sha256 = ?',
-      )
-      .get(projectId, sha256) as { data: Uint8Array } | undefined;
-    return row?.data;
-  }
-
-  writeAttachment(projectId: string, sha256: string, data: Uint8Array): void {
-    this.db
-      .prepare(
-        `INSERT INTO attachments (project_id, sha256, data)
-         VALUES (?, ?, ?)
-         ON CONFLICT(project_id, sha256) DO UPDATE SET data = excluded.data`,
-      )
-      .run(projectId, sha256, data);
   }
 
   loadDocState(projectId: string): Uint8Array | undefined {

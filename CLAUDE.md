@@ -130,6 +130,7 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 
 ## Conventions
 
+- **Comments explain *why*, not *what*.** Don't write comments that paraphrase the code below them — well-named identifiers already convey the *what*. Reserve comments for behaviour that is counter-intuitive from the code alone: a hidden invariant, a workaround for a specific upstream bug, a non-obvious ordering constraint, a deliberate departure from a sibling code path. If removing a comment would not leave a future reader confused, don't write it. Avoid restating the surrounding diff or task ("added for X flow", "used by Y caller") — that context belongs in the commit message / PR description and rots quickly. Look at `packages/cli-bundle/rolldown.config.ts` for the intended density.
 - **Biome** (`biome.json`) is the only formatter/linter. Single quotes, semicolons, 2-space indent. Import order is enforced: URLs → protocol packages → third-party packages → blank line → `@v/*` and relative imports.
 - **pnpm catalog**: dependency versions are pinned in `pnpm-workspace.yaml`'s `catalog:` section, and packages reference them with `"catalog:"`. When upgrading a dep, edit the catalog (not the individual `package.json`).
 - **Patches**: `patches/buffer@6.0.3.patch` is applied via `patchedDependencies` in `pnpm-workspace.yaml` (moved there from `package.json#pnpm.patchedDependencies` in pnpm 11). The `allowBuilds` key in the same file controls which packages may run install scripts.

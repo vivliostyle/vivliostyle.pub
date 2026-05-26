@@ -131,9 +131,14 @@ interface ServeApiOptions {
    * API uses an in-memory store and all data is lost on dev server restart.
    */
   sqlitePath?: string;
+  /** Forwarded to `createApiDevServer`'s `projectFilePath`. */
+  projectFilePath?: string;
 }
 
-const serveApi = ({ sqlitePath }: ServeApiOptions = {}): Plugin => {
+const serveApi = ({
+  sqlitePath,
+  projectFilePath,
+}: ServeApiOptions = {}): Plugin => {
   let currentMiddleware:
     | ((
         req: import('node:http').IncomingMessage,
@@ -155,7 +160,7 @@ const serveApi = ({ sqlitePath }: ServeApiOptions = {}): Plugin => {
         const mod = (await server.ssrLoadModule(
           '@v/api-server-reference/dev-server',
         )) as typeof import('@v/api-server-reference/dev-server');
-        return mod.createApiDevServer({ sqlitePath });
+        return mod.createApiDevServer({ sqlitePath, projectFilePath });
       };
 
       let api = await loadApi();
@@ -221,7 +226,7 @@ const serveApi = ({ sqlitePath }: ServeApiOptions = {}): Plugin => {
           api.injectWebSocket(server.httpServer);
         }
         server.config.logger.info(
-          `  \x1b[32m➜\x1b[0m  API mounted at \x1b[36m${basePath}\x1b[0m  \x1b[2m[sqlite ${sqlitePath ?? ':memory:'}]\x1b[0m`,
+          `  \x1b[32m➜\x1b[0m  API mounted at \x1b[36m${basePath}\x1b[0m  \x1b[2m[sqlite ${sqlitePath ?? ':memory:'}, files ${projectFilePath ?? ':memory: (vfs)'}]\x1b[0m`,
         );
       };
     },
@@ -316,6 +321,9 @@ export default defineConfig(({ mode, command }) => {
       serveApi({
         sqlitePath: env.API_SQLITE_PATH
           ? path.resolve(getProjectRoot(), env.API_SQLITE_PATH)
+          : undefined,
+        projectFilePath: env.API_PROJECT_FILE_PATH
+          ? path.resolve(getProjectRoot(), env.API_PROJECT_FILE_PATH)
           : undefined,
       }),
       visualizer() as PluginOption,

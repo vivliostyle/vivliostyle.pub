@@ -25,7 +25,6 @@ import { cn } from '@v/ui/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@v/ui/popover';
 import { useLiveInputField } from '../../../hooks/use-live-field';
 import { usePromiseState } from '../../../hooks/use-promise-state';
-import { generateProjectId } from '../../../libs/generate-id';
 import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
 import { Theme } from '../../../stores/proxies/theme';
@@ -174,11 +173,7 @@ export function ProjectDetailForm() {
           return;
         }
         startTransition(async () => {
-          const projectId = generateProjectId();
-          await setupProjectFromDraft({
-            projectId,
-            templateValue,
-          });
+          const { projectId } = await setupProjectFromDraft({ templateValue });
           const project = $project.valueOrThrow();
           const contentId = project.content.readingOrder[0];
           const file = project.content.files.get(contentId);

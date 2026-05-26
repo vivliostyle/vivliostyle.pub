@@ -10,6 +10,7 @@ import {
   defaultConfig,
   type ServerConfig,
 } from './deps';
+import { FileStore } from './file-store';
 import { openApiDocumentation } from './openapi';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
@@ -22,6 +23,7 @@ import { DocRegistry } from './sync-doc';
 
 export interface CreateAppOptions {
   store?: SqliteStore;
+  files?: FileStore;
   config?: Partial<ServerConfig>;
 }
 
@@ -30,9 +32,10 @@ export function createApp(options: CreateAppOptions = {}) {
   // Callers that want persistence pass an explicit `store` (e.g. a
   // file-backed `SqliteStore`).
   const store = options.store ?? new SqliteStore();
+  const files = options.files ?? new FileStore();
   const config: ServerConfig = { ...defaultConfig, ...options.config };
   const docs = new DocRegistry(store);
-  const deps: Deps = { store, docs, config };
+  const deps: Deps = { store, files, docs, config };
 
   const app = new Hono();
 

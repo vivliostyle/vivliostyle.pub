@@ -2,6 +2,12 @@ import { AuthError } from '@v/auth-client';
 import { $session } from '../accessors';
 import { discoverProjects } from './discover-projects';
 
+// Await before reading `$session.status` if you might race the initial
+// `restoreSession()` call in `main.tsx` (otherwise status is `'initial'` and
+// sign-in-dependent decisions silently fall through). Re-assigned by
+// `restoreSession()`; never rejects.
+export let sessionReady: Promise<void> = Promise.resolve();
+
 export class SessionError extends Error {
   constructor(
     message: string,
@@ -34,32 +40,30 @@ function describeAuthFailure(error: unknown, fallback: string): SessionError {
   return new SessionError(fallback);
 }
 
-/**
- * Reads any persisted refresh token from IndexedDB and, if found, hydrates
- * `$session` with the current user. Safe to call repeatedly; no-ops when
- * already authenticating.
- */
-export async function restoreSession(): Promise<void> {
+export function restoreSession(): Promise<void> {
   if ($session.status === 'authenticating') {
-    return;
+    return sessionReady;
   }
   $session.status = 'initial';
-  try {
-    const user = await $session.auth.getUser();
-    if (user) {
-      $session.user = user;
-      $session.status = 'authenticated';
-    } else {
+  sessionReady = (async () => {
+    try {
+      const user = await $session.auth.getUser();
+      if (user) {
+        $session.user = user;
+        $session.status = 'authenticated';
+      } else {
+        $session.user = null;
+        $session.status = 'anonymous';
+      }
+    } catch {
       $session.user = null;
       $session.status = 'anonymous';
     }
-  } catch {
-    $session.user = null;
-    $session.status = 'anonymous';
-  }
-  // Best-effort refresh of the merged project list; failures here are
-  // benign (no remote reachable).
-  discoverProjects().catch(() => {});
+    // Best-effort refresh of the merged project list; failures here are
+    // benign (no remote reachable).
+    discoverProjects().catch(() => {});
+  })();
+  return sessionReady;
 }
 
 export async function login(username: string, password: string): Promise<void> {

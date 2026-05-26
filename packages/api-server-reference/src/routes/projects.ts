@@ -10,7 +10,7 @@ import {
   ProjectRecordSchema,
 } from '../schemas';
 
-export function projectRoutes({ store }: Deps) {
+export function projectRoutes({ store, files }: Deps) {
   const app = new Hono<AuthEnv>();
 
   app.get(
@@ -111,11 +111,13 @@ export function projectRoutes({ store }: Deps) {
         404: { description: 'Not found', content: jsonContent(ErrorSchema) },
       },
     }),
-    (c) => {
-      const ok = store.removeProject(c.get('userId'), c.req.param('id'));
+    async (c) => {
+      const projectId = c.req.param('id');
+      const ok = store.removeProject(c.get('userId'), projectId);
       if (!ok) {
         return c.json({ error: 'not_found' }, 404);
       }
+      await files.removeProject(projectId);
       return c.body(null, 204);
     },
   );

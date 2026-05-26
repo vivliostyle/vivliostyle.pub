@@ -1,3 +1,4 @@
+import type { FileStore } from './file-store';
 import type { SqliteStore } from './store';
 import type { DocRegistry } from './sync-doc';
 
@@ -19,6 +20,7 @@ export const defaultConfig: ServerConfig = {
 
 export interface Deps {
   store: SqliteStore;
+  files: FileStore;
   docs: DocRegistry;
   config: ServerConfig;
 }

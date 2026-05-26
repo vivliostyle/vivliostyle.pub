@@ -10,6 +10,7 @@ import { getRequestListener } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 
 import { type CreateAppOptions, createApp } from './app';
+import { FileStore } from './file-store';
 import { SqliteStore } from './store';
 import { registerSyncWebSocket } from './sync-websocket';
 
@@ -35,6 +36,8 @@ export interface CreateApiDevServerOptions extends CreateAppOptions {
    * restart). Ignored if `store` is supplied explicitly.
    */
   sqlitePath?: string;
+  /** Forwarded to `FileStore`. Ignored if `files` is supplied explicitly. */
+  projectFilePath?: string;
 }
 
 export interface ApiDevServer {
@@ -67,10 +70,17 @@ export interface ApiDevServer {
 export function createApiDevServer(
   options: CreateApiDevServerOptions = {},
 ): ApiDevServer {
-  const { basePath: rawBasePath = '/api', sqlitePath, ...appOptions } = options;
+  const {
+    basePath: rawBasePath = '/api',
+    sqlitePath,
+    projectFilePath,
+    ...appOptions
+  } = options;
   const basePath = rawBasePath.replace(/\/+$/, '') || '/';
   const store = appOptions.store ?? new SqliteStore({ path: sqlitePath });
-  const { app, deps } = createApp({ ...appOptions, store });
+  const files =
+    appOptions.files ?? new FileStore({ basePath: projectFilePath });
+  const { app, deps } = createApp({ ...appOptions, store, files });
   const { injectWebSocket: honoInjectWebSocket, upgradeWebSocket } =
     createNodeWebSocket({ app });
   registerSyncWebSocket(app, deps, upgradeWebSocket);

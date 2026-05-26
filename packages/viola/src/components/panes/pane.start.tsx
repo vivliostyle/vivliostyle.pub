@@ -57,7 +57,11 @@ function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const onDelete = async () => {
+  const onDelete = async (e: React.MouseEvent) => {
+    // The delete button sits inside the navigation Link; stop the click from
+    // also triggering project open.
+    e.preventDefault();
+    e.stopPropagation();
     if (
       !window.confirm(
         `Delete cloud project "${entry.title || 'Untitled'}"? This cannot be undone.`,
@@ -76,35 +80,38 @@ function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
   };
 
   return (
-    <li className="rounded-md border border-input px-4 py-3 flex items-start gap-3">
-      <Cloud className="size-4 mt-1 text-muted-foreground shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="font-medium">{entry.title || 'Untitled project'}</div>
-        {entry.author && (
-          <div className="text-sm text-muted-foreground">{entry.author}</div>
-        )}
-        <div className="text-xs text-muted-foreground mt-1 break-all">
-          {entry.projectId}
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          File sync for cloud projects is not yet available.
-        </p>
-        {error && (
-          <p className="text-xs text-destructive mt-1" role="alert">
-            {error}
-          </p>
-        )}
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={onDelete}
-        disabled={deleting}
-        aria-label="Delete cloud project"
+    <li className="rounded-md border border-input hover:bg-accent transition-colors">
+      <Link
+        to="/projects/$projectId"
+        params={{ projectId: entry.projectId }}
+        className="block px-4 py-3 flex items-start gap-3"
       >
-        {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
-      </Button>
+        <Cloud className="size-4 mt-1 text-muted-foreground shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="font-medium">{entry.title || 'Untitled project'}</div>
+          {entry.author && (
+            <div className="text-sm text-muted-foreground">{entry.author}</div>
+          )}
+          <div className="text-xs text-muted-foreground mt-1 break-all">
+            {entry.projectId}
+          </div>
+          {error && (
+            <p className="text-xs text-destructive mt-1" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onDelete}
+          disabled={deleting}
+          aria-label="Delete cloud project"
+        >
+          {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
+        </Button>
+      </Link>
     </li>
   );
 }

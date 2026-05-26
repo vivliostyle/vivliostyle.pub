@@ -63,6 +63,9 @@ catalogs:
     '@jsonjoy.com/json-pack':
       specifier: 18.23.0
       version: 18.23.0
+    '@platformatic/vfs':
+      specifier: 0.4.0
+      version: 0.4.0
     '@rolldown/browser':
       specifier: 1.0.0-rc.18
       version: 1.0.0-rc.18
@@ -410,6 +413,9 @@ importers:
       '@hono/standard-validator':
         specifier: 'catalog:'
         version: 0.2.2(@standard-schema/spec@1.1.0)(hono@4.12.22)
+      '@platformatic/vfs':
+        specifier: 'catalog:'
+        version: 0.4.0
       '@standard-community/standard-json':
         specifier: 'catalog:'
         version: 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(@valibot/to-json-schema@1.7.0(valibot@1.4.0(typescript@6.0.3)))(quansync@0.2.11)(valibot@1.4.0(typescript@6.0.3))(zod@3.25.76)
@@ -440,6 +446,9 @@ importers:
       openapi-types:
         specifier: 'catalog:'
         version: 12.1.3
+      pathe:
+        specifier: 'catalog:'
+        version: 2.0.3
       tsx:
         specifier: 'catalog:'
         version: 4.22.0
@@ -2424,6 +2433,10 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@platformatic/vfs@0.4.0':
+    resolution: {integrity: sha512-JwRxSIG63e/VaDSkYXkSBajySt5MJzxYIKuknYda28fhhmJMqyUGf5rbKrGW+vO9L83nIjQH3+YI12fp7EKICQ==}
+    engines: {node: '>= 22'}
 
   '@polka/url@1.0.0-next.28':
     resolution: {integrity: sha512-8LduaNlMZGwdZ6qWrKlfa+2M4gahzFkprZiAt2TF8uS0qQgBizKXpXURqvTJ4WtmupWxaLqjRb2UCTe72mu+Aw==}
@@ -9620,6 +9633,8 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@platformatic/vfs@0.4.0': {}
 
   '@polka/url@1.0.0-next.28': {}
 

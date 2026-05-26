@@ -6,7 +6,7 @@ import type { AuthEnv, Deps } from '../deps';
 import { binaryContent, jsonContent, toArrayBuffer } from '../route-helpers';
 import { AttachmentResultSchema, ErrorSchema } from '../schemas';
 
-export function attachmentRoutes({ store }: Deps) {
+export function attachmentRoutes({ store, files }: Deps) {
   const app = new Hono<AuthEnv>();
 
   const owns = (userId: string, projectId: string) =>
@@ -23,12 +23,12 @@ export function attachmentRoutes({ store }: Deps) {
         404: { description: 'Not found', content: jsonContent(ErrorSchema) },
       },
     }),
-    (c) => {
+    async (c) => {
       const projectId = c.req.param('id');
       if (!owns(c.get('userId'), projectId)) {
         return c.json({ error: 'not_found' }, 404);
       }
-      const data = store.readAttachment(projectId, c.req.param('sha256'));
+      const data = await files.readAttachment(projectId, c.req.param('sha256'));
       if (!data) {
         return c.json({ error: 'not_found' }, 404);
       }
@@ -72,7 +72,7 @@ export function attachmentRoutes({ store }: Deps) {
           400,
         );
       }
-      store.writeAttachment(projectId, sha256, data);
+      await files.writeAttachment(projectId, sha256, data);
       return c.json({ sha256, size: data.byteLength }, 201);
     },
   );
