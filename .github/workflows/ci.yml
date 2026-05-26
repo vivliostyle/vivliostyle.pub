@@ -32,3 +32,11 @@ jobs:
     steps:
       - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
       - run: pnpm typecheck
+
+  i18n:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
+      - run: pnpm i18n:validate

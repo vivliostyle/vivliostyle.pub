@@ -137,6 +137,32 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 - **Husky pre-commit** runs `lint-staged` (Biome format) and `pnpm check`.
 - **Agent guidance lives only in this file.** No `.cursor/rules`, `.cursorrules`, or `.github/copilot-instructions.md` exist — `AGENTS.md` is a symlink to `CLAUDE.md` so every agent reads the same source. If you need to extend the guide, edit `CLAUDE.md`.
 
+## Internationalization (i18n)
+
+The host React UI (`@v/viola`) is localized with **[inlang Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)** (compiler-based, tree-shakeable). The CLI worker / iframe (`@v/cli-bundle`, the Vivliostyle CLI itself) is out of scope.
+
+- **Source of truth**: `messages/{locale}.json` (inlang message format) at the repo root. Base locale is `en`; target locales `ja`, `zh`, `ko`. Config lives in `project.inlang/settings.json`.
+- **Generated code**: `paraglideVitePlugin` (in `packages/viola/vite.config.ts`) compiles messages into `packages/viola/src/paraglide/` (git-ignored, self-emits its own `.gitignore`, treated like `routeTree.gen.ts` — also ignored by Biome). `tsc` reads the emitted `.d.ts` files (the project does not set `allowJs`), so the compile must run before typecheck — the viola `build`/`typecheck` scripts chain `pnpm paraglide` first.
+- **Vendored plugins**: the inlang message-format + m-function-matcher plugins are vendored under `project.inlang/plugins/*.js` and referenced by relative path in `settings.json` (NOT jsdelivr URLs). This keeps compilation fully offline/reproducible inside the agent sandbox (jsdelivr is not in the network allowlist) and lets web tools read them straight from the repo. To bump a plugin: `npm pack <plugin>@<version>`, replace the vendored bundle, and update the path.
+
+### Message key naming (flat snake_case)
+
+- Flat, underscore-separated keys with a feature-area prefix: **`{area}_{element}[_{descriptor}]`** — e.g. `side_menu_open_project`, `bibliography_book_title_label`. No nesting. Call as `m.side_menu_open_project()`.
+- area prefixes mirror the source location: `side_menu_`, `bibliography_`, `theme_`, `media_`, `start_`/`new_project_`, `preview_`/`edit_`, `image_menu_`. Use `common_` only for genuinely shared words (`common_cancel`, `common_untitled`).
+- **Don't reuse** keys across contexts (unique key per instance) except the governed `common_` namespace — identical English can translate differently by context.
+- Accessibility strings take a `_aria` suffix (`side_menu_open_workspace_aria`). Interpolation uses ICU `{name}` placeholders; pluralization/gender uses ICU `plural`/`select`.
+- Name keys semantically by hand — do **not** derive them from the English text (so editing copy never churns keys).
+
+### Adding / editing messages
+
+Three equivalent paths, all land as normal PRs that maintainers review:
+1. **Source (humans & AI agents)**: add the key to `messages/en.json`, use `m.<key>()` in code, then run `pnpm i18n:translate` to fill the other locales. `pnpm --filter @v/viola paraglide` regenerates types.
+2. **Web UI (non-developers)**: [Fink](https://fink.inlang.com) — connect the GitHub repo, edit in the browser, opens a PR.
+3. **VS Code**: the [Sherlock](https://inlang.com/m/r7kp499g/app-inlang-ideExtension) extension for inline extraction/editing.
+
+- **Machine translation**: `pnpm i18n:translate` (inlang CLI, Google Cloud Translation v2). It only fills empty/missing messages, so human edits are preserved. Needs `INLANG_GOOGLE_TRANSLATE_API_KEY`. CI runs it via `.github/workflows/i18n-translate.yml` whenever `messages/en.json` changes and commits the result back.
+- **Validation**: `pnpm i18n:validate` (runs in the `i18n` CI job).
+
 ## Deployment
 
 Cloudflare Workers via Wrangler. `wrangler.toml` serves `packages/viola/dist/` as a SPA. The GitHub Actions workflow `build-deploy.yml` deploys `main` to `alpha.vivliostyle.pub` and PR previews to `pr-preview-<n>-vivliostyle-pub-app.vivliostyle.workers.dev`.

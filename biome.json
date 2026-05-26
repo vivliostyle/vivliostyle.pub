@@ -39,6 +39,8 @@
       "!**/routeTree.gen.ts",
       "!**/packages/api-client/src/schema.d.ts",
       "!**/packages/api-spec/src/openapi.yaml",
+      "!**/inlang-plugins",
+      "!**/src/paraglide",
       "!**/templates/**/*",
       "!!**/secrets"
     ]

@@ -1,0 +1,41 @@
+name: i18n-translate
+
+# Fills in missing translations for non-base locales using machine translation.
+# Existing (human-edited) translations are preserved — only empty/missing
+# messages are translated. Requires the repository secret
+# INLANG_GOOGLE_TRANSLATE_API_KEY (Google Cloud Translation API v2 key).
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      # Only the base locale triggers translation. The bot commits the other
+      # locale files, so this filter also prevents self-triggering loops.
+      - messages/en.json
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
+      - name: Machine translate missing messages
+        run: pnpm i18n:translate
+        env:
+          INLANG_GOOGLE_TRANSLATE_API_KEY: ${{ secrets.INLANG_GOOGLE_TRANSLATE_API_KEY }}
+      - name: Commit updated translations
+        run: |
+          if [ -n "$(git status --porcelain messages)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add messages
+            git commit -m "chore(i18n): machine-translate missing messages"
+            git push
+          else
+            echo "No translation changes."
+          fi

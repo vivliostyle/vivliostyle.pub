@@ -1,0 +1,6 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "app_name": "Vivliostyle Pub Alpha",
+  "common_untitled": "제목 없음",
+  "language_menu_label": "언어"
+}

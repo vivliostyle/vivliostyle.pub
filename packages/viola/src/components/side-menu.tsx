@@ -72,6 +72,8 @@ import {
   $ui,
 } from '../stores/accessors';
 import { deleteCloudProject } from '../stores/actions/cloud-project';
+import { m } from '../paraglide/messages';
+import { getLocale, locales, setLocale } from '../paraglide/runtime';
 import {
   createContentFile,
   deleteContentFile,
@@ -148,15 +150,51 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
             </DropdownMenuItem>
           </>
         )}
+        <LanguageMenuSection />
         <DropdownMenuSeparator />
         <DropdownMenuLabel
           inset
           className={cn('text-xs text-muted-foreground my-1')}
         >
-          <p>Vivliostyle Pub Alpha</p>
+          <p>{m.app_name()}</p>
         </DropdownMenuLabel>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function LanguageMenuSection() {
+  const activeLocale = getLocale();
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel inset className={cn('text-xs text-muted-foreground')}>
+        {m.language_menu_label()}
+      </DropdownMenuLabel>
+      {locales.map((locale) => {
+        const label =
+          new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ??
+          locale;
+        return (
+          <DropdownMenuItem
+            key={locale}
+            inset
+            aria-current={locale === activeLocale}
+            className={cn(
+              'capitalize',
+              locale === activeLocale && 'font-semibold',
+            )}
+            onClick={() => {
+              if (locale !== activeLocale) {
+                setLocale(locale);
+              }
+            }}
+          >
+            <span>{label}</span>
+          </DropdownMenuItem>
+        );
+      })}
+    </>
   );
 }
 
@@ -190,7 +228,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
           inset
           className={cn('text-xs text-muted-foreground max-w-120 truncate')}
         >
-          {title}
+          {title || m.common_untitled()}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -259,7 +297,7 @@ function TopMenuSection() {
               )}
             >
               <span className="min-w-0 flex-1 line-clamp-2 wrap-break-word">
-                {project.bibliography.title || 'Untitled'}
+                {project.bibliography.title || m.common_untitled()}
               </span>
               <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
             </SidebarMenuButton>
