@@ -5,7 +5,7 @@ import type { AuthEnv, Deps } from '../deps';
 import { binaryContent, jsonContent, toArrayBuffer } from '../route-helpers';
 import { ErrorSchema, FileListSchema } from '../schemas';
 
-export function fileRoutes({ store, files }: Deps) {
+export function fileRoutes({ store, files, docs }: Deps) {
   const app = new Hono<AuthEnv>();
 
   const owns = (userId: string, projectId: string) =>
@@ -96,9 +96,14 @@ export function fileRoutes({ store, files }: Deps) {
       if (!owns(c.get('userId'), projectId)) {
         return c.json({ error: 'not_found' }, 404);
       }
-      if (!(await files.removeFile(projectId, c.req.param('path')))) {
+      const filename = c.req.param('path');
+      if (!(await files.removeFile(projectId, filename))) {
         return c.json({ error: 'not_found' }, 404);
       }
+      // The CRDT for this path is no longer relevant; drop it so a later
+      // re-creation of the same path does not inherit the deleted history.
+      store.deleteDocState(projectId, filename);
+      docs.evict(projectId, filename);
       return c.body(null, 204);
     },
   );

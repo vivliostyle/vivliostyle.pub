@@ -958,6 +958,9 @@ importers:
       '@v/storage-providers':
         specifier: workspace:*
         version: link:../storage-providers
+      '@v/sync-client':
+        specifier: workspace:*
+        version: link:../sync-client
       '@v/theme-registry':
         specifier: workspace:*
         version: link:../theme-registry

@@ -34,9 +34,10 @@ export function registerSyncWebSocket(
   upgradeWebSocket: UpgradeWebSocket,
 ) {
   app.get(
-    '/projects/:id/sync/ws',
+    '/projects/:id/sync-ws/:path{.+}',
     upgradeWebSocket((c) => {
       const projectId = c.req.param('id') ?? '';
+      const filename = c.req.param('path') ?? '';
       const token = c.req.query('access_token');
       let authorized = false;
       let unsubscribe = () => {};
@@ -54,20 +55,24 @@ export function registerSyncWebSocket(
             return;
           }
           authorized = true;
-          const doc = deps.docs.get(projectId);
+          const doc = deps.docs.get(projectId, filename);
           const encoder = encoding.createEncoder();
           encoding.writeVarUint(encoder, MESSAGE_SYNC);
           syncProtocol.writeSyncStep1(encoder, doc);
           ws.send(toArrayBuffer(encoding.toUint8Array(encoder)));
-          unsubscribe = deps.docs.subscribe(projectId, (update, origin) => {
-            if (origin === ws) {
-              return;
-            }
-            const enc = encoding.createEncoder();
-            encoding.writeVarUint(enc, MESSAGE_SYNC);
-            syncProtocol.writeUpdate(enc, update);
-            ws.send(toArrayBuffer(encoding.toUint8Array(enc)));
-          });
+          unsubscribe = deps.docs.subscribe(
+            projectId,
+            filename,
+            (update, origin) => {
+              if (origin === ws) {
+                return;
+              }
+              const enc = encoding.createEncoder();
+              encoding.writeVarUint(enc, MESSAGE_SYNC);
+              syncProtocol.writeUpdate(enc, update);
+              ws.send(toArrayBuffer(encoding.toUint8Array(enc)));
+            },
+          );
         },
         onMessage(evt, ws) {
           if (!authorized) {
@@ -85,7 +90,7 @@ export function registerSyncWebSocket(
             syncProtocol.readSyncMessage(
               decoder,
               encoder,
-              deps.docs.get(projectId),
+              deps.docs.get(projectId, filename),
               ws,
             );
             if (encoding.length(encoder) > 1) {

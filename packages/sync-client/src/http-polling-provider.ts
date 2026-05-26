@@ -5,6 +5,7 @@ import { BaseSyncProvider, type SyncTransport } from './types';
 export interface HttpPollingSyncOptions {
   transport: SyncTransport;
   projectId: string;
+  filename: string;
   doc: Y.Doc;
   /** Poll interval in milliseconds. */
   intervalMs?: number;
@@ -13,11 +14,12 @@ export interface HttpPollingSyncOptions {
 /**
  * Yjs sync over the HTTP fallback endpoint. Each round trip pushes any pending
  * local updates and pulls whatever the server has that the local document is
- * missing, in a single `POST /projects/:id/sync` call.
+ * missing, in a single `POST /projects/:id/sync/:filename` call.
  */
 export class HttpPollingSyncProvider extends BaseSyncProvider {
   private readonly transport: SyncTransport;
   private readonly projectId: string;
+  private readonly filename: string;
   private readonly doc: Y.Doc;
   private readonly intervalMs: number;
   private readonly origin = Symbol('http-polling');
@@ -28,6 +30,7 @@ export class HttpPollingSyncProvider extends BaseSyncProvider {
     super();
     this.transport = options.transport;
     this.projectId = options.projectId;
+    this.filename = options.filename;
     this.doc = options.doc;
     this.intervalMs = options.intervalMs ?? 5000;
   }
@@ -60,6 +63,7 @@ export class HttpPollingSyncProvider extends BaseSyncProvider {
     try {
       const diff = await this.transport.syncPush(
         this.projectId,
+        this.filename,
         localUpdate,
         stateVector,
       );

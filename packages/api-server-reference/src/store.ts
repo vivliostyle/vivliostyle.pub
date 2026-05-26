@@ -75,8 +75,10 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 CREATE INDEX IF NOT EXISTS projects_owner_id_idx ON projects(owner_id);
 CREATE TABLE IF NOT EXISTS docs (
-  project_id TEXT PRIMARY KEY,
-  state BLOB NOT NULL
+  project_id TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  state BLOB NOT NULL,
+  PRIMARY KEY (project_id, filename)
 );
 `;
 
@@ -395,19 +397,34 @@ export class SqliteStore {
     return true;
   }
 
-  loadDocState(projectId: string): Uint8Array | undefined {
+  /** Filenames that have a persisted Yjs doc for the project. */
+  listDocFilenames(projectId: string): string[] {
+    const rows = this.db
+      .prepare('SELECT filename FROM docs WHERE project_id = ?')
+      .all(projectId) as { filename: string }[];
+    return rows.map((r) => r.filename);
+  }
+
+  loadDocState(projectId: string, filename: string): Uint8Array | undefined {
     const row = this.db
-      .prepare('SELECT state FROM docs WHERE project_id = ?')
-      .get(projectId) as { state: Uint8Array } | undefined;
+      .prepare('SELECT state FROM docs WHERE project_id = ? AND filename = ?')
+      .get(projectId, filename) as { state: Uint8Array } | undefined;
     return row?.state;
   }
 
-  saveDocState(projectId: string, state: Uint8Array): void {
+  saveDocState(projectId: string, filename: string, state: Uint8Array): void {
     this.db
       .prepare(
-        `INSERT INTO docs (project_id, state) VALUES (?, ?)
-         ON CONFLICT(project_id) DO UPDATE SET state = excluded.state`,
+        `INSERT INTO docs (project_id, filename, state) VALUES (?, ?, ?)
+         ON CONFLICT(project_id, filename) DO UPDATE SET state = excluded.state`,
       )
-      .run(projectId, state);
+      .run(projectId, filename, state);
+  }
+
+  deleteDocState(projectId: string, filename: string): boolean {
+    const result = this.db
+      .prepare('DELETE FROM docs WHERE project_id = ? AND filename = ?')
+      .run(projectId, filename);
+    return result.changes > 0;
   }
 }

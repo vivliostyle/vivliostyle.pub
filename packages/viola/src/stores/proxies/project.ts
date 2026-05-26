@@ -4,10 +4,11 @@ import { join, relative } from 'pathe';
 import { proxy, ref, subscribe } from 'valtio';
 import { deepClone } from 'valtio/utils';
 
-import { setupEditor } from '../../libs/editor';
+import { type EditorSyncContext, setupEditor } from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
 import { Content, type ContentId } from './content';
 import { Sandbox, SandboxFile } from './sandbox';
+import { session } from './session';
 import { Theme } from './theme';
 
 function detectBrowserLanguage(): string {
@@ -140,6 +141,7 @@ export class Project {
         return { filename, format, content };
       });
 
+    const sync = this.resolveEditorSyncContext();
     const readingOrder: ContentId[] = [];
     for (const { filename, format, content } of entryFiles) {
       if (!format) {
@@ -153,6 +155,7 @@ export class Project {
         filename,
         entryContext,
         initialFile: content,
+        sync,
       });
       const summary =
         editor
@@ -183,6 +186,16 @@ export class Project {
     ) {
       this.theme.install(sandbox.vivliostyleConfig.theme[0]);
     }
+  }
+
+  protected resolveEditorSyncContext(): EditorSyncContext | undefined {
+    if (!__CLOUD_ENABLED__) {
+      return undefined;
+    }
+    if (projects.entries[this.projectId]?.source !== 'remote') {
+      return undefined;
+    }
+    return { api: session.api, auth: session.auth };
   }
 
   protected async handleBibliographyUpdate() {

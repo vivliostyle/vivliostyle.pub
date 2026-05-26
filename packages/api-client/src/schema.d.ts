@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Server capabilities and supported API versions. */
+        /** Describe the server and the optional features it supports. */
         get: operations["getWellKnownVivliostylePub"];
         put?: never;
         post?: never;
@@ -30,7 +30,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a new user (reference-server convenience). */
+        /**
+         * Create a new user account.
+         * @description Creates an account with the given username and password. Sign in via `/oauth/authorize` afterwards to obtain access tokens.
+         */
         post: operations["postAuthRegister"];
         delete?: never;
         options?: never;
@@ -48,8 +51,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Issue an authorization code (OAuth 2.1 + PKCE).
-         * @description The reference server validates credentials inline in place of an interactive consent screen.
+         * Sign in and receive an authorization code.
+         * @description Verifies the username and password and returns a short-lived authorization code. Exchange it for tokens by calling `/oauth/token` with the matching PKCE verifier.
          */
         post: operations["postOauthAuthorize"];
         delete?: never;
@@ -67,7 +70,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Exchange an authorization code or refresh token for tokens. */
+        /**
+         * Exchange an authorization code or refresh token for an access token.
+         * @description Two grant types are supported: `authorization_code` (after `/oauth/authorize`) and `refresh_token` (to rotate an existing session).
+         */
         post: operations["postOauthToken"];
         delete?: never;
         options?: never;
@@ -84,7 +90,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refresh tokens (rotating refresh token). */
+        /**
+         * Renew the access token using a refresh token.
+         * @description Returns a new access token and rotates the refresh token. The previous refresh token is invalidated.
+         */
         post: operations["postOauthRefresh"];
         delete?: never;
         options?: never;
@@ -102,7 +111,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke the caller's tokens. */
+        /**
+         * Sign out the current user.
+         * @description Revokes every access and refresh token issued to the signed-in user.
+         */
         delete: operations["deleteOauthSession"];
         options?: never;
         head?: never;
@@ -116,7 +128,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the authenticated user. */
+        /** Get the profile of the signed-in user. */
         get: operations["getOauthUserinfo"];
         put?: never;
         post?: never;
@@ -158,6 +170,30 @@ export interface paths {
         post?: never;
         /** Delete a project. */
         delete: operations["deleteProjectsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{id}/sync/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pull the latest document updates for a file.
+         * @description Returns the Yjs update needed to bring the caller up to date for one file in a project. If the `sv` query parameter is supplied, only the delta missing from that state vector is returned; otherwise the full document state is returned.
+         */
+        get: operations["getProjectsByIdSyncByPath"];
+        put?: never;
+        /**
+         * Push a file's local updates and pull remote updates back.
+         * @description Applies the Yjs update sent in the request body to the file-scoped document, then returns the update the caller still needs to converge with the server (filtered by the `sv` state vector when supplied). Send an empty body to pull-only.
+         */
+        post: operations["postProjectsByIdSyncByPath"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -206,32 +242,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read a content-addressed attachment. */
+        /** Download an attachment by its SHA-256 hash. */
         get: operations["getProjectsByIdAttachmentsBySha256"];
         /**
-         * Upload a content-addressed attachment.
-         * @description The request body must hash (SHA-256, hex) to the path parameter.
+         * Upload an attachment.
+         * @description The SHA-256 hex digest of the request body must match the `sha256` path parameter; uploads that fail this check are rejected. Uploading the same hash twice is idempotent.
          */
         put: operations["putProjectsByIdAttachmentsBySha256"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{id}/sync": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Fetch the Yjs update missing from the client state vector. */
-        get: operations["getProjectsByIdSync"];
-        put?: never;
-        /** Apply a Yjs update and receive the merged diff in return. */
-        post: operations["postProjectsByIdSync"];
         delete?: never;
         options?: never;
         head?: never;
@@ -728,6 +746,86 @@ export interface operations {
             };
         };
     };
+    getProjectsByIdSyncByPath: {
+        parameters: {
+            query?: {
+                /** @description The client's current Yjs state vector, encoded as base64url. Omit to receive the full document state. */
+                sv?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Yjs update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postProjectsByIdSyncByPath: {
+        parameters: {
+            query?: {
+                /** @description The client's current Yjs state vector, encoded as base64url. Omit to receive the full document state. */
+                sv?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Merged Yjs update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     getProjectsByIdFiles: {
         parameters: {
             query?: never;
@@ -947,84 +1045,6 @@ export interface operations {
                         error: string;
                         message?: string;
                     };
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    getProjectsByIdSync: {
-        parameters: {
-            query?: {
-                /** @description Client's base64url-encoded Yjs state vector. */
-                sv?: string;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Yjs update */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    postProjectsByIdSync: {
-        parameters: {
-            query?: {
-                /** @description Client's base64url-encoded Yjs state vector. */
-                sv?: string;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/octet-stream": string;
-            };
-        };
-        responses: {
-            /** @description Merged Yjs update */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
                 };
             };
             /** @description Not found */

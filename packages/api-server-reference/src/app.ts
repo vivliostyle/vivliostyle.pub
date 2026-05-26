@@ -60,19 +60,23 @@ export function createApp(options: CreateAppOptions = {}) {
   // middleware to the prefix (rather than `use('*')` inside each sub-app)
   // keeps it from leaking onto sibling routes such as `/openapi`.
   const requireBearer = bearerAuth(store);
-  // The realtime WebSocket endpoint (/projects/:id/sync/ws, registered by the
-  // Node entrypoint) authenticates with a query-string token because browsers
-  // cannot set the Authorization header on a WebSocket handshake, so it must
-  // bypass this header-based guard.
+  // The realtime WebSocket endpoint (`/projects/:id/sync-ws/:path`, registered
+  // by the Node entrypoint) authenticates with a query-string token because
+  // browsers cannot set the Authorization header on a WebSocket handshake, so
+  // it must bypass this header-based guard.
+  const syncWsPattern = /\/projects\/[^/]+\/sync-ws\//;
   const projectAuth = createMiddleware<AuthEnv>((c, next) =>
-    c.req.path.endsWith('/sync/ws') ? next() : requireBearer(c, next),
+    syncWsPattern.test(c.req.path) ? next() : requireBearer(c, next),
   );
   app.use('/projects', projectAuth);
   app.use('/projects/*', projectAuth);
   app.route('/', projectRoutes(deps));
+  // Sync routes live under `/projects/:id/files/:path/sync`; register them
+  // before the catch-all `:path{.+}` file routes so the more specific match
+  // wins.
+  app.route('/', syncRoutes(deps));
   app.route('/', fileRoutes(deps));
   app.route('/', attachmentRoutes(deps));
-  app.route('/', syncRoutes(deps));
 
   app.get(
     '/openapi',

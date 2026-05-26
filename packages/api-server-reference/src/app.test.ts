@@ -374,7 +374,7 @@ describe('sync (http)', () => {
     local.getText('body').insert(0, 'hello yjs');
     const update = Y.encodeStateAsUpdate(local);
 
-    const post = await app.request(`/projects/${projectId}/sync`, {
+    const post = await app.request(`/projects/${projectId}/sync/chapter.md`, {
       method: 'POST',
       headers: bearer(token),
       body: update,
@@ -382,7 +382,7 @@ describe('sync (http)', () => {
     expect(post.status).toBe(200);
 
     const remote = new Y.Doc();
-    const get = await app.request(`/projects/${projectId}/sync`, {
+    const get = await app.request(`/projects/${projectId}/sync/chapter.md`, {
       headers: bearer(token),
     });
     Y.applyUpdate(remote, new Uint8Array(await get.arrayBuffer()));
@@ -392,21 +392,104 @@ describe('sync (http)', () => {
   it('returns only the diff for a provided state vector', async () => {
     const local = new Y.Doc();
     local.getText('body').insert(0, 'abc');
-    await app.request(`/projects/${projectId}/sync`, {
+    await app.request(`/projects/${projectId}/sync/chapter.md`, {
       method: 'POST',
       headers: bearer(token),
       body: Y.encodeStateAsUpdate(local),
     });
 
     const sv = Buffer.from(Y.encodeStateVector(local)).toString('base64url');
-    const get = await app.request(`/projects/${projectId}/sync?sv=${sv}`, {
-      headers: bearer(token),
-    });
+    const get = await app.request(
+      `/projects/${projectId}/sync/chapter.md?sv=${sv}`,
+      { headers: bearer(token) },
+    );
     // No further changes, so the diff is the empty update.
     const diff = new Uint8Array(await get.arrayBuffer());
     const check = new Y.Doc();
     Y.applyUpdate(check, Y.encodeStateAsUpdate(local));
     Y.applyUpdate(check, diff);
     expect(check.getText('body').toString()).toBe('abc');
+  });
+
+  it('accepts a pull-only POST with empty body and a non-trivial sv', async () => {
+    // Mirrors the client's startEditorSync initial sync: empty body, state
+    // vector reflecting the client's IndexedDB-hydrated Y.Doc.
+    const local = new Y.Doc();
+    local.getText('body').insert(0, 'hi');
+    const sv = Buffer.from(Y.encodeStateVector(local)).toString('base64url');
+    const res = await app.request(
+      `/projects/${projectId}/sync/drafts/manuscript.md?sv=${sv}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...bearer(token),
+        },
+        body: new Uint8Array(),
+      },
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects malformed update bytes with invalid_update', async () => {
+    // A Yjs state vector is *not* a valid update body; sending one as the
+    // POST body should produce invalid_update (not invalid_state_vector).
+    const doc = new Y.Doc();
+    doc.getText('t').insert(0, 'x');
+    const res = await app.request(`/projects/${projectId}/sync/chapter.md`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', ...bearer(token) },
+      body: Y.encodeStateVector(doc),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_update' });
+  });
+
+  it('rejects a truncated state vector with invalid_state_vector', async () => {
+    // sv=AQ decodes to [0x01] — claims length=1 but no client/clock follows.
+    const res = await app.request(
+      `/projects/${projectId}/sync/chapter.md?sv=AQ`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...bearer(token),
+        },
+        body: new Uint8Array(),
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_state_vector' });
+  });
+
+  it('keeps per-file sync state isolated', async () => {
+    const ch1 = new Y.Doc();
+    ch1.getText('body').insert(0, 'one');
+    await app.request(`/projects/${projectId}/sync/chapter1.md`, {
+      method: 'POST',
+      headers: bearer(token),
+      body: Y.encodeStateAsUpdate(ch1),
+    });
+
+    const ch2 = new Y.Doc();
+    ch2.getText('body').insert(0, 'two');
+    await app.request(`/projects/${projectId}/sync/chapter2.md`, {
+      method: 'POST',
+      headers: bearer(token),
+      body: Y.encodeStateAsUpdate(ch2),
+    });
+
+    const get1 = await app.request(`/projects/${projectId}/sync/chapter1.md`, {
+      headers: bearer(token),
+    });
+    const get2 = await app.request(`/projects/${projectId}/sync/chapter2.md`, {
+      headers: bearer(token),
+    });
+    const remote1 = new Y.Doc();
+    const remote2 = new Y.Doc();
+    Y.applyUpdate(remote1, new Uint8Array(await get1.arrayBuffer()));
+    Y.applyUpdate(remote2, new Uint8Array(await get2.arrayBuffer()));
+    expect(remote1.getText('body').toString()).toBe('one');
+    expect(remote2.getText('body').toString()).toBe('two');
   });
 });

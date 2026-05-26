@@ -1,38 +1,67 @@
 openapi: 3.1.0
 info:
   title: Vivliostyle Pub Sync API
-  description: Open API for Vivliostyle Pub project sync, files, attachments, and
-    OAuth 2.1 authentication. Generated from the reference implementation
-    (@v/api-server-reference); do not edit by hand.
+  description: >-
+    The Vivliostyle Pub Sync API lets you sign in, manage your book
+
+    projects, and keep their contents synchronized across devices.
+
+
+    - **Sign in** with OAuth 2.1 + PKCE to obtain a bearer token, then send it
+    as `Authorization: Bearer <token>` on every other call.
+
+    - **Manage projects** — list, create, update, or delete the books on your
+    account.
+
+    - **Read and write project files** — individual text/source files plus
+    larger binary assets stored as attachments.
+
+    - **Sync collaboratively** — exchange document updates with other editors in
+    realtime over WebSocket, or one-shot over HTTP.
+
+
+    All endpoints except the ones under **auth** and **capabilities** require a
+    valid bearer token.
   version: 0.1.0
 servers:
   - url: /
-    description: Relative to the server origin
+    description: Same origin as this documentation page
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
+      description: "Access token obtained from `POST /oauth/token`. Send it as
+        `Authorization: Bearer <token>`."
 tags:
   - name: auth
-    description: OAuth 2.1 + PKCE authentication
+    description: Sign in and manage access tokens. Uses OAuth 2.1 with PKCE; the
+      resulting bearer token authorizes every other endpoint.
   - name: projects
-    description: Project metadata
+    description: Create, list, update, and delete the book projects on your account.
+      Each project is the container for its files, attachments, and
+      collaborative-editing state.
   - name: files
-    description: Direct file access
+    description: Read and write the source files (Markdown, CSS, configuration,
+      etc.) inside a project.
   - name: attachments
-    description: Content-addressed binary attachments
+    description: Upload and fetch binary assets — such as images embedded in a book
+      — addressed by their SHA-256 hash. Identical contents are stored only
+      once.
   - name: sync
-    description: Yjs document sync (HTTP fallback)
+    description: Exchange collaborative-editing updates for a project. The realtime
+      channel is a WebSocket; these HTTP endpoints provide the same data for
+      clients that cannot keep a socket open. Updates use the Yjs CRDT binary
+      format.
   - name: capabilities
-    description: Server capability discovery
+    description: Discover the server name, version, and which optional features it supports.
 paths:
   /.well-known/vivliostyle-pub:
     get:
       operationId: getWellKnownVivliostylePub
       tags:
         - capabilities
-      summary: Server capabilities and supported API versions.
+      summary: Describe the server and the optional features it supports.
       responses:
         "200":
           description: Capabilities
@@ -72,7 +101,9 @@ paths:
       operationId: postAuthRegister
       tags:
         - auth
-      summary: Register a new user (reference-server convenience).
+      summary: Create a new user account.
+      description: Creates an account with the given username and password. Sign in
+        via `/oauth/authorize` afterwards to obtain access tokens.
       responses:
         "201":
           description: Created
@@ -124,9 +155,10 @@ paths:
       operationId: postOauthAuthorize
       tags:
         - auth
-      summary: Issue an authorization code (OAuth 2.1 + PKCE).
-      description: The reference server validates credentials inline in place of an
-        interactive consent screen.
+      summary: Sign in and receive an authorization code.
+      description: Verifies the username and password and returns a short-lived
+        authorization code. Exchange it for tokens by calling `/oauth/token`
+        with the matching PKCE verifier.
       responses:
         "200":
           description: Authorization code
@@ -193,7 +225,10 @@ paths:
       operationId: postOauthToken
       tags:
         - auth
-      summary: Exchange an authorization code or refresh token for tokens.
+      summary: Exchange an authorization code or refresh token for an access token.
+      description: "Two grant types are supported: `authorization_code` (after
+        `/oauth/authorize`) and `refresh_token` (to rotate an existing
+        session)."
       responses:
         "200":
           description: Tokens
@@ -272,7 +307,9 @@ paths:
       operationId: postOauthRefresh
       tags:
         - auth
-      summary: Refresh tokens (rotating refresh token).
+      summary: Renew the access token using a refresh token.
+      description: Returns a new access token and rotates the refresh token. The
+        previous refresh token is invalidated.
       responses:
         "200":
           description: Tokens
@@ -328,7 +365,8 @@ paths:
       operationId: deleteOauthSession
       tags:
         - auth
-      summary: Revoke the caller's tokens.
+      summary: Sign out the current user.
+      description: Revokes every access and refresh token issued to the signed-in user.
       security:
         - bearerAuth: []
       responses:
@@ -352,7 +390,7 @@ paths:
       operationId: getOauthUserinfo
       tags:
         - auth
-      summary: Get the authenticated user.
+      summary: Get the profile of the signed-in user.
       security:
         - bearerAuth: []
       responses:
@@ -611,6 +649,105 @@ paths:
           in: path
           name: id
           required: true
+  /projects/{id}/sync/{path}:
+    get:
+      operationId: getProjectsByIdSyncByPath
+      tags:
+        - sync
+      summary: Pull the latest document updates for a file.
+      description: Returns the Yjs update needed to bring the caller up to date for
+        one file in a project. If the `sv` query parameter is supplied, only the
+        delta missing from that state vector is returned; otherwise the full
+        document state is returned.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sv
+          in: query
+          required: false
+          description: The client's current Yjs state vector, encoded as base64url. Omit
+            to receive the full document state.
+          schema:
+            type: string
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: path
+          required: true
+      responses:
+        "200":
+          description: Yjs update
+          content: &a1
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+    post:
+      operationId: postProjectsByIdSyncByPath
+      tags:
+        - sync
+      summary: Push a file's local updates and pull remote updates back.
+      description: Applies the Yjs update sent in the request body to the file-scoped
+        document, then returns the update the caller still needs to converge
+        with the server (filtered by the `sv` state vector when supplied). Send
+        an empty body to pull-only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sv
+          in: query
+          required: false
+          description: The client's current Yjs state vector, encoded as base64url. Omit
+            to receive the full document state.
+          schema:
+            type: string
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: path
+          required: true
+      requestBody:
+        content: *a1
+      responses:
+        "200":
+          description: Merged Yjs update
+          content: *a1
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
   /projects/{id}/files:
     get:
       operationId: getProjectsByIdFiles
@@ -677,11 +814,7 @@ paths:
       responses:
         "200":
           description: File contents
-          content: &a1
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
+          content: *a1
         "404":
           description: Not found
           content:
@@ -781,7 +914,7 @@ paths:
       operationId: getProjectsByIdAttachmentsBySha256
       tags:
         - attachments
-      summary: Read a content-addressed attachment.
+      summary: Download an attachment by its SHA-256 hash.
       security:
         - bearerAuth: []
       responses:
@@ -816,8 +949,10 @@ paths:
       operationId: putProjectsByIdAttachmentsBySha256
       tags:
         - attachments
-      summary: Upload a content-addressed attachment.
-      description: The request body must hash (SHA-256, hex) to the path parameter.
+      summary: Upload an attachment.
+      description: The SHA-256 hex digest of the request body must match the `sha256`
+        path parameter; uploads that fail this check are rejected. Uploading the
+        same hash twice is idempotent.
       security:
         - bearerAuth: []
       requestBody:
@@ -874,78 +1009,3 @@ paths:
           in: path
           name: sha256
           required: true
-  /projects/{id}/sync:
-    get:
-      operationId: getProjectsByIdSync
-      tags:
-        - sync
-      summary: Fetch the Yjs update missing from the client state vector.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: sv
-          in: query
-          required: false
-          description: Client's base64url-encoded Yjs state vector.
-          schema:
-            type: string
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      responses:
-        "200":
-          description: Yjs update
-          content: *a1
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                  message:
-                    type: string
-                required:
-                  - error
-    post:
-      operationId: postProjectsByIdSync
-      tags:
-        - sync
-      summary: Apply a Yjs update and receive the merged diff in return.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: sv
-          in: query
-          required: false
-          description: Client's base64url-encoded Yjs state vector.
-          schema:
-            type: string
-        - schema:
-            type: string
-          in: path
-          name: id
-          required: true
-      requestBody:
-        content: *a1
-      responses:
-        "200":
-          description: Merged Yjs update
-          content: *a1
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                  message:
-                    type: string
-                required:
-                  - error

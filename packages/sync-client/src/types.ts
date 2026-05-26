@@ -13,9 +13,14 @@ export interface SyncProvider {
 
 /** Minimal transport the HTTP polling provider needs (satisfied by ApiClient). */
 export interface SyncTransport {
-  syncPull(projectId: string, stateVector?: Uint8Array): Promise<Uint8Array>;
+  syncPull(
+    projectId: string,
+    filename: string,
+    stateVector?: Uint8Array,
+  ): Promise<Uint8Array>;
   syncPush(
     projectId: string,
+    filename: string,
     update: Uint8Array,
     stateVector?: Uint8Array,
   ): Promise<Uint8Array>;

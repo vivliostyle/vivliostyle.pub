@@ -90,15 +90,18 @@ describe('ApiClient', () => {
   });
 
   it('round-trips binary sync payloads', async () => {
+    let seenUrl = '';
     const api = new ApiClient({
       baseUrl: BASE,
       fetch: mockFetch(async (req) => {
+        seenUrl = req.url;
         const body = new Uint8Array(await req.arrayBuffer());
         return new Response(body, { status: 200 });
       }),
     });
     const update = new Uint8Array([9, 8, 7]);
-    expect(await api.syncPush('p1', update)).toEqual(update);
+    expect(await api.syncPush('p1', 'chapter.md', update)).toEqual(update);
+    expect(seenUrl).toBe(`${BASE}/projects/p1/sync/chapter.md`);
   });
 
   it('passes the state vector as a base64url query parameter', async () => {
@@ -110,8 +113,8 @@ describe('ApiClient', () => {
         return new Response(new Uint8Array(), { status: 200 });
       }),
     });
-    await api.syncPull('p1', new Uint8Array([255, 254]));
-    expect(url).toBe(`${BASE}/projects/p1/sync?sv=__4`);
+    await api.syncPull('p1', 'images/a b.md', new Uint8Array([255, 254]));
+    expect(url).toBe(`${BASE}/projects/p1/sync/images/a%20b.md?sv=__4`);
   });
 
   it('throws ApiError on a failed request', async () => {
@@ -124,8 +127,34 @@ describe('ApiClient', () => {
 
   it('builds a websocket url with the access token', () => {
     const api = new ApiClient({ baseUrl: BASE });
-    expect(api.syncWebSocketUrl('p1', 'tok')).toBe(
-      'wss://sync.example/projects/p1/sync/ws?access_token=tok',
+    expect(api.syncWebSocketUrl('p1', 'chapter.md', 'tok')).toBe(
+      'wss://sync.example/projects/p1/sync-ws/chapter.md?access_token=tok',
     );
+  });
+
+  it('builds a websocket url when baseUrl is a relative path', () => {
+    // Browsers running against an in-process dev API see `baseUrl = '/api'`;
+    // the WS URL must resolve against the document origin instead of failing
+    // with `Invalid URL`.
+    const originalLocation = globalThis.location;
+    Object.defineProperty(globalThis, 'location', {
+      value: { origin: 'https://app.example' },
+      configurable: true,
+    });
+    try {
+      const api = new ApiClient({ baseUrl: '/api' });
+      expect(api.syncWebSocketUrl('p1', 'chapter.md', 'tok')).toBe(
+        'wss://app.example/api/projects/p1/sync-ws/chapter.md?access_token=tok',
+      );
+    } finally {
+      if (originalLocation === undefined) {
+        Reflect.deleteProperty(globalThis, 'location');
+      } else {
+        Object.defineProperty(globalThis, 'location', {
+          value: originalLocation,
+          configurable: true,
+        });
+      }
+    }
   });
 });

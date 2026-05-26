@@ -6,10 +6,10 @@ import type { SyncTransport } from './types';
 
 function serverTransport(serverDoc: Y.Doc): SyncTransport {
   return {
-    async syncPull(_projectId, stateVector) {
+    async syncPull(_projectId, _filename, stateVector) {
       return Y.encodeStateAsUpdate(serverDoc, stateVector);
     },
-    async syncPush(_projectId, update, stateVector) {
+    async syncPush(_projectId, _filename, update, stateVector) {
       if (update.byteLength > 0) {
         Y.applyUpdate(serverDoc, update);
       }
@@ -30,6 +30,7 @@ describe('HttpPollingSyncProvider', () => {
     const a = new HttpPollingSyncProvider({
       transport,
       projectId: 'p',
+      filename: 'f.md',
       doc: docA,
       intervalMs: NEVER,
     });
@@ -40,6 +41,7 @@ describe('HttpPollingSyncProvider', () => {
     const b = new HttpPollingSyncProvider({
       transport,
       projectId: 'p',
+      filename: 'f.md',
       doc: docB,
       intervalMs: NEVER,
     });
@@ -62,6 +64,7 @@ describe('HttpPollingSyncProvider', () => {
     const provider = new HttpPollingSyncProvider({
       transport: serverTransport(new Y.Doc()),
       projectId: 'p',
+      filename: 'f.md',
       doc: new Y.Doc(),
       intervalMs: NEVER,
     });
@@ -74,10 +77,10 @@ describe('HttpPollingSyncProvider', () => {
     let fail = true;
     const serverDoc = new Y.Doc();
     const transport: SyncTransport = {
-      async syncPull(_projectId, stateVector) {
+      async syncPull(_projectId, _filename, stateVector) {
         return Y.encodeStateAsUpdate(serverDoc, stateVector);
       },
-      async syncPush(_projectId, update, stateVector) {
+      async syncPush(_projectId, _filename, update, stateVector) {
         if (fail) {
           throw new Error('network down');
         }
@@ -93,6 +96,7 @@ describe('HttpPollingSyncProvider', () => {
     const provider = new HttpPollingSyncProvider({
       transport,
       projectId: 'p',
+      filename: 'f.md',
       doc,
       intervalMs: NEVER,
     });

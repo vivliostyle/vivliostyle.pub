@@ -106,10 +106,26 @@ describe('SqliteStore', () => {
 
   it('cascades doc-state cleanup on project deletion', () => {
     const p = store.createProject('owner', {});
-    store.saveDocState(p.id, new Uint8Array([7, 8, 9]));
+    store.saveDocState(p.id, 'chapter.md', new Uint8Array([7, 8, 9]));
+    store.saveDocState(p.id, 'preface.md', new Uint8Array([10, 11]));
 
     expect(store.removeProject('owner', p.id)).toBe(true);
-    expect(store.loadDocState(p.id)).toBeUndefined();
+    expect(store.loadDocState(p.id, 'chapter.md')).toBeUndefined();
+    expect(store.loadDocState(p.id, 'preface.md')).toBeUndefined();
+  });
+
+  it('keeps per-file doc states isolated within a project', () => {
+    const p = store.createProject('owner', {});
+    store.saveDocState(p.id, 'a.md', new Uint8Array([1]));
+    store.saveDocState(p.id, 'b.md', new Uint8Array([2]));
+
+    expect(store.loadDocState(p.id, 'a.md')).toEqual(new Uint8Array([1]));
+    expect(store.loadDocState(p.id, 'b.md')).toEqual(new Uint8Array([2]));
+    expect(store.listDocFilenames(p.id).sort()).toEqual(['a.md', 'b.md']);
+
+    expect(store.deleteDocState(p.id, 'a.md')).toBe(true);
+    expect(store.loadDocState(p.id, 'a.md')).toBeUndefined();
+    expect(store.loadDocState(p.id, 'b.md')).toEqual(new Uint8Array([2]));
   });
 });
 
@@ -182,14 +198,15 @@ describe('SqliteStore end-to-end via createApp', () => {
 
     const doc = new Y.Doc();
     doc.getText('body').insert(0, 'hello yjs');
-    await app.request(`/projects/${projectId}/sync`, {
+    await app.request(`/projects/${projectId}/sync/chapter.md`, {
       method: 'POST',
       headers: auth,
       body: Y.encodeStateAsUpdate(doc),
     });
-    const syncRes = await app.request(`/projects/${projectId}/sync`, {
-      headers: auth,
-    });
+    const syncRes = await app.request(
+      `/projects/${projectId}/sync/chapter.md`,
+      { headers: auth },
+    );
     const remote = new Y.Doc();
     Y.applyUpdate(remote, new Uint8Array(await syncRes.arrayBuffer()));
     expect(remote.getText('body').toString()).toBe('hello yjs');

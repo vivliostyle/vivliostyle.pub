@@ -79,11 +79,21 @@ export class WebSocketSyncProvider extends BaseSyncProvider {
     this.disposed = false;
     this.errored = false;
     this.setStatus('connecting');
-    const url = await this.resolveUrl();
-    if (this.disposed) {
-      return;
+    let ws: WebSocket;
+    try {
+      const url = await this.resolveUrl();
+      if (this.disposed) {
+        return;
+      }
+      ws = new this.WebSocketImpl(url);
+    } catch (err) {
+      // URL resolution or WebSocket construction failed synchronously. Surface
+      // it as an 'error' status so callers wiring up fallback transports can
+      // react; the `error`/`close` events would never fire otherwise.
+      this.errored = true;
+      this.setStatus('error');
+      throw err;
     }
-    const ws = new this.WebSocketImpl(url);
     ws.binaryType = 'arraybuffer';
     this.ws = ws;
     this.doc.on('update', this.handleUpdate);

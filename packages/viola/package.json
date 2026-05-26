@@ -41,6 +41,7 @@
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
     "@v/storage-providers": "workspace:*",
+    "@v/sync-client": "workspace:*",
     "@v/theme-registry": "workspace:*",
     "@v/tiptap-extensions": "workspace:*",
     "@v/ui": "workspace:*",

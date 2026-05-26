@@ -252,11 +252,12 @@ export class ApiClient {
   /** Fetch the Yjs update the client is missing for the given state vector. */
   async syncPull(
     projectId: string,
+    filename: string,
     stateVector?: Uint8Array,
   ): Promise<Uint8Array> {
     const query = stateVector ? `?sv=${toBase64Url(stateVector)}` : '';
     const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/sync${query}`,
+      `/projects/${encodeURIComponent(projectId)}/sync/${encodeFilePath(filename)}${query}`,
     );
     if (!res.ok) {
       throw new ApiError('Failed to pull sync state', res.status);
@@ -267,12 +268,13 @@ export class ApiClient {
   /** Apply a Yjs update on the server and receive the merged diff in return. */
   async syncPush(
     projectId: string,
+    filename: string,
     update: Uint8Array,
     stateVector?: Uint8Array,
   ): Promise<Uint8Array> {
     const query = stateVector ? `?sv=${toBase64Url(stateVector)}` : '';
     const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/sync${query}`,
+      `/projects/${encodeURIComponent(projectId)}/sync/${encodeFilePath(filename)}${query}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
@@ -286,10 +288,18 @@ export class ApiClient {
   }
 
   /** WebSocket URL for realtime sync (token passed as query parameter). */
-  syncWebSocketUrl(projectId: string, accessToken: string): string {
-    const url = new URL(
-      `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/sync/ws`,
-    );
+  syncWebSocketUrl(
+    projectId: string,
+    filename: string,
+    accessToken: string,
+  ): string {
+    // `baseUrl` may be a relative path (e.g. `/api`) when the API is mounted
+    // on the same origin as the app. `URL` needs an absolute reference in
+    // that case, so resolve against the document origin.
+    const path = `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/sync-ws/${encodeFilePath(filename)}`;
+    const base =
+      typeof location !== 'undefined' ? location.origin : 'http://localhost';
+    const url = new URL(path, base);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     url.searchParams.set('access_token', accessToken);
     return url.toString();
