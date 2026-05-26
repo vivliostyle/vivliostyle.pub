@@ -39,4 +39,4 @@ jobs:
       contents: read
     steps:
       - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
-      - run: pnpm i18n:validate
+      - run: pnpm --filter @v/viola i18n:validate

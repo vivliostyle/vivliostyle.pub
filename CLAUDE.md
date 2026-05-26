@@ -141,9 +141,11 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 
 The host React UI (`@v/viola`) is localized with **[inlang Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)** (compiler-based, tree-shakeable). The CLI worker / iframe (`@v/cli-bundle`, the Vivliostyle CLI itself) is out of scope.
 
-- **Source of truth**: `messages/{locale}.json` (inlang message format) at the repo root. Base locale is `en`; target locales `ja`, `zh`, `ko`. Config lives in `project.inlang/settings.json`.
+All i18n data, config, and scripts live inside the **`@v/viola` package** (`packages/viola/`), not the repo root — viola is the only consumer.
+
+- **Source of truth**: `packages/viola/messages/{locale}.json` (inlang message format). Base locale is `en`; target locales `ja`, `zh`, `ko`. Config lives in `packages/viola/project.inlang/settings.json`.
 - **Generated code**: `paraglideVitePlugin` (in `packages/viola/vite.config.ts`) compiles messages into `packages/viola/src/generated/paraglide/` (the whole `src/generated/` tree is git-ignored and ignored by Biome; paraglide also self-emits its own `.gitignore`). `tsc` reads the emitted `.d.ts` files (the project does not set `allowJs`), so the compile must run before typecheck — the viola `build`/`typecheck` scripts chain `pnpm paraglide` first.
-- **Vendored plugins**: the inlang message-format + m-function-matcher plugins are vendored under `project.inlang/plugins/*.js` and referenced by relative path in `settings.json` (NOT jsdelivr URLs). This keeps compilation fully offline/reproducible inside the agent sandbox (jsdelivr is not in the network allowlist) and lets web tools read them straight from the repo. To bump a plugin: `npm pack <plugin>@<version>`, replace the vendored bundle, and update the path.
+- **Vendored plugins**: the inlang message-format + m-function-matcher plugins are vendored under `packages/viola/inlang-plugins/*.js` and referenced by relative path in `settings.json` (NOT jsdelivr URLs). This keeps compilation fully offline/reproducible inside the agent sandbox (jsdelivr is not in the network allowlist) and lets web tools read them straight from the repo. To bump a plugin: `npm pack <plugin>@<version>`, replace the vendored bundle, and update the path.
 
 ### Message key naming (flat snake_case)
 
@@ -156,12 +158,12 @@ The host React UI (`@v/viola`) is localized with **[inlang Paraglide JS](https:/
 ### Adding / editing messages
 
 Three equivalent paths, all land as normal PRs that maintainers review:
-1. **Source (humans & AI agents)**: add the key to `messages/en.json`, use `m.<key>()` in code, then run `pnpm i18n:translate` to fill the other locales. `pnpm --filter @v/viola paraglide` regenerates types.
+1. **Source (humans & AI agents)**: add the key to `packages/viola/messages/en.json`, use `m.<key>()` in code, then run `pnpm --filter @v/viola i18n:translate` to fill the other locales. `pnpm --filter @v/viola paraglide` regenerates types.
 2. **Web UI (non-developers)**: [Fink](https://fink.inlang.com) — connect the GitHub repo, edit in the browser, opens a PR.
 3. **VS Code**: the [Sherlock](https://inlang.com/m/r7kp499g/app-inlang-ideExtension) extension for inline extraction/editing.
 
-- **Machine translation**: `pnpm i18n:translate` (inlang CLI, Google Cloud Translation v2). It only fills empty/missing messages, so human edits are preserved. Needs `INLANG_GOOGLE_TRANSLATE_API_KEY`. CI runs it via `.github/workflows/i18n-translate.yml` whenever `messages/en.json` changes and commits the result back.
-- **Validation**: `pnpm i18n:validate` (runs in the `i18n` CI job).
+- **Machine translation**: `pnpm --filter @v/viola i18n:translate` (inlang CLI, Google Cloud Translation v2). It only fills empty/missing messages, so human edits are preserved. Needs `INLANG_GOOGLE_TRANSLATE_API_KEY`. CI runs it via `.github/workflows/i18n-translate.yml` whenever `packages/viola/messages/en.json` changes and commits the result back.
+- **Validation**: `pnpm --filter @v/viola i18n:validate` (runs in the `i18n` CI job).
 
 ## Deployment
 

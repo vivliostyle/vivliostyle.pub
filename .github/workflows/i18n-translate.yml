@@ -11,7 +11,7 @@ on:
     paths:
       # Only the base locale triggers translation. The bot commits the other
       # locale files, so this filter also prevents self-triggering loops.
-      - messages/en.json
+      - packages/viola/messages/en.json
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,15 +25,15 @@ jobs:
     steps:
       - uses: vivliostyle/vivliostyle.pub/.github/actions/setup@main
       - name: Machine translate missing messages
-        run: pnpm i18n:translate
+        run: pnpm --filter @v/viola i18n:translate
         env:
           INLANG_GOOGLE_TRANSLATE_API_KEY: ${{ secrets.INLANG_GOOGLE_TRANSLATE_API_KEY }}
       - name: Commit updated translations
         run: |
-          if [ -n "$(git status --porcelain messages)" ]; then
+          if [ -n "$(git status --porcelain packages/viola/messages)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add messages
+            git add packages/viola/messages
             git commit -m "chore(i18n): machine-translate missing messages"
             git push
           else

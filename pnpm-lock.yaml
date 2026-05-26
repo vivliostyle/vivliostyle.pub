@@ -365,9 +365,6 @@ importers:
       '@biomejs/biome':
         specifier: 'catalog:'
         version: 2.4.15
-      '@inlang/cli':
-        specifier: 'catalog:'
-        version: 3.1.11
       husky:
         specifier: 'catalog:'
         version: 9.1.7
@@ -907,6 +904,9 @@ importers:
       '@floating-ui/react-dom':
         specifier: 'catalog:'
         version: 2.1.8(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@inlang/cli':
+        specifier: 'catalog:'
+        version: 3.1.11
       '@inlang/paraglide-js':
         specifier: 'catalog:'
         version: 2.18.1(typescript@6.0.3)

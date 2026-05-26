@@ -9,15 +9,12 @@
     "check": "biome check .",
     "dev": "turbo dev",
     "fix": "biome check --write --unsafe .",
-    "i18n:translate": "inlang machine translate --project ./project.inlang",
-    "i18n:validate": "inlang validate --project ./project.inlang",
     "prepare": "husky",
     "test": "turbo test",
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@inlang/cli": "catalog:",
     "husky": "catalog:",
     "lint-staged": "catalog:",
     "pnpm": "catalog:",
