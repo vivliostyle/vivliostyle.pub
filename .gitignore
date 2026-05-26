@@ -33,7 +33,7 @@ coverage/
 vivliostyle-pub/
 
 # Auto-generated code (e.g. inlang Paraglide JS via paraglideVitePlugin)
-packages/viola/src/generated/
+**/src/generated/
 /secrets/*
 !/secrets/*/
 /secrets/*/*
