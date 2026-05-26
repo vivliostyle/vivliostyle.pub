@@ -145,7 +145,7 @@ All i18n data, config, and scripts live inside the **`@v/viola` package** (`pack
 
 - **Source of truth**: `packages/viola/messages/{locale}.json` (inlang message format). Base locale is `en`; target locales `ja`, `zh`, `ko`. Config lives in `packages/viola/project.inlang/settings.json`.
 - **Generated code**: `paraglideVitePlugin` (in `packages/viola/vite.config.ts`) compiles messages into `packages/viola/src/generated/paraglide/` (the whole `src/generated/` tree is git-ignored and ignored by Biome; paraglide also self-emits its own `.gitignore`). `tsc` reads the emitted `.d.ts` files (the project does not set `allowJs`), so the compile must run before typecheck — the viola `build`/`typecheck` scripts chain `pnpm paraglide` first.
-- **Vendored plugins**: the inlang message-format + m-function-matcher plugins are vendored under `packages/viola/inlang-plugins/*.js` and referenced by relative path in `settings.json` (NOT jsdelivr URLs). This keeps compilation fully offline/reproducible inside the agent sandbox (jsdelivr is not in the network allowlist) and lets web tools read them straight from the repo. To bump a plugin: `npm pack <plugin>@<version>`, replace the vendored bundle, and update the path.
+- **Plugins**: the inlang message-format + m-function-matcher plugins are loaded from pinned jsdelivr URLs in `settings.json`. `cdn.jsdelivr.net` must be in the agent sandbox's network allowlist for the compile to run (it fetches the plugin modules). To bump a plugin, edit the version in the URL.
 
 ### Message key naming (flat snake_case)
 
