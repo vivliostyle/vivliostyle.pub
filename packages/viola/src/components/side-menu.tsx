@@ -43,6 +43,7 @@ import {
   MoreHorizontal,
   Palette,
   Printer,
+  Trash2,
   UserRound,
 } from '@v/ui/icon';
 import { cn } from '@v/ui/lib/utils';
@@ -70,6 +71,7 @@ import {
   $session,
   $ui,
 } from '../stores/accessors';
+import { deleteCloudProject } from '../stores/actions/cloud-project';
 import {
   createContentFile,
   deleteContentFile,
@@ -80,6 +82,7 @@ import {
   exportProjectZip,
   exportWebPub,
 } from '../stores/actions/export-project';
+import { deleteLocalProject } from '../stores/actions/local-project';
 import { printPdf } from '../stores/actions/print-pdf';
 import type {
   ContentId,
@@ -159,6 +162,26 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
 
 function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
   const projectSnap = useSnapshot($project).valueOrThrow();
+  const projectsSnap = useSnapshot($projects);
+  const entry = projectsSnap.entries[projectSnap.projectId];
+  const title = projectSnap.bibliography.title || 'Untitled';
+
+  const onDelete = async () => {
+    if (!entry) return;
+    if (!window.confirm(`Delete project "${title}"? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      if (entry.source === 'remote') {
+        await deleteCloudProject(projectSnap.projectId);
+      } else {
+        await deleteLocalProject(projectSnap.projectId);
+      }
+    } catch {
+      window.alert('Failed to delete project.');
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
@@ -167,7 +190,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
           inset
           className={cn('text-xs text-muted-foreground max-w-120 truncate')}
         >
-          {projectSnap.bibliography.title || 'Untitled'}
+          {title}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -196,6 +219,15 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
             <Palette />
             <span>Customize theme</span>
           </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          disabled={!entry}
+          onClick={onDelete}
+        >
+          <Trash2 />
+          <span>Delete project</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
