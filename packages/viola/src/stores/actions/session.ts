@@ -44,6 +44,12 @@ export function restoreSession(): Promise<void> {
   }
   $session.status = 'initial';
   sessionReady = (async () => {
+    if (!__CLOUD_ENABLED__) {
+      $session.user = null;
+      $session.status = 'anonymous';
+      discoverProjects().catch(() => {});
+      return;
+    }
     try {
       const user = await $session.auth.getUser();
       if (user) {

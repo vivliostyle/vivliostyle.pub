@@ -210,7 +210,7 @@ function Content(_: StartPaneProperty) {
         </Button>
       </section>
 
-      {sessionSnap.status === 'authenticated' && (
+      {__CLOUD_ENABLED__ && sessionSnap.status === 'authenticated' && (
         <section className="grid gap-3">
           <h3 className="text-sm font-semibold text-muted-foreground">
             Cloud projects
@@ -230,7 +230,8 @@ function Content(_: StartPaneProperty) {
         </section>
       )}
 
-      {sessionSnap.status !== 'authenticated' &&
+      {__CLOUD_ENABLED__ &&
+        sessionSnap.status !== 'authenticated' &&
         sessionSnap.status !== 'initial' && (
           <p className="text-xs text-muted-foreground">
             <Link to="/settings/account" className="hover:underline">

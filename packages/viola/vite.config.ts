@@ -297,7 +297,19 @@ const serviceWorker = () => [
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, secretsDir, ['VITE_', 'API_']);
 
+  // Cloud (Account / API-backed projects) is enabled when an API base URL is
+  // configured. The vite dev server mounts an in-process API at `/api`, so we
+  // default to that when one isn't explicitly set. `VITE_DISABLE_CLOUD`
+  // is an explicit kill-switch that wins over everything else.
+  const apiBaseUrl =
+    env.VITE_API_BASE_URL || (command === 'serve' ? '/api' : '');
+  const cloudEnabled = env.VITE_DISABLE_CLOUD !== 'true' && Boolean(apiBaseUrl);
+
   return {
+    define: {
+      __CLOUD_ENABLED__: JSON.stringify(cloudEnabled),
+      __API_BASE_URL__: JSON.stringify(cloudEnabled ? apiBaseUrl : ''),
+    },
     build: {
       rolldownOptions: {
         input: {
@@ -318,14 +330,18 @@ export default defineConfig(({ mode, command }) => {
       serviceWorker(),
       serveTemplates(),
       serveCli(),
-      serveApi({
-        sqlitePath: env.API_SQLITE_PATH
-          ? path.resolve(getProjectRoot(), env.API_SQLITE_PATH)
-          : undefined,
-        projectFilePath: env.API_PROJECT_FILE_PATH
-          ? path.resolve(getProjectRoot(), env.API_PROJECT_FILE_PATH)
-          : undefined,
-      }),
+      ...(cloudEnabled
+        ? [
+            serveApi({
+              sqlitePath: env.API_SQLITE_PATH
+                ? path.resolve(getProjectRoot(), env.API_SQLITE_PATH)
+                : undefined,
+              projectFilePath: env.API_PROJECT_FILE_PATH
+                ? path.resolve(getProjectRoot(), env.API_PROJECT_FILE_PATH)
+                : undefined,
+            }),
+          ]
+        : []),
       visualizer() as PluginOption,
     ],
     server:

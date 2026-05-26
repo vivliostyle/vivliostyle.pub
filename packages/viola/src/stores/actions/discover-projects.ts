@@ -52,7 +52,7 @@ async function listLocalProjects(): Promise<ProjectEntry[]> {
 }
 
 async function listRemoteProjects(): Promise<ProjectEntry[]> {
-  if ($session.status !== 'authenticated') {
+  if (!__CLOUD_ENABLED__ || $session.status !== 'authenticated') {
     return [];
   }
   try {

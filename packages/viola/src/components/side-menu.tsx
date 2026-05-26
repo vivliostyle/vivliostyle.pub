@@ -558,10 +558,14 @@ export function SideMenu() {
         // flex-1; without it, the footer rides up under the header).
         <SidebarContent />
       )}
-      <SidebarSeparator />
-      <SidebarFooter>
-        <AccountMenuSection />
-      </SidebarFooter>
+      {__CLOUD_ENABLED__ && (
+        <>
+          <SidebarSeparator />
+          <SidebarFooter>
+            <AccountMenuSection />
+          </SidebarFooter>
+        </>
+      )}
     </Sidebar>
   );
 }

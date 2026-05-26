@@ -10,7 +10,11 @@ export type SessionStatus =
   | 'authenticated'
   | 'authenticating';
 
-const DEFAULT_BASE_URL = '/api';
+// `__API_BASE_URL__` is `''` when the build was made without an API server
+// configured. The session is still constructed so the proxy stays shaped the
+// same; `restoreSession()` short-circuits to `'anonymous'` instead of hitting
+// a non-existent endpoint.
+const DEFAULT_BASE_URL = __API_BASE_URL__ || '/api';
 const CLIENT_ID = 'vivliostyle-pub-web';
 
 function buildRedirectUri(): string {

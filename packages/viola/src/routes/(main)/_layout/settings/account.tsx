@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
 import { generateId } from '../../../../libs/generate-id';
 import { $projects, $ui } from '../../../../stores/accessors';
@@ -9,6 +9,9 @@ export const Route = createFileRoute('/(main)/_layout/settings/account')({
   beforeLoad: async ({ preload }) => {
     if (preload) {
       return;
+    }
+    if (!__CLOUD_ENABLED__) {
+      throw redirect({ to: '/' });
     }
     await restoreSession();
     $projects.currentProjectId = null;
