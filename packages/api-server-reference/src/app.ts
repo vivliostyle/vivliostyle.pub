@@ -11,7 +11,7 @@ import {
   type ServerConfig,
 } from './deps';
 import { FileStore } from './file-store';
-import { openApiDocumentation } from './openapi';
+import { openApiDocumentation, openApiReferencePage } from './openapi';
 import { attachmentRoutes } from './routes/attachments';
 import { authRoutes } from './routes/auth';
 import { fileRoutes } from './routes/files';
@@ -77,6 +77,9 @@ export function createApp(options: CreateAppOptions = {}) {
   app.get(
     '/openapi',
     openAPIRouteHandler(app, { documentation: openApiDocumentation() }),
+  );
+  app.get('/docs', (c) =>
+    c.html(openApiReferencePage({ specUrl: './openapi' })),
   );
 
   return { app, deps };

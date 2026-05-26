@@ -109,6 +109,17 @@ describe('openapi document', () => {
     expect(spec.openapi).toBe('3.1.0');
     expect(spec.paths['/projects']).toBeDefined();
   });
+
+  it('serves an HTML reference page at /docs', async () => {
+    const { app } = createApp();
+    const res = await app.request('/docs');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/text\/html/);
+    const html = await res.text();
+    expect(html).toContain('id="api-reference"');
+    expect(html).toContain('data-url="./openapi"');
+    expect(html).toContain('@scalar/api-reference');
+  });
 });
 
 describe('auth', () => {

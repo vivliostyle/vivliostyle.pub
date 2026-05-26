@@ -10,7 +10,12 @@ export {
   type FileStoreFile,
   type FileStoreOptions,
 } from './file-store';
-export { generateSpec, openApiDocumentation } from './openapi';
+export {
+  generateSpec,
+  type OpenApiReferencePageOptions,
+  openApiDocumentation,
+  openApiReferencePage,
+} from './openapi';
 export * from './schemas';
 export {
   type AccessToken,

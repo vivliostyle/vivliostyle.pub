@@ -33,3 +33,48 @@ export function openApiDocumentation(): GenerateSpecOptions['documentation'] {
 export function generateSpec(app: Hono) {
   return generateSpecs(app, { documentation: openApiDocumentation() });
 }
+
+export interface OpenApiReferencePageOptions {
+  /** URL the viewer fetches the spec from. Defaults to `/openapi`. */
+  specUrl?: string;
+  /** Document `<title>`. Defaults to the spec's `info.title`. */
+  title?: string;
+}
+
+/**
+ * Self-contained HTML page that renders the OpenAPI spec via the Scalar API
+ * Reference viewer loaded from a CDN. Kept dependency-free so the reference
+ * server can serve docs without bundling a UI; clients hitting the page need
+ * outbound access to jsdelivr.
+ */
+export function openApiReferencePage(
+  options: OpenApiReferencePageOptions = {},
+): string {
+  const specUrl = options.specUrl ?? '/openapi';
+  const title = options.title ?? openApiDocumentation().info?.title ?? 'API';
+  const escapeHtml = (s: string) =>
+    s.replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[c] as string,
+    );
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title)}</title>
+  </head>
+  <body>
+    <script id="api-reference" data-url="${escapeHtml(specUrl)}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>
+`;
+}
