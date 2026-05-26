@@ -335,7 +335,7 @@ export default defineConfig(({ mode, command }) => {
     plugins: [
       paraglideVitePlugin({
         project: path.join(getProjectRoot(), 'project.inlang'),
-        outdir: path.join(dirname, 'src/paraglide'),
+        outdir: path.join(dirname, 'src/generated/paraglide'),
         strategy: ['cookie', 'preferredLanguage', 'baseLocale'],
         emitTsDeclarations: true,
       }),

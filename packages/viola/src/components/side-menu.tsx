@@ -63,6 +63,8 @@ import {
   SidebarSeparator,
 } from '@v/ui/sidebar';
 import VivliostyleLogo from '../assets/vivliostyle-logo.svg';
+import { m } from '../generated/paraglide/messages';
+import { getLocale, locales, setLocale } from '../generated/paraglide/runtime';
 import { generateId } from '../libs/generate-id';
 import {
   $content,
@@ -72,8 +74,6 @@ import {
   $ui,
 } from '../stores/accessors';
 import { deleteCloudProject } from '../stores/actions/cloud-project';
-import { m } from '../paraglide/messages';
-import { getLocale, locales, setLocale } from '../paraglide/runtime';
 import {
   createContentFile,
   deleteContentFile,
