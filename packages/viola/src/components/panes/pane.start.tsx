@@ -46,10 +46,7 @@ function DeleteProjectButton({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const onClick = async (e: React.MouseEvent) => {
-    // Nested inside the navigation Link; stop the click from opening the project.
-    e.preventDefault();
-    e.stopPropagation();
+  const onClick = async () => {
     if (!window.confirm(confirmMessage)) {
       return;
     }
@@ -64,7 +61,7 @@ function DeleteProjectButton({
   };
 
   return (
-    <>
+    <div className="flex flex-col items-end">
       <Button
         type="button"
         variant="ghost"
@@ -80,44 +77,47 @@ function DeleteProjectButton({
           {error}
         </p>
       )}
-    </>
+    </div>
   );
 }
 
+// The delete button is a sibling of the Link rather than a child because
+// HTML5 forbids interactive descendants of `<a>` (button-in-anchor confuses
+// assistive tech and is re-parsed unpredictably by some browsers).
 function LocalProjectListItem({ entry }: { entry: ProjectEntry }) {
   return (
-    <li className="rounded-md border border-input hover:bg-accent transition-colors">
+    <li className="rounded-md border border-input hover:bg-accent transition-colors flex items-start gap-3 pr-3">
       <Link
         to="/projects/$projectId"
         params={{ projectId: entry.projectId }}
-        className="block px-4 py-3 flex items-start gap-3"
+        className="flex-1 min-w-0 px-4 py-3"
       >
-        <div className="flex-1 min-w-0">
-          <div className="font-medium">{entry.title || 'Untitled project'}</div>
-          {entry.author && (
-            <div className="text-sm text-muted-foreground">{entry.author}</div>
-          )}
-          <div className="text-xs text-muted-foreground mt-1 break-all">
-            {entry.projectId}
-          </div>
+        <div className="font-medium">{entry.title || 'Untitled project'}</div>
+        {entry.author && (
+          <div className="text-sm text-muted-foreground">{entry.author}</div>
+        )}
+        <div className="text-xs text-muted-foreground mt-1 break-all">
+          {entry.projectId}
         </div>
+      </Link>
+      <div className="py-3">
         <DeleteProjectButton
           ariaLabel="Delete local project"
           confirmMessage={`Delete local project "${entry.title || 'Untitled'}"? This cannot be undone.`}
           onDelete={() => deleteLocalProject(entry.projectId as ProjectId)}
         />
-      </Link>
+      </div>
     </li>
   );
 }
 
 function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
   return (
-    <li className="rounded-md border border-input hover:bg-accent transition-colors">
+    <li className="rounded-md border border-input hover:bg-accent transition-colors flex items-start gap-3 pr-3">
       <Link
         to="/projects/$projectId"
         params={{ projectId: entry.projectId }}
-        className="block px-4 py-3 flex items-start gap-3"
+        className="flex-1 min-w-0 px-4 py-3 flex items-start gap-3"
       >
         <Cloud className="size-4 mt-1 text-muted-foreground shrink-0" />
         <div className="flex-1 min-w-0">
@@ -129,12 +129,14 @@ function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
             {entry.projectId}
           </div>
         </div>
+      </Link>
+      <div className="py-3">
         <DeleteProjectButton
           ariaLabel="Delete cloud project"
           confirmMessage={`Delete cloud project "${entry.title || 'Untitled'}"? This cannot be undone.`}
           onDelete={() => deleteCloudProject(entry.projectId)}
         />
-      </Link>
+      </div>
     </li>
   );
 }
