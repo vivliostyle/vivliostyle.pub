@@ -3,6 +3,7 @@ import * as Y from 'yjs';
 import type { ApiClient } from '@v/api-client';
 import type { AuthClient } from '@v/auth-client';
 import {
+  type ConnectionStatus,
   HttpPollingSyncProvider,
   type SyncProvider,
   WebSocketSyncProvider,
@@ -55,13 +56,26 @@ export async function startEditorSync({
     WebSocketImpl: sync.webSocketImpl,
   });
   let active: SyncProvider = ws;
+  // Listeners are registered against the wrapper, not the underlying
+  // provider, so they keep receiving status updates after the WS→polling
+  // swap. Without this indirection, listeners attached pre-swap would stay
+  // bound to the disconnected `ws` and miss every status change from the
+  // polling provider.
+  const listeners = new Set<(status: ConnectionStatus) => void>();
+  const forward = (status: ConnectionStatus) => {
+    for (const listener of listeners) {
+      listener(status);
+    }
+  };
+  let unsubscribeActive = active.onStatusChange(forward);
   let fallbackStarted = false;
-  const unsubscribe = ws.onStatusChange((status) => {
+  const wsUnsubscribe = ws.onStatusChange((status) => {
     if (status !== 'error' || fallbackStarted) {
       return;
     }
     fallbackStarted = true;
-    unsubscribe();
+    wsUnsubscribe();
+    unsubscribeActive();
     ws.disconnect();
     const polling = new HttpPollingSyncProvider({
       transport: sync.api,
@@ -70,6 +84,7 @@ export async function startEditorSync({
       doc,
     });
     active = polling;
+    unsubscribeActive = polling.onStatusChange(forward);
     void polling.connect().catch(() => {
       // Polling provider retains pending updates internally and the interval
       // timer keeps retrying; nothing actionable to do here.
@@ -86,6 +101,11 @@ export async function startEditorSync({
     },
     connect: () => active.connect(),
     disconnect: () => active.disconnect(),
-    onStatusChange: (listener) => active.onStatusChange(listener),
+    onStatusChange: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
   };
 }
