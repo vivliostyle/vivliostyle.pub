@@ -187,11 +187,15 @@ const serveApi = ({
       const scheduleReload = (file: string) => {
         clearTimeout(reloadTimer);
         reloadTimer = setTimeout(async () => {
+          // Close the previous instance's SQLite handle before building a
+          // new one. With a file path this would otherwise leak a
+          // connection per reload until the process exits.
+          api.close();
+          // Clear the middleware reference so requests fall through to
+          // `next()` while the new instance is loading (and stay falling-
+          // through if the load fails, instead of hitting a closed handle).
+          currentMiddleware = undefined;
           try {
-            // Close the previous instance's SQLite handle before building a
-            // new one. With a file path this would otherwise leak a
-            // connection per reload until the process exits.
-            api.close();
             server.moduleGraph.invalidateAll();
             api = await loadApi();
             currentMiddleware = api.middleware;
@@ -205,6 +209,10 @@ const serveApi = ({
           }
         }, 100);
       };
+      // Snapshot the file tree at startup; files added later won't be
+      // watched until the dev server is restarted. Polling-based
+      // `fs.watchFile` handles are intentionally not cleaned up — the
+      // plugin lives for the lifetime of the dev server.
       const watchTree = (dir: string) => {
         for (const entry of fs.readdirSync(dir)) {
           const p = path.join(dir, entry);
