@@ -767,7 +767,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/octet-stream": string;
+                    "application/octet-stream": Uint8Array;
                 };
             };
             /** @description Not found */
@@ -799,7 +799,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/octet-stream": string;
+                "application/octet-stream": Uint8Array;
             };
         };
         responses: {
@@ -809,7 +809,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/octet-stream": string;
+                    "application/octet-stream": Uint8Array;
                 };
             };
             /** @description Not found */
@@ -885,7 +885,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/octet-stream": string;
+                    "application/octet-stream": Uint8Array;
                 };
             };
             /** @description Not found */
@@ -914,7 +914,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/octet-stream": string;
+                "application/octet-stream": Uint8Array;
             };
         };
         responses: {
@@ -990,7 +990,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/octet-stream": string;
+                    "application/octet-stream": Uint8Array;
                 };
             };
             /** @description Not found */
@@ -1019,7 +1019,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/octet-stream": string;
+                "application/octet-stream": Uint8Array;
             };
         };
         responses: {

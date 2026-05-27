@@ -1,4 +1,8 @@
-import createClient, { type Client } from 'openapi-fetch';
+import createClient, {
+  type Client,
+  defaultBodySerializer,
+  type Middleware,
+} from 'openapi-fetch';
 
 import type { paths } from './schema';
 
@@ -67,22 +71,20 @@ function toBase64Url(bytes: Uint8Array): string {
     .replace(/=+$/, '');
 }
 
-/** Copy into a standalone ArrayBuffer so it is a valid `fetch` body. */
-function toRequestBody(data: Uint8Array): ArrayBuffer {
-  const copy = new Uint8Array(data.byteLength);
-  copy.set(data);
-  return copy.buffer;
-}
-
 /**
  * Typed client for the Vivliostyle Pub sync API. JSON endpoints go through the
  * generated openapi-fetch `client`; the binary file/attachment/sync endpoints
- * use plain authenticated `fetch` because octet-stream bodies are awkward to
- * express through openapi-fetch.
+ * go through the parallel `authedClient`, which is the same `Client<paths>`
+ * shape but configured with a `Uint8Array`-aware `bodySerializer` and a
+ * `/`-preserving `pathSerializer` (needed because the API's `{path}` parameter
+ * holds hierarchical file paths). Both clients share the bearer-token
+ * middleware so every authenticated call carries the same `Authorization`
+ * header.
  */
 export class ApiClient {
   readonly baseUrl: string;
   readonly client: Client<paths>;
+  readonly authedClient: Client<paths>;
   private readonly getAccessToken?: AccessTokenProvider;
   private readonly fetchImpl: typeof globalThis.fetch;
 
@@ -90,11 +92,8 @@ export class ApiClient {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.getAccessToken = options.getAccessToken;
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
-    this.client = createClient<paths>({
-      baseUrl: this.baseUrl,
-      fetch: this.fetchImpl,
-    });
-    this.client.use({
+
+    const bearerMiddleware: Middleware = {
       onRequest: async ({ request }) => {
         const token = await this.getAccessToken?.();
         if (token) {
@@ -102,19 +101,42 @@ export class ApiClient {
         }
         return request;
       },
-    });
-  }
+    };
 
-  private async authedFetch(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<Response> {
-    const token = await this.getAccessToken?.();
-    const headers = new Headers(init.headers);
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-    return this.fetchImpl(`${this.baseUrl}${path}`, { ...init, headers });
+    this.client = createClient<paths>({
+      baseUrl: this.baseUrl,
+      fetch: this.fetchImpl,
+    });
+    this.client.use(bearerMiddleware);
+
+    this.authedClient = createClient<paths>({
+      baseUrl: this.baseUrl,
+      fetch: this.fetchImpl,
+      // Pass `Uint8Array` bodies through as a standalone `ArrayBuffer` (so
+      // `fetch` accepts them as `BodyInit` regardless of the caller's buffer
+      // ownership); fall back to openapi-fetch's default JSON-or-FormData
+      // handling for anything else.
+      bodySerializer: (body: unknown) => {
+        if (body instanceof Uint8Array) {
+          const copy = new Uint8Array(body.byteLength);
+          copy.set(body);
+          return copy.buffer;
+        }
+        return defaultBodySerializer(body);
+      },
+      // openapi-fetch's default `pathSerializer` calls `encodeURIComponent`
+      // on the entire value, which turns `/` into `%2F` and breaks
+      // hierarchical `{path}` params like `images/a b.png`. Encode per
+      // segment instead.
+      pathSerializer: (pathname, pathParams) => {
+        return pathname.replace(/\{([^{}]+)\}/g, (_match, name: string) => {
+          const value = pathParams[name];
+          if (value === undefined || value === null) return '';
+          return String(value).split('/').map(encodeURIComponent).join('/');
+        });
+      },
+    });
+    this.authedClient.use(bearerMiddleware);
   }
 
   async capabilities(): Promise<Capabilities> {
@@ -173,16 +195,20 @@ export class ApiClient {
     projectId: string,
     filePath: string,
   ): Promise<Uint8Array | null> {
-    const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/files/${encodeFilePath(filePath)}`,
+    const { data, error, response } = await this.authedClient.GET(
+      '/projects/{id}/files/{path}',
+      {
+        params: { path: { id: projectId, path: filePath } },
+        parseAs: 'arrayBuffer',
+      },
     );
-    if (res.status === 404) {
+    if (response.status === 404) {
       return null;
     }
-    if (!res.ok) {
-      throw new ApiError('Failed to read file', res.status);
+    if (!data) {
+      throw new ApiError('Failed to read file', response.status, error);
     }
-    return new Uint8Array(await res.arrayBuffer());
+    return new Uint8Array(data);
   }
 
   async writeFile(
@@ -191,26 +217,26 @@ export class ApiClient {
     data: Uint8Array,
     contentType = 'application/octet-stream',
   ): Promise<void> {
-    const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/files/${encodeFilePath(filePath)}`,
+    const { error, response } = await this.authedClient.PUT(
+      '/projects/{id}/files/{path}',
       {
-        method: 'PUT',
+        params: { path: { id: projectId, path: filePath } },
+        body: data,
         headers: { 'Content-Type': contentType },
-        body: toRequestBody(data),
       },
     );
-    if (!res.ok) {
-      throw new ApiError('Failed to write file', res.status);
+    if (!response.ok) {
+      throw new ApiError('Failed to write file', response.status, error);
     }
   }
 
   async deleteFile(projectId: string, filePath: string): Promise<void> {
-    const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/files/${encodeFilePath(filePath)}`,
-      { method: 'DELETE' },
+    const { error, response } = await this.authedClient.DELETE(
+      '/projects/{id}/files/{path}',
+      { params: { path: { id: projectId, path: filePath } } },
     );
-    if (!res.ok && res.status !== 404) {
-      throw new ApiError('Failed to delete file', res.status);
+    if (!response.ok && response.status !== 404) {
+      throw new ApiError('Failed to delete file', response.status, error);
     }
   }
 
@@ -218,16 +244,20 @@ export class ApiClient {
     projectId: string,
     sha256: string,
   ): Promise<Uint8Array | null> {
-    const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/attachments/${sha256}`,
+    const { data, error, response } = await this.authedClient.GET(
+      '/projects/{id}/attachments/{sha256}',
+      {
+        params: { path: { id: projectId, sha256 } },
+        parseAs: 'arrayBuffer',
+      },
     );
-    if (res.status === 404) {
+    if (response.status === 404) {
       return null;
     }
-    if (!res.ok) {
-      throw new ApiError('Failed to read attachment', res.status);
+    if (!data) {
+      throw new ApiError('Failed to read attachment', response.status, error);
     }
-    return new Uint8Array(await res.arrayBuffer());
+    return new Uint8Array(data);
   }
 
   async putAttachment(
@@ -235,18 +265,21 @@ export class ApiClient {
     sha256: string,
     data: Uint8Array,
   ): Promise<AttachmentResult> {
-    const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/attachments/${sha256}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: toRequestBody(data),
-      },
-    );
-    if (!res.ok) {
-      throw new ApiError('Failed to upload attachment', res.status);
+    const {
+      data: result,
+      error,
+      response,
+    } = await this.authedClient.PUT('/projects/{id}/attachments/{sha256}', {
+      params: { path: { id: projectId, sha256 } },
+      body: data,
+      // Override openapi-fetch's default `application/json` since our
+      // `bodySerializer` is shipping the raw bytes.
+      headers: { 'Content-Type': 'application/octet-stream' },
+    });
+    if (!result) {
+      throw new ApiError('Failed to upload attachment', response.status, error);
     }
-    return (await res.json()) as AttachmentResult;
+    return result;
   }
 
   /** Fetch the Yjs update the client is missing for the given state vector. */
@@ -255,14 +288,20 @@ export class ApiClient {
     filename: string,
     stateVector?: Uint8Array,
   ): Promise<Uint8Array> {
-    const query = stateVector ? `?sv=${toBase64Url(stateVector)}` : '';
-    const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/sync/${encodeFilePath(filename)}${query}`,
+    const { data, error, response } = await this.authedClient.GET(
+      '/projects/{id}/sync/{path}',
+      {
+        params: {
+          path: { id: projectId, path: filename },
+          query: stateVector ? { sv: toBase64Url(stateVector) } : undefined,
+        },
+        parseAs: 'arrayBuffer',
+      },
     );
-    if (!res.ok) {
-      throw new ApiError('Failed to pull sync state', res.status);
+    if (!data) {
+      throw new ApiError('Failed to pull sync state', response.status, error);
     }
-    return new Uint8Array(await res.arrayBuffer());
+    return new Uint8Array(data);
   }
 
   /** Apply a Yjs update on the server and receive the merged diff in return. */
@@ -272,19 +311,22 @@ export class ApiClient {
     update: Uint8Array,
     stateVector?: Uint8Array,
   ): Promise<Uint8Array> {
-    const query = stateVector ? `?sv=${toBase64Url(stateVector)}` : '';
-    const res = await this.authedFetch(
-      `/projects/${encodeURIComponent(projectId)}/sync/${encodeFilePath(filename)}${query}`,
+    const { data, error, response } = await this.authedClient.POST(
+      '/projects/{id}/sync/{path}',
       {
-        method: 'POST',
+        params: {
+          path: { id: projectId, path: filename },
+          query: stateVector ? { sv: toBase64Url(stateVector) } : undefined,
+        },
+        body: update,
         headers: { 'Content-Type': 'application/octet-stream' },
-        body: toRequestBody(update),
+        parseAs: 'arrayBuffer',
       },
     );
-    if (!res.ok) {
-      throw new ApiError('Failed to push sync state', res.status);
+    if (!data) {
+      throw new ApiError('Failed to push sync state', response.status, error);
     }
-    return new Uint8Array(await res.arrayBuffer());
+    return new Uint8Array(data);
   }
 
   /** WebSocket URL for realtime sync (token passed as query parameter). */
