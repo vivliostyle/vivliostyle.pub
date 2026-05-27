@@ -185,7 +185,7 @@ export class Sandbox {
       // ignore
     }
     const provider = await OPFSStorageProvider.open({ subPath: projectId });
-    const sandbox = proxy(Sandbox.create({ projectId, provider }));
+    const sandbox = Sandbox.create({ projectId, provider });
     await sandbox.initializeProjectFiles({
       themePackageName: '@vivliostyle/theme-base',
       entry: [],
@@ -199,7 +199,7 @@ export class Sandbox {
     projectId: ProjectId;
   }) {
     const provider = await OPFSStorageProvider.open({ subPath: projectId });
-    const sandbox = proxy(Sandbox.create({ projectId, provider }));
+    const sandbox = Sandbox.create({ projectId, provider });
     await sandbox.loadFromFileSystem();
     return sandbox;
   }
@@ -212,7 +212,7 @@ export class Sandbox {
     api: ApiClient;
   }) {
     const provider = new RemoteHttpStorageProvider(api, projectId);
-    const sandbox = proxy(Sandbox.create({ projectId, provider }));
+    const sandbox = Sandbox.create({ projectId, provider });
     await sandbox.initializeProjectFiles({
       themePackageName: '@vivliostyle/theme-base',
       entry: [],
@@ -228,7 +228,7 @@ export class Sandbox {
     api: ApiClient;
   }) {
     const provider = new RemoteHttpStorageProvider(api, projectId);
-    const sandbox = proxy(Sandbox.create({ projectId, provider }));
+    const sandbox = Sandbox.create({ projectId, provider });
     // An "empty" remote project (e.g. one created via the "Create an empty
     // cloud project" button) has no vivliostyle.config.json yet, so
     // `loadFromFileSystem` would throw. Seed it instead so the editor mounts.
