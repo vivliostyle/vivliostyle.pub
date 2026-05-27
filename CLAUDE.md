@@ -143,7 +143,7 @@ The host React UI (`@v/viola`) is localized with **[inlang Paraglide JS](https:/
 
 All i18n data, config, and scripts live inside the **`@v/viola` package** (`packages/viola/`), not the repo root — viola is the only consumer.
 
-- **Source of truth**: `packages/viola/messages/{locale}.json` (inlang message format). Base locale is `en`; target locales `ja`, `zh`, `ko`. Config lives in `packages/viola/project.inlang/settings.json`.
+- **Source of truth**: `packages/viola/messages/{locale}.json` (inlang message format). Base locale is `en`; the only target locale is `ja`. Config lives in `packages/viola/project.inlang/settings.json`.
 - **Generated code**: `paraglideVitePlugin` (in `packages/viola/vite.config.ts`) compiles messages into `packages/viola/src/generated/paraglide/` (the whole `src/generated/` tree is git-ignored and ignored by Biome; paraglide also self-emits its own `.gitignore`). `tsc` reads the emitted `.d.ts` files (the project does not set `allowJs`), so the compile must run before typecheck — the viola `build`/`typecheck` scripts chain `pnpm paraglide` first.
 - **Plugins**: the inlang message-format + m-function-matcher plugins are loaded from pinned jsdelivr URLs in `settings.json`. `cdn.jsdelivr.net` must be in the agent sandbox's network allowlist for the compile to run (it fetches the plugin modules). To bump a plugin, edit the version in the URL.
 
