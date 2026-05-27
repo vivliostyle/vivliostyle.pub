@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Describe the server and the optional features it supports. */
+        /**
+         * Capabilities
+         * @description Returns the server name, supported API versions, and which optional features it implements.
+         */
         get: operations["getWellKnownVivliostylePub"];
         put?: never;
         post?: never;
@@ -31,8 +34,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create a new user account.
-         * @description Creates an account with the given username and password. Sign in via `/oauth/authorize` afterwards to obtain access tokens.
+         * Register
+         * @description Creates a new user account; sign in via `/oauth/authorize` afterwards to obtain access tokens.
          */
         post: operations["postAuthRegister"];
         delete?: never;
@@ -51,8 +54,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Sign in and receive an authorization code.
-         * @description Verifies the username and password and returns a short-lived authorization code. Exchange it for tokens by calling `/oauth/token` with the matching PKCE verifier.
+         * Authorize
+         * @description Verifies the username and password and returns a short-lived authorization code to exchange via `/oauth/token` with the matching PKCE verifier.
          */
         post: operations["postOauthAuthorize"];
         delete?: never;
@@ -71,8 +74,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Exchange an authorization code or refresh token for an access token.
-         * @description Two grant types are supported: `authorization_code` (after `/oauth/authorize`) and `refresh_token` (to rotate an existing session).
+         * Token
+         * @description Exchanges an authorization code (after `/oauth/authorize`) or a refresh token for an access token.
          */
         post: operations["postOauthToken"];
         delete?: never;
@@ -91,8 +94,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Renew the access token using a refresh token.
-         * @description Returns a new access token and rotates the refresh token. The previous refresh token is invalidated.
+         * Refresh
+         * @description Issues a new access token and rotates the refresh token, invalidating the previous one.
          */
         post: operations["postOauthRefresh"];
         delete?: never;
@@ -112,7 +115,7 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Sign out the current user.
+         * Logout
          * @description Revokes every access and refresh token issued to the signed-in user.
          */
         delete: operations["deleteOauthSession"];
@@ -128,7 +131,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the profile of the signed-in user. */
+        /**
+         * Get user
+         * @description Returns the signed-in user's profile.
+         */
         get: operations["getOauthUserinfo"];
         put?: never;
         post?: never;
@@ -145,10 +151,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the authenticated user's projects. */
+        /**
+         * List projects
+         * @description Returns all projects owned by the authenticated user.
+         */
         get: operations["getProjects"];
         put?: never;
-        /** Create a project. */
+        /**
+         * Create project
+         * @description Creates a new project owned by the authenticated user.
+         */
         post: operations["postProjects"];
         delete?: never;
         options?: never;
@@ -163,12 +175,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get project metadata. */
+        /**
+         * Get project
+         * @description Returns the project's metadata.
+         */
         get: operations["getProjectsById"];
-        /** Update project metadata. */
+        /**
+         * Update project
+         * @description Replaces the project's metadata with the request body.
+         */
         put: operations["putProjectsById"];
         post?: never;
-        /** Delete a project. */
+        /**
+         * Delete project
+         * @description Removes the project along with all of its files and document state.
+         */
         delete: operations["deleteProjectsById"];
         options?: never;
         head?: never;
@@ -183,14 +204,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Pull the latest document updates for a file.
-         * @description Returns the Yjs update needed to bring the caller up to date for one file in a project. If the `sv` query parameter is supplied, only the delta missing from that state vector is returned; otherwise the full document state is returned.
+         * Sync pull
+         * @description Returns the Yjs update needed to bring the caller's copy of one file up to date — limited to the delta missing from the `sv` state vector when supplied, or the full state otherwise.
          */
         get: operations["getProjectsByIdSyncByPath"];
         put?: never;
         /**
-         * Push a file's local updates and pull remote updates back.
-         * @description Applies the Yjs update sent in the request body to the file-scoped document, then returns the update the caller still needs to converge with the server (filtered by the `sv` state vector when supplied). Send an empty body to pull-only.
+         * Sync push
+         * @description Applies the Yjs update in the request body and returns the diff the caller is still missing — filtered by the `sv` state vector when supplied, with an empty body acting as pull-only.
          */
         post: operations["postProjectsByIdSyncByPath"];
         delete?: never;
@@ -206,7 +227,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List files in a project. */
+        /**
+         * List files
+         * @description Returns every file currently stored in the project.
+         */
         get: operations["getProjectsByIdFiles"];
         put?: never;
         post?: never;
@@ -223,12 +247,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read a file. */
+        /**
+         * Read file
+         * @description Returns the file's raw bytes.
+         */
         get: operations["getProjectsByIdFilesByPath"];
-        /** Create or replace a file. */
+        /**
+         * Write file
+         * @description Creates or replaces the file at the given path.
+         */
         put: operations["putProjectsByIdFilesByPath"];
         post?: never;
-        /** Delete a file. */
+        /**
+         * Delete file
+         * @description Removes the file and drops its associated CRDT state.
+         */
         delete: operations["deleteProjectsByIdFilesByPath"];
         options?: never;
         head?: never;
@@ -242,11 +275,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download an attachment by its SHA-256 hash. */
+        /**
+         * Get attachment
+         * @description Returns the attachment whose SHA-256 hex digest matches the path parameter.
+         */
         get: operations["getProjectsByIdAttachmentsBySha256"];
         /**
-         * Upload an attachment.
-         * @description The SHA-256 hex digest of the request body must match the `sha256` path parameter; uploads that fail this check are rejected. Uploading the same hash twice is idempotent.
+         * Put attachment
+         * @description Stores the attachment keyed by its SHA-256 hex digest; the request body's digest must match the path parameter, and uploading the same hash twice is idempotent.
          */
         put: operations["putProjectsByIdAttachmentsBySha256"];
         post?: never;

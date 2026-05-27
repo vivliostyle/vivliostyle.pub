@@ -61,7 +61,9 @@ paths:
       operationId: getWellKnownVivliostylePub
       tags:
         - capabilities
-      summary: Describe the server and the optional features it supports.
+      summary: Capabilities
+      description: Returns the server name, supported API versions, and which optional
+        features it implements.
       responses:
         "200":
           description: Capabilities
@@ -101,9 +103,9 @@ paths:
       operationId: postAuthRegister
       tags:
         - auth
-      summary: Create a new user account.
-      description: Creates an account with the given username and password. Sign in
-        via `/oauth/authorize` afterwards to obtain access tokens.
+      summary: Register
+      description: Creates a new user account; sign in via `/oauth/authorize`
+        afterwards to obtain access tokens.
       responses:
         "201":
           description: Created
@@ -155,10 +157,10 @@ paths:
       operationId: postOauthAuthorize
       tags:
         - auth
-      summary: Sign in and receive an authorization code.
+      summary: Authorize
       description: Verifies the username and password and returns a short-lived
-        authorization code. Exchange it for tokens by calling `/oauth/token`
-        with the matching PKCE verifier.
+        authorization code to exchange via `/oauth/token` with the matching PKCE
+        verifier.
       responses:
         "200":
           description: Authorization code
@@ -225,10 +227,9 @@ paths:
       operationId: postOauthToken
       tags:
         - auth
-      summary: Exchange an authorization code or refresh token for an access token.
-      description: "Two grant types are supported: `authorization_code` (after
-        `/oauth/authorize`) and `refresh_token` (to rotate an existing
-        session)."
+      summary: Token
+      description: Exchanges an authorization code (after `/oauth/authorize`) or a
+        refresh token for an access token.
       responses:
         "200":
           description: Tokens
@@ -307,9 +308,9 @@ paths:
       operationId: postOauthRefresh
       tags:
         - auth
-      summary: Renew the access token using a refresh token.
-      description: Returns a new access token and rotates the refresh token. The
-        previous refresh token is invalidated.
+      summary: Refresh
+      description: Issues a new access token and rotates the refresh token,
+        invalidating the previous one.
       responses:
         "200":
           description: Tokens
@@ -365,7 +366,7 @@ paths:
       operationId: deleteOauthSession
       tags:
         - auth
-      summary: Sign out the current user.
+      summary: Logout
       description: Revokes every access and refresh token issued to the signed-in user.
       security:
         - bearerAuth: []
@@ -390,7 +391,8 @@ paths:
       operationId: getOauthUserinfo
       tags:
         - auth
-      summary: Get the profile of the signed-in user.
+      summary: Get user
+      description: Returns the signed-in user's profile.
       security:
         - bearerAuth: []
       responses:
@@ -426,7 +428,8 @@ paths:
       operationId: getProjects
       tags:
         - projects
-      summary: List the authenticated user's projects.
+      summary: List projects
+      description: Returns all projects owned by the authenticated user.
       security:
         - bearerAuth: []
       responses:
@@ -464,7 +467,8 @@ paths:
       operationId: postProjects
       tags:
         - projects
-      summary: Create a project.
+      summary: Create project
+      description: Creates a new project owned by the authenticated user.
       security:
         - bearerAuth: []
       responses:
@@ -510,7 +514,8 @@ paths:
       operationId: getProjectsById
       tags:
         - projects
-      summary: Get project metadata.
+      summary: Get project
+      description: Returns the project's metadata.
       security:
         - bearerAuth: []
       responses:
@@ -560,7 +565,8 @@ paths:
       operationId: putProjectsById
       tags:
         - projects
-      summary: Update project metadata.
+      summary: Update project
+      description: Replaces the project's metadata with the request body.
       security:
         - bearerAuth: []
       responses:
@@ -624,7 +630,8 @@ paths:
       operationId: deleteProjectsById
       tags:
         - projects
-      summary: Delete a project.
+      summary: Delete project
+      description: Removes the project along with all of its files and document state.
       security:
         - bearerAuth: []
       responses:
@@ -654,11 +661,10 @@ paths:
       operationId: getProjectsByIdSyncByPath
       tags:
         - sync
-      summary: Pull the latest document updates for a file.
-      description: Returns the Yjs update needed to bring the caller up to date for
-        one file in a project. If the `sv` query parameter is supplied, only the
-        delta missing from that state vector is returned; otherwise the full
-        document state is returned.
+      summary: Sync pull
+      description: Returns the Yjs update needed to bring the caller's copy of one
+        file up to date — limited to the delta missing from the `sv` state
+        vector when supplied, or the full state otherwise.
       security:
         - bearerAuth: []
       parameters:
@@ -704,11 +710,10 @@ paths:
       operationId: postProjectsByIdSyncByPath
       tags:
         - sync
-      summary: Push a file's local updates and pull remote updates back.
-      description: Applies the Yjs update sent in the request body to the file-scoped
-        document, then returns the update the caller still needs to converge
-        with the server (filtered by the `sv` state vector when supplied). Send
-        an empty body to pull-only.
+      summary: Sync push
+      description: Applies the Yjs update in the request body and returns the diff the
+        caller is still missing — filtered by the `sv` state vector when
+        supplied, with an empty body acting as pull-only.
       security:
         - bearerAuth: []
       parameters:
@@ -753,7 +758,8 @@ paths:
       operationId: getProjectsByIdFiles
       tags:
         - files
-      summary: List files in a project.
+      summary: List files
+      description: Returns every file currently stored in the project.
       security:
         - bearerAuth: []
       responses:
@@ -808,7 +814,8 @@ paths:
       operationId: getProjectsByIdFilesByPath
       tags:
         - files
-      summary: Read a file.
+      summary: Read file
+      description: Returns the file's raw bytes.
       security:
         - bearerAuth: []
       responses:
@@ -843,7 +850,8 @@ paths:
       operationId: putProjectsByIdFilesByPath
       tags:
         - files
-      summary: Create or replace a file.
+      summary: Write file
+      description: Creates or replaces the file at the given path.
       security:
         - bearerAuth: []
       requestBody:
@@ -879,7 +887,8 @@ paths:
       operationId: deleteProjectsByIdFilesByPath
       tags:
         - files
-      summary: Delete a file.
+      summary: Delete file
+      description: Removes the file and drops its associated CRDT state.
       security:
         - bearerAuth: []
       responses:
@@ -914,7 +923,9 @@ paths:
       operationId: getProjectsByIdAttachmentsBySha256
       tags:
         - attachments
-      summary: Download an attachment by its SHA-256 hash.
+      summary: Get attachment
+      description: Returns the attachment whose SHA-256 hex digest matches the path
+        parameter.
       security:
         - bearerAuth: []
       responses:
@@ -949,10 +960,10 @@ paths:
       operationId: putProjectsByIdAttachmentsBySha256
       tags:
         - attachments
-      summary: Upload an attachment.
-      description: The SHA-256 hex digest of the request body must match the `sha256`
-        path parameter; uploads that fail this check are rejected. Uploading the
-        same hash twice is idempotent.
+      summary: Put attachment
+      description: Stores the attachment keyed by its SHA-256 hex digest; the request
+        body's digest must match the path parameter, and uploading the same hash
+        twice is idempotent.
       security:
         - bearerAuth: []
       requestBody:

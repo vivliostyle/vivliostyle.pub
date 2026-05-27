@@ -17,7 +17,8 @@ export function projectRoutes({ store, files }: Deps) {
     '/projects',
     describeRoute({
       tags: ['projects'],
-      summary: "List the authenticated user's projects.",
+      summary: 'List projects',
+      description: 'Returns all projects owned by the authenticated user.',
       security: [{ bearerAuth: [] }],
       responses: {
         200: {
@@ -33,7 +34,8 @@ export function projectRoutes({ store, files }: Deps) {
     '/projects',
     describeRoute({
       tags: ['projects'],
-      summary: 'Create a project.',
+      summary: 'Create project',
+      description: 'Creates a new project owned by the authenticated user.',
       security: [{ bearerAuth: [] }],
       responses: {
         201: {
@@ -53,7 +55,8 @@ export function projectRoutes({ store, files }: Deps) {
     '/projects/:id',
     describeRoute({
       tags: ['projects'],
-      summary: 'Get project metadata.',
+      summary: 'Get project',
+      description: "Returns the project's metadata.",
       security: [{ bearerAuth: [] }],
       responses: {
         200: {
@@ -76,7 +79,8 @@ export function projectRoutes({ store, files }: Deps) {
     '/projects/:id',
     describeRoute({
       tags: ['projects'],
-      summary: 'Update project metadata.',
+      summary: 'Update project',
+      description: "Replaces the project's metadata with the request body.",
       security: [{ bearerAuth: [] }],
       responses: {
         200: {
@@ -104,7 +108,9 @@ export function projectRoutes({ store, files }: Deps) {
     '/projects/:id',
     describeRoute({
       tags: ['projects'],
-      summary: 'Delete a project.',
+      summary: 'Delete project',
+      description:
+        'Removes the project along with all of its files and document state.',
       security: [{ bearerAuth: [] }],
       responses: {
         204: { description: 'Deleted' },

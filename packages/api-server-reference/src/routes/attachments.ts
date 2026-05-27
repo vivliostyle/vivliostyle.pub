@@ -16,7 +16,9 @@ export function attachmentRoutes({ store, files }: Deps) {
     '/projects/:id/attachments/:sha256',
     describeRoute({
       tags: ['attachments'],
-      summary: 'Download an attachment by its SHA-256 hash.',
+      summary: 'Get attachment',
+      description:
+        'Returns the attachment whose SHA-256 hex digest matches the path parameter.',
       security: [{ bearerAuth: [] }],
       responses: {
         200: { description: 'Attachment bytes', content: binaryContent },
@@ -42,9 +44,9 @@ export function attachmentRoutes({ store, files }: Deps) {
     '/projects/:id/attachments/:sha256',
     describeRoute({
       tags: ['attachments'],
-      summary: 'Upload an attachment.',
+      summary: 'Put attachment',
       description:
-        'The SHA-256 hex digest of the request body must match the `sha256` path parameter; uploads that fail this check are rejected. Uploading the same hash twice is idempotent.',
+        "Stores the attachment keyed by its SHA-256 hex digest; the request body's digest must match the path parameter, and uploading the same hash twice is idempotent.",
       security: [{ bearerAuth: [] }],
       requestBody: { content: binaryContent },
       responses: {

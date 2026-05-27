@@ -32,9 +32,9 @@ export function syncRoutes({ store, docs }: Deps) {
     '/projects/:id/sync/:path{.+}',
     describeRoute({
       tags: ['sync'],
-      summary: 'Pull the latest document updates for a file.',
+      summary: 'Sync pull',
       description:
-        'Returns the Yjs update needed to bring the caller up to date for one file in a project. If the `sv` query parameter is supplied, only the delta missing from that state vector is returned; otherwise the full document state is returned.',
+        "Returns the Yjs update needed to bring the caller's copy of one file up to date — limited to the delta missing from the `sv` state vector when supplied, or the full state otherwise.",
       security: [{ bearerAuth: [] }],
       parameters: [
         {
@@ -80,9 +80,9 @@ export function syncRoutes({ store, docs }: Deps) {
     '/projects/:id/sync/:path{.+}',
     describeRoute({
       tags: ['sync'],
-      summary: "Push a file's local updates and pull remote updates back.",
+      summary: 'Sync push',
       description:
-        'Applies the Yjs update sent in the request body to the file-scoped document, then returns the update the caller still needs to converge with the server (filtered by the `sv` state vector when supplied). Send an empty body to pull-only.',
+        'Applies the Yjs update in the request body and returns the diff the caller is still missing — filtered by the `sv` state vector when supplied, with an empty body acting as pull-only.',
       security: [{ bearerAuth: [] }],
       parameters: [
         {

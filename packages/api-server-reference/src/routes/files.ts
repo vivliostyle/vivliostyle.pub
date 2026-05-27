@@ -15,7 +15,8 @@ export function fileRoutes({ store, files, docs }: Deps) {
     '/projects/:id/files',
     describeRoute({
       tags: ['files'],
-      summary: 'List files in a project.',
+      summary: 'List files',
+      description: 'Returns every file currently stored in the project.',
       security: [{ bearerAuth: [] }],
       responses: {
         200: { description: 'Files', content: jsonContent(FileListSchema) },
@@ -35,7 +36,8 @@ export function fileRoutes({ store, files, docs }: Deps) {
     '/projects/:id/files/:path{.+}',
     describeRoute({
       tags: ['files'],
-      summary: 'Read a file.',
+      summary: 'Read file',
+      description: "Returns the file's raw bytes.",
       security: [{ bearerAuth: [] }],
       responses: {
         200: { description: 'File contents', content: binaryContent },
@@ -61,7 +63,8 @@ export function fileRoutes({ store, files, docs }: Deps) {
     '/projects/:id/files/:path{.+}',
     describeRoute({
       tags: ['files'],
-      summary: 'Create or replace a file.',
+      summary: 'Write file',
+      description: 'Creates or replaces the file at the given path.',
       security: [{ bearerAuth: [] }],
       requestBody: { content: binaryContent },
       responses: {
@@ -84,7 +87,8 @@ export function fileRoutes({ store, files, docs }: Deps) {
     '/projects/:id/files/:path{.+}',
     describeRoute({
       tags: ['files'],
-      summary: 'Delete a file.',
+      summary: 'Delete file',
+      description: 'Removes the file and drops its associated CRDT state.',
       security: [{ bearerAuth: [] }],
       responses: {
         204: { description: 'Deleted' },

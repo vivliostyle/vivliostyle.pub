@@ -12,7 +12,9 @@ export function wellKnownRoutes({ config }: Deps) {
     '/.well-known/vivliostyle-pub',
     describeRoute({
       tags: ['capabilities'],
-      summary: 'Describe the server and the optional features it supports.',
+      summary: 'Capabilities',
+      description:
+        'Returns the server name, supported API versions, and which optional features it implements.',
       responses: {
         200: {
           description: 'Capabilities',
