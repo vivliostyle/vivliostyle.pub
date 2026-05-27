@@ -39,10 +39,18 @@ export async function setupProjectFromDraft({
     });
     projectId = record.id as ProjectId;
     source = 'remote';
-    sandbox = await Sandbox.createNewRemoteSandbox({
-      projectId,
-      api: $session.api,
-    });
+    try {
+      sandbox = await Sandbox.createNewRemoteSandbox({
+        projectId,
+        api: $session.api,
+      });
+    } catch (err) {
+      // The remote record exists but we never produced a local handle for
+      // it, so roll it back to avoid leaving the user with an orphaned
+      // cloud project from a transient client failure.
+      await $session.api.deleteProject(projectId).catch(() => {});
+      throw err;
+    }
     // Seeded eagerly so the start pane reflects the new project before the
     // template install (and the trailing `discoverProjects()`) finishes.
     const entry: ProjectEntry = {
@@ -67,31 +75,39 @@ export async function setupProjectFromDraft({
     $projects.entries[projectId] = entry;
   }
 
-  const cli = await sandbox.cli.createRemotePromise();
-  const themePackageName =
-    (await $$draftProject.theme.installPromise)?.packageName ??
-    '@vivliostyle/theme-base';
+  try {
+    const cli = await sandbox.cli.createRemotePromise();
+    const themePackageName =
+      (await $$draftProject.theme.installPromise)?.packageName ??
+      '@vivliostyle/theme-base';
 
-  await cli.setupTemplate({
-    title: $$draftProject.bibliography.title,
-    author: $$draftProject.bibliography.author,
-    language: $$draftProject.bibliography.language,
-    template: template.source,
-    theme: themePackageName,
-  });
-  await sandbox.saveMemoryToFileSystem();
-  await sandbox.initializeProjectFiles({
-    themePackageName,
-    entry: deepClone(sandbox.vivliostyleConfig.entry) as BuildTask['entry'],
-  });
-  const project = Project.createProjectFromSandbox({
-    projectId,
-    sandboxPromise: Promise.resolve(sandbox),
-  });
-  await Promise.all([
-    project.setupPromise,
-    project.theme.install(themePackageName),
-  ]);
+    await cli.setupTemplate({
+      title: $$draftProject.bibliography.title,
+      author: $$draftProject.bibliography.author,
+      language: $$draftProject.bibliography.language,
+      template: template.source,
+      theme: themePackageName,
+    });
+    await sandbox.saveMemoryToFileSystem();
+    await sandbox.initializeProjectFiles({
+      themePackageName,
+      entry: deepClone(sandbox.vivliostyleConfig.entry) as BuildTask['entry'],
+    });
+    const project = Project.createProjectFromSandbox({
+      projectId,
+      sandboxPromise: Promise.resolve(sandbox),
+    });
+    await Promise.all([
+      project.setupPromise,
+      project.theme.install(themePackageName),
+    ]);
+  } catch (err) {
+    if (useCloud) {
+      await $session.api.deleteProject(projectId).catch(() => {});
+      delete $projects.entries[projectId];
+    }
+    throw err;
+  }
 
   $projects.currentProjectId = projectId;
   await discoverProjects();
