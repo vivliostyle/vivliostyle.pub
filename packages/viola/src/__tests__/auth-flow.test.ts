@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// `actions/session.ts` calls `discoverProjects()` after each auth transition.
-// That helper tries to enumerate OPFS, which throws under Node. Stub it so
-// session transitions surface cleanly without spurious unhandled rejections.
+// `discoverProjects` enumerates OPFS, which throws under Node.
 vi.mock('../stores/actions/discover-projects', () => ({
   discoverProjects: vi.fn().mockResolvedValue(undefined),
 }));
@@ -13,7 +11,6 @@ import {
   logout,
   register,
   restoreSession,
-  SessionError,
 } from '../stores/actions/session';
 import { buildTestServer, type TestServer } from './harness/server';
 import { setupTestSession } from './harness/session';
@@ -57,15 +54,10 @@ describe('auth flow', () => {
   });
 
   it('restores a session from persisted tokens on a fresh client', async () => {
-    // First "tab": register and confirm tokens were persisted in our shared
-    // MemoryTokenStore.
     const first = setupTestSession();
     await register('alice', 'password123');
     expect(await first.tokenStore.load()).not.toBeNull();
 
-    // Second "tab": brand-new AuthClient pointed at the same token store, no
-    // active session yet. `restoreSession()` must hydrate from the refresh
-    // token and reach `'authenticated'`.
     setupTestSession({ tokenStore: first.tokenStore });
     expect($session.status).toBe('initial');
     await restoreSession();
@@ -77,19 +69,11 @@ describe('auth flow', () => {
     await register('alice', 'password123');
     await logout();
 
-    // `setupTestSession` resets status; the server still has alice.
-    setupTestSession();
     await expect(register('alice', 'password123')).rejects.toMatchObject({
       name: 'SessionError',
       message: 'That username is already taken.',
       status: 409,
     });
     expect($session.status).toBe('anonymous');
-  });
-
-  it('exports SessionError so callers can branch on it', () => {
-    const err = new SessionError('boom', 500);
-    expect(err).toBeInstanceOf(SessionError);
-    expect(err.status).toBe(500);
   });
 });

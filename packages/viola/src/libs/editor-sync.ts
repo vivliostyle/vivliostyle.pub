@@ -12,8 +12,6 @@ import type { ProjectId } from '../stores/proxies/project';
 export interface EditorSyncContext {
   api: ApiClient;
   auth: AuthClient;
-  // Optional WebSocket implementation override. Defaults to `globalThis.WebSocket`.
-  // Threaded through to `WebSocketSyncProvider` so tests can substitute a fake.
   webSocketImpl?: typeof WebSocket;
 }
 

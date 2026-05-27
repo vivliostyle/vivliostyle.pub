@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// `actions/cloud-project.ts` calls `router.navigate(...)` when deleting the
-// current project. Importing `../router` pulls in TanStack Router + the full
-// route tree, which we don't need (and which expects a DOM). The mock keeps
-// the surface area minimal — assertions never exercise the `currentProjectId`
-// branch in these tests.
+// Importing `../router` pulls in TanStack Router + the full route tree, which
+// expects a DOM. Tests never hit the `currentProjectId === id` branch of
+// `deleteCloudProject` where the real `router.navigate` would matter.
 vi.mock('../router', () => ({
   router: { navigate: vi.fn() },
 }));
 
-// `discoverProjects` enumerates OPFS, which throws under Node. Stub it so
-// the action under test surfaces purely the API roundtrip.
+// `discoverProjects` enumerates OPFS, which throws under Node.
 vi.mock('../stores/actions/discover-projects', () => ({
   discoverProjects: vi.fn().mockResolvedValue(undefined),
 }));
@@ -62,7 +59,6 @@ describe('cloud project CRUD', () => {
       title: 'My Book',
     });
 
-    // Server-side truth via the SDK list endpoint.
     const remote = await $session.api.listProjects();
     expect(remote.map((r) => r.id)).toContain(entry.projectId);
   });
@@ -82,8 +78,8 @@ describe('cloud project CRUD', () => {
   it('rejects deleteCloudProject when the session is anonymous', async () => {
     await register('alice', 'password123');
     const entry = await createCloudProject({ title: 'Owned' });
-    // Drop the local session without going through logout — we want the
-    // action's `$session.status !== 'authenticated'` guard to fire.
+    // Drop the local session without going through logout, so the action's
+    // `$session.status !== 'authenticated'` guard is what fires.
     setupTestSession();
     await expect(deleteCloudProject(entry.projectId)).rejects.toThrowError(
       /Sign in to delete a cloud project/,
@@ -94,8 +90,6 @@ describe('cloud project CRUD', () => {
     await register('alice', 'password123');
     const aliceEntry = await createCloudProject({ title: "Alice's" });
 
-    // Fresh session for bob. setupTestSession resets the in-memory store,
-    // so the entry from alice is gone from the local proxy; reassert it.
     setupTestSession();
     await register('bob', 'password123');
 

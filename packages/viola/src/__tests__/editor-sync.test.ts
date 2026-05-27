@@ -78,8 +78,6 @@ describe('startEditorSync', () => {
   it('pulls existing server state on the initial HTTP sync before opening the socket', async () => {
     const { projectId, filename } = await bootstrapProject();
 
-    // Seed the server via the same HTTP endpoint the polling provider uses,
-    // so the API client has to deliver it back on the next call.
     const seedDoc = new Y.Doc();
     seedDoc.getText('t').insert(0, 'preexisting content');
     const seedUpdate = Y.encodeStateAsUpdate(seedDoc);
@@ -127,11 +125,9 @@ describe('startEditorSync', () => {
 
     expect(provider?.status).toBe('connected');
 
-    // Round-trip an edit through the HTTP endpoint and confirm the server
-    // received it (via a second-client read).
     clientDoc.getText('t').insert(0, 'polling works');
-    // The polling provider buffers updates until its next interval; force a
-    // round-trip via a peer client to confirm the server now has the edit.
+    // The polling provider buffers updates until its next interval, so force
+    // a round-trip via a peer client instead of waiting.
     const peer = new Y.Doc();
     const diff = await $session.api.syncPush(
       projectId,
@@ -141,7 +137,6 @@ describe('startEditorSync', () => {
     if (diff.byteLength > 0) {
       Y.applyUpdate(peer, diff);
     }
-    // Also pull whatever the server holds in case our update raced.
     const after = await $session.api.syncPush(
       projectId,
       filename,

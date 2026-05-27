@@ -33,15 +33,3 @@ export function buildTestClients(
   });
   return { auth, api, tokenStore };
 }
-
-// Convenience for tests that need an authenticated session without exercising
-// the viola store actions themselves. Mirrors `app.test.ts`'s `register` +
-// `authenticate` helpers but goes through the SDK so token storage is real.
-export async function registerAndLogin(
-  auth: AuthClient,
-  username = 'alice',
-  password = 'password123',
-): Promise<void> {
-  await auth.register(username, password);
-  await auth.login(username, password);
-}

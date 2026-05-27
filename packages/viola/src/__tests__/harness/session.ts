@@ -4,12 +4,10 @@ import type { TokenStore } from '@v/auth-client';
 import { $session } from '../../stores/accessors';
 import { buildTestClients, type TestClients } from './clients';
 
-// Swap viola's module-singleton `$session` over to test-built clients backed
-// by a `MemoryTokenStore`. Production code defaults to `IndexedDBTokenStore`,
-// which throws under Node — every test must call this in `beforeEach`.
-//
-// The returned `tokenStore` can be passed back in via `options.tokenStore` to
-// share login state across "two clients on the same session" scenarios.
+// Production code wires `$session.auth` to an `IndexedDBTokenStore`, which
+// throws under Node. Tests swap in a `MemoryTokenStore`-backed pair in
+// `beforeEach`; pass the returned `tokenStore` back in to share login state
+// across "two tabs on the same session" scenarios.
 export function setupTestSession(
   options: { tokenStore?: TokenStore } = {},
 ): TestClients {
