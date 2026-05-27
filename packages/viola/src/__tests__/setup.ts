@@ -1,5 +1,25 @@
 import { afterEach } from 'vitest';
 
+// Several viola modules read `location` at top level (e.g. `proxies/sandbox.ts`
+// computes a `https://${VITE_APP_HOSTNAME}` origin string). Provide a minimal
+// stand-in so those modules load under Node.
+if (typeof globalThis.location === 'undefined') {
+  Object.defineProperty(globalThis, 'location', {
+    value: {
+      origin: 'http://test.invalid',
+      host: 'test.invalid',
+      hostname: 'test.invalid',
+      port: '',
+      protocol: 'http:',
+      href: 'http://test.invalid/',
+      pathname: '/',
+      search: '',
+      hash: '',
+    },
+    configurable: true,
+  });
+}
+
 // All test requests target this sentinel host. The patch below routes them
 // to the currently-bound Hono app (`bindApp`) so SDK clients constructed
 // anywhere — including viola's `proxies/session.ts` module-init — can reach
