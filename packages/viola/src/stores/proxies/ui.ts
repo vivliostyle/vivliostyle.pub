@@ -19,5 +19,7 @@ export const ui = proxy({
 subscribeKey(ui, 'dedicatedModal', async (modal) => {
   if (modal?.type !== 'start') return;
   const { discoverProjects } = await import('../actions/discover-projects');
-  discoverProjects().catch(() => {});
+  discoverProjects().catch((err) => {
+    console.error('[ui] discoverProjects failed', err);
+  });
 });
