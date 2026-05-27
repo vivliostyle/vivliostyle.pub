@@ -12,9 +12,12 @@ export type SessionStatus =
 
 // `__API_BASE_URL__` is `''` when the build was made without an API server
 // configured. The session is still constructed so the proxy stays shaped the
-// same; `restoreSession()` short-circuits to `'anonymous'` instead of hitting
-// a non-existent endpoint.
-const DEFAULT_BASE_URL = __API_BASE_URL__ || '/api';
+// same, but we deliberately do NOT fall back to `/api` here: callers must
+// gate on `__CLOUD_ENABLED__` (and `restoreSession()` short-circuits to
+// `'anonymous'`) so a stray auth call when cloud is disabled fails loudly
+// against an empty base URL instead of silently hitting a non-existent
+// local endpoint.
+const DEFAULT_BASE_URL = __API_BASE_URL__;
 const CLIENT_ID = 'vivliostyle-pub-web';
 
 function buildRedirectUri(): string {
