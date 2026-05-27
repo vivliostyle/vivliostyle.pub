@@ -7,6 +7,7 @@
     "dev": "vite --host",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host",
+    "test": "vitest run",
     "typecheck": "tsc -b"
   },
   "devDependencies": {
@@ -53,6 +54,7 @@
     "bunshi": "catalog:",
     "comlink": "catalog:",
     "dompurify": "catalog:",
+    "hono": "catalog:",
     "html-react-parser": "catalog:",
     "nanoid": "catalog:",
     "nanoid-dictionary": "catalog:",
@@ -71,6 +73,7 @@
     "valtio-reactive": "catalog:",
     "vite": "catalog:",
     "vite-plugin-pwa": "catalog:",
+    "vitest": "catalog:",
     "y-indexeddb": "catalog:",
     "y-prosemirror": "catalog:",
     "yjs": "catalog:"
