@@ -31,6 +31,16 @@ export class AuthError extends Error {
   }
 }
 
+// Linear-time trailing-slash trim. Avoids the `/\/+$/` regex CodeQL flags as
+// polynomial when applied to library input.
+function trimTrailingSlash(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) {
+    end--;
+  }
+  return end === s.length ? s : s.slice(0, end);
+}
+
 /**
  * OAuth 2.1 + PKCE client for a single sync server.
  *
@@ -50,7 +60,7 @@ export class AuthClient {
   private refreshing?: Promise<StoredTokens | null>;
 
   constructor(options: AuthClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = trimTrailingSlash(options.baseUrl);
     this.clientId = options.clientId;
     this.redirectUri = options.redirectUri;
     this.store = options.tokenStore ?? new MemoryTokenStore();

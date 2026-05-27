@@ -60,6 +60,16 @@ function encodeFilePath(filePath: string): string {
   return filePath.split('/').map(encodeURIComponent).join('/');
 }
 
+// Linear-time trailing-slash trim. Avoids the `/\/+$/` regex CodeQL flags as
+// polynomial when applied to library input.
+function trimTrailingSlash(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) {
+    end--;
+  }
+  return end === s.length ? s : s.slice(0, end);
+}
+
 function toBase64Url(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) {
@@ -89,7 +99,7 @@ export class ApiClient {
   private readonly fetchImpl: typeof globalThis.fetch;
 
   constructor(options: ApiClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = trimTrailingSlash(options.baseUrl);
     this.getAccessToken = options.getAccessToken;
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
 
