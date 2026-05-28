@@ -5,6 +5,7 @@ import { useSnapshot } from 'valtio';
 
 import { Button } from '@v/ui/button';
 import { Cloud, FilePlus, Loader2, Trash2 } from '@v/ui/icon';
+import { m } from '../../generated/paraglide/messages';
 import { $projects, $session } from '../../stores/accessors';
 import {
   createCloudProject,
@@ -23,7 +24,7 @@ declare global {
 }
 
 export const Pane = createPane<StartPaneProperty>({
-  title: () => 'Open project',
+  title: () => m.start_pane_title(),
   content: (props) => (
     <ScrollOverflow>
       <PaneContainer>
@@ -55,7 +56,7 @@ function DeleteProjectButton({
     try {
       await onDelete();
     } catch {
-      setError('Failed to delete project.');
+      setError(m.start_delete_error());
       setDeleting(false);
     }
   };
@@ -92,7 +93,9 @@ function LocalProjectListItem({ entry }: { entry: ProjectEntry }) {
         params={{ projectId: entry.projectId }}
         className="flex-1 min-w-0 px-4 py-3"
       >
-        <div className="font-medium">{entry.title || 'Untitled project'}</div>
+        <div className="font-medium">
+          {entry.title || m.start_untitled_project()}
+        </div>
         {entry.author && (
           <div className="text-sm text-muted-foreground">{entry.author}</div>
         )}
@@ -102,8 +105,10 @@ function LocalProjectListItem({ entry }: { entry: ProjectEntry }) {
       </Link>
       <div className="py-3">
         <DeleteProjectButton
-          ariaLabel="Delete local project"
-          confirmMessage={`Delete local project "${entry.title || 'Untitled'}"? This cannot be undone.`}
+          ariaLabel={m.start_delete_local_aria()}
+          confirmMessage={m.start_delete_local_confirm({
+            title: entry.title || m.common_untitled(),
+          })}
           onDelete={() => deleteLocalProject(entry.projectId as ProjectId)}
         />
       </div>
@@ -121,7 +126,9 @@ function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
       >
         <Cloud className="size-4 mt-1 text-muted-foreground shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="font-medium">{entry.title || 'Untitled project'}</div>
+          <div className="font-medium">
+            {entry.title || m.start_untitled_project()}
+          </div>
           {entry.author && (
             <div className="text-sm text-muted-foreground">{entry.author}</div>
           )}
@@ -132,8 +139,10 @@ function CloudProjectListItem({ entry }: { entry: ProjectEntry }) {
       </Link>
       <div className="py-3">
         <DeleteProjectButton
-          ariaLabel="Delete cloud project"
-          confirmMessage={`Delete cloud project "${entry.title || 'Untitled'}"? This cannot be undone.`}
+          ariaLabel={m.start_delete_cloud_aria()}
+          confirmMessage={m.start_delete_cloud_confirm({
+            title: entry.title || m.common_untitled(),
+          })}
           onDelete={() => deleteCloudProject(entry.projectId)}
         />
       </div>
@@ -151,7 +160,7 @@ function CreateCloudProjectButton() {
     try {
       await createCloudProject({});
     } catch {
-      setError('Failed to create cloud project.');
+      setError(m.start_create_cloud_error());
     } finally {
       setBusy(false);
     }
@@ -166,7 +175,7 @@ function CreateCloudProjectButton() {
         disabled={busy}
       >
         {busy ? <Loader2 className="animate-spin" /> : <Cloud />}
-        Create an empty cloud project
+        {m.start_create_cloud_button()}
       </Button>
       {error && (
         <p className="text-xs text-destructive" role="alert">
@@ -188,7 +197,7 @@ function Content(_: StartPaneProperty) {
     <div className="grid gap-8">
       <section className="grid gap-3">
         <h3 className="text-sm font-semibold text-muted-foreground">
-          Local projects
+          {m.start_local_projects_heading()}
         </h3>
         {localEntries.length > 0 ? (
           <ul className="grid gap-2">
@@ -201,13 +210,13 @@ function Content(_: StartPaneProperty) {
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No local projects yet.
+            {m.start_no_local_projects()}
           </p>
         )}
         <Button asChild>
           <Link to="/new-project">
             <FilePlus />
-            Create a new project
+            {m.start_create_new_project()}
           </Link>
         </Button>
       </section>
@@ -215,7 +224,7 @@ function Content(_: StartPaneProperty) {
       {__CLOUD_ENABLED__ && sessionSnap.status === 'authenticated' && (
         <section className="grid gap-3">
           <h3 className="text-sm font-semibold text-muted-foreground">
-            Cloud projects
+            {m.start_cloud_projects_heading()}
           </h3>
           {remoteEntries.length > 0 ? (
             <ul className="grid gap-2">
@@ -225,7 +234,7 @@ function Content(_: StartPaneProperty) {
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No cloud projects yet.
+              {m.start_no_cloud_projects()}
             </p>
           )}
           <CreateCloudProjectButton />
@@ -237,9 +246,9 @@ function Content(_: StartPaneProperty) {
         sessionSnap.status !== 'initial' && (
           <p className="text-xs text-muted-foreground">
             <Link to="/settings/account" className="hover:underline">
-              Sign in
-            </Link>{' '}
-            to sync projects with the cloud.
+              {m.start_sign_in_link()}
+            </Link>
+            {m.start_sign_in_to_sync_suffix()}
           </p>
         )}
     </div>

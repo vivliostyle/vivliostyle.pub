@@ -9,6 +9,7 @@ import {
 } from '@v/tiptap-extensions';
 import { Button } from '@v/ui/button';
 import { Upload } from '@v/ui/icon';
+import { m } from '../../generated/paraglide/messages';
 import { openFilePicker } from '../../libs/open-file-picker';
 import { $project, $sandbox } from '../../stores/accessors';
 import { type MediaAsset, Sandbox } from '../../stores/proxies/sandbox';
@@ -24,9 +25,9 @@ declare global {
 }
 
 export const Pane = createPane<MediaPaneProperty>({
-  title: () => 'Media',
+  title: () => m.media_pane_title(),
   content: (props) => (
-    <ImageDropZone label="Images drop zone">
+    <ImageDropZone label={m.media_drop_zone_label()}>
       <ScrollOverflow>
         <PaneContainer>
           <Content {...props} />
@@ -59,16 +60,15 @@ function Content(_: MediaPaneProperty) {
   return (
     <div className="grid gap-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-l font-bold">Images</h3>
+        <h3 className="text-l font-bold">{m.media_images_section_title()}</h3>
         <Button type="button" onClick={handleUpload}>
           <Upload />
-          Upload image
+          {m.media_upload_image_button()}
         </Button>
       </div>
       {images.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">
-          No images yet. Upload from the button above, drag images into the
-          editor, or drop image files here.
+          {m.media_empty_state()}
         </p>
       ) : (
         <ul className="grid grid-cols-3 gap-3">

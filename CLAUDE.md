@@ -155,6 +155,10 @@ All i18n data, config, and scripts live inside the **`@v/viola` package** (`pack
 - Accessibility strings take a `_aria` suffix (`side_menu_open_workspace_aria`). Interpolation uses ICU `{name}` placeholders; pluralization/gender uses ICU `plural`/`select`.
 - Name keys semantically by hand — do **not** derive them from the English text (so editing copy never churns keys).
 
+### Wording / translation style
+
+Per-locale wording rules (punctuation, spacing, casing, untranslatable terms) live in `.claude/rules/i18n-message-style.md`, scoped via `paths:` so it loads automatically when message JSON files are touched. When writing or machine-translating a message, follow that file's section for the target locale; add new conventions there rather than burying them in PR comments.
+
 ### Adding / editing messages
 
 Three equivalent paths, all land as normal PRs that maintainers review:

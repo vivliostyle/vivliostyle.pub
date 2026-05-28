@@ -1,4 +1,5 @@
 import { ImageIcon } from '@v/ui/icon';
+import { m } from '../../generated/paraglide/messages';
 import { Sandbox } from '../../stores/proxies/sandbox';
 import { openFilePicker } from '../open-file-picker';
 import { registerInlineMenuPlugin } from './inline-menu';
@@ -10,7 +11,7 @@ registerInlineMenuPlugin({
   items: [
     {
       id: 'image',
-      label: 'Insert Image',
+      label: m.inline_menu_insert_image(),
       icon: ImageIcon,
       onSelect: async ({ editor, from }) => {
         const files = await openFilePicker({

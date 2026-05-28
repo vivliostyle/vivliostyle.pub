@@ -6,11 +6,24 @@ import { Button } from '@v/ui/button';
 import { Check, Loader2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
+import { m } from '../../generated/paraglide/messages';
 import { usePromiseState } from '../../hooks/use-promise-state';
 import { $sandbox, $theme } from '../../stores/accessors';
 import { SandboxFile } from '../../stores/proxies/sandbox';
 import { Theme } from '../../stores/proxies/theme';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
+
+const officialThemeTitleMessages: Record<
+  keyof typeof Theme.officialThemes,
+  () => string
+> = {
+  '@vivliostyle/theme-base': m.theme_official_base,
+  '@vivliostyle/theme-techbook': m.theme_official_techbook,
+  '@vivliostyle/theme-academic': m.theme_official_academic,
+  '@vivliostyle/theme-bunko': m.theme_official_bunko,
+  '@vivliostyle/theme-gutenberg': m.theme_official_gutenberg,
+  '@vivliostyle/theme-slide': m.theme_official_slide,
+};
 
 type ThemePaneProperty = object;
 
@@ -21,7 +34,7 @@ declare global {
 }
 
 export const Pane = createPane<ThemePaneProperty>({
-  title: () => 'Customize Theme',
+  title: () => m.theme_pane_title(),
   content: (props) => (
     <ScrollOverflow>
       <PaneContainer>
@@ -77,39 +90,49 @@ function Content(_: ThemePaneProperty) {
   return (
     <div className="grid gap-4">
       <section className="grid gap-2">
-        <h3 className="text-l font-bold">Vivliostyle Theme</h3>
+        <h3 className="text-l font-bold">{m.theme_official_section_title()}</h3>
         <ul className="grid grid-cols-2 gap-2">
           {Object.entries(Theme.officialThemes).map(
-            ([packageName, { title }]) => (
-              <li key={packageName}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn(
-                    'size-full text-left',
-                    packageName === currentPackageName && 'border-primary',
-                  )}
-                  onClick={() => $theme.valueOrThrow().install(packageName)}
-                >
-                  <span className="flex-1">{title}</span>
-                  {packageName === themeSnap.installingPackageName ? (
-                    <LoadingIcon />
-                  ) : (
-                    <InstalledIcon
-                      className={cn(
-                        packageName !== currentPackageName && 'invisible',
-                      )}
-                    />
-                  )}
-                </Button>
-              </li>
-            ),
+            ([packageName, { title }]) => {
+              const getTitle =
+                officialThemeTitleMessages[
+                  packageName as keyof typeof Theme.officialThemes
+                ];
+              return (
+                <li key={packageName}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      'size-full text-left',
+                      packageName === currentPackageName && 'border-primary',
+                    )}
+                    onClick={() => $theme.valueOrThrow().install(packageName)}
+                  >
+                    <span className="flex-1">
+                      {getTitle ? getTitle() : title}
+                    </span>
+                    {packageName === themeSnap.installingPackageName ? (
+                      <LoadingIcon />
+                    ) : (
+                      <InstalledIcon
+                        className={cn(
+                          packageName !== currentPackageName && 'invisible',
+                        )}
+                      />
+                    )}
+                  </Button>
+                </li>
+              );
+            },
           )}
         </ul>
       </section>
 
       <section className="grid gap-2">
-        <h3 className="text-l font-bold">Install other themes from npm</h3>
+        <h3 className="text-l font-bold">
+          {m.theme_install_other_section_title()}
+        </h3>
         <form
           className="contents"
           onSubmit={(e) => {
@@ -121,7 +144,7 @@ function Content(_: ThemePaneProperty) {
         >
           <div className="flex items-center gap-2">
             <label className="contents">
-              <span className="sr-only">Package name</span>
+              <span className="sr-only">{m.theme_package_name_aria()}</span>
               <div className="relative flex-1 flex">
                 <Input
                   type="text"
@@ -150,27 +173,31 @@ function Content(_: ThemePaneProperty) {
               </div>
             </label>
             <Button type="submit" disabled={!!themeSnap.installingPackageName}>
-              Install
+              {m.theme_install_button()}
             </Button>
           </div>
           <p
             id={packageNameInputDescriptionId}
             className="text-sm text-gray-500"
           >
-            Enter the npm package name of the theme you want to install.
+            {m.theme_package_name_description()}
           </p>
           {themeSnap.installFailure && (
             <p className="text-sm text-destructive" aria-live="polite">
-              Error: {themeSnap.installFailure.message}
+              {m.theme_install_error({
+                message: themeSnap.installFailure.message,
+              })}
             </p>
           )}
         </form>
       </section>
 
       <section className="grid gap-2">
-        <h3 className="text-l font-bold">Edit custom CSS</h3>
+        <h3 className="text-l font-bold">
+          {m.theme_custom_css_section_title()}
+        </h3>
         <CodeEditor
-          aria-label="Code editor of custom CSS"
+          aria-label={m.theme_custom_css_editor_aria()}
           code={customCss}
           onCodeUpdate={setCustomCss}
         />

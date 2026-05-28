@@ -6,8 +6,23 @@ import {
   StackedRadioGroup,
   StackedRadioGroupItem,
 } from '@v/ui/custom/stacked-radio';
+import { m } from '../../../generated/paraglide/messages';
 import { Sandbox } from '../../../stores/proxies/sandbox';
 import { TemplateStoreMolecule } from './store';
+
+const officialTemplateMessages: Record<
+  keyof typeof Sandbox.officialTemplates,
+  { title: () => string; description: () => string }
+> = {
+  blank: {
+    title: m.new_project_template_blank_title,
+    description: m.new_project_template_blank_description,
+  },
+  basic: {
+    title: m.new_project_template_basic_title,
+    description: m.new_project_template_basic_description,
+  },
+};
 
 export function TemplateSelectForm() {
   const { templateStoreProxy } = useMolecule(TemplateStoreMolecule);
@@ -17,7 +32,9 @@ export function TemplateSelectForm() {
   return (
     <form className="contents">
       <div className="grid gap-4">
-        <h3 className="text-xl font-bold">Choose Template</h3>
+        <h3 className="text-xl font-bold">
+          {m.new_project_template_section_title()}
+        </h3>
         <StackedRadioGroup
           className="grid-cols-2"
           value={snap.selected}
@@ -26,17 +43,25 @@ export function TemplateSelectForm() {
           }}
         >
           {Object.entries(Sandbox.officialTemplates).map(
-            ([value, { title, description }]) => (
-              <StackedRadioGroupItem
-                key={value}
-                value={value}
-                disabled={isPending}
-                isLoading={isPending && snap.selected === value}
-              >
-                {title}
-                <p className="text-xs text-muted-foreground">{description}</p>
-              </StackedRadioGroupItem>
-            ),
+            ([value, { title, description }]) => {
+              const messages =
+                officialTemplateMessages[
+                  value as keyof typeof Sandbox.officialTemplates
+                ];
+              return (
+                <StackedRadioGroupItem
+                  key={value}
+                  value={value}
+                  disabled={isPending}
+                  isLoading={isPending && snap.selected === value}
+                >
+                  {messages ? messages.title() : title}
+                  <p className="text-xs text-muted-foreground">
+                    {messages ? messages.description() : description}
+                  </p>
+                </StackedRadioGroupItem>
+              );
+            },
           )}
         </StackedRadioGroup>
       </div>
