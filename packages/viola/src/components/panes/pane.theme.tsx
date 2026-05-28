@@ -8,22 +8,11 @@ import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import { usePromiseState } from '../../hooks/use-promise-state';
+import { getOfficialThemeTitle } from '../../libs/official-theme-title';
 import { $sandbox, $theme } from '../../stores/accessors';
 import { SandboxFile } from '../../stores/proxies/sandbox';
 import { Theme } from '../../stores/proxies/theme';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
-
-const officialThemeTitleMessages: Record<
-  keyof typeof Theme.officialThemes,
-  () => string
-> = {
-  '@vivliostyle/theme-base': m.theme_official_base,
-  '@vivliostyle/theme-techbook': m.theme_official_techbook,
-  '@vivliostyle/theme-academic': m.theme_official_academic,
-  '@vivliostyle/theme-bunko': m.theme_official_bunko,
-  '@vivliostyle/theme-gutenberg': m.theme_official_gutenberg,
-  '@vivliostyle/theme-slide': m.theme_official_slide,
-};
 
 type ThemePaneProperty = object;
 
@@ -94,10 +83,6 @@ function Content(_: ThemePaneProperty) {
         <ul className="grid grid-cols-2 gap-2">
           {Object.entries(Theme.officialThemes).map(
             ([packageName, { title }]) => {
-              const getTitle =
-                officialThemeTitleMessages[
-                  packageName as keyof typeof Theme.officialThemes
-                ];
               return (
                 <li key={packageName}>
                   <Button
@@ -110,7 +95,7 @@ function Content(_: ThemePaneProperty) {
                     onClick={() => $theme.valueOrThrow().install(packageName)}
                   >
                     <span className="flex-1">
-                      {getTitle ? getTitle() : title}
+                      {getOfficialThemeTitle(packageName, title)}
                     </span>
                     {packageName === themeSnap.installingPackageName ? (
                       <LoadingIcon />

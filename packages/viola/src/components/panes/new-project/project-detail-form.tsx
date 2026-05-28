@@ -26,22 +26,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@v/ui/popover';
 import { m } from '../../../generated/paraglide/messages';
 import { useLiveInputField } from '../../../hooks/use-live-field';
 import { usePromiseState } from '../../../hooks/use-promise-state';
+import { getOfficialThemeTitle } from '../../../libs/official-theme-title';
 import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
 import { Theme } from '../../../stores/proxies/theme';
 import { TemplateStoreMolecule } from './store';
-
-const officialThemeTitleMessages: Record<
-  keyof typeof Theme.officialThemes,
-  () => string
-> = {
-  '@vivliostyle/theme-base': m.theme_official_base,
-  '@vivliostyle/theme-techbook': m.theme_official_techbook,
-  '@vivliostyle/theme-academic': m.theme_official_academic,
-  '@vivliostyle/theme-bunko': m.theme_official_bunko,
-  '@vivliostyle/theme-gutenberg': m.theme_official_gutenberg,
-  '@vivliostyle/theme-slide': m.theme_official_slide,
-};
 
 function BookTitleInput({ children }: React.PropsWithChildren) {
   const inputProps = useLiveInputField(
@@ -165,17 +154,11 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
         value={currentPackageName}
         onValueChange={handleSelect}
       >
-        {Object.entries(Theme.officialThemes).map(([value, { title }]) => {
-          const getTitle =
-            officialThemeTitleMessages[
-              value as keyof typeof Theme.officialThemes
-            ];
-          return (
-            <StackedRadioGroupItem key={value} value={value} required>
-              {getTitle ? getTitle() : title}
-            </StackedRadioGroupItem>
-          );
-        })}
+        {Object.entries(Theme.officialThemes).map(([value, { title }]) => (
+          <StackedRadioGroupItem key={value} value={value} required>
+            {getOfficialThemeTitle(value, title)}
+          </StackedRadioGroupItem>
+        ))}
       </StackedRadioGroup>
     </div>
   );
