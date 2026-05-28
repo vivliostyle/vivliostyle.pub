@@ -6,6 +6,7 @@ import { ref } from 'valtio';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 
+import type { SyncProvider } from '@v/sync-client';
 import { PubExtensions } from '@v/tiptap-extensions';
 import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { debounce } from '../libs/debounce';
@@ -18,8 +19,11 @@ import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
 import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
 import { YUndoCursorFix } from './editor/y-undo-cursor-fix';
+import { type EditorSyncContext, startEditorSync } from './editor-sync';
 
 import './editor/inline-menu.media';
+
+export type { EditorSyncContext } from './editor-sync';
 
 function editorPersistenceKey(projectId: ProjectId, filename: string): string {
   return `viola:editor:${projectId}:${filename}`;
@@ -31,12 +35,14 @@ export async function setupEditor({
   filename,
   entryContext,
   initialFile,
+  sync,
 }: {
   projectId: ProjectId;
   contentId: ContentId;
   filename?: string;
   entryContext?: string;
   initialFile?: SandboxFile;
+  sync?: EditorSyncContext;
 }) {
   const fileDir = filename ? dirname(filename) : '';
   let basePath = filename && relative(entryContext || '', dirname(filename));
@@ -131,17 +137,27 @@ export async function setupEditor({
     },
   });
 
+  let syncProvider: SyncProvider | undefined;
   editor.on('destroy', () => {
+    syncProvider?.disconnect();
     persistence?.destroy();
     doc.destroy();
   });
 
-  // Load any previously persisted state first, then seed from the on-disk
-  // markdown only when this file has no editor history yet (first open).
-  // Seeding emits no update so it neither re-writes the source file nor
-  // requires the project to be the current one yet.
+  // Load any previously persisted state first, then pull whatever the server
+  // already has for this file. Seeding from the on-disk markdown only happens
+  // when neither IndexedDB nor the server had any history — that keeps a
+  // second tab from re-seeding an empty Y.Doc on top of the server's state.
   if (persistence) {
     await persistence.whenSynced;
+  }
+  if (sync && filename) {
+    syncProvider = await startEditorSync({
+      doc,
+      sync,
+      projectId,
+      filename,
+    });
   }
   if (doc.getXmlFragment('default').length === 0) {
     const markdown = (await initialFile?.text())?.trim();

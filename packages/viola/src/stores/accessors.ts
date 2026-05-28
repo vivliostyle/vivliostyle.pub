@@ -4,9 +4,15 @@ import { proxy } from 'valtio';
 import { awaiter } from '../libs/awaiter';
 import { draftProjectId, projects } from './proxies/project';
 import { sandboxes } from './proxies/sandbox';
+import { session } from './proxies/session';
 import { ui } from './proxies/ui';
 
-export { projects as $projects, sandboxes as $sandboxes, ui as $ui };
+export {
+  projects as $projects,
+  sandboxes as $sandboxes,
+  session as $session,
+  ui as $ui,
+};
 
 function createProxyGetter<S extends unknown[], T>(
   dependencies: S,

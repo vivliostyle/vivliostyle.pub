@@ -125,6 +125,122 @@ const serveCli = () =>
     },
   }) satisfies Plugin;
 
+interface ServeApiOptions {
+  /**
+   * SQLite database path forwarded to `createApiDevServer`. When unset, the
+   * API uses an in-memory store and all data is lost on dev server restart.
+   */
+  sqlitePath?: string;
+  /** Forwarded to `createApiDevServer`'s `projectFilePath`. */
+  projectFilePath?: string;
+}
+
+const serveApi = ({
+  sqlitePath,
+  projectFilePath,
+}: ServeApiOptions = {}): Plugin => {
+  let currentMiddleware:
+    | ((
+        req: import('node:http').IncomingMessage,
+        res: import('node:http').ServerResponse,
+        next: (err?: unknown) => void,
+      ) => void)
+    | undefined;
+  let basePath = '/api';
+
+  return {
+    name: 'serve-api',
+    apply: 'serve',
+    async configureServer(server) {
+      // Use vite's own SSR loader. Vite's config-file loader uses Node's
+      // strict ESM resolution which rejects the extensionless TS imports
+      // used throughout `@v/api-server-reference`; the SSR loader runs
+      // through vite's plugin pipeline and resolves them correctly.
+      const loadApi = async () => {
+        const mod = (await server.ssrLoadModule(
+          '@v/api-server-reference/dev-server',
+        )) as typeof import('@v/api-server-reference/dev-server');
+        return mod.createApiDevServer({ sqlitePath, projectFilePath });
+      };
+
+      let api = await loadApi();
+      currentMiddleware = api.middleware;
+      basePath = api.basePath;
+
+      // Single middleware registration that always delegates to the current
+      // API instance, so swapping the instance on reload doesn't double-
+      // register or leave dead handlers behind.
+      server.middlewares.use((req, res, next) => {
+        if (currentMiddleware) {
+          currentMiddleware(req, res, next);
+        } else {
+          next();
+        }
+      });
+
+      // Watch the reference server source. On change, invalidate vite's SSR
+      // module cache and rebuild the API instance so HTTP routes hot-reload.
+      // Vite's own watcher only fires for files inside its project root, so
+      // poll the external workspace package with `fs.watchFile` instead.
+      const apiSrc = path.resolve(dirname, '../api-server-reference/src');
+      let reloadTimer: NodeJS.Timeout | undefined;
+      const scheduleReload = (file: string) => {
+        clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(async () => {
+          // Close the previous instance's SQLite handle before building a
+          // new one. With a file path this would otherwise leak a
+          // connection per reload until the process exits.
+          api.close();
+          // Clear the middleware reference so requests fall through to
+          // `next()` while the new instance is loading (and stay falling-
+          // through if the load fails, instead of hitting a closed handle).
+          currentMiddleware = undefined;
+          try {
+            server.moduleGraph.invalidateAll();
+            api = await loadApi();
+            currentMiddleware = api.middleware;
+            server.config.logger.info(
+              `  \x1b[32m➜\x1b[0m  API reloaded (${path.relative(apiSrc, file)})`,
+            );
+          } catch (err) {
+            server.config.logger.error(
+              `  [api] reload failed: ${(err as Error).message}`,
+            );
+          }
+        }, 100);
+      };
+      // Snapshot the file tree at startup; files added later won't be
+      // watched until the dev server is restarted. Polling-based
+      // `fs.watchFile` handles are intentionally not cleaned up — the
+      // plugin lives for the lifetime of the dev server.
+      const watchTree = (dir: string) => {
+        for (const entry of fs.readdirSync(dir)) {
+          const p = path.join(dir, entry);
+          const stat = fs.statSync(p);
+          if (stat.isDirectory()) {
+            watchTree(p);
+          } else if (p.endsWith('.ts') && !p.endsWith('.test.ts')) {
+            fs.watchFile(p, { interval: 200 }, () => scheduleReload(p));
+          }
+        }
+      };
+      watchTree(apiSrc);
+
+      // WebSocket upgrade has to be attached after vite binds `httpServer`,
+      // and only once: hono-ws's listener cannot be removed cleanly, so WS
+      // handlers do not hot-reload (HTTP routes do).
+      return () => {
+        if (server.httpServer) {
+          api.injectWebSocket(server.httpServer);
+        }
+        server.config.logger.info(
+          `  \x1b[32m➜\x1b[0m  API mounted at \x1b[36m${basePath}\x1b[0m  \x1b[2m[sqlite ${sqlitePath ?? ':memory:'}, files ${projectFilePath ?? ':memory: (vfs)'}]\x1b[0m`,
+        );
+      };
+    },
+  };
+};
+
 const serviceWorker = () => [
   VitePWA({
     strategies: 'injectManifest',
@@ -187,9 +303,21 @@ const serviceWorker = () => [
 
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
-  const env = loadEnv(mode, secretsDir);
+  const env = loadEnv(mode, secretsDir, ['VITE_', 'API_']);
+
+  // Cloud (Account / API-backed projects) is enabled when an API base URL is
+  // configured. The vite dev server mounts an in-process API at `/api`, so we
+  // default to that when one isn't explicitly set. `VITE_DISABLE_CLOUD`
+  // is an explicit kill-switch that wins over everything else.
+  const apiBaseUrl =
+    env.VITE_API_BASE_URL || (command === 'serve' ? '/api' : '');
+  const cloudEnabled = env.VITE_DISABLE_CLOUD !== 'true' && Boolean(apiBaseUrl);
 
   return {
+    define: {
+      __CLOUD_ENABLED__: JSON.stringify(cloudEnabled),
+      __API_BASE_URL__: JSON.stringify(cloudEnabled ? apiBaseUrl : ''),
+    },
     build: {
       rolldownOptions: {
         input: {
@@ -210,6 +338,18 @@ export default defineConfig(({ mode, command }) => {
       serviceWorker(),
       serveTemplates(),
       serveCli(),
+      ...(cloudEnabled
+        ? [
+            serveApi({
+              sqlitePath: env.API_SQLITE_PATH
+                ? path.resolve(getProjectRoot(), env.API_SQLITE_PATH)
+                : undefined,
+              projectFilePath: env.API_PROJECT_FILE_PATH
+                ? path.resolve(getProjectRoot(), env.API_PROJECT_FILE_PATH)
+                : undefined,
+            }),
+          ]
+        : []),
       visualizer() as PluginOption,
     ],
     server:

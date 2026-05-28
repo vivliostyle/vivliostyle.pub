@@ -1,0 +1,23 @@
+{
+  "name": "@v/sync-client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@v/api-client": "workspace:*",
+    "@v/config": "workspace:*",
+    "lib0": "catalog:",
+    "vitest": "catalog:",
+    "y-protocols": "catalog:",
+    "yjs": "catalog:"
+  }
+}

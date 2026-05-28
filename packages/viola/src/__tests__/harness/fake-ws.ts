@@ -1,0 +1,157 @@
+import * as decoding from 'lib0/decoding';
+import * as encoding from 'lib0/encoding';
+import * as syncProtocol from 'y-protocols/sync';
+import * as Y from 'yjs';
+
+// Mirrors the y-websocket message framing the reference server speaks: a
+// leading varuint message type, followed by a `y-protocols/sync` payload.
+const MESSAGE_SYNC = 0;
+
+function serverProcess(
+  serverDoc: Y.Doc,
+  incoming: Uint8Array,
+): Uint8Array | null {
+  const decoder = decoding.createDecoder(incoming);
+  if (decoding.readVarUint(decoder) !== MESSAGE_SYNC) {
+    return null;
+  }
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, MESSAGE_SYNC);
+  syncProtocol.readSyncMessage(decoder, encoder, serverDoc, 'server');
+  return encoding.length(encoder) > 1 ? encoding.toUint8Array(encoder) : null;
+}
+
+export interface FakeWebSocketRegistry {
+  WebSocketImpl: typeof WebSocket;
+  // Server-side `Y.Doc` keyed by `(projectId, filename)` parsed from the
+  // sync-ws URL, so a single registry can host multiple files.
+  serverDoc(projectId: string, filename: string): Y.Doc;
+}
+
+export interface CreateFakeWsOptions {
+  // Fire `error` then `close` synchronously on every connect, forcing
+  // `startEditorSync`'s fallback to `HttpPollingSyncProvider`.
+  alwaysError?: boolean;
+}
+
+export function createFakeWebSocketRegistry(
+  options: CreateFakeWsOptions = {},
+): FakeWebSocketRegistry {
+  const docs = new Map<string, Y.Doc>();
+  const key = (projectId: string, filename: string) =>
+    `${projectId} ${filename}`;
+
+  function serverDoc(projectId: string, filename: string): Y.Doc {
+    const k = key(projectId, filename);
+    let doc = docs.get(k);
+    if (!doc) {
+      doc = new Y.Doc();
+      docs.set(k, doc);
+    }
+    return doc;
+  }
+
+  // Sync URLs look like `ws://host/api/projects/{id}/sync-ws/{path}?token=...`.
+  function parseUrl(rawUrl: string): { projectId: string; filename: string } {
+    const url = new URL(rawUrl);
+    const match = url.pathname.match(/\/projects\/([^/]+)\/sync-ws\/(.+)$/);
+    if (!match) {
+      throw new Error(`fake-ws: cannot parse sync URL: ${rawUrl}`);
+    }
+    return {
+      projectId: decodeURIComponent(match[1]),
+      filename: decodeURIComponent(match[2]),
+    };
+  }
+
+  class FakeWebSocket {
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+    static readonly CLOSING = 2;
+    static readonly CLOSED = 3;
+    binaryType: BinaryType = 'arraybuffer';
+    readyState = 0;
+    private readonly listeners: Record<string, Set<(event: unknown) => void>> =
+      {};
+    private readonly doc: Y.Doc;
+    private readonly serverUpdateHandler: (
+      update: Uint8Array,
+      origin: unknown,
+    ) => void;
+
+    constructor(readonly url: string) {
+      const { projectId, filename } = parseUrl(url);
+      this.doc = serverDoc(projectId, filename);
+      // Server-originated edits (anything not flagged with the `'server'`
+      // origin we set in `serverProcess`) need to propagate down to the
+      // client just like the real y-websocket handler does.
+      this.serverUpdateHandler = (update, origin) => {
+        if (origin === 'server' || this.readyState !== 1) {
+          return;
+        }
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, MESSAGE_SYNC);
+        syncProtocol.writeUpdate(encoder, update);
+        const bytes = encoding.toUint8Array(encoder);
+        const buffer = bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        );
+        this.emit('message', { data: buffer });
+      };
+      this.doc.on('update', this.serverUpdateHandler);
+
+      setTimeout(() => {
+        if (options.alwaysError) {
+          this.readyState = 3;
+          this.doc.off('update', this.serverUpdateHandler);
+          this.emit('error', {});
+          this.emit('close', {});
+          return;
+        }
+        this.readyState = 1;
+        this.emit('open', {});
+      }, 0);
+    }
+
+    addEventListener(type: string, cb: (event: unknown) => void): void {
+      const set = this.listeners[type] ?? new Set();
+      this.listeners[type] = set;
+      set.add(cb);
+    }
+
+    removeEventListener(type: string, cb: (event: unknown) => void): void {
+      this.listeners[type]?.delete(cb);
+    }
+
+    private emit(type: string, event: unknown): void {
+      for (const cb of this.listeners[type] ?? []) {
+        cb(event);
+      }
+    }
+
+    send(data: ArrayBufferView | ArrayBuffer | string): void {
+      const bytes =
+        data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
+      const reply = serverProcess(this.doc, bytes);
+      if (reply) {
+        const buffer = reply.buffer.slice(
+          reply.byteOffset,
+          reply.byteOffset + reply.byteLength,
+        );
+        this.emit('message', { data: buffer });
+      }
+    }
+
+    close(): void {
+      this.readyState = 3;
+      this.doc.off('update', this.serverUpdateHandler);
+      this.emit('close', {});
+    }
+  }
+
+  return {
+    WebSocketImpl: FakeWebSocket as unknown as typeof WebSocket,
+    serverDoc,
+  };
+}

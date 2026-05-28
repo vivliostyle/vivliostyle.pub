@@ -7,6 +7,7 @@
     "dev": "vite --host",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host",
+    "test": "vitest run",
     "typecheck": "tsc -b"
   },
   "devDependencies": {
@@ -35,9 +36,13 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@v/api-client": "workspace:*",
+    "@v/api-server-reference": "workspace:*",
+    "@v/auth-client": "workspace:*",
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
     "@v/storage-providers": "workspace:*",
+    "@v/sync-client": "workspace:*",
     "@v/theme-registry": "workspace:*",
     "@v/tiptap-extensions": "workspace:*",
     "@v/ui": "workspace:*",
@@ -49,7 +54,9 @@
     "bunshi": "catalog:",
     "comlink": "catalog:",
     "dompurify": "catalog:",
+    "hono": "catalog:",
     "html-react-parser": "catalog:",
+    "lib0": "catalog:",
     "nanoid": "catalog:",
     "nanoid-dictionary": "catalog:",
     "outvariant": "catalog:",
@@ -67,8 +74,10 @@
     "valtio-reactive": "catalog:",
     "vite": "catalog:",
     "vite-plugin-pwa": "catalog:",
+    "vitest": "catalog:",
     "y-indexeddb": "catalog:",
     "y-prosemirror": "catalog:",
+    "y-protocols": "catalog:",
     "yjs": "catalog:"
   }
 }

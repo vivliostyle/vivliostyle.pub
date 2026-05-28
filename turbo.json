@@ -23,8 +23,30 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
+    "@v/api-spec#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/openapi.yaml"]
+    },
+    "@v/api-client#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/schema.d.ts"]
+    },
     "dev": {
-      "dependsOn": ["@v/cli-bundle#build"],
+      "dependsOn": [
+        "@v/cli-bundle#build",
+        "@v/api-spec#build",
+        "@v/api-client#build"
+      ],
+      "cache": false,
+      "persistent": true
+    },
+    "@v/api-spec#dev": {
+      "dependsOn": ["@v/api-spec#build"],
+      "cache": false,
+      "persistent": true
+    },
+    "@v/api-client#dev": {
+      "dependsOn": ["@v/api-client#build"],
       "cache": false,
       "persistent": true
     },
