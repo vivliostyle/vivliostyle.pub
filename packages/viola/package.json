@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "pnpm paraglide && tsc -b && vite build",
     "preview": "vite preview --host",
-    "test": "vitest run",
+    "test": "pnpm paraglide && vitest run",
     "paraglide": "paraglide-js compile --project project.inlang --outdir src/generated/paraglide --strategy cookie preferredLanguage baseLocale --emit-ts-declarations",
     "i18n:translate": "inlang machine translate --project project.inlang",
     "i18n:validate": "inlang validate --project project.inlang",
