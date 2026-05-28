@@ -31,6 +31,9 @@ dist-ssr
 *.tsbuildinfo
 coverage/
 vivliostyle-pub/
+
+# Auto-generated code (e.g. inlang Paraglide JS via paraglideVitePlugin)
+**/src/generated/
 /secrets/*
 !/secrets/*/
 /secrets/*/*

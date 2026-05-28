@@ -39,6 +39,7 @@
       "!**/routeTree.gen.ts",
       "!**/packages/api-client/src/schema.d.ts",
       "!**/packages/api-spec/src/openapi.yaml",
+      "!**/src/generated",
       "!**/templates/**/*",
       "!!**/secrets"
     ]

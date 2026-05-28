@@ -63,6 +63,8 @@ import {
   SidebarSeparator,
 } from '@v/ui/sidebar';
 import VivliostyleLogo from '../assets/vivliostyle-logo.svg';
+import { m } from '../generated/paraglide/messages';
+import { getLocale, locales, setLocale } from '../generated/paraglide/runtime';
 import { generateId } from '../libs/generate-id';
 import {
   $content,
@@ -113,12 +115,12 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
           }}
         >
           <FolderOpen />
-          <span>Open Project</span>
+          <span>{m.side_menu_open_project()}</span>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link to="/new-project">
             <FilePlus />
-            <span>New Project</span>
+            <span>{m.side_menu_new_project()}</span>
           </Link>
         </DropdownMenuItem>
         {project && (
@@ -130,33 +132,69 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
                 params={{ projectId: project.projectId }}
               >
                 <Printer />
-                <span>Open Print Preview</span>
+                <span>{m.side_menu_open_print_preview()}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem inset onClick={printPdf}>
-              <span>Print PDF</span>
+              <span>{m.side_menu_print_pdf()}</span>
             </DropdownMenuItem>
             <DropdownMenuItem inset onClick={exportEpub}>
-              <span>Export EPUB</span>
+              <span>{m.side_menu_export_epub()}</span>
             </DropdownMenuItem>
             <DropdownMenuItem inset onClick={exportWebPub}>
-              <span>Export Web Publication</span>
+              <span>{m.side_menu_export_web_pub()}</span>
             </DropdownMenuItem>
             <DropdownMenuItem inset onClick={exportProjectZip}>
-              <span>Export Vivliostyle Project files</span>
+              <span>{m.side_menu_export_vivliostyle_project()}</span>
             </DropdownMenuItem>
           </>
         )}
+        <LanguageMenuSection />
         <DropdownMenuSeparator />
         <DropdownMenuLabel
           inset
           className={cn('text-xs text-muted-foreground my-1')}
         >
-          <p>Vivliostyle Pub Alpha</p>
+          <p>{m.app_name()}</p>
         </DropdownMenuLabel>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function LanguageMenuSection() {
+  const activeLocale = getLocale();
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel inset className={cn('text-xs text-muted-foreground')}>
+        {m.language_menu_label()}
+      </DropdownMenuLabel>
+      {locales.map((locale) => {
+        const label =
+          new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ??
+          locale;
+        return (
+          <DropdownMenuItem
+            key={locale}
+            inset
+            aria-current={locale === activeLocale}
+            className={cn(
+              'capitalize',
+              locale === activeLocale && 'font-semibold',
+            )}
+            onClick={() => {
+              if (locale !== activeLocale) {
+                setLocale(locale);
+              }
+            }}
+          >
+            <span>{label}</span>
+          </DropdownMenuItem>
+        );
+      })}
+    </>
   );
 }
 
@@ -164,11 +202,11 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
   const projectSnap = useSnapshot($project).valueOrThrow();
   const projectsSnap = useSnapshot($projects);
   const entry = projectsSnap.entries[projectSnap.projectId];
-  const title = projectSnap.bibliography.title || 'Untitled';
+  const title = projectSnap.bibliography.title || m.common_untitled();
 
   const onDelete = async () => {
     if (!entry) return;
-    if (!window.confirm(`Delete project "${title}"? This cannot be undone.`)) {
+    if (!window.confirm(m.side_menu_delete_project_confirm({ title }))) {
       return;
     }
     try {
@@ -178,7 +216,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
         await deleteLocalProject(projectSnap.projectId);
       }
     } catch {
-      window.alert('Failed to delete project.');
+      window.alert(m.side_menu_delete_project_error());
     }
   };
 
@@ -190,7 +228,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
           inset
           className={cn('text-xs text-muted-foreground max-w-120 truncate')}
         >
-          {title}
+          {title || m.common_untitled()}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -199,7 +237,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
             params={{ projectId: projectSnap.projectId }}
           >
             <BookOpen />
-            <span>Title and metadata</span>
+            <span>{m.side_menu_title_and_metadata()}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
@@ -208,7 +246,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
             params={{ projectId: projectSnap.projectId }}
           >
             <ImageIcon />
-            <span>Media</span>
+            <span>{m.side_menu_media()}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
@@ -217,7 +255,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
             params={{ projectId: projectSnap.projectId }}
           >
             <Palette />
-            <span>Customize theme</span>
+            <span>{m.side_menu_customize_theme()}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -227,7 +265,7 @@ function ProjectDropdownMenu({ children }: React.PropsWithChildren) {
           onClick={onDelete}
         >
           <Trash2 />
-          <span>Delete project</span>
+          <span>{m.side_menu_delete_project()}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -243,7 +281,7 @@ function TopMenuSection() {
           <Button
             variant="ghost"
             className={cn('h-10 px-1.5 gap-1 shrink-0')}
-            aria-label="Open workspace menu"
+            aria-label={m.side_menu_open_workspace_aria()}
           >
             <img src={VivliostyleLogo} alt="" className="size-6" />
             <ChevronDown className="size-3 opacity-60" aria-hidden />
@@ -252,14 +290,14 @@ function TopMenuSection() {
         {project && (
           <ProjectDropdownMenu>
             <SidebarMenuButton
-              tooltip="Open project menu"
+              tooltip={m.side_menu_open_project_menu_tooltip()}
               className={cn(
                 'font-semibold px-1.5 min-w-0 py-1.5',
                 !project.bibliography.title && 'text-muted-foreground',
               )}
             >
               <span className="min-w-0 flex-1 line-clamp-2 wrap-break-word">
-                {project.bibliography.title || 'Untitled'}
+                {project.bibliography.title || m.common_untitled()}
               </span>
               <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
             </SidebarMenuButton>
@@ -285,14 +323,20 @@ function AccountMenuSection() {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
-            tooltip={authed ? 'Account' : 'Sign in'}
+            tooltip={
+              authed
+                ? m.side_menu_account_tooltip()
+                : m.side_menu_sign_in_tooltip()
+            }
             onClick={() => {
               $ui.dedicatedModal = { id: generateId(), type: 'account' };
             }}
           >
             {authed ? <UserRound /> : <LogIn />}
             <span className="truncate">
-              {authed ? sessionSnap.user?.username : 'Sign in'}
+              {authed
+                ? sessionSnap.user?.username
+                : m.side_menu_sign_in_label()}
             </span>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -302,11 +346,20 @@ function AccountMenuSection() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip={authed ? 'Account' : 'Sign in'}>
+        <SidebarMenuButton
+          asChild
+          tooltip={
+            authed
+              ? m.side_menu_account_tooltip()
+              : m.side_menu_sign_in_tooltip()
+          }
+        >
           <Link to="/settings/account">
             {authed ? <UserRound /> : <LogIn />}
             <span className="truncate">
-              {authed ? sessionSnap.user?.username : 'Sign in'}
+              {authed
+                ? sessionSnap.user?.username
+                : m.side_menu_sign_in_label()}
             </span>
           </Link>
         </SidebarMenuButton>
@@ -321,7 +374,7 @@ function ContentMenuSection() {
       <SidebarMenuItem>
         <AddNewFileButton>
           <CirclePlus />
-          Add new file
+          {m.side_menu_add_new_file()}
         </AddNewFileButton>
       </SidebarMenuItem>
     </SidebarMenu>
@@ -342,7 +395,7 @@ function FileDropdownMenu({
             deleteContentFile({ contentId });
           }}
         >
-          <span>Delete file</span>
+          <span>{m.side_menu_delete_file()}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -404,7 +457,7 @@ function FileTreeItem({
             replace
           >
             <span className={cn(!file?.summary && 'text-muted-foreground')}>
-              {file?.summary || 'Empty file'}
+              {file?.summary || m.side_menu_empty_file()}
             </span>
           </Link>
         ) : (
@@ -414,7 +467,7 @@ function FileTreeItem({
       {typeof item === 'string' && (
         <FileDropdownMenu contentId={item}>
           <SidebarMenuAction className="opacity-0 group-hover/file-tree-item:opacity-100 group-has-[*:focus]/file-tree-item:opacity-100 data-[state=open]:opacity-100">
-            <MoreHorizontal aria-label="Open menu" />
+            <MoreHorizontal aria-label={m.side_menu_open_file_menu_aria()} />
           </SidebarMenuAction>
         </FileDropdownMenu>
       )}
@@ -435,7 +488,7 @@ function FileTreeDraggingItem() {
     <SidebarMenuItem>
       <div className="opacity-80 flex w-full items-center gap-2 overflow-hidden rounded-md px-2 text-left bg-sidebar-accent text-sidebar-accent-foreground [&>span:last-child]:truncate text-sm min-h-7">
         <span className={cn(!file?.summary && 'text-muted-foreground')}>
-          {file?.summary || 'Empty file'}
+          {file?.summary || m.side_menu_empty_file()}
         </span>
       </div>
     </SidebarMenuItem>

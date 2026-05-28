@@ -137,6 +137,38 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 - **Husky pre-commit** runs `lint-staged` (Biome format) and `pnpm check`.
 - **Agent guidance lives only in this file.** No `.cursor/rules`, `.cursorrules`, or `.github/copilot-instructions.md` exist — `AGENTS.md` is a symlink to `CLAUDE.md` so every agent reads the same source. If you need to extend the guide, edit `CLAUDE.md`.
 
+## Internationalization (i18n)
+
+The host React UI (`@v/viola`) is localized with **[inlang Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)** (compiler-based, tree-shakeable). The CLI worker / iframe (`@v/cli-bundle`, the Vivliostyle CLI itself) is out of scope.
+
+All i18n data, config, and scripts live inside the **`@v/viola` package** (`packages/viola/`), not the repo root — viola is the only consumer.
+
+- **Source of truth**: `packages/viola/messages/{locale}.json` (inlang message format). Base locale is `en`; the only target locale is `ja`. Config lives in `packages/viola/project.inlang/settings.json`.
+- **Generated code**: `paraglideVitePlugin` (in `packages/viola/vite.config.ts`) compiles messages into `packages/viola/src/generated/paraglide/` (the whole `src/generated/` tree is git-ignored and ignored by Biome; paraglide also self-emits its own `.gitignore`). `tsc` reads the emitted `.d.ts` files (the project does not set `allowJs`), so the compile must run before typecheck — the viola `build`/`typecheck` scripts chain `pnpm paraglide` first.
+- **Plugins**: the inlang message-format + m-function-matcher plugins are loaded from pinned jsdelivr URLs in `settings.json`. `cdn.jsdelivr.net` must be in the agent sandbox's network allowlist for the compile to run (it fetches the plugin modules). To bump a plugin, edit the version in the URL.
+
+### Message key naming (flat snake_case)
+
+- Flat, underscore-separated keys with a feature-area prefix: **`{area}_{element}[_{descriptor}]`** — e.g. `side_menu_open_project`, `bibliography_book_title_label`. No nesting. Call as `m.side_menu_open_project()`.
+- area prefixes mirror the source location: `side_menu_`, `bibliography_`, `theme_`, `media_`, `start_`/`new_project_`, `preview_`/`edit_`, `image_menu_`. Use `common_` only for genuinely shared words (`common_cancel`, `common_untitled`).
+- **Don't reuse** keys across contexts (unique key per instance) except the governed `common_` namespace — identical English can translate differently by context.
+- Accessibility strings take a `_aria` suffix (`side_menu_open_workspace_aria`). Interpolation uses ICU `{name}` placeholders; pluralization/gender uses ICU `plural`/`select`.
+- Name keys semantically by hand — do **not** derive them from the English text (so editing copy never churns keys).
+
+### Wording / translation style
+
+Per-locale wording rules (punctuation, spacing, casing, untranslatable terms) live in `.claude/rules/i18n-message-style.md`, scoped via `paths:` so it loads automatically when message JSON files are touched. When writing or machine-translating a message, follow that file's section for the target locale; add new conventions there rather than burying them in PR comments.
+
+### Adding / editing messages
+
+Three equivalent paths, all land as normal PRs that maintainers review:
+1. **Source (humans & AI agents)**: add the key to `packages/viola/messages/en.json`, use `m.<key>()` in code, then run `pnpm --filter @v/viola i18n:translate` to fill the other locales. `pnpm --filter @v/viola paraglide` regenerates types.
+2. **Web UI (non-developers)**: [Fink](https://fink.inlang.com) — connect the GitHub repo, edit in the browser, opens a PR.
+3. **VS Code**: the [Sherlock](https://inlang.com/m/r7kp499g/app-inlang-ideExtension) extension for inline extraction/editing.
+
+- **Machine translation**: `pnpm --filter @v/viola i18n:translate` (inlang CLI, Google Cloud Translation v2). It only fills empty/missing messages, so human edits are preserved. Needs `INLANG_GOOGLE_TRANSLATE_API_KEY`. CI runs it via `.github/workflows/i18n-translate.yml` whenever `packages/viola/messages/en.json` changes and commits the result back.
+- **Validation**: `pnpm --filter @v/viola i18n:validate` (runs in the `i18n` CI job).
+
 ## Deployment
 
 Cloudflare Workers via Wrangler. `wrangler.toml` serves `packages/viola/dist/` as a SPA. The GitHub Actions workflow `build-deploy.yml` deploys `main` to `alpha.vivliostyle.pub` and PR previews to `pr-preview-<n>-vivliostyle-pub-app.vivliostyle.workers.dev`.

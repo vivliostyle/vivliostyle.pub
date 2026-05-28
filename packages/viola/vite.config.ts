@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
@@ -332,6 +333,12 @@ export default defineConfig(({ mode, command }) => {
       plugins: () => [serveCli()],
     },
     plugins: [
+      paraglideVitePlugin({
+        project: path.join(dirname, 'project.inlang'),
+        outdir: path.join(dirname, 'src/generated/paraglide'),
+        strategy: ['cookie', 'preferredLanguage', 'baseLocale'],
+        emitTsDeclarations: true,
+      }),
       TanStackRouterVite(),
       react(),
       tailwindcss(),

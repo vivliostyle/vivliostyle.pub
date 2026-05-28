@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@v/ui/button';
 import { Trash2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
+import { m } from '../../generated/paraglide/messages';
 import { useContainerRelativeRect } from '../../hooks/use-container-relative-rect';
 
 const IMAGE_MENU_OFFSET_VAR = '--image-menu-offset';
@@ -134,7 +135,7 @@ export function ImageMenu({ containerRef }: ImageMenuProps) {
           partially scrolled past, then settles back below the image. */}
       <div
         role="toolbar"
-        aria-label="Image actions"
+        aria-label={m.image_menu_toolbar_aria()}
         style={{
           position: 'sticky',
           bottom: `var(${IMAGE_MENU_OFFSET_VAR})`,
@@ -148,9 +149,9 @@ export function ImageMenu({ containerRef }: ImageMenuProps) {
           ref={altInputRef}
           defaultValue={state.alt}
           onBlur={handleAltBlur}
-          placeholder="Alt text"
+          placeholder={m.image_menu_alt_placeholder()}
           className="h-7 w-48"
-          aria-label="Alt text"
+          aria-label={m.image_menu_alt_aria()}
         />
         <Button
           type="button"
@@ -159,7 +160,7 @@ export function ImageMenu({ containerRef }: ImageMenuProps) {
           className="h-7 w-7"
           onMouseDown={(e) => e.preventDefault()}
           onClick={handleDelete}
-          aria-label="Delete image"
+          aria-label={m.image_menu_delete_aria()}
         >
           <Trash2 />
         </Button>

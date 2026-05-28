@@ -5,6 +5,7 @@ import { Button } from '@v/ui/button';
 import { Loader2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { Label } from '@v/ui/label';
+import { m } from '../../generated/paraglide/messages';
 import { $session } from '../../stores/accessors';
 import {
   login,
@@ -23,7 +24,7 @@ declare global {
 }
 
 export const Pane = createPane<AccountPaneProps>({
-  title: () => 'Account',
+  title: () => m.account_pane_title(),
   content: (props) => (
     <ScrollOverflow>
       <PaneContainer>
@@ -59,9 +60,7 @@ function SignInForm() {
       setPassword('');
     } catch (err) {
       setError(
-        err instanceof SessionError
-          ? err.message
-          : 'Something went wrong. Try again.',
+        err instanceof SessionError ? err.message : m.account_generic_error(),
       );
     }
   };
@@ -71,16 +70,17 @@ function SignInForm() {
       <div className="grid gap-3">
         <p className="text-sm text-muted-foreground">
           {mode === 'login'
-            ? 'Sign in to sync projects with the cloud server.'
-            : 'Create a new account on the cloud server.'}
+            ? m.account_login_description()
+            : m.account_register_description()}
         </p>
         <p className="text-xs text-muted-foreground">
-          Server: <code className="font-mono">{sessionSnap.baseUrl}</code>
+          {m.account_server_label()}{' '}
+          <code className="font-mono">{sessionSnap.baseUrl}</code>
         </p>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={usernameId}>Username</Label>
+        <Label htmlFor={usernameId}>{m.account_username_label()}</Label>
         <Input
           id={usernameId}
           type="text"
@@ -94,7 +94,7 @@ function SignInForm() {
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={passwordId}>Password</Label>
+        <Label htmlFor={passwordId}>{m.account_password_label()}</Label>
         <Input
           id={passwordId}
           type="password"
@@ -107,7 +107,7 @@ function SignInForm() {
         />
         {mode === 'register' && (
           <p className="text-xs text-muted-foreground">
-            At least 8 characters.
+            {m.account_password_min_chars_note()}
           </p>
         )}
       </div>
@@ -120,7 +120,9 @@ function SignInForm() {
 
       <Button type="submit" disabled={disabled}>
         {submitting && <Loader2 className="animate-spin" />}
-        {mode === 'login' ? 'Sign in' : 'Create account'}
+        {mode === 'login'
+          ? m.account_sign_in_button()
+          : m.account_register_button()}
       </Button>
 
       <button
@@ -132,8 +134,8 @@ function SignInForm() {
         }}
       >
         {mode === 'login'
-          ? "Don't have an account? Create one."
-          : 'Already have an account? Sign in.'}
+          ? m.account_switch_to_register()
+          : m.account_switch_to_login()}
       </button>
     </form>
   );
@@ -155,10 +157,13 @@ function SignedInView() {
   return (
     <div className="grid gap-4">
       <div className="grid gap-1">
-        <p className="text-sm text-muted-foreground">Signed in as</p>
+        <p className="text-sm text-muted-foreground">
+          {m.account_signed_in_as()}
+        </p>
         <p className="text-lg font-medium">{sessionSnap.user?.username}</p>
         <p className="text-xs text-muted-foreground">
-          Server: <code className="font-mono">{sessionSnap.baseUrl}</code>
+          {m.account_server_label()}{' '}
+          <code className="font-mono">{sessionSnap.baseUrl}</code>
         </p>
       </div>
       <Button
@@ -168,7 +173,7 @@ function SignedInView() {
         className="justify-self-start"
       >
         {signingOut && <Loader2 className="animate-spin" />}
-        Sign out
+        {m.account_sign_out_button()}
       </Button>
     </div>
   );

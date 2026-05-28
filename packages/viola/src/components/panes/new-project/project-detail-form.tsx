@@ -23,8 +23,10 @@ import { ChevronDownIcon } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@v/ui/popover';
+import { m } from '../../../generated/paraglide/messages';
 import { useLiveInputField } from '../../../hooks/use-live-field';
 import { usePromiseState } from '../../../hooks/use-promise-state';
+import { getOfficialThemeTitle } from '../../../libs/official-theme-title';
 import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
 import { Theme } from '../../../stores/proxies/theme';
@@ -103,15 +105,19 @@ function LanguageSelect({ children }: React.PropsWithChildren) {
             className="sr-only inset-0 size-auto pointer-events-none"
           />
           {LANGUAGES[snap.bibliography.language as keyof typeof LANGUAGES] || (
-            <span className="text-muted-foreground">Select language</span>
+            <span className="text-muted-foreground">
+              {m.new_project_language_placeholder()}
+            </span>
           )}
           <ChevronDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </PopoverTrigger>
         <PopoverContent className="w-xs p-0">
           <Command>
-            <CommandInput placeholder="Search language..." />
+            <CommandInput
+              placeholder={m.new_project_language_search_placeholder()}
+            />
             <CommandList>
-              <CommandEmpty>No language found.</CommandEmpty>
+              <CommandEmpty>{m.new_project_language_empty()}</CommandEmpty>
               <CommandGroup>
                 {Object.entries(LANGUAGES).map(([code, name]) => (
                   <CommandItem key={code} value={code} onSelect={handleSelect}>
@@ -150,7 +156,7 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
       >
         {Object.entries(Theme.officialThemes).map(([value, { title }]) => (
           <StackedRadioGroupItem key={value} value={value} required>
-            {title}
+            {getOfficialThemeTitle(value, title)}
           </StackedRadioGroupItem>
         ))}
       </StackedRadioGroup>
@@ -190,32 +196,40 @@ export function ProjectDetailForm() {
       }}
     >
       <section className="grid gap-4">
-        <h3 className="text-xl font-bold">Project Details</h3>
+        <h3 className="text-xl font-bold">
+          {m.new_project_details_section_title()}
+        </h3>
 
-        <p className="text-sm">
-          All fields are optional and can be changed later in project settings.
-        </p>
+        <p className="text-sm">{m.new_project_details_optional_note()}</p>
 
         <BookTitleInput>
-          <span className="text-l font-bold">Book title</span>
+          <span className="text-l font-bold">
+            {m.new_project_book_title_label()}
+          </span>
         </BookTitleInput>
 
         <AuthorInput>
-          <span className="text-l font-bold">Author</span>
+          <span className="text-l font-bold">
+            {m.new_project_author_label()}
+          </span>
         </AuthorInput>
 
         <LanguageSelect>
-          <span className="text-l font-bold">Language</span>
+          <span className="text-l font-bold">
+            {m.new_project_language_label()}
+          </span>
         </LanguageSelect>
 
         <ThemeSelect>
-          <span className="text-l font-bold">Theme</span>
+          <span className="text-l font-bold">
+            {m.new_project_theme_label()}
+          </span>
         </ThemeSelect>
       </section>
 
       <Button type="submit" loading={isPending}>
-        <span>Create Project</span>
-        <LoadingUI>Creating project</LoadingUI>
+        <span>{m.new_project_submit_button()}</span>
+        <LoadingUI>{m.new_project_submit_loading()}</LoadingUI>
       </Button>
     </form>
   );

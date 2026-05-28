@@ -2,6 +2,7 @@ import { ScopeProvider, useMolecule } from 'bunshi/react';
 import { useId } from 'react';
 import { useSnapshot } from 'valtio';
 
+import { m } from '../../generated/paraglide/messages';
 import { ProjectDetailForm } from './new-project/project-detail-form';
 import {
   NewProjectPaneScope,
@@ -19,7 +20,7 @@ declare global {
 }
 
 export const Pane = createPane<NewProjectPaneProps>({
-  title: () => 'Create New Project',
+  title: () => m.new_project_pane_title(),
   content: (props) => (
     <ScrollOverflow>
       <PaneContainer>

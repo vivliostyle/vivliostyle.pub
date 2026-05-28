@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import { useSnapshot } from 'valtio';
 
+import { m } from '../../generated/paraglide/messages';
 import { $content } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import { createPane, ScrollOverflow } from './util';
@@ -27,7 +28,9 @@ const ContentEditor = lazy(() => import('../content-editor'));
 function Title({ contentId }: EditPaneProperty) {
   const content = useSnapshot($content).value();
   const file = content?.files.get(contentId);
-  return file ? `Content Editor: File ${file.filename}` : `Content Editor`;
+  return file
+    ? m.edit_pane_title_with_file({ filename: file.filename })
+    : m.edit_pane_title();
 }
 
 function Content({ contentId }: EditPaneProperty) {

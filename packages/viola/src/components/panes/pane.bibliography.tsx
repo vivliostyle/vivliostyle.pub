@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@v/ui/select';
 import { Switch } from '@v/ui/switch';
+import { m } from '../../generated/paraglide/messages';
 import {
   useLiveCheckboxField,
   useLiveInputField,
@@ -40,7 +41,7 @@ declare global {
 }
 
 export const Pane = createPane<BibliographyPaneProperty>({
-  title: () => 'Title and metadata',
+  title: () => m.bibliography_pane_title(),
   content: (props) => (
     <ScrollOverflow>
       <PaneContainer>
@@ -125,15 +126,19 @@ function LanguageSelect({ children }: React.PropsWithChildren) {
             className="sr-only inset-0 size-auto pointer-events-none"
           />
           {LANGUAGES[snap.bibliography.language as keyof typeof LANGUAGES] || (
-            <span className="text-muted-foreground">Select language</span>
+            <span className="text-muted-foreground">
+              {m.bibliography_language_placeholder()}
+            </span>
           )}
           <ChevronDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
         </PopoverTrigger>
         <PopoverContent className="w-xs p-0">
           <Command>
-            <CommandInput placeholder="Search language..." />
+            <CommandInput
+              placeholder={m.bibliography_language_search_placeholder()}
+            />
             <CommandList>
-              <CommandEmpty>No language found.</CommandEmpty>
+              <CommandEmpty>{m.bibliography_language_empty()}</CommandEmpty>
               <CommandGroup>
                 {Object.entries(LANGUAGES).map(([code, name]) => (
                   <CommandItem key={code} value={code} onSelect={handleSelect}>
@@ -217,13 +222,25 @@ function TocSectionDepthSelect({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="0">Do not display sections</SelectItem>
-          <SelectItem value="1">Level 1</SelectItem>
-          <SelectItem value="2">Level 2</SelectItem>
-          <SelectItem value="3">Level 3</SelectItem>
-          <SelectItem value="4">Level 4</SelectItem>
-          <SelectItem value="5">Level 5</SelectItem>
-          <SelectItem value="6">Level 6</SelectItem>
+          <SelectItem value="0">{m.bibliography_toc_depth_none()}</SelectItem>
+          <SelectItem value="1">
+            {m.bibliography_toc_depth_level({ level: 1 })}
+          </SelectItem>
+          <SelectItem value="2">
+            {m.bibliography_toc_depth_level({ level: 2 })}
+          </SelectItem>
+          <SelectItem value="3">
+            {m.bibliography_toc_depth_level({ level: 3 })}
+          </SelectItem>
+          <SelectItem value="4">
+            {m.bibliography_toc_depth_level({ level: 4 })}
+          </SelectItem>
+          <SelectItem value="5">
+            {m.bibliography_toc_depth_level({ level: 5 })}
+          </SelectItem>
+          <SelectItem value="6">
+            {m.bibliography_toc_depth_level({ level: 6 })}
+          </SelectItem>
         </SelectContent>
       </Select>
     </label>
@@ -237,22 +254,30 @@ function Content(_: BibliographyPaneProperty) {
   return (
     <div className="grid gap-4">
       <BookTitleInput>
-        <span className="text-l font-bold">Book Title</span>
+        <span className="text-l font-bold">
+          {m.bibliography_book_title_label()}
+        </span>
       </BookTitleInput>
 
       <AuthorInput>
-        <span className="text-l font-bold">Author</span>
+        <span className="text-l font-bold">
+          {m.bibliography_author_label()}
+        </span>
       </AuthorInput>
 
       <LanguageSelect>
-        <span className="text-l font-bold">Language</span>
+        <span className="text-l font-bold">
+          {m.bibliography_language_label()}
+        </span>
       </LanguageSelect>
 
       <section className="grid gap-2">
-        <h3 className="text-l font-bold">Table of Contents</h3>
+        <h3 className="text-l font-bold">
+          {m.bibliography_toc_section_title()}
+        </h3>
         <div className="flex items-center gap-2">
           <UseTocSwitch>
-            <span className="text-sm">Enable Table of Contents</span>
+            <span className="text-sm">{m.bibliography_toc_enable_label()}</span>
           </UseTocSwitch>
         </div>
 
@@ -266,7 +291,7 @@ function Content(_: BibliographyPaneProperty) {
                   : 'text-muted-foreground',
               )}
             >
-              Table of Contents Title
+              {m.bibliography_toc_title_label()}
             </span>
           </TocTitleInput>
         </section>
@@ -281,7 +306,7 @@ function Content(_: BibliographyPaneProperty) {
                   : 'text-muted-foreground',
               )}
             >
-              Table of Contents Depth
+              {m.bibliography_toc_depth_label()}
             </span>
           </TocSectionDepthSelect>
         </section>
