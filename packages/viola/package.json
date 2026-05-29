@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite",
     "build": "pnpm paraglide && tsc -b && vite build",
-    "preview": "vite preview --host",
+    "preview": "vite preview",
     "test": "pnpm paraglide && vitest run",
     "paraglide": "paraglide-js compile --project project.inlang --outdir src/generated/paraglide --strategy cookie preferredLanguage baseLocale --emit-ts-declarations",
     "i18n:translate": "inlang machine translate --project project.inlang",

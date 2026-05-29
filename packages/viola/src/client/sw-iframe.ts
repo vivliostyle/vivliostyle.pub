@@ -49,7 +49,7 @@ async function handleNavigate(event: FetchEvent) {
       headers: {
         'Content-Type': 'text/html',
         'Content-Length': `${iframeHtml.length}`,
-        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Cross-Origin-Resource-Policy': 'cross-origin',
       },
@@ -57,7 +57,7 @@ async function handleNavigate(event: FetchEvent) {
   }
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
-    url.hostname = url.hostname.split('.').slice(1).join('.');
+    url.hostname = import.meta.env.VITE_APP_HOSTNAME;
     url.pathname = '/_cli/viewer/index.html';
     const viewerHtml = await fetch(url, { mode: 'cors' }).then((res) =>
       res.text(),
@@ -67,7 +67,7 @@ async function handleNavigate(event: FetchEvent) {
       headers: {
         'Content-Type': 'text/html',
         'Content-Length': `${viewerHtml.length}`,
-        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Cross-Origin-Resource-Policy': 'cross-origin',
       },
@@ -82,7 +82,7 @@ async function handleRequest(event: FetchEvent) {
   const url = new URL(request.url);
 
   if (url.pathname.startsWith('/__vivliostyle-viewer/')) {
-    url.hostname = url.hostname.split('.').slice(1).join('.');
+    url.hostname = import.meta.env.VITE_APP_HOSTNAME;
     url.pathname = `/_cli/viewer${url.pathname.slice('/__vivliostyle-viewer'.length)}`;
     return fetch(url, { mode: 'no-cors' });
   }

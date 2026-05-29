@@ -31,7 +31,7 @@ Run from the repo root unless noted.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm dev` | Dev server (Turbo: builds `@v/cli-bundle` first, then `vite --host` for `@v/viola`). Requires HTTPS certs + `VITE_APP_HOSTNAME` — see *Local dev prerequisites*. |
+| `pnpm dev` | Dev server (Turbo: builds `@v/cli-bundle` first, then `vite` for `@v/viola`; `server.host` is forced on in `vite.config.ts`). Requires `VITE_APP_HOSTNAME` — see *Local dev prerequisites*. |
 | `pnpm build` | Full production build via Turbo. |
 | `pnpm test` | Runs Vitest across packages (currently only `@v/cli-bundle` has real tests; others use `--passWithNoTests`). |
 | `pnpm typecheck` | `tsc --noEmit` across all packages. |
@@ -49,10 +49,10 @@ Single-package and single-test invocations:
 
 ### Local dev prerequisites
 
-`packages/viola/vite.config.ts` reads from `<repo>/secrets/`:
+`packages/viola/vite.config.ts` reads its env from `<repo>/secrets/` (`envDir`), with the `VITE_`/`API_` prefixes:
 
-- `secrets/.env` — must define `VITE_APP_HOSTNAME` (the sandbox iframe origin is computed as `sandbox-*.${VITE_APP_HOSTNAME}`, so this must be a domain you have a wildcard cert + DNS for).
-- `secrets/certs/privkey.pem`, `secrets/certs/fullchain.pem` — HTTPS is mandatory in dev because the app requires `Cross-Origin-Embedder-Policy: credentialless` (needed for `SharedArrayBuffer`, which Rolldown's WASI worker uses).
+- `secrets/.env` — must define `VITE_APP_HOSTNAME` (the host page origin). The sandbox iframe origin defaults to `sandbox-*.${VITE_APP_HOSTNAME}`; set `VITE_SANDBOX_HOSTNAME` to host the sandbox subdomain on a different base domain. Either way the iframe needs a wildcard cert + DNS for the `sandbox-*` subdomain.
+- HTTPS in dev is opt-in via `VITE_DEV_SERVER_HTTPS` — when set, Vite reads `secrets/certs/privkey.pem` + `secrets/certs/fullchain.pem`. The app needs `Cross-Origin-Embedder-Policy: require-corp` for `SharedArrayBuffer` (used by Rolldown's WASI worker), so a secure context is required; serve over HTTPS, or front the dev server with an HTTPS-terminating proxy (then leave `VITE_DEV_SERVER_HTTPS` unset).
 
 The `secrets/` directory is gitignored, and agent sandboxes are configured to deny reads from it. Agents must not attempt to bypass that restriction.
 
@@ -89,7 +89,7 @@ Communication is layered:
   - Host SW (`sw-host.ts`) forwards `/vivliostyle/...` to `cli.serve()` via the project channel.
   - Iframe SW (`sw-iframe.ts`) forwards `/vivliostyle/...` to the CLI worker's `serve()`, and proxies `/__vivliostyle-viewer/...` to the bundled Vivliostyle viewer assets served from `/_cli/viewer/`.
 
-All responses set COEP `credentialless` + COOP `same-origin` + CORP `cross-origin`. Don't drop these headers — they're load-bearing for `SharedArrayBuffer` access.
+All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`. Don't drop these headers — they're load-bearing for `SharedArrayBuffer` access. Because `require-corp` (unlike `credentialless`) requires every cross-origin subresource to carry an explicit CORP header, the cross-origin assets the iframe pulls from the host origin must be served with CORP — see the `_headers` rules (prod) and the `serveCli` plugin headers (dev). The headers are mirrored in several places that must stay in sync: `packages/viola/public/_headers` (Cloudflare prod), `vite.config.ts` `server.headers` + the `serveCli` plugin (dev), the two service workers (`sw-utils.ts`, `sw-iframe.ts`), and `@v/cli-bundle`'s `commonHeaders` in `src/index.ts`.
 
 ### Package layout
 

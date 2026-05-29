@@ -92,7 +92,7 @@ const serveCli = () =>
               'Access-Control-Allow-Headers',
               'Origin, Content-Type, Accept, Range',
             );
-            res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
             res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
           },
@@ -359,31 +359,30 @@ export default defineConfig(({ mode, command }) => {
         : []),
       visualizer() as PluginOption,
     ],
-    server:
-      command === 'serve'
+    server: {
+      host: true,
+      port: env.VITE_DEV_SERVER_PORT ? +env.VITE_DEV_SERVER_PORT : undefined,
+      https: env.VITE_DEV_SERVER_HTTPS
         ? {
-            https: {
-              key: fs.readFileSync(path.join(secretsDir, 'certs/privkey.pem')),
-              cert: fs.readFileSync(
-                path.join(secretsDir, 'certs/fullchain.pem'),
-              ),
-            },
-            headers: {
-              'Cross-Origin-Embedder-Policy': 'credentialless',
-              'Cross-Origin-Opener-Policy': 'same-origin',
-              'Cross-Origin-Resource-Policy': 'cross-origin',
-            },
-            allowedHosts: [
-              // Leading dot allows any subdomains
-              `.${env.VITE_APP_HOSTNAME}`,
-            ],
-            cors: {
-              origin: new RegExp(
-                `^https?://([\\w-]+\\.)?${env.VITE_APP_HOSTNAME.replace('.', '\\.')}(?::\\d+)$`,
-              ),
-            },
+            key: fs.readFileSync(path.join(secretsDir, 'certs/privkey.pem')),
+            cert: fs.readFileSync(path.join(secretsDir, 'certs/fullchain.pem')),
           }
         : undefined,
+      headers: {
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+      },
+      allowedHosts: [
+        // Leading dot allows any subdomains
+        `.${env.VITE_APP_HOSTNAME}`,
+      ],
+      cors: {
+        origin: new RegExp(
+          `^https?://([\\w-]+\\.)?${env.VITE_APP_HOSTNAME.replace('.', '\\.')}(?::\\d+)$`,
+        ),
+      },
+    },
     envDir: secretsDir,
   };
 });

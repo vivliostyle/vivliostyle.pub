@@ -28,7 +28,7 @@ import { restoreBundledNodeModules } from './volume';
 
 const commonHeaders = {
   'cache-control': 'no-store',
-  'cross-origin-embedder-policy': 'credentialless',
+  'cross-origin-embedder-policy': 'require-corp',
   'cross-origin-opener-policy': 'same-origin',
   'cross-origin-resource-policy': 'cross-origin',
 };

@@ -4,7 +4,7 @@ const self = globalThis as unknown as ServiceWorkerGlobalScope;
 
 const coepHeaders = {
   'Cache-Control': 'no-store',
-  'Cross-Origin-Embedder-Policy': 'credentialless',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'cross-origin',
 };

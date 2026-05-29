@@ -1,13 +1,16 @@
 # https://developers.cloudflare.com/workers/static-assets/headers/
 
-/assets/*
-  Cross-Origin-Embedder-Policy: credentialless
+/*
+  Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Opener-Policy: same-origin
+
+https://:sandbox.vspub.dev/*
+  Cross-Origin-Resource-Policy: cross-origin
+
+/assets/*
   Cross-Origin-Resource-Policy: cross-origin
 
 /_*
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Headers: Origin, Content-Type, Accept, Range
-  Cross-Origin-Embedder-Policy: credentialless
-  Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: cross-origin

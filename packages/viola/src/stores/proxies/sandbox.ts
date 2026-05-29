@@ -43,7 +43,13 @@ type SymlinkNode = [
 ];
 type UnknownNode = null;
 
-const origin = `https://${import.meta.env.VITE_APP_HOSTNAME}${location.port ? `:${location.port}` : ''}`;
+let origin = `https://${import.meta.env.VITE_APP_HOSTNAME}`;
+if (import.meta.env.DEV && location.port) {
+  origin += `:${location.port}`;
+}
+const sandboxOrigin = import.meta.env.VITE_SANDBOX_HOSTNAME
+  ? `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}`
+  : origin;
 
 const defaultCss = /* css */ `:root {
   /* Edit this CSS to customize the theme */
@@ -284,9 +290,9 @@ export class Sandbox {
     projectId: ProjectId;
     provider: StorageProvider;
   }) {
-    const url = new URL(location.href);
-    url.hostname = `sandbox-${projectId}.${url.hostname}`;
-    this.iframeOrigin = url.origin;
+    const sandboxUrl = new URL(sandboxOrigin);
+    sandboxUrl.hostname = `sandbox-${projectId}.${sandboxUrl.hostname}`;
+    this.iframeOrigin = sandboxUrl.origin;
     this.provider = ref(provider);
   }
 

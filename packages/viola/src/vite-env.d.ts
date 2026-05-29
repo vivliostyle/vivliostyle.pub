@@ -2,6 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_IFRAME_HTML: string;
+  readonly VITE_APP_HOSTNAME: string;
+  readonly VITE_SANDBOX_HOSTNAME?: string;
 }
 
 interface ImportMeta {
