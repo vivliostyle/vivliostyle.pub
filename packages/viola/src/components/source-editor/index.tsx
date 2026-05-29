@@ -73,17 +73,24 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
     [saveToSandbox],
   );
 
-  // Switching back to the visual editor unmounts this component. Flush the
-  // latest markdown into the XmlFragment then; emitUpdate runs the editor's
-  // own save path so the sandbox file and server sync reconverge.
+  // Switching back to the visual editor unmounts this component. Cancel any
+  // pending debounced write first so a late timer can't clobber the sandbox
+  // after a subsequent visual edit, then flush the latest markdown into the
+  // XmlFragment — emitUpdate runs the editor's own save path so the sandbox
+  // file and server sync reconverge deterministically. Skip the write entirely
+  // when the source never diverged from the seed, to avoid emitting a redundant
+  // collaborative update for an untouched document.
   useEffect(() => {
     return () => {
-      editor.commands.setContent(latestCode.current, {
-        contentType: 'markdown',
-        emitUpdate: true,
-      });
+      saveToSandbox.cancel();
+      if (latestCode.current !== initialCode) {
+        editor.commands.setContent(latestCode.current, {
+          contentType: 'markdown',
+          emitUpdate: true,
+        });
+      }
     };
-  }, [editor]);
+  }, [editor, saveToSandbox, initialCode]);
 
   return (
     <CodeEditor

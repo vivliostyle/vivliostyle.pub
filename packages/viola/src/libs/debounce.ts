@@ -3,7 +3,7 @@ export const debounce = <T extends (...rest: any[]) => unknown>(
   fn: T,
   delay: number,
   options: { leading?: boolean; trailing?: boolean } = {},
-): T => {
+): T & { cancel: () => void } => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let lastArgs: unknown[] | null = null;
 
@@ -27,5 +27,13 @@ export const debounce = <T extends (...rest: any[]) => unknown>(
     }, delay);
   };
 
-  return debouncedFn as T;
+  debouncedFn.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    lastArgs = null;
+  };
+
+  return debouncedFn as T & { cancel: () => void };
 };
