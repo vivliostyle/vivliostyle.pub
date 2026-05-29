@@ -1,12 +1,16 @@
 import { lazy } from 'react';
 import { useSnapshot } from 'valtio';
 
+import { Tabs, TabsList, TabsTrigger } from '@v/ui/tabs';
 import { m } from '../../generated/paraglide/messages';
-import { $content } from '../../stores/accessors';
+import { $content, $ui } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
+import type { PaneId } from '../../stores/proxies/ui';
 import { createPane, ScrollOverflow } from './util';
 
-type EditPaneProperty = { contentId: ContentId };
+export type EditorMode = 'visual' | 'source';
+
+type EditPaneProperty = { contentId: ContentId; mode?: EditorMode };
 
 declare global {
   interface PanePropertyMap {
@@ -18,12 +22,14 @@ export const Pane = createPane<EditPaneProperty>({
   title: Title,
   content: (props) => (
     <ScrollOverflow>
+      <ModeToggle {...props} />
       <Content {...props} />
     </ScrollOverflow>
   ),
 });
 
 const ContentEditor = lazy(() => import('../content-editor'));
+const SourceEditor = lazy(() => import('../source-editor'));
 
 function Title({ contentId }: EditPaneProperty) {
   const content = useSnapshot($content).value();
@@ -33,6 +39,36 @@ function Title({ contentId }: EditPaneProperty) {
     : m.edit_pane_title();
 }
 
-function Content({ contentId }: EditPaneProperty) {
-  return <ContentEditor contentId={contentId} />;
+function setMode(id: PaneId, mode: EditorMode) {
+  const tab = $ui.tabs.find((t) => t.id === id);
+  if (tab?.type === 'edit') {
+    tab.mode = mode;
+  }
+}
+
+function ModeToggle({
+  id,
+  mode = 'visual',
+}: EditPaneProperty & { id?: PaneId }) {
+  return (
+    <div className="sticky top-0 z-10 flex justify-end bg-background p-2">
+      <Tabs
+        value={mode}
+        onValueChange={(value) => id && setMode(id, value as EditorMode)}
+      >
+        <TabsList aria-label={m.edit_mode_toggle_aria()}>
+          <TabsTrigger value="visual">{m.edit_mode_visual()}</TabsTrigger>
+          <TabsTrigger value="source">{m.edit_mode_source()}</TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
+  );
+}
+
+function Content({ contentId, mode = 'visual' }: EditPaneProperty) {
+  return mode === 'source' ? (
+    <SourceEditor contentId={contentId} />
+  ) : (
+    <ContentEditor contentId={contentId} />
+  );
 }

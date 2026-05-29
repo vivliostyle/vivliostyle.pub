@@ -25,11 +25,12 @@ export default function CodeEditor({
   onCodeUpdate,
   language = 'css',
   ...other
-}: Required<Pick<React.HTMLAttributes<HTMLDivElement>, 'aria-label'>> & {
-  code?: string;
-  onCodeUpdate?: (code: string) => void;
-  language?: 'css' | 'markdown';
-}) {
+}: Required<Pick<React.HTMLAttributes<HTMLDivElement>, 'aria-label'>> &
+  Pick<React.HTMLAttributes<HTMLDivElement>, 'className'> & {
+    code?: string;
+    onCodeUpdate?: (code: string) => void;
+    language?: 'css' | 'markdown';
+  }) {
   const currentCode = useRef('');
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView>(null);
