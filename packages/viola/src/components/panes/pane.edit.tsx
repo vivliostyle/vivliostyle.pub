@@ -1,6 +1,7 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import { useSnapshot } from 'valtio';
 
+import { Loader2 } from '@v/ui/icon';
 import { Tabs, TabsList, TabsTrigger } from '@v/ui/tabs';
 import { m } from '../../generated/paraglide/messages';
 import { $content, $ui } from '../../stores/accessors';
@@ -23,7 +24,15 @@ export const Pane = createPane<EditPaneProperty>({
   content: (props) => (
     <ScrollOverflow>
       <ModeToggle {...props} />
-      <Content {...props} />
+      <Suspense
+        fallback={
+          <div className="grid size-full place-items-center">
+            <Loader2 className="animate-spin size-12 text-gray-300" />
+          </div>
+        }
+      >
+        <Content {...props} />
+      </Suspense>
     </ScrollOverflow>
   ),
 });
