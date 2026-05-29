@@ -47,3 +47,5 @@ function Content(props) {
 ## Pin toolbars with `sticky`, not a fixed layout
 
 Toolbars, mode toggles, and other chrome that must stay visible while the body scrolls should use `position: sticky` (`sticky top-0 z-10` with a solid background) **inside** the same scroll container. Do not split the pane into a fixed header + separately-scrolling body — that reintroduces the height-chain problem above.
+
+The layout grid in `layout.tsx` carries `isolate` so it forms its own stacking context. Without it, a pane's `sticky top-0 z-10` toolbar would tie with the `z-10` sidebar trigger (`SidebarTrigger`) that sits at the top-left of `main`, and — being later in the DOM — paint over it, hiding the open/close button. Keeping the grid isolated confines these `z-10` toolbars to the grid's own stacking context (itself `z-auto`), so the trigger stays on top without needing a larger z-index. Don't drop `isolate` from the grid, and don't bump pane-internal z-indexes to escape it.
