@@ -1,8 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { useSnapshot } from 'valtio';
 
-import { Loader2 } from '@v/ui/icon';
-import { Tabs, TabsList, TabsTrigger } from '@v/ui/tabs';
+import { Button } from '@v/ui/button';
+import { Code, Loader2, Type } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
 import { $content, $ui } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
@@ -59,17 +59,17 @@ function ModeToggle({
   id,
   mode = 'visual',
 }: EditPaneProperty & { id?: PaneId }) {
+  const isSource = mode === 'source';
   return (
     <div className="sticky top-0 z-10 flex justify-end bg-background p-2">
-      <Tabs
-        value={mode}
-        onValueChange={(value) => id && setMode(id, value as EditorMode)}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => id && setMode(id, isSource ? 'visual' : 'source')}
       >
-        <TabsList aria-label={m.edit_mode_toggle_aria()}>
-          <TabsTrigger value="visual">{m.edit_mode_visual()}</TabsTrigger>
-          <TabsTrigger value="source">{m.edit_mode_source()}</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        {isSource ? <Type /> : <Code />}
+        {isSource ? m.edit_mode_visual() : m.edit_mode_source()}
+      </Button>
     </div>
   );
 }
