@@ -24,12 +24,15 @@ export default function CodeEditor({
   code = '',
   onCodeUpdate,
   language = 'css',
+  lineWrapping = false,
   ...other
-}: Required<Pick<React.HTMLAttributes<HTMLDivElement>, 'aria-label'>> & {
-  code?: string;
-  onCodeUpdate?: (code: string) => void;
-  language?: 'css' | 'markdown';
-}) {
+}: Required<Pick<React.HTMLAttributes<HTMLDivElement>, 'aria-label'>> &
+  Pick<React.HTMLAttributes<HTMLDivElement>, 'className'> & {
+    code?: string;
+    onCodeUpdate?: (code: string) => void;
+    language?: 'css' | 'markdown';
+    lineWrapping?: boolean;
+  }) {
   const currentCode = useRef('');
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView>(null);
@@ -66,6 +69,7 @@ export default function CodeEditor({
           currentCode.current = code;
           onCodeUpdate?.(code);
         }),
+        lineWrapping ? EditorView.lineWrapping : [],
         {
           css: css(),
           markdown: markdown(),
@@ -78,7 +82,7 @@ export default function CodeEditor({
     return () => {
       editorViewRef.current?.destroy();
     };
-  }, [onCodeUpdate, language]);
+  }, [onCodeUpdate, language, lineWrapping]);
 
   useEffect(() => {
     const editorView = editorViewRef.current;
