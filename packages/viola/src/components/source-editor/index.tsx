@@ -91,6 +91,7 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
       className="w-full"
       code={initialCode}
       language="markdown"
+      lineWrapping
       onCodeUpdate={handleCodeUpdate}
     />
   );
