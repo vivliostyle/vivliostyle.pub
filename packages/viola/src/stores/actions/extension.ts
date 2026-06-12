@@ -1,8 +1,10 @@
 import type { ExtensionPermission } from '@v/viola-extension-kit';
 import { installedExtensions } from '../../extensions/installed';
+import { generateId } from '../../libs/generate-id';
 import { $extensions, $ui } from '../accessors';
 import {
   type ExtensionId,
+  findPermalink,
   registerExtension,
   unregisterExtension,
 } from '../proxies/extension';
@@ -49,6 +51,37 @@ export function deactivateExtension(id: ExtensionId): void {
   ) {
     $ui.dedicatedModal = null;
   }
+}
+
+// Resolves a permalink slug to an extension pane tab, activating extensions
+// first. Returns false when the slug matches no permalink so the caller can
+// redirect.
+export async function openPermalink(slug: string): Promise<boolean> {
+  await ensureExtensionsActivated();
+  const permalink = findPermalink(slug);
+  if (!permalink) {
+    return false;
+  }
+  if (
+    $ui.tabs.some(
+      (tab) =>
+        tab.type === 'extension' &&
+        tab.extensionId === permalink.extensionId &&
+        tab.panePath === permalink.panePath,
+    )
+  ) {
+    return true;
+  }
+  $ui.tabs = [
+    ...$ui.tabs.filter((tab) => tab.type === 'edit').slice(0, 1),
+    {
+      id: generateId(),
+      type: 'extension',
+      extensionId: permalink.extensionId,
+      panePath: permalink.panePath,
+    },
+  ];
+  return true;
 }
 
 let activation: Promise<void> | undefined;

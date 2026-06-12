@@ -15,6 +15,7 @@ import { Route as DebugIndexeddbPersistenceIndexRouteImport } from './routes/deb
 import { Route as DebugAstViewerIndexRouteImport } from './routes/debug/ast-viewer/index'
 import { Route as mainLayoutIndexRouteImport } from './routes/(main)/_layout/index'
 import { Route as mainLayoutNewProjectRouteImport } from './routes/(main)/_layout/new-project'
+import { Route as mainLayoutAccountRouteImport } from './routes/(main)/_layout/account'
 import { Route as mainLayoutExtensionSplatRouteImport } from './routes/(main)/_layout/extension/$'
 import { Route as mainLayoutProjectsProjectIdIndexRouteImport } from './routes/(main)/_layout/projects/$projectId/index'
 import { Route as mainLayoutProjectsProjectIdThemeRouteImport } from './routes/(main)/_layout/projects/$projectId/theme'
@@ -51,6 +52,11 @@ const mainLayoutIndexRoute = mainLayoutIndexRouteImport.update({
 const mainLayoutNewProjectRoute = mainLayoutNewProjectRouteImport.update({
   id: '/new-project',
   path: '/new-project',
+  getParentRoute: () => mainLayoutRoute,
+} as any)
+const mainLayoutAccountRoute = mainLayoutAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => mainLayoutRoute,
 } as any)
 const mainLayoutExtensionSplatRoute =
@@ -98,6 +104,7 @@ const mainLayoutProjectsProjectIdEditSplatRoute =
 
 export interface FileRoutesByFullPath {
   '/debug/': typeof DebugIndexRoute
+  '/account': typeof mainLayoutAccountRoute
   '/new-project': typeof mainLayoutNewProjectRoute
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/debug': typeof DebugIndexRoute
+  '/account': typeof mainLayoutAccountRoute
   '/new-project': typeof mainLayoutNewProjectRoute
   '/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer': typeof DebugAstViewerIndexRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(main)/_layout': typeof mainLayoutRouteWithChildren
   '/debug/': typeof DebugIndexRoute
+  '/(main)/_layout/account': typeof mainLayoutAccountRoute
   '/(main)/_layout/new-project': typeof mainLayoutNewProjectRoute
   '/(main)/_layout/': typeof mainLayoutIndexRoute
   '/debug/ast-viewer/': typeof DebugAstViewerIndexRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/debug/'
+    | '/account'
     | '/new-project'
     | '/'
     | '/debug/ast-viewer/'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/debug'
+    | '/account'
     | '/new-project'
     | '/'
     | '/debug/ast-viewer'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/(main)/_layout'
     | '/debug/'
+    | '/(main)/_layout/account'
     | '/(main)/_layout/new-project'
     | '/(main)/_layout/'
     | '/debug/ast-viewer/'
@@ -237,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof mainLayoutNewProjectRouteImport
       parentRoute: typeof mainLayoutRoute
     }
+    '/(main)/_layout/account': {
+      id: '/(main)/_layout/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof mainLayoutAccountRouteImport
+      parentRoute: typeof mainLayoutRoute
+    }
     '/(main)/_layout/extension/$': {
       id: '/(main)/_layout/extension/$'
       path: '/extension/$'
@@ -290,6 +309,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface mainLayoutRouteChildren {
+  mainLayoutAccountRoute: typeof mainLayoutAccountRoute
   mainLayoutNewProjectRoute: typeof mainLayoutNewProjectRoute
   mainLayoutIndexRoute: typeof mainLayoutIndexRoute
   mainLayoutExtensionSplatRoute: typeof mainLayoutExtensionSplatRoute
@@ -302,6 +322,7 @@ interface mainLayoutRouteChildren {
 }
 
 const mainLayoutRouteChildren: mainLayoutRouteChildren = {
+  mainLayoutAccountRoute: mainLayoutAccountRoute,
   mainLayoutNewProjectRoute: mainLayoutNewProjectRoute,
   mainLayoutIndexRoute: mainLayoutIndexRoute,
   mainLayoutExtensionSplatRoute: mainLayoutExtensionSplatRoute,

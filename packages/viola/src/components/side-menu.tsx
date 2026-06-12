@@ -91,10 +91,7 @@ import type {
   ContentId,
   HierarchicalReadingOrder,
 } from '../stores/proxies/content';
-import {
-  resolvePanePermalink,
-  resolvePanePresentation,
-} from '../stores/proxies/extension';
+import { resolvePanePresentation } from '../stores/proxies/extension';
 
 const DraggingContentContext = createContext<ContentId | null>(null);
 
@@ -356,12 +353,7 @@ function AccountMenuSection() {
           </SidebarMenuButton>
         ) : (
           <SidebarMenuButton asChild tooltip={tooltip}>
-            <Link
-              to="/extension/$"
-              params={{ _splat: resolvePanePermalink(account.id, '.') }}
-            >
-              {inner}
-            </Link>
+            <Link to="/account">{inner}</Link>
           </SidebarMenuButton>
         )}
       </SidebarMenuItem>

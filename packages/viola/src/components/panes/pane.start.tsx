@@ -13,10 +13,7 @@ import {
   deleteCloudProject,
 } from '../../stores/actions/cloud-project';
 import { deleteLocalProject } from '../../stores/actions/local-project';
-import {
-  resolvePanePermalink,
-  resolvePanePresentation,
-} from '../../stores/proxies/extension';
+import { resolvePanePresentation } from '../../stores/proxies/extension';
 import type { ProjectEntry, ProjectId } from '../../stores/proxies/project';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -268,11 +265,7 @@ function Content(_: StartPaneProperty) {
                 {m.start_sign_in_link()}
               </button>
             ) : (
-              <Link
-                to="/extension/$"
-                params={{ _splat: resolvePanePermalink(account.id, '.') }}
-                className="hover:underline"
-              >
+              <Link to="/account" className="hover:underline">
                 {m.start_sign_in_link()}
               </Link>
             )}
