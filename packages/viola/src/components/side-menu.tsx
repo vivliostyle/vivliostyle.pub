@@ -68,6 +68,7 @@ import { getLocale, locales, setLocale } from '../generated/paraglide/runtime';
 import { generateId } from '../libs/generate-id';
 import {
   $content,
+  $extensions,
   $project,
   $projects,
   $session,
@@ -90,6 +91,10 @@ import type {
   ContentId,
   HierarchicalReadingOrder,
 } from '../stores/proxies/content';
+import {
+  resolvePanePermalink,
+  resolvePanePresentation,
+} from '../stores/proxies/extension';
 
 const DraggingContentContext = createContext<ContentId | null>(null);
 
@@ -310,59 +315,55 @@ function TopMenuSection() {
 
 function AccountMenuSection() {
   const sessionSnap = useSnapshot($session);
-  const uiSnap = useSnapshot($ui);
+  // Without the account extension active there's no pane to open; this also
+  // re-renders the section as it activates/deactivates.
+  const account = useSnapshot($extensions).account;
+  if (!account) {
+    return null;
+  }
   const authed =
     sessionSnap.status === 'authenticated' && sessionSnap.user !== null;
-  // Mirror Open Project: if the user is already in a pane, open Account in a
-  // dedicated modal so we don't tear down their current view. On the empty
-  // root, navigate to the route instead.
-  const hasOpenPane = uiSnap.tabs.some((tab) => tab.type !== 'start');
+  const inner = (
+    <>
+      {authed ? <UserRound /> : <LogIn />}
+      <span className="truncate">
+        {authed ? sessionSnap.user?.username : m.side_menu_sign_in_label()}
+      </span>
+    </>
+  );
+  const tooltip = authed
+    ? m.side_menu_account_tooltip()
+    : m.side_menu_sign_in_tooltip();
 
-  if (hasOpenPane) {
-    return (
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton
-            tooltip={
-              authed
-                ? m.side_menu_account_tooltip()
-                : m.side_menu_sign_in_tooltip()
-            }
-            onClick={() => {
-              $ui.dedicatedModal = { id: generateId(), type: 'account' };
-            }}
-          >
-            {authed ? <UserRound /> : <LogIn />}
-            <span className="truncate">
-              {authed
-                ? sessionSnap.user?.username
-                : m.side_menu_sign_in_label()}
-            </span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    );
-  }
+  // Honor the account pane's declared presentation: open it as a dedicated
+  // modal over the current view, or navigate to its permalink as a full pane.
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton
-          asChild
-          tooltip={
-            authed
-              ? m.side_menu_account_tooltip()
-              : m.side_menu_sign_in_tooltip()
-          }
-        >
-          <Link to="/settings/account">
-            {authed ? <UserRound /> : <LogIn />}
-            <span className="truncate">
-              {authed
-                ? sessionSnap.user?.username
-                : m.side_menu_sign_in_label()}
-            </span>
-          </Link>
-        </SidebarMenuButton>
+        {resolvePanePresentation(account.id, '.') === 'modal' ? (
+          <SidebarMenuButton
+            tooltip={tooltip}
+            onClick={() => {
+              $ui.dedicatedModal = {
+                id: generateId(),
+                type: 'extension',
+                extensionId: account.id,
+                panePath: '.',
+              };
+            }}
+          >
+            {inner}
+          </SidebarMenuButton>
+        ) : (
+          <SidebarMenuButton asChild tooltip={tooltip}>
+            <Link
+              to="/extension/$"
+              params={{ _splat: resolvePanePermalink(account.id, '.') }}
+            >
+              {inner}
+            </Link>
+          </SidebarMenuButton>
+        )}
       </SidebarMenuItem>
     </SidebarMenu>
   );

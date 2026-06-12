@@ -42,7 +42,7 @@ async function handleNavigate(event: FetchEvent) {
   const { request } = event;
   const url = new URL(request.url);
 
-  if (url.pathname === '/sandbox') {
+  if (url.pathname === '/sandbox' || url.pathname.startsWith('/extension')) {
     const iframeHtml = import.meta.env.VITE_IFRAME_HTML;
     return new Response(iframeHtml, {
       status: 200,

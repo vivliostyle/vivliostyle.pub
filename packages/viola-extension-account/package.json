@@ -1,0 +1,26 @@
+{
+  "name": "@v/viola-extension-account",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/extension.ts",
+    "./views": "./src/views/view.account.tsx"
+  },
+  "scripts": {
+    "build": "viola i18n",
+    "dev": "viola i18n --watch",
+    "typecheck": "pnpm build && tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@v/config": "workspace:*",
+    "@v/ui": "workspace:*",
+    "@v/viola-extension-kit": "workspace:*",
+    "comlink": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

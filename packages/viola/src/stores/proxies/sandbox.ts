@@ -17,6 +17,7 @@ import {
   type StorageProvider,
 } from '@v/storage-providers';
 import { generateId } from '../../libs/generate-id';
+import { appOrigin, sandboxOrigin } from '../../libs/origins';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { ProjectId } from './project';
@@ -42,14 +43,6 @@ type SymlinkNode = [
   },
 ];
 type UnknownNode = null;
-
-let origin = `https://${import.meta.env.VITE_APP_HOSTNAME}`;
-if (import.meta.env.DEV && location.port) {
-  origin += `:${location.port}`;
-}
-const sandboxOrigin = import.meta.env.VITE_SANDBOX_HOSTNAME
-  ? `https://${import.meta.env.VITE_SANDBOX_HOSTNAME}`
-  : origin;
 
 const defaultCss = /* css */ `:root {
   /* Edit this CSS to customize the theme */
@@ -148,12 +141,12 @@ export class Sandbox {
     blank: {
       title: 'Blank Book Template',
       description: 'A minimal template to start from scratch.',
-      source: `${origin}/_templates/minimal.tar.gz`,
+      source: `${appOrigin()}/_templates/minimal.tar.gz`,
     },
     basic: {
       title: 'Basic Book Template',
       description: 'A simple template with common sections for a book.',
-      source: `${origin}/_templates/basic.tar.gz`,
+      source: `${appOrigin()}/_templates/basic.tar.gz`,
     },
   } as const;
 
@@ -290,9 +283,7 @@ export class Sandbox {
     projectId: ProjectId;
     provider: StorageProvider;
   }) {
-    const sandboxUrl = new URL(sandboxOrigin);
-    sandboxUrl.hostname = `sandbox-${projectId}.${sandboxUrl.hostname}`;
-    this.iframeOrigin = sandboxUrl.origin;
+    this.iframeOrigin = sandboxOrigin(`sandbox-${projectId}`);
     this.provider = ref(provider);
   }
 

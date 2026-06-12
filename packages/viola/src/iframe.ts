@@ -1,5 +1,7 @@
 import * as Comlink from 'comlink';
 
+import { initExtensionFrame } from './extensions/init-extension-frame';
+
 // https://github.com/GoogleChromeLabs/comlink/tree/HEAD/src/protocol.ts
 
 interface RawWireValue {
@@ -222,4 +224,8 @@ async function init() {
   setupChannel('worker:theme-registry');
 }
 
-init();
+if (location.pathname.startsWith('/extension')) {
+  initExtensionFrame();
+} else {
+  init();
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@v/viola-extension-kit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./styles.css": {
+      "types": "./src/styles.css.d.ts",
+      "default": "./src/styles.css"
+    }
+  },
+  "bin": {
+    "viola": "./bin/viola.mjs"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@inlang/paraglide-js": "catalog:",
+    "@types/react": "catalog:",
+    "@v/config": "workspace:*",
+    "@v/ui": "workspace:*",
+    "comlink": "catalog:",
+    "tailwindcss": "catalog:",
+    "tailwindcss-animate": "catalog:"
+  }
+}

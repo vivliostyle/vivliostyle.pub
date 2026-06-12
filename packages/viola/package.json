@@ -51,6 +51,8 @@
     "@v/theme-registry": "workspace:*",
     "@v/tiptap-extensions": "workspace:*",
     "@v/ui": "workspace:*",
+    "@v/viola-extension-account": "workspace:*",
+    "@v/viola-extension-kit": "workspace:*",
     "@vitejs/plugin-react-swc": "catalog:",
     "@vivliostyle/cli": "catalog:",
     "@vivliostyle/theme-base": "catalog:",

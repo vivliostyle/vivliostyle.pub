@@ -262,11 +262,21 @@ const serviceWorker = () => [
     enforce: 'post',
     apply: 'serve',
     config(config) {
+      // The iframe HTML is served raw by the service worker, bypassing Vite's
+      // index-HTML transform, so the React Refresh preamble that
+      // @vitejs/plugin-react-swc normally injects is missing.
+      const preamble = `<script type="module">
+        import { injectIntoGlobalHook } from "/@react-refresh";
+        injectIntoGlobalHook(window);
+        window.$RefreshReg$ = () => {};
+        window.$RefreshSig$ = () => (type) => type;
+      </script>`;
+      const html = fs
+        .readFileSync(path.join(dirname, 'iframe.html'), 'utf8')
+        .replace('<script', `${preamble}\n<script`);
       config.define = {
         ...config.define,
-        'import.meta.env.VITE_IFRAME_HTML': JSON.stringify(
-          fs.readFileSync(path.join(dirname, 'iframe.html'), 'utf8'),
-        ),
+        'import.meta.env.VITE_IFRAME_HTML': JSON.stringify(html),
       };
       return config;
     },

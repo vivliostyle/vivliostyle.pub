@@ -6,12 +6,17 @@ import { useSnapshot } from 'valtio';
 import { Button } from '@v/ui/button';
 import { Cloud, FilePlus, Loader2, Trash2 } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
-import { $projects, $session } from '../../stores/accessors';
+import { generateId } from '../../libs/generate-id';
+import { $extensions, $projects, $session, $ui } from '../../stores/accessors';
 import {
   createCloudProject,
   deleteCloudProject,
 } from '../../stores/actions/cloud-project';
 import { deleteLocalProject } from '../../stores/actions/local-project';
+import {
+  resolvePanePermalink,
+  resolvePanePresentation,
+} from '../../stores/proxies/extension';
 import type { ProjectEntry, ProjectId } from '../../stores/proxies/project';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -189,6 +194,7 @@ function CreateCloudProjectButton() {
 function Content(_: StartPaneProperty) {
   const projectsSnap = useSnapshot($projects);
   const sessionSnap = useSnapshot($session);
+  const account = useSnapshot($extensions).account;
   const entries = Object.values(projectsSnap.entries) as ProjectEntry[];
   const localEntries = entries.filter((e) => e.source === 'local');
   const remoteEntries = entries.filter((e) => e.source === 'remote');
@@ -242,12 +248,34 @@ function Content(_: StartPaneProperty) {
       )}
 
       {__CLOUD_ENABLED__ &&
+        account &&
         sessionSnap.status !== 'authenticated' &&
         sessionSnap.status !== 'initial' && (
           <p className="text-xs text-muted-foreground">
-            <Link to="/settings/account" className="hover:underline">
-              {m.start_sign_in_link()}
-            </Link>
+            {resolvePanePresentation(account.id, '.') === 'modal' ? (
+              <button
+                type="button"
+                className="hover:underline"
+                onClick={() => {
+                  $ui.dedicatedModal = {
+                    id: generateId(),
+                    type: 'extension',
+                    extensionId: account.id,
+                    panePath: '.',
+                  };
+                }}
+              >
+                {m.start_sign_in_link()}
+              </button>
+            ) : (
+              <Link
+                to="/extension/$"
+                params={{ _splat: resolvePanePermalink(account.id, '.') }}
+                className="hover:underline"
+              >
+                {m.start_sign_in_link()}
+              </Link>
+            )}
             {m.start_sign_in_to_sync_suffix()}
           </p>
         )}

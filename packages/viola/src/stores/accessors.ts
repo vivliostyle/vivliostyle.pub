@@ -2,12 +2,14 @@ import { invariant } from 'outvariant';
 import { proxy } from 'valtio';
 
 import { awaiter } from '../libs/awaiter';
+import { extensions } from './proxies/extension';
 import { draftProjectId, projects } from './proxies/project';
 import { sandboxes } from './proxies/sandbox';
 import { session } from './proxies/session';
 import { ui } from './proxies/ui';
 
 export {
+  extensions as $extensions,
   projects as $projects,
   sandboxes as $sandboxes,
   session as $session,
