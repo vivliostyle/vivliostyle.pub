@@ -53,6 +53,7 @@
     "@v/ui": "workspace:*",
     "@v/viola-extension-account": "workspace:*",
     "@v/viola-extension-kit": "workspace:*",
+    "@v/viola-extension-preview": "workspace:*",
     "@vitejs/plugin-react-swc": "catalog:",
     "@vivliostyle/cli": "catalog:",
     "@vivliostyle/theme-base": "catalog:",

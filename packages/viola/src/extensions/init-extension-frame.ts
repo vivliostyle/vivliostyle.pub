@@ -31,12 +31,26 @@ export async function initExtensionFrame() {
   const host = Comlink.wrap<ExtensionHostApi>(channel.port1);
 
   const locale = await host.getLocale();
-  const [{ StrictMode, createElement }, { createRoot }, viewModule] =
-    await Promise.all([
-      import('react'),
-      import('react-dom/client'),
-      loadView(),
-    ]);
+  const [
+    { StrictMode, createElement },
+    { createRoot },
+    viewModule,
+    extensionModule,
+  ] = await Promise.all([
+    import('react'),
+    import('react-dom/client'),
+    loadView(),
+    installed.loadExtension(),
+  ]);
+
+  // The kit's styles.css keys off this attribute to pin fill panes to the
+  // iframe viewport instead of flowing at content height.
+  const sizing =
+    extensionModule.default.panes?.find((pane) => pane.path === panePath)
+      ?.sizing ?? 'content';
+  if (sizing === 'fill') {
+    document.documentElement.dataset.paneSizing = 'fill';
+  }
 
   const root = createRoot(document.body);
   const renderView = (module: ExtensionViewModule) => {
@@ -46,7 +60,9 @@ export async function initExtensionFrame() {
     );
   };
   renderView(viewModule);
-  reportExtensionContentSize();
+  if (sizing === 'content') {
+    reportExtensionContentSize();
+  }
 
   // React Fast Refresh doesn't repaint this manually-created root in the isolated
   // iframe (the view self-accepts, so Vite never full-reloads, yet the refresh

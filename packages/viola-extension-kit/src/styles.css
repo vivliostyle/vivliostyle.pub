@@ -7,19 +7,24 @@
 @import "@v/ui/index.css";
 @import "@v/ui/global.css" layer(base);
 
-/* Scan the design system and every extension's source so the utilities used by
-   extension views are generated. */
+/* A bare directory glob with a wildcard in its name matches nothing in
+   Tailwind's scanner, so spell out the file pattern. */
 @source "../../ui/src";
-@source "../../viola-extension-*/src";
+@source "../../viola-extension-*/src/**/*.{ts,tsx}";
 
-/* The host sizes the embedding <iframe> to this document's content height (see
-   iframe-autosize in @v/viola), so the view flows at its natural height. The
-   shared global.css pins `html, body` to `height: 100%` for the app shell;
-   override it here, otherwise the body stretches to the iframe's current box and
-   its measured height can never shrink below it. */
+/* Content-sized panes report `body.scrollHeight` to the host (see
+   iframe-autosize in @v/viola), which can never shrink while global.css pins
+   `html, body` to 100%. */
 html,
 body {
   height: auto;
+}
+
+/* `data-pane-sizing` is set by the frame bootstrap in @v/viola. */
+html[data-pane-sizing="fill"],
+html[data-pane-sizing="fill"] body {
+  height: 100%;
+  overflow: hidden;
 }
 
 body {

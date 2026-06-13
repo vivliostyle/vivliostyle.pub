@@ -988,6 +988,9 @@ importers:
       '@v/viola-extension-kit':
         specifier: workspace:*
         version: link:../viola-extension-kit
+      '@v/viola-extension-preview':
+        specifier: workspace:*
+        version: link:../viola-extension-preview
       '@vitejs/plugin-react-swc':
         specifier: 'catalog:'
         version: 4.3.1(vite@8.0.11(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0))
@@ -1138,6 +1141,33 @@ importers:
       tailwindcss-animate:
         specifier: 'catalog:'
         version: 1.0.7(tailwindcss@4.3.0)
+
+  packages/viola-extension-preview:
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.14)
+      '@v/config':
+        specifier: workspace:*
+        version: link:../config
+      '@v/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@v/viola-extension-kit':
+        specifier: workspace:*
+        version: link:../viola-extension-kit
+      comlink:
+        specifier: 'catalog:'
+        version: 4.4.2
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.6(react@19.2.6)
 
 packages:
 

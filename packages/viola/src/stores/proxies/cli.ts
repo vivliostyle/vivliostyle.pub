@@ -12,8 +12,6 @@ export class Cli {
     return proxy(new Cli(sandbox));
   }
 
-  viewerIframeElement: HTMLIFrameElement | undefined;
-
   protected sandbox: Sandbox;
   protected remoteDeferred: PromiseWithResolvers<RemoteCli> | undefined;
   protected lazyViewerUrlPromise: Promise<string> | undefined;
@@ -62,9 +60,5 @@ export class Cli {
     this.remoteDeferred?.reject(new Error('CLI remote disposed'));
     this.remoteDeferred = undefined;
     this.lazyViewerUrlPromise = undefined;
-  }
-
-  viewerIframeRef(el: HTMLIFrameElement | null) {
-    this.viewerIframeElement = el ? ref(el) : undefined;
   }
 }

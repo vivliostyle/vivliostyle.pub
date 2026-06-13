@@ -60,8 +60,12 @@ export type ExtensionSessionListener = (
  * granted permissions unlock:
  *   - `session:read`  → `getSessionSnapshot`, `subscribeSession`
  *   - `session:write` → `login`, `register`, `logout`
+ *   - `viewer:read`   → `getViewerUrl`
  */
-export type ExtensionPermission = 'session:read' | 'session:write';
+export type ExtensionPermission =
+  | 'session:read'
+  | 'session:write'
+  | 'viewer:read';
 
 /**
  * Capabilities the host exposes to an extension view over Comlink.
@@ -82,6 +86,7 @@ export interface ExtensionHostApi {
   register(username: string, password: string): Promise<void>;
   logout(): Promise<void>;
   getLocale(): string;
+  getViewerUrl(): Promise<string>;
 }
 
 /** The host API as seen from inside the iframe (Comlink-proxied). */
@@ -122,6 +127,13 @@ export interface PaneContribution {
    * the pane in full (the addressable form).
    */
   presentation?: 'pane' | 'modal';
+  /**
+   * How the view iframe is sized. `'content'` (default) tracks the rendered
+   * content's height and scrolls when it exceeds the pane; `'fill'` stretches
+   * the iframe to the pane itself, for views that manage their own viewport
+   * (e.g. an embedded viewer).
+   */
+  sizing?: 'content' | 'fill';
 }
 
 export interface PermalinkContribution {

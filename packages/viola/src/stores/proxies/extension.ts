@@ -105,6 +105,25 @@ export function resolvePanePresentation(
   return extensions[extensionId]?.panes[panePath]?.presentation ?? 'pane';
 }
 
+export function resolvePaneSizing(
+  extensionId: ExtensionId,
+  panePath: string,
+): 'content' | 'fill' {
+  return extensions[extensionId]?.panes[panePath]?.sizing ?? 'content';
+}
+
+// Mounted view iframes. Host-side actions that need to message a view (e.g.
+// `printPdf`) look the element up here and wait reactively for it to mount;
+// elements are `ref()`d so valtio leaves the DOM nodes un-proxied.
+export const extensionFrames = proxy<Record<string, HTMLIFrameElement>>({});
+
+export function extensionFrameKey(
+  extensionId: ExtensionId,
+  panePath: string,
+): string {
+  return `${extensionId}:${panePath}`;
+}
+
 export function findPermalink(slug: string): ResolvedPermalink | undefined {
   for (const ext of Object.values(extensions)) {
     const panePath = ext.permalinks[slug];

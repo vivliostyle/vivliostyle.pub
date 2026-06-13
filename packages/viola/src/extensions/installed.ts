@@ -17,4 +17,10 @@ export const installedExtensions: Record<ExtensionId, InstalledExtension> = {
       '.': () => import('@v/viola-extension-account/views'),
     },
   },
+  ['preview' as ExtensionId]: {
+    loadExtension: () => import('@v/viola-extension-preview'),
+    loadView: {
+      '.': () => import('@v/viola-extension-preview/views'),
+    },
+  },
 };

@@ -1,6 +1,6 @@
 import * as Comlink from 'comlink';
-import { useEffect, useRef } from 'react';
-import { subscribe } from 'valtio';
+import { useCallback, useEffect, useRef } from 'react';
+import { subscribe, ref as valtioRef } from 'valtio';
 
 import type {
   ExtensionAuthErrorCode,
@@ -14,7 +14,7 @@ import {
   extensionSandboxOrigin,
 } from '../../extensions/sandbox-origin';
 import { getLocale } from '../../generated/paraglide/runtime';
-import { $session } from '../../stores/accessors';
+import { $cli, $session } from '../../stores/accessors';
 import {
   login,
   logout,
@@ -23,7 +23,10 @@ import {
 } from '../../stores/actions/session';
 import {
   type ExtensionId,
+  extensionFrameKey,
+  extensionFrames,
   getExtensionPermissions,
+  resolvePaneSizing,
   resolvePaneTitle,
 } from '../../stores/proxies/extension';
 import { createPane } from './util';
@@ -105,6 +108,13 @@ const hostApiRegistry: HostApiRegistry = {
     permission: 'session:write',
     impl: () => runAuth(() => logout()),
   },
+  getViewerUrl: {
+    permission: 'viewer:read',
+    impl: async () => {
+      const cli = await $cli.awaiter();
+      return await cli.createViewerUrlPromise();
+    },
+  },
 };
 
 function denyPermission(
@@ -144,6 +154,7 @@ export const Pane = createPane<ExtensionPaneProperty>({
 function Content({ extensionId, panePath }: ExtensionPaneProperty) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const origin = extensionSandboxOrigin(extensionId);
+  const sizing = resolvePaneSizing(extensionId, panePath);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -160,26 +171,49 @@ function Content({ extensionId, panePath }: ExtensionPaneProperty) {
       );
     };
     window.addEventListener('message', onMessage);
-    const detachAutoSize = attachExtensionAutoSize(iframe, origin);
+    const detachAutoSize =
+      sizing === 'content'
+        ? attachExtensionAutoSize(iframe, origin)
+        : undefined;
     return () => {
       window.removeEventListener('message', onMessage);
-      detachAutoSize();
+      detachAutoSize?.();
     };
-  }, [origin, extensionId]);
+  }, [origin, extensionId, sizing]);
 
+  const registerFrame = useCallback(
+    (el: HTMLIFrameElement | null) => {
+      iframeRef.current = el;
+      const key = extensionFrameKey(extensionId, panePath);
+      if (el) {
+        extensionFrames[key] = valtioRef(el);
+      } else {
+        delete extensionFrames[key];
+      }
+    },
+    [extensionId, panePath],
+  );
+
+  const iframe = (
+    <iframe
+      ref={registerFrame}
+      title={resolvePaneTitle(extensionId, panePath, getLocale())}
+      src={`${origin}${extensionFramePath(extensionId, panePath)}`}
+      // With `content` sizing the height tracks the content (see
+      // iframe-autosize); width fills the pane and the height is capped at the
+      // wrapper so taller content scrolls inside the iframe itself.
+      className={sizing === 'fill' ? 'size-full' : 'w-full'}
+      sandbox="allow-same-origin allow-scripts allow-modals allow-forms"
+      allow="cross-origin-isolated"
+    />
+  );
+
+  if (sizing === 'fill') {
+    return iframe;
+  }
   return (
     <div className="size-full overflow-auto overscroll-contain scrollbar-stable">
-      <iframe
-        ref={iframeRef}
-        title={resolvePaneTitle(extensionId, panePath, getLocale())}
-        src={`${origin}${extensionFramePath(extensionId, panePath)}`}
-        // Height tracks the content (see iframe-autosize); width fills the pane
-        // and the height is capped at the wrapper so taller content scrolls
-        // inside the iframe itself.
-        className="w-full"
-        sandbox="allow-same-origin allow-scripts allow-modals allow-forms"
-        allow="cross-origin-isolated"
-      />
+      {iframe}
     </div>
   );
 }
