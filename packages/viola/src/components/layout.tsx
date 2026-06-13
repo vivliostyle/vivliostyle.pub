@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
-import { cn } from '@v/ui/lib/utils';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
 import { $ui } from '../stores/accessors';
 import type { PaneContent } from '../stores/proxies/ui';
