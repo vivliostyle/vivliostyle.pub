@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { ExtensionMountContext } from '@v/viola-extension-kit';
-import { m } from '../generated/paraglide/messages';
-import { toLocale } from '../locale';
+import type { ExtensionMountContext } from '@v/extension-kit';
 
-import '@v/viola-extension-kit/styles.css';
+import '@v/extension-kit/styles.css';
 
-export default function PreviewPane({ host, locale }: ExtensionMountContext) {
+export default function PreviewPane({ host, t }: ExtensionMountContext) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const viewerLoadedRef = useRef(false);
   const [url, setUrl] = useState<string | null>(null);
@@ -59,7 +57,7 @@ export default function PreviewPane({ host, locale }: ExtensionMountContext) {
   return (
     <iframe
       ref={iframeRef}
-      title={m.preview_iframe_title({}, { locale: toLocale(locale) })}
+      title={t('preview_iframe_title')}
       src={url}
       onLoad={() => {
         viewerLoadedRef.current = true;

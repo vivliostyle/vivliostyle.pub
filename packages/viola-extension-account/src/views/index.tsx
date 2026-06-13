@@ -1,35 +1,33 @@
 import * as Comlink from 'comlink';
 import { useEffect, useId, useState } from 'react';
 
+import type {
+  ExtensionMountContext,
+  ExtensionSessionSnapshot,
+  ExtensionTranslate,
+  RemoteExtensionHostApi,
+} from '@v/extension-kit';
 import { Button } from '@v/ui/button';
 import { Loader2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { Label } from '@v/ui/label';
 import { PaneContainer } from '@v/ui/pane';
-import type {
-  ExtensionMountContext,
-  ExtensionSessionSnapshot,
-  RemoteExtensionHostApi,
-} from '@v/viola-extension-kit';
-import { m } from '../generated/paraglide/messages';
-import type { Locale } from '../generated/paraglide/runtime';
-import { toLocale } from '../locale';
 
-import '@v/viola-extension-kit/styles.css';
+import '@v/extension-kit/styles.css';
 
 type Mode = 'login' | 'register';
 
-function errorMessage(error: unknown, locale: Locale): string {
+function errorMessage(error: unknown, t: ExtensionTranslate): string {
   const code = error instanceof Error ? error.message : '';
   switch (code) {
     case 'invalid_credentials':
-      return m.account_error_invalid_credentials({}, { locale });
+      return t('account_error_invalid_credentials');
     case 'username_taken':
-      return m.account_error_username_taken({}, { locale });
+      return t('account_error_username_taken');
     case 'network':
-      return m.account_error_network({}, { locale });
+      return t('account_error_network');
     default:
-      return m.account_generic_error({}, { locale });
+      return t('account_generic_error');
   }
 }
 
@@ -66,11 +64,11 @@ function useSessionSnapshot(
 
 interface ViewProps {
   host: RemoteExtensionHostApi;
-  locale: Locale;
+  t: ExtensionTranslate;
   snapshot: ExtensionSessionSnapshot;
 }
 
-function SignInForm({ host, locale, snapshot }: ViewProps) {
+function SignInForm({ host, t, snapshot }: ViewProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -92,7 +90,7 @@ function SignInForm({ host, locale, snapshot }: ViewProps) {
       }
       setPassword('');
     } catch (err) {
-      setError(errorMessage(err, locale));
+      setError(errorMessage(err, t));
     }
   };
 
@@ -101,19 +99,17 @@ function SignInForm({ host, locale, snapshot }: ViewProps) {
       <div className="grid gap-3">
         <p className="text-sm text-muted-foreground">
           {mode === 'login'
-            ? m.account_login_description({}, { locale })
-            : m.account_register_description({}, { locale })}
+            ? t('account_login_description')
+            : t('account_register_description')}
         </p>
         <p className="text-xs text-muted-foreground">
-          {m.account_server_label({}, { locale })}{' '}
+          {t('account_server_label')}{' '}
           <code className="font-mono">{snapshot.baseUrl}</code>
         </p>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={usernameId}>
-          {m.account_username_label({}, { locale })}
-        </Label>
+        <Label htmlFor={usernameId}>{t('account_username_label')}</Label>
         <Input
           id={usernameId}
           type="text"
@@ -127,9 +123,7 @@ function SignInForm({ host, locale, snapshot }: ViewProps) {
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={passwordId}>
-          {m.account_password_label({}, { locale })}
-        </Label>
+        <Label htmlFor={passwordId}>{t('account_password_label')}</Label>
         <Input
           id={passwordId}
           type="password"
@@ -142,7 +136,7 @@ function SignInForm({ host, locale, snapshot }: ViewProps) {
         />
         {mode === 'register' && (
           <p className="text-xs text-muted-foreground">
-            {m.account_password_min_chars_note({}, { locale })}
+            {t('account_password_min_chars_note')}
           </p>
         )}
       </div>
@@ -156,8 +150,8 @@ function SignInForm({ host, locale, snapshot }: ViewProps) {
       <Button type="submit" disabled={disabled}>
         {submitting && <Loader2 className="animate-spin" />}
         {mode === 'login'
-          ? m.account_sign_in_button({}, { locale })
-          : m.account_register_button({}, { locale })}
+          ? t('account_sign_in_button')
+          : t('account_register_button')}
       </Button>
 
       <button
@@ -169,14 +163,14 @@ function SignInForm({ host, locale, snapshot }: ViewProps) {
         }}
       >
         {mode === 'login'
-          ? m.account_switch_to_register({}, { locale })
-          : m.account_switch_to_login({}, { locale })}
+          ? t('account_switch_to_register')
+          : t('account_switch_to_login')}
       </button>
     </form>
   );
 }
 
-function SignedInView({ host, locale, snapshot }: ViewProps) {
+function SignedInView({ host, t, snapshot }: ViewProps) {
   const [signingOut, setSigningOut] = useState(false);
 
   const onLogout = async () => {
@@ -192,11 +186,11 @@ function SignedInView({ host, locale, snapshot }: ViewProps) {
     <div className="grid gap-4">
       <div className="grid gap-1">
         <p className="text-sm text-muted-foreground">
-          {m.account_signed_in_as({}, { locale })}
+          {t('account_signed_in_as')}
         </p>
         <p className="text-lg font-medium">{snapshot.user?.username}</p>
         <p className="text-xs text-muted-foreground">
-          {m.account_server_label({}, { locale })}{' '}
+          {t('account_server_label')}{' '}
           <code className="font-mono">{snapshot.baseUrl}</code>
         </p>
       </div>
@@ -207,23 +201,22 @@ function SignedInView({ host, locale, snapshot }: ViewProps) {
         className="justify-self-start"
       >
         {signingOut && <Loader2 className="animate-spin" />}
-        {m.account_sign_out_button({}, { locale })}
+        {t('account_sign_out_button')}
       </Button>
     </div>
   );
 }
 
-export default function AccountPane({ host, locale }: ExtensionMountContext) {
+export default function AccountPane({ host, t }: ExtensionMountContext) {
   const snapshot = useSessionSnapshot(host);
-  const loc = toLocale(locale);
 
   let body: React.ReactNode;
   if (!snapshot || snapshot.status === 'initial') {
     body = null;
   } else if (snapshot.status === 'authenticated' && snapshot.user) {
-    body = <SignedInView host={host} locale={loc} snapshot={snapshot} />;
+    body = <SignedInView host={host} t={t} snapshot={snapshot} />;
   } else {
-    body = <SignInForm host={host} locale={loc} snapshot={snapshot} />;
+    body = <SignInForm host={host} t={t} snapshot={snapshot} />;
   }
 
   return <PaneContainer>{body}</PaneContainer>;

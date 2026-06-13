@@ -1,11 +1,13 @@
 import { invariant } from 'outvariant';
 import { proxy, ref } from 'valtio';
 
-import type {
-  ExtensionPermission,
-  PaneContribution,
-  ViolaExtension,
-} from '@v/viola-extension-kit';
+import {
+  type ExtensionPermission,
+  type MessageCatalog,
+  type PaneContribution,
+  translate,
+  type ViolaExtension,
+} from '@v/extension-kit';
 
 declare const extensionIdBrand: unique symbol;
 export type ExtensionId = string & { [extensionIdBrand]: never };
@@ -17,13 +19,15 @@ export interface RegisteredExtension {
   /** Permalink slug (under `/extension/`) → pane path, e.g. `account` → `.`. */
   permalinks: Record<string, string>;
   permissions: ReadonlySet<ExtensionPermission>;
+  /** All locales' messages, used to resolve pane titles (see {@link resolvePaneTitle}). */
+  messages: MessageCatalog;
 }
 
 // Reactive set of active extensions. Keyed by the id string (so callers can
 // probe a known extension by literal, e.g. `$extensions.account`); the canonical
 // branded id lives on each value. Activation/deactivation mutates membership so
 // subscribed UI re-renders; each value is wrapped in `ref()` so valtio leaves
-// the contributed `title` functions un-proxied.
+// the contributed values un-proxied.
 export const extensions = proxy<Record<string, RegisteredExtension>>({});
 
 export interface ResolvedPermalink {
@@ -41,7 +45,10 @@ export function resolvePanePermalink(
   return panePath === '.' ? extensionId : `${extensionId}${panePath}`;
 }
 
-export function registerExtension(extension: ViolaExtension): void {
+export function registerExtension(
+  extension: ViolaExtension,
+  messages: MessageCatalog,
+): void {
   invariant(
     /^[a-z0-9-]+$/.test(extension.id),
     'Extension id must be a lowercase DNS label: %s',
@@ -73,6 +80,7 @@ export function registerExtension(extension: ViolaExtension): void {
     panes,
     permalinks,
     permissions: new Set(extension.permissions ?? []),
+    messages,
   });
 }
 
@@ -85,11 +93,12 @@ export function resolvePaneTitle(
   panePath: string,
   locale: string,
 ): string {
-  const pane = extensions[extensionId]?.panes[panePath];
-  if (!pane) {
+  const ext = extensions[extensionId];
+  const pane = ext?.panes[panePath];
+  if (!ext || !pane) {
     return '';
   }
-  return typeof pane.title === 'function' ? pane.title(locale) : pane.title;
+  return translate(ext.messages, locale, pane.title);
 }
 
 export function getExtensionPermissions(

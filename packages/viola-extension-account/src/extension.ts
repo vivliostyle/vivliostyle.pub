@@ -1,6 +1,4 @@
-import { defineExtension } from '@v/viola-extension-kit';
-import { m } from './generated/paraglide/messages';
-import { toLocale } from './locale';
+import { defineExtension } from '@v/extension-kit';
 
 export default defineExtension({
   id: 'account',
@@ -8,7 +6,7 @@ export default defineExtension({
   panes: [
     {
       path: '.',
-      title: (locale) => m.account_pane_title({}, { locale: toLocale(locale) }),
+      title: 'account_pane_title',
       presentation: 'pane',
     },
   ],

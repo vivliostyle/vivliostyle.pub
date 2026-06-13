@@ -1,4 +1,6 @@
-import type { ExtensionPermission } from '@v/viola-extension-kit';
+import { invariant } from 'outvariant';
+
+import type { ExtensionPermission } from '@v/extension-kit';
 import { installedExtensions } from '../../extensions/installed';
 import { generateId } from '../../libs/generate-id';
 import { $extensions, $ui } from '../accessors';
@@ -30,13 +32,19 @@ export async function activateExtension(id: ExtensionId): Promise<void> {
     return;
   }
   const mod = await entry.loadExtension();
+  invariant(
+    mod.default.id === id,
+    'Extension id "%s" does not match its package name @v/viola-extension-%s',
+    mod.default.id,
+    id,
+  );
   const permissions = mod.default.permissions ?? [];
   if (!permissions.every(isPermissionGrantable)) {
     return;
   }
   // A concurrent activation may have registered it while we awaited the import.
   if (!$extensions[id]) {
-    registerExtension(mod.default);
+    registerExtension(mod.default, entry.messages);
   }
 }
 

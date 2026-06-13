@@ -31,21 +31,11 @@
       "dependsOn": ["^build"],
       "outputs": ["src/schema.d.ts"]
     },
-    "@v/viola-extension-account#build": {
-      "inputs": ["messages/**"],
-      "outputs": ["src/generated/paraglide/**"]
-    },
-    "@v/viola-extension-preview#build": {
-      "inputs": ["messages/**"],
-      "outputs": ["src/generated/paraglide/**"]
-    },
     "dev": {
       "dependsOn": [
         "@v/cli-bundle#build",
         "@v/api-spec#build",
-        "@v/api-client#build",
-        "@v/viola-extension-account#build",
-        "@v/viola-extension-preview#build"
+        "@v/api-client#build"
       ],
       "cache": false,
       "persistent": true

@@ -1,7 +1,7 @@
 /**
  * Shared library for Viola extension authors. It provides:
  *   - the host/extension contract (types + {@link defineExtension}) from here, and
- *   - base styles from `@v/viola-extension-kit/styles.css`.
+ *   - base styles from `@v/extension-kit/styles.css`.
  *
  * UI components come from the `@v/ui` design system, which extensions depend on
  * directly (e.g. `import { Button } from '@v/ui/button'`).
@@ -13,6 +13,15 @@
  *   - per-pane view modules whose default export is a React component
  *     ({@link ExtensionViewComponent}). The host mounts one inside an isolated
  *     cross-origin iframe; it talks back through {@link ExtensionHostApi}.
+ *
+ * The host discovers extensions by workspace package name: every
+ * `@v/viola-extension-<id>` package is installed automatically, with
+ * `src/extension.ts` as the host module and `src/views/<sub>.tsx` as the view
+ * for pane `./<sub>` (`index.tsx` is the default pane `.`).
+ *
+ * Localization needs no build step: an extension ships `messages/<locale>.json`
+ * (inlang message format), the host reads them directly, and a view receives a
+ * locale-bound translator ({@link ExtensionTranslate}) on its mount context.
  *
  * The host (`@v/viola`) only imports types from here, so its build never pulls
  * in the React/CSS surface.
@@ -92,10 +101,32 @@ export interface ExtensionHostApi {
 /** The host API as seen from inside the iframe (Comlink-proxied). */
 export type RemoteExtensionHostApi = Remote<ExtensionHostApi>;
 
+/**
+ * An extension's `messages/<locale>.json` files, merged by locale:
+ * `catalog[locale][key]`. Read by the host directly from the package — no
+ * compile step.
+ */
+export type MessageCatalog = Record<string, Record<string, string>>;
+
+/** Looks up a message for the active locale, falling back to the base locale
+ * and finally the key itself. */
+export type ExtensionTranslate = (key: string) => string;
+
+export function translate(
+  catalog: MessageCatalog,
+  locale: string,
+  key: string,
+  baseLocale = 'en',
+): string {
+  return catalog[locale]?.[key] ?? catalog[baseLocale]?.[key] ?? key;
+}
+
 /** Props the host passes to a pane's view component. */
 export interface ExtensionMountContext {
   host: RemoteExtensionHostApi;
   locale: string;
+  /** Translator bound to {@link ExtensionMountContext.locale}. */
+  t: ExtensionTranslate;
 }
 
 /**
@@ -118,7 +149,12 @@ export interface PaneContribution {
    * paths must start with `.` or `/` (e.g. `/settings`, `.settings`).
    */
   path: string;
-  title: string | ((locale: string) => string);
+  /**
+   * The pane's title, given as a message key resolved against the extension's
+   * `messages/` catalog for the active locale. A string that matches no message
+   * is shown verbatim.
+   */
+  title: string;
   /**
    * How in-app entry points (e.g. menu buttons) present this pane. `'pane'`
    * (default) navigates to the pane's permalink; `'modal'` opens it as a

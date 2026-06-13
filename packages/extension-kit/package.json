@@ -1,5 +1,5 @@
 {
-  "name": "@v/viola-extension-kit",
+  "name": "@v/extension-kit",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,14 +11,10 @@
       "default": "./src/styles.css"
     }
   },
-  "bin": {
-    "viola": "./bin/viola.mjs"
-  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@inlang/paraglide-js": "catalog:",
     "@types/react": "catalog:",
     "@v/config": "workspace:*",
     "@v/ui": "workspace:*",

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -125,6 +126,93 @@ const serveCli = () =>
       fs.cpSync(src, dest, { recursive: true });
     },
   }) satisfies Plugin;
+
+// Extensions are the workspace packages named `@v/viola-extension-<id>`,
+// enumerated through pnpm itself so they are found wherever the workspace
+// places them. Discovery runs once per Vite startup; restart the dev server
+// after adding or removing an extension package.
+const discoverViolaExtensions = (): { id: string; packageDir: string }[] => {
+  const projects: { name?: string; path: string }[] = JSON.parse(
+    execFileSync('pnpm', ['m', 'ls', '--json', '--depth', '-1'], {
+      cwd: getProjectRoot(),
+      encoding: 'utf8',
+    }),
+  );
+  return projects.flatMap((project) =>
+    project.name?.startsWith('@v/viola-extension-')
+      ? [
+          {
+            id: project.name.slice('@v/viola-extension-'.length),
+            packageDir: project.path,
+          },
+        ]
+      : [],
+  );
+};
+
+const installedExtensions = () => {
+  const moduleId = '#installed-extensions';
+  // A `#` inside a module id would be cut off as a URL fragment when the dev
+  // server rewrites imports, so the resolved id must not contain it.
+  const resolvedModuleId = '\0virtual:installed-extensions';
+  return {
+    name: 'installed-extensions',
+    resolveId(id) {
+      if (id === moduleId) {
+        return resolvedModuleId;
+      }
+    },
+    load(id) {
+      if (id !== resolvedModuleId) {
+        return;
+      }
+      // Message catalogs are imported statically (not `import()`d) so the host
+      // can read titles synchronously and views get them without a round-trip.
+      const imports: string[] = [];
+      const entries = discoverViolaExtensions().map(({ id, packageDir }, i) => {
+        const viewsDir = path.join(packageDir, 'src/views');
+        const views = (
+          fs.existsSync(viewsDir)
+            ? fs.readdirSync(viewsDir, { recursive: true, encoding: 'utf8' })
+            : []
+        )
+          .filter((file) => file.endsWith('.tsx'))
+          .map((file) => {
+            const sub = file
+              .split(path.sep)
+              .join('/')
+              .replace(/\.tsx$/, '')
+              .replace(/(^|\/)index$/, '');
+            const panePath = sub ? `./${sub}` : '.';
+            return `${JSON.stringify(panePath)}: () => import(${JSON.stringify(
+              path.join(viewsDir, file),
+            )})`;
+          });
+        const messagesDir = path.join(packageDir, 'messages');
+        const messages = (
+          fs.existsSync(messagesDir) ? fs.readdirSync(messagesDir) : []
+        )
+          .filter((file) => file.endsWith('.json'))
+          .map((file) => {
+            const locale = file.replace(/\.json$/, '');
+            const binding = `messages_${i}_${locale.replace(/\W/g, '_')}`;
+            imports.push(
+              `import ${binding} from ${JSON.stringify(path.join(messagesDir, file))};`,
+            );
+            return `${JSON.stringify(locale)}: ${binding}`;
+          });
+        return `${JSON.stringify(id)}: {
+    loadExtension: () => import(${JSON.stringify(path.join(packageDir, 'src/extension.ts'))}),
+    loadView: { ${views.join(', ')} },
+    messages: { ${messages.join(', ')} },
+  }`;
+      });
+      return `${imports.join('\n')}\nexport const installedExtensions = {\n${entries
+        .map((entry) => `  ${entry},\n`)
+        .join('')}};\n`;
+    },
+  } satisfies Plugin;
+};
 
 interface ServeApiOptions {
   /**
@@ -355,6 +443,7 @@ export default defineConfig(({ mode, command }) => {
       serviceWorker(),
       serveTemplates(),
       serveCli(),
+      installedExtensions(),
       ...(cloudEnabled
         ? [
             serveApi({

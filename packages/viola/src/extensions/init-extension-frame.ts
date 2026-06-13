@@ -2,11 +2,12 @@ import * as Comlink from 'comlink';
 import { invariant } from 'outvariant';
 import type { ComponentType } from 'react';
 
-import type {
-  ExtensionHostApi,
-  ExtensionMountContext,
-  ExtensionViewModule,
-} from '@v/viola-extension-kit';
+import {
+  type ExtensionHostApi,
+  type ExtensionMountContext,
+  type ExtensionViewModule,
+  translate,
+} from '@v/extension-kit';
 import { reportExtensionContentSize } from './iframe-autosize';
 import { installedExtensions } from './installed';
 import { parseExtensionFramePath } from './sandbox-origin';
@@ -31,6 +32,7 @@ export async function initExtensionFrame() {
   const host = Comlink.wrap<ExtensionHostApi>(channel.port1);
 
   const locale = await host.getLocale();
+  const t = (key: string) => translate(installed.messages, locale, key);
   const [
     { StrictMode, createElement },
     { createRoot },
@@ -56,7 +58,7 @@ export async function initExtensionFrame() {
   const renderView = (module: ExtensionViewModule) => {
     const Pane = module.default as ComponentType<ExtensionMountContext>;
     root.render(
-      createElement(StrictMode, null, createElement(Pane, { host, locale })),
+      createElement(StrictMode, null, createElement(Pane, { host, locale, t })),
     );
   };
   renderView(viewModule);

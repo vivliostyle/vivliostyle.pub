@@ -7,7 +7,7 @@ import type {
   ExtensionHostApi,
   ExtensionPermission,
   ExtensionSessionSnapshot,
-} from '@v/viola-extension-kit';
+} from '@v/extension-kit';
 import { attachExtensionAutoSize } from '../../extensions/iframe-autosize';
 import {
   extensionFramePath,
