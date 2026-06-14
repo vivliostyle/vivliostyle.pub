@@ -32,7 +32,7 @@ export function attachExtensionAutoSize(
     iframe.style.setProperty('frame-sizing', 'content-height');
     return () => iframe.style.removeProperty('frame-sizing');
   }
-  let appliedHeight = 0;
+  let appliedHeight = -1;
   const onMessage = (event: MessageEvent) => {
     if (event.origin !== origin) return;
     if (event.source !== iframe.contentWindow) return;
@@ -40,7 +40,10 @@ export function attachExtensionAutoSize(
     if (data?.command !== RESIZE_COMMAND || typeof data.height !== 'number') {
       return;
     }
-    if (data.height <= appliedHeight) return;
+    // Track both growth and shrinkage so the pane reclaims space when content
+    // gets shorter (the kit pins content panes to `height: auto`, so the
+    // reported height is intrinsic and can't feed back into a resize loop).
+    if (data.height === appliedHeight) return;
     appliedHeight = data.height;
     iframe.style.height = `${data.height}px`;
   };

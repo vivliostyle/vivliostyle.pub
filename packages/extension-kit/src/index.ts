@@ -145,8 +145,9 @@ export interface ExtensionViewModule {
 export interface PaneContribution {
   /**
    * The pane's path within the extension, used as its key everywhere (view
-   * loader, permalink, lookups). `'.'` is the extension's default pane; other
-   * paths must start with `.` or `/` (e.g. `/settings`, `.settings`).
+   * loader, permalink, lookups). `'.'` is the extension's default pane (backed
+   * by `src/views/index.tsx`); a sub-pane is `'./<name>'`, backed by
+   * `src/views/<name>.tsx`.
    */
   path: string;
   /**
@@ -174,10 +175,10 @@ export interface PaneContribution {
 
 export interface PermalinkContribution {
   /**
-   * The pane path this permalink exposes. `'.'` or starts with `.` or `/`. The
-   * full, addressable URL is generated from the extension id as
-   * `-<id>` (for `'.'`) or `-<id><path>`, so it always starts with `-` and
-   * cannot shadow a core route.
+   * The pane path this permalink exposes: `'.'` (the default pane) or
+   * `'./<name>'`. The host serves it under `/extension/<slug>`, where the slug
+   * is the extension id for `'.'` or `<id><path>` for a sub-pane, so a
+   * permalink can never shadow a core route.
    */
   path: string;
 }

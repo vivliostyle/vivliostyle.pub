@@ -67,14 +67,19 @@ export async function printPdf() {
 
   const frameKey = extensionFrameKey(previewExtensionId, previewPanePath);
   if (!extensionFrames[frameKey]) {
-    await Promise.race([
-      new Promise<void>((resolve) => {
-        subscribe(extensionFrames, () => {
-          extensionFrames[frameKey] && resolve();
-        });
-      }),
-      new Promise((resolve) => setTimeout(resolve, 10_000)), // timeout
-    ]);
+    await new Promise<void>((resolve) => {
+      const unsubscribe = subscribe(extensionFrames, check);
+      const timer = setTimeout(finish, 10_000);
+      function finish() {
+        clearTimeout(timer);
+        unsubscribe();
+        resolve();
+      }
+      function check() {
+        if (extensionFrames[frameKey]) finish();
+      }
+      check();
+    });
   }
 
   const element = extensionFrames[frameKey];
