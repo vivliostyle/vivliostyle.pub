@@ -5,7 +5,9 @@ navigator.serviceWorker.register(
 
 if (location.hostname.split('.')[0].startsWith('sandbox-')) {
   navigator.serviceWorker.ready.then(() => {
-    location.reload();
+    if (!navigator.serviceWorker.controller) {
+      location.reload();
+    }
   });
 } else {
   import('./main');

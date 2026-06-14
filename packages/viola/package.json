@@ -46,6 +46,7 @@
     "@v/auth-client": "workspace:*",
     "@v/cli-bundle": "workspace:*",
     "@v/config": "workspace:*",
+    "@v/extension-kit": "workspace:*",
     "@v/storage-providers": "workspace:*",
     "@v/sync-client": "workspace:*",
     "@v/theme-registry": "workspace:*",

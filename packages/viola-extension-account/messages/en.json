@@ -1,0 +1,20 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "account_pane_title": "Account",
+  "account_login_description": "Sign in to sync projects with the cloud server.",
+  "account_register_description": "Create a new account on the cloud server.",
+  "account_server_label": "Server:",
+  "account_username_label": "Username",
+  "account_password_label": "Password",
+  "account_password_min_chars_note": "At least 8 characters.",
+  "account_sign_in_button": "Sign in",
+  "account_register_button": "Create account",
+  "account_sign_out_button": "Sign out",
+  "account_signed_in_as": "Signed in as",
+  "account_switch_to_login": "Already have an account? Sign in.",
+  "account_switch_to_register": "Don't have an account? Create one.",
+  "account_generic_error": "Something went wrong. Try again.",
+  "account_error_invalid_credentials": "Incorrect username or password.",
+  "account_error_username_taken": "That username is already taken.",
+  "account_error_network": "Could not reach the server. Check your network connection."
+}

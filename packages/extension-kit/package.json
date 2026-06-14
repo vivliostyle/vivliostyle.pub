@@ -1,0 +1,25 @@
+{
+  "name": "@v/extension-kit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./styles.css": {
+      "types": "./src/styles.css.d.ts",
+      "default": "./src/styles.css"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@v/config": "workspace:*",
+    "@v/ui": "workspace:*",
+    "comlink": "catalog:",
+    "tailwindcss": "catalog:",
+    "tailwindcss-animate": "catalog:"
+  }
+}

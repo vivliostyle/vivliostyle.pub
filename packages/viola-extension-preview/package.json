@@ -1,0 +1,23 @@
+{
+  "name": "@v/viola-extension-preview",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/extension.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@v/config": "workspace:*",
+    "@v/extension-kit": "workspace:*",
+    "@v/ui": "workspace:*",
+    "comlink": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

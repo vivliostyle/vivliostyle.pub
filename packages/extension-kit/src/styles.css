@@ -1,0 +1,32 @@
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/preflight" layer(base);
+@import "tailwindcss/utilities" layer(utilities);
+
+@import "@v/ui/index.css";
+@import "@v/ui/global.css" layer(base);
+
+/* A bare directory glob with a wildcard in its name matches nothing in
+   Tailwind's scanner, so spell out the file pattern. */
+@source "../../ui/src";
+@source "../../viola-extension-*/src/**/*.{ts,tsx}";
+
+/* Content-sized panes report `body.scrollHeight` to the host (see
+   iframe-autosize in @v/viola), which can never shrink while global.css pins
+   `html, body` to 100%. */
+html,
+body {
+  height: auto;
+}
+
+/* `data-pane-sizing` is set by the frame bootstrap in @v/viola. */
+html[data-pane-sizing="fill"],
+html[data-pane-sizing="fill"] body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  @apply bg-background text-foreground;
+}

@@ -1,7 +1,9 @@
 import { invariant } from 'outvariant';
 import { createContext, useContext } from 'react';
 
-import { cn } from '@v/ui/lib/utils';
+import { ScrollOverflow, PaneContainer as UiPaneContainer } from '@v/ui/pane';
+
+export { ScrollOverflow };
 
 export interface PaneDefinition<P> {
   title: React.ComponentType<P>;
@@ -18,29 +20,19 @@ export const PaneContext = createContext<
   (PaneDefinition<any> & { props: any }) | null
 >(null);
 
-export function ScrollOverflow({ children }: React.PropsWithChildren<object>) {
-  return (
-    <div className="size-full overflow-auto overscroll-contain scrollbar-stable">
-      {children}
-    </div>
-  );
-}
-
+// Binds the `@v/ui` pane layout to the active pane's context, so core panes get
+// their title and `hideTitle` automatically. Extensions use the prop-based
+// `@v/ui/pane` component directly instead.
 export function PaneContainer({ children }: React.PropsWithChildren) {
   const context = useContext(PaneContext);
   invariant(context, 'PaneContext not found');
 
   return (
-    <div
-      className={cn(
-        'pb-8 px-8 max-w-xl mx-auto grid gap-4',
-        context.hideTitle ? 'pt-8' : 'pt-16',
-      )}
+    <UiPaneContainer
+      title={<context.title {...context.props} />}
+      hideTitle={context.hideTitle}
     >
-      <h2 className={cn('text-2xl font-bold', context.hideTitle && 'sr-only')}>
-        <context.title {...context.props} />
-      </h2>
-      <div>{children}</div>
-    </div>
+      {children}
+    </UiPaneContainer>
   );
 }
