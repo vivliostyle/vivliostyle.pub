@@ -1,5 +1,5 @@
 import * as Comlink from 'comlink';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribe, ref as valtioRef } from 'valtio';
 
 import type {
@@ -8,6 +8,7 @@ import type {
   ExtensionPermission,
   ExtensionSessionSnapshot,
 } from '@v/extension-kit';
+import { Loader2 } from '@v/ui/icon';
 import { attachExtensionAutoSize } from '../../extensions/iframe-autosize';
 import {
   extensionFramePath,
@@ -156,6 +157,8 @@ function Content({ extensionId, panePath }: ExtensionPaneProperty) {
   const origin = extensionSandboxOrigin(extensionId);
   const sizing = resolvePaneSizing(extensionId, panePath);
 
+  const [loaded, setLoaded] = useState(false);
+
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -199,6 +202,7 @@ function Content({ extensionId, panePath }: ExtensionPaneProperty) {
       ref={registerFrame}
       title={resolvePaneTitle(extensionId, panePath, getLocale())}
       src={`${origin}${extensionFramePath(extensionId, panePath)}`}
+      onLoad={() => setLoaded(true)}
       // With `content` sizing the height tracks the content (see
       // iframe-autosize); width fills the pane and the height is capped at the
       // wrapper so taller content scrolls inside the iframe itself.
@@ -208,12 +212,26 @@ function Content({ extensionId, panePath }: ExtensionPaneProperty) {
     />
   );
 
+  // The iframe stays mounted to fire its `load` event, so the spinner overlays
+  // it rather than replacing it.
+  const spinner = !loaded && (
+    <div className="absolute inset-0 grid place-items-center bg-background">
+      <Loader2 className="animate-spin size-12 text-gray-300" />
+    </div>
+  );
+
   if (sizing === 'fill') {
-    return iframe;
+    return (
+      <div className="relative size-full">
+        {iframe}
+        {spinner}
+      </div>
+    );
   }
   return (
-    <div className="size-full overflow-auto overscroll-contain scrollbar-stable">
+    <div className="relative size-full overflow-auto overscroll-contain scrollbar-stable">
       {iframe}
+      {spinner}
     </div>
   );
 }
