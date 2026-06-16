@@ -68,7 +68,8 @@ export type ExtensionSessionListener = (
  * current build, and exposes only the {@link ExtensionHostApi} methods the
  * granted permissions unlock:
  *   - `session:read`  → `getSessionSnapshot`, `subscribeSession`
- *   - `session:write` → `login`, `register`, `logout`
+ *   - `session:write` → `login`, `register`, `logout`, `applyBearerSession`,
+ *                       `clearBearerSession`
  *   - `viewer:read`   → `getViewerUrl`
  */
 export type ExtensionPermission =
@@ -94,6 +95,8 @@ export interface ExtensionHostApi {
   login(username: string, password: string): Promise<void>;
   register(username: string, password: string): Promise<void>;
   logout(): Promise<void>;
+  applyBearerSession(token: string): Promise<void>;
+  clearBearerSession(): Promise<void>;
   getLocale(): string;
   getViewerUrl(): Promise<string>;
 }

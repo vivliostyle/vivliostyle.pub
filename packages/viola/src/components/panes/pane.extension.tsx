@@ -17,6 +17,8 @@ import {
 import { getLocale } from '../../generated/paraglide/runtime';
 import { $cli, $session } from '../../stores/accessors';
 import {
+  applyBearerSession,
+  clearBearerSession,
   login,
   logout,
   register,
@@ -108,6 +110,14 @@ const hostApiRegistry: HostApiRegistry = {
   logout: {
     permission: 'session:write',
     impl: () => runAuth(() => logout()),
+  },
+  applyBearerSession: {
+    permission: 'session:write',
+    impl: (token) => applyBearerSession(token),
+  },
+  clearBearerSession: {
+    permission: 'session:write',
+    impl: () => clearBearerSession(),
   },
   getViewerUrl: {
     permission: 'viewer:read',

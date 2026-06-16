@@ -28,7 +28,13 @@ export function openApiDocumentation(): GenerateSpecOptions['documentation'] {
           type: 'http',
           scheme: 'bearer',
           description:
-            'Access token obtained from `POST /oauth/token`. Send it as `Authorization: Bearer <token>`.',
+            'Access token obtained from `POST /auth/oauth2/token`. Send it as `Authorization: Bearer <token>`.',
+        },
+        sessionAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          description:
+            'Session token obtained from `POST /auth/sign-in`. Send it as `Authorization: Bearer <token>`.',
         },
       },
     },

@@ -21,6 +21,14 @@ function postJson(body: unknown): RequestInit {
   };
 }
 
+function postForm(body: Record<string, string>): RequestInit {
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(body).toString(),
+  };
+}
+
 async function register(
   app: App,
   username = 'alice',
@@ -29,40 +37,69 @@ async function register(
   return app.request('/auth/register', postJson({ username, password }));
 }
 
+/** Sign in with a password and return the session token. */
+async function signIn(
+  app: App,
+  username = 'alice',
+  password = 'password123',
+): Promise<string> {
+  const res = await app.request(
+    '/auth/sign-in',
+    postJson({ username, password }),
+  );
+  return ((await res.json()) as { token: string }).token;
+}
+
+/** Run `/auth/oauth2/authorize` and return the code from the redirect URL. */
+async function authorizeCode(
+  app: App,
+  verifier: string,
+  username = 'alice',
+  password = 'password123',
+): Promise<string> {
+  const sessionToken = await signIn(app, username, password);
+  const query = new URLSearchParams({
+    response_type: 'code',
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    code_challenge: pkceChallengeS256(verifier),
+    code_challenge_method: 'S256',
+  }).toString();
+  const res = await app.request(`/auth/oauth2/authorize?${query}`, {
+    headers: bearer(sessionToken),
+  });
+  const { url } = (await res.json()) as { url: string };
+  return new URL(url).searchParams.get('code') as string;
+}
+
 async function authenticate(
   app: App,
   username = 'alice',
   password = 'password123',
 ) {
   const verifier = 'verifier-abcdefghijklmnopqrstuvwxyz-0123456789';
-  const codeChallenge = pkceChallengeS256(verifier);
-  const authorizeRes = await app.request(
-    '/oauth/authorize',
-    postJson({
-      clientId: CLIENT_ID,
-      redirectUri: REDIRECT_URI,
-      codeChallenge,
-      codeChallengeMethod: 'S256',
-      username,
-      password,
-    }),
-  );
-  const { code } = (await authorizeRes.json()) as { code: string };
+  const code = await authorizeCode(app, verifier, username, password);
   const tokenRes = await app.request(
-    '/oauth/token',
-    postJson({
-      grantType: 'authorization_code',
+    '/auth/oauth2/token',
+    postForm({
+      grant_type: 'authorization_code',
       code,
-      codeVerifier: verifier,
-      redirectUri: REDIRECT_URI,
-      clientId: CLIENT_ID,
+      code_verifier: verifier,
+      redirect_uri: REDIRECT_URI,
+      client_id: CLIENT_ID,
     }),
   );
-  return (await tokenRes.json()) as {
-    accessToken: string;
-    refreshToken: string;
-    tokenType: string;
-    expiresIn: number;
+  const t = (await tokenRes.json()) as {
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    expires_in: number;
+  };
+  return {
+    accessToken: t.access_token,
+    refreshToken: t.refresh_token,
+    tokenType: t.token_type,
+    expiresIn: t.expires_in,
   };
 }
 
@@ -142,53 +179,50 @@ describe('auth', () => {
     expect(tokens.accessToken).toBeTruthy();
     expect(tokens.refreshToken).toBeTruthy();
 
-    const me = await app.request('/oauth/userinfo', {
+    const me = await app.request('/auth/oauth2/userinfo', {
       headers: bearer(tokens.accessToken),
     });
     expect(me.status).toBe(200);
-    expect((await readJson<{ username: string }>(me)).username).toBe('alice');
+    expect((await readJson<{ name: string }>(me)).name).toBe('alice');
   });
 
   it('rejects an invalid PKCE verifier', async () => {
     await register(app);
-    const codeChallenge = pkceChallengeS256('the-real-verifier');
-    const authorizeRes = await app.request(
-      '/oauth/authorize',
-      postJson({
-        clientId: CLIENT_ID,
-        redirectUri: REDIRECT_URI,
-        codeChallenge,
-        codeChallengeMethod: 'S256',
-        username: 'alice',
-        password: 'password123',
-      }),
-    );
-    const { code } = (await authorizeRes.json()) as { code: string };
+    const code = await authorizeCode(app, 'the-real-verifier');
     const tokenRes = await app.request(
-      '/oauth/token',
-      postJson({
-        grantType: 'authorization_code',
+      '/auth/oauth2/token',
+      postForm({
+        grant_type: 'authorization_code',
         code,
-        codeVerifier: 'wrong-verifier',
-        redirectUri: REDIRECT_URI,
-        clientId: CLIENT_ID,
+        code_verifier: 'wrong-verifier',
+        redirect_uri: REDIRECT_URI,
+        client_id: CLIENT_ID,
       }),
     );
     expect(tokenRes.status).toBe(400);
   });
 
-  it('rejects bad credentials', async () => {
+  it('rejects bad credentials at sign-in', async () => {
     await register(app);
     const res = await app.request(
-      '/oauth/authorize',
-      postJson({
-        clientId: CLIENT_ID,
-        redirectUri: REDIRECT_URI,
-        codeChallenge: pkceChallengeS256('v'),
-        username: 'alice',
-        password: 'wrong',
-      }),
+      '/auth/sign-in',
+      postJson({ username: 'alice', password: 'wrong' }),
     );
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects authorize without a valid session', async () => {
+    await register(app);
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      code_challenge: pkceChallengeS256('v'),
+      code_challenge_method: 'S256',
+    }).toString();
+    const res = await app.request(`/auth/oauth2/authorize?${query}`, {
+      headers: bearer('not-a-session'),
+    });
     expect(res.status).toBe(401);
   });
 
@@ -196,19 +230,69 @@ describe('auth', () => {
     await register(app);
     const tokens = await authenticate(app);
     const refreshRes = await app.request(
-      '/oauth/refresh',
-      postJson({ refreshToken: tokens.refreshToken, clientId: CLIENT_ID }),
+      '/auth/oauth2/token',
+      postForm({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refreshToken,
+        client_id: CLIENT_ID,
+      }),
     );
     expect(refreshRes.status).toBe(200);
-    const refreshed = await readJson<{ accessToken: string }>(refreshRes);
-    expect(refreshed.accessToken).not.toBe(tokens.accessToken);
+    const refreshed = await readJson<{ access_token: string }>(refreshRes);
+    expect(refreshed.access_token).not.toBe(tokens.accessToken);
 
     // Old refresh token is single-use.
     const reuse = await app.request(
-      '/oauth/refresh',
-      postJson({ refreshToken: tokens.refreshToken, clientId: CLIENT_ID }),
+      '/auth/oauth2/token',
+      postForm({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refreshToken,
+        client_id: CLIENT_ID,
+      }),
     );
     expect(reuse.status).toBe(400);
+  });
+
+  it('revokes a grant via the refresh token and rejects its access token', async () => {
+    await register(app);
+    const tokens = await authenticate(app);
+    expect(
+      (await app.request('/projects', { headers: bearer(tokens.accessToken) }))
+        .status,
+    ).toBe(200);
+
+    const revoked = await app.request(
+      '/auth/oauth2/revoke',
+      postForm({
+        client_id: CLIENT_ID,
+        token: tokens.refreshToken,
+        token_type_hint: 'refresh_token',
+      }),
+    );
+    expect(revoked.status).toBe(200);
+
+    expect(
+      (await app.request('/projects', { headers: bearer(tokens.accessToken) }))
+        .status,
+    ).toBe(401);
+
+    const reuse = await app.request(
+      '/auth/oauth2/token',
+      postForm({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refreshToken,
+        client_id: CLIENT_ID,
+      }),
+    );
+    expect(reuse.status).toBe(400);
+  });
+
+  it('responds 200 when revoking an unknown token', async () => {
+    const res = await app.request(
+      '/auth/oauth2/revoke',
+      postForm({ client_id: CLIENT_ID, token: 'no-such-token' }),
+    );
+    expect(res.status).toBe(200);
   });
 
   it('requires a bearer token for projects', async () => {

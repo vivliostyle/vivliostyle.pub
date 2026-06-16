@@ -14,11 +14,14 @@ import {
   AuthorizeRequestSchema,
   AuthorizeResponseSchema,
   ErrorSchema,
-  RefreshRequestSchema,
   RegisterRequestSchema,
+  RevokeRequestSchema,
+  SignInRequestSchema,
+  SignInResponseSchema,
   TokenRequestSchema,
   type TokenResponse,
   TokenResponseSchema,
+  UserInfoSchema,
   UserSchema,
 } from '../schemas';
 
@@ -29,12 +32,14 @@ export function authRoutes({ store, config }: Deps) {
     userId: string,
     clientId: string,
     scope?: string,
+    grantId: string = randomToken(16),
   ): TokenResponse => {
     const accessToken = randomToken();
     const refreshToken = randomToken();
     store.saveAccessToken({
       token: accessToken,
       userId,
+      grantId,
       scope,
       expiresAt: Date.now() + config.accessTokenTtlMs,
     });
@@ -42,14 +47,15 @@ export function authRoutes({ store, config }: Deps) {
       token: refreshToken,
       userId,
       clientId,
+      grantId,
       scope,
       expiresAt: Date.now() + config.refreshTokenTtlMs,
     });
     return {
-      accessToken,
-      tokenType: 'Bearer',
-      expiresIn: Math.floor(config.accessTokenTtlMs / 1000),
-      refreshToken,
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: Math.floor(config.accessTokenTtlMs / 1000),
+      refresh_token: refreshToken,
       scope,
     };
   };
@@ -60,7 +66,7 @@ export function authRoutes({ store, config }: Deps) {
       tags: ['auth'],
       summary: 'Register',
       description:
-        'Creates a new user account; sign in via `/oauth/authorize` afterwards to obtain access tokens.',
+        'Creates a new user account; sign in via `/auth/oauth2/authorize` afterwards to obtain access tokens.',
       responses: {
         201: { description: 'Created', content: jsonContent(UserSchema) },
         409: {
@@ -84,16 +90,16 @@ export function authRoutes({ store, config }: Deps) {
   );
 
   app.post(
-    '/oauth/authorize',
+    '/auth/sign-in',
     describeRoute({
       tags: ['auth'],
-      summary: 'Authorize',
+      summary: 'Sign in',
       description:
-        'Verifies the username and password and returns a short-lived authorization code to exchange via `/oauth/token` with the matching PKCE verifier.',
+        'Verifies the username and password and starts a session, returning the session token to authorize `/auth/oauth2/authorize`.',
       responses: {
         200: {
-          description: 'Authorization code',
-          content: jsonContent(AuthorizeResponseSchema),
+          description: 'Session',
+          content: jsonContent(SignInResponseSchema),
         },
         401: {
           description: 'Invalid credentials',
@@ -101,37 +107,84 @@ export function authRoutes({ store, config }: Deps) {
         },
       },
     }),
-    validator('json', AuthorizeRequestSchema),
+    validator('json', SignInRequestSchema),
     (c) => {
-      const body = c.req.valid('json');
-      const user = store.findUserByUsername(body.username);
-      if (!user || !verifyPassword(body.password, user.passwordHash)) {
+      const { username, password } = c.req.valid('json');
+      const user = store.findUserByUsername(username);
+      if (!user || !verifyPassword(password, user.passwordHash)) {
         return c.json({ error: 'invalid_credentials' }, 401);
       }
-      const code = randomToken(24);
-      store.saveAuthCode({
-        code,
+      const token = randomToken();
+      store.saveSession({
+        token,
         userId: user.id,
-        clientId: body.clientId,
-        redirectUri: body.redirectUri,
-        codeChallenge: body.codeChallenge,
-        scope: body.scope,
-        expiresAt: Date.now() + config.authCodeTtlMs,
+        expiresAt: Date.now() + config.sessionTtlMs,
       });
       return c.json(
-        { code, state: body.state, redirectUri: body.redirectUri },
+        { token, user: { id: user.id, username: user.username } },
         200,
       );
     },
   );
 
+  app.get(
+    '/auth/oauth2/authorize',
+    describeRoute({
+      tags: ['auth'],
+      summary: 'Authorize',
+      description:
+        'Issues a short-lived authorization code for the session given in the `Authorization: Bearer <session token>` header (from `/auth/sign-in`), returning the redirect URI carrying the code to exchange via `/auth/oauth2/token` with the matching PKCE verifier.',
+      security: [{ sessionAuth: [] }],
+      responses: {
+        200: {
+          description: 'Authorization redirect',
+          content: jsonContent(AuthorizeResponseSchema),
+        },
+        401: {
+          description: 'Invalid session',
+          content: jsonContent(ErrorSchema),
+        },
+      },
+    }),
+    validator('query', AuthorizeRequestSchema),
+    (c) => {
+      const header = c.req.header('Authorization');
+      const sessionToken = header?.startsWith('Bearer ')
+        ? header.slice(7)
+        : undefined;
+      const session = sessionToken
+        ? store.findSession(sessionToken)
+        : undefined;
+      if (!session) {
+        return c.json({ error: 'invalid_session' }, 401);
+      }
+      const query = c.req.valid('query');
+      const code = randomToken(24);
+      store.saveAuthCode({
+        code,
+        userId: session.userId,
+        clientId: query.client_id,
+        redirectUri: query.redirect_uri,
+        codeChallenge: query.code_challenge,
+        scope: query.scope,
+        expiresAt: Date.now() + config.authCodeTtlMs,
+      });
+      const url = new URL(query.redirect_uri);
+      url.searchParams.set('code', code);
+      if (query.state) {
+        url.searchParams.set('state', query.state);
+      }
+      return c.json({ redirect: true, url: url.toString() }, 200);
+    },
+  );
+
   app.post(
-    '/oauth/token',
+    '/auth/oauth2/token',
     describeRoute({
       tags: ['auth'],
       summary: 'Token',
       description:
-        'Exchanges an authorization code (after `/oauth/authorize`) or a refresh token for an access token.',
+        'Exchanges an authorization code (after `/auth/oauth2/authorize`) or a refresh token for an access token. The refresh token is rotated, invalidating the previous one.',
       responses: {
         200: {
           description: 'Tokens',
@@ -143,10 +196,10 @@ export function authRoutes({ store, config }: Deps) {
         },
       },
     }),
-    validator('json', TokenRequestSchema),
+    validator('form', TokenRequestSchema),
     (c) => {
-      const body = c.req.valid('json');
-      if (body.grantType === 'authorization_code') {
+      const body = c.req.valid('form');
+      if (body.grant_type === 'authorization_code') {
         const authCode = store.takeAuthCode(body.code);
         if (!authCode || authCode.expiresAt < Date.now()) {
           return c.json(
@@ -155,15 +208,15 @@ export function authRoutes({ store, config }: Deps) {
           );
         }
         if (
-          authCode.clientId !== body.clientId ||
-          authCode.redirectUri !== body.redirectUri
+          authCode.clientId !== body.client_id ||
+          authCode.redirectUri !== body.redirect_uri
         ) {
           return c.json(
             { error: 'invalid_grant', message: 'client/redirect mismatch' },
             400,
           );
         }
-        if (!verifyPkce(body.codeVerifier, authCode.codeChallenge)) {
+        if (!verifyPkce(body.code_verifier, authCode.codeChallenge)) {
           return c.json(
             { error: 'invalid_grant', message: 'PKCE verification failed' },
             400,
@@ -174,11 +227,11 @@ export function authRoutes({ store, config }: Deps) {
           200,
         );
       }
-      const refresh = store.takeRefreshToken(body.refreshToken);
+      const refresh = store.takeRefreshToken(body.refresh_token);
       if (
         !refresh ||
         refresh.expiresAt < Date.now() ||
-        refresh.clientId !== body.clientId
+        refresh.clientId !== body.client_id
       ) {
         return c.json(
           { error: 'invalid_grant', message: 'refresh token invalid' },
@@ -186,50 +239,49 @@ export function authRoutes({ store, config }: Deps) {
         );
       }
       return c.json(
-        issueTokens(refresh.userId, refresh.clientId, refresh.scope),
+        issueTokens(
+          refresh.userId,
+          refresh.clientId,
+          refresh.scope,
+          refresh.grantId,
+        ),
         200,
       );
     },
   );
 
   app.post(
-    '/oauth/refresh',
+    '/auth/oauth2/revoke',
     describeRoute({
       tags: ['auth'],
-      summary: 'Refresh',
+      summary: 'Revoke',
       description:
-        'Issues a new access token and rotates the refresh token, invalidating the previous one.',
+        'Revokes a token (RFC 7009). Revoking a refresh token also drops the access tokens of the same grant. Always responds 200, even for an unknown or already-revoked token.',
       responses: {
-        200: {
-          description: 'Tokens',
-          content: jsonContent(TokenResponseSchema),
-        },
-        400: {
-          description: 'Invalid refresh token',
-          content: jsonContent(ErrorSchema),
-        },
+        200: { description: 'Revoked' },
       },
     }),
-    validator('json', RefreshRequestSchema),
+    validator('form', RevokeRequestSchema),
     (c) => {
-      const { refreshToken, clientId } = c.req.valid('json');
-      const refresh = store.takeRefreshToken(refreshToken);
-      if (
-        !refresh ||
-        refresh.expiresAt < Date.now() ||
-        refresh.clientId !== clientId
-      ) {
-        return c.json({ error: 'invalid_grant' }, 400);
+      const { token, client_id } = c.req.valid('form');
+      const refresh = store.findRefreshToken(token);
+      if (refresh) {
+        // Only the client the token was issued to may revoke it (RFC 7009 §2.1).
+        if (refresh.clientId === client_id) {
+          store.revokeGrant(refresh.grantId);
+        }
+      } else {
+        const access = store.findAccessToken(token);
+        if (access) {
+          store.revokeGrant(access.grantId);
+        }
       }
-      return c.json(
-        issueTokens(refresh.userId, refresh.clientId, refresh.scope),
-        200,
-      );
+      return c.body(null, 200);
     },
   );
 
   app.delete(
-    '/oauth/session',
+    '/auth/oauth2/session',
     describeRoute({
       tags: ['auth'],
       summary: 'Logout',
@@ -249,14 +301,14 @@ export function authRoutes({ store, config }: Deps) {
   );
 
   app.get(
-    '/oauth/userinfo',
+    '/auth/oauth2/userinfo',
     describeRoute({
       tags: ['auth'],
-      summary: 'Get user',
-      description: "Returns the signed-in user's profile.",
+      summary: 'User info',
+      description: "Returns the signed-in user's OpenID Connect claims.",
       security: [{ bearerAuth: [] }],
       responses: {
-        200: { description: 'User', content: jsonContent(UserSchema) },
+        200: { description: 'Claims', content: jsonContent(UserInfoSchema) },
         401: { description: 'Unauthorized', content: jsonContent(ErrorSchema) },
       },
     }),
@@ -266,7 +318,7 @@ export function authRoutes({ store, config }: Deps) {
       if (!user) {
         return c.json({ error: 'not_found' }, 404);
       }
-      return c.json({ id: user.id, username: user.username }, 200);
+      return c.json({ sub: user.id, name: user.username }, 200);
     },
   );
 

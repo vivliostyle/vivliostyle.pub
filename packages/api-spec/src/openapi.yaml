@@ -31,7 +31,12 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: "Access token obtained from `POST /oauth/token`. Send it as
+      description: "Access token obtained from `POST /auth/oauth2/token`. Send it as
+        `Authorization: Bearer <token>`."
+    sessionAuth:
+      type: http
+      scheme: bearer
+      description: "Session token obtained from `POST /auth/sign-in`. Send it as
         `Authorization: Bearer <token>`."
 tags:
   - name: auth
@@ -104,7 +109,7 @@ paths:
       tags:
         - auth
       summary: Register
-      description: Creates a new user account; sign in via `/oauth/authorize`
+      description: Creates a new user account; sign in via `/auth/oauth2/authorize`
         afterwards to obtain access tokens.
       responses:
         "201":
@@ -152,32 +157,37 @@ paths:
               required:
                 - username
                 - password
-  /oauth/authorize:
+  /auth/sign-in:
     post:
-      operationId: postOauthAuthorize
+      operationId: postAuthSignIn
       tags:
         - auth
-      summary: Authorize
-      description: Verifies the username and password and returns a short-lived
-        authorization code to exchange via `/oauth/token` with the matching PKCE
-        verifier.
+      summary: Sign in
+      description: Verifies the username and password and starts a session, returning
+        the session token to authorize `/auth/oauth2/authorize`.
       responses:
         "200":
-          description: Authorization code
+          description: Session
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  code:
+                  token:
                     type: string
-                  state:
-                    type: string
-                  redirectUri:
-                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      username:
+                        type: string
+                    required:
+                      - id
+                      - username
                 required:
-                  - code
-                  - redirectUri
+                  - token
+                  - user
         "401":
           description: Invalid credentials
           content:
@@ -198,38 +208,97 @@ paths:
             schema:
               type: object
               properties:
-                clientId:
-                  type: string
-                redirectUri:
-                  type: string
-                  format: uri
-                codeChallenge:
-                  type: string
-                codeChallengeMethod:
-                  const: S256
-                  default: S256
-                scope:
-                  type: string
-                state:
-                  type: string
                 username:
                   type: string
                 password:
                   type: string
               required:
-                - clientId
-                - redirectUri
-                - codeChallenge
                 - username
                 - password
-  /oauth/token:
+  /auth/oauth2/authorize:
+    get:
+      operationId: getAuthOauth2Authorize
+      tags:
+        - auth
+      summary: Authorize
+      description: "Issues a short-lived authorization code for the session given in
+        the `Authorization: Bearer <session token>` header (from
+        `/auth/sign-in`), returning the redirect URI carrying the code to
+        exchange via `/auth/oauth2/token` with the matching PKCE verifier."
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: Authorization redirect
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect:
+                    type: boolean
+                  url:
+                    type: string
+                required:
+                  - redirect
+                  - url
+        "401":
+          description: Invalid session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                required:
+                  - error
+      parameters:
+        - in: query
+          name: response_type
+          schema:
+            const: code
+            default: code
+        - in: query
+          name: client_id
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: redirect_uri
+          schema:
+            type: string
+            format: uri
+          required: true
+        - in: query
+          name: scope
+          schema:
+            type: string
+        - in: query
+          name: state
+          schema:
+            type: string
+        - in: query
+          name: code_challenge
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: code_challenge_method
+          schema:
+            const: S256
+            default: S256
+  /auth/oauth2/token:
     post:
-      operationId: postOauthToken
+      operationId: postAuthOauth2Token
       tags:
         - auth
       summary: Token
-      description: Exchanges an authorization code (after `/oauth/authorize`) or a
-        refresh token for an access token.
+      description: Exchanges an authorization code (after `/auth/oauth2/authorize`) or
+        a refresh token for an access token. The refresh token is rotated,
+        invalidating the previous one.
       responses:
         "200":
           description: Tokens
@@ -238,21 +307,21 @@ paths:
               schema:
                 type: object
                 properties:
-                  accessToken:
+                  access_token:
                     type: string
-                  tokenType:
+                  token_type:
                     const: Bearer
-                  expiresIn:
+                  expires_in:
                     type: number
-                  refreshToken:
+                  refresh_token:
                     type: string
                   scope:
                     type: string
                 required:
-                  - accessToken
-                  - tokenType
-                  - expiresIn
-                  - refreshToken
+                  - access_token
+                  - token_type
+                  - expires_in
+                  - refresh_token
         "400":
           description: Invalid grant
           content:
@@ -269,101 +338,74 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               oneOf:
                 - type: object
                   properties:
-                    grantType:
+                    grant_type:
                       const: authorization_code
                     code:
                       type: string
-                    codeVerifier:
+                    code_verifier:
                       type: string
-                    redirectUri:
+                    redirect_uri:
                       type: string
                       format: uri
-                    clientId:
+                    client_id:
                       type: string
                   required:
-                    - grantType
+                    - grant_type
                     - code
-                    - codeVerifier
-                    - redirectUri
-                    - clientId
+                    - code_verifier
+                    - redirect_uri
+                    - client_id
                 - type: object
                   properties:
-                    grantType:
+                    grant_type:
                       const: refresh_token
-                    refreshToken:
+                    refresh_token:
                       type: string
-                    clientId:
+                    client_id:
                       type: string
                   required:
-                    - grantType
-                    - refreshToken
-                    - clientId
-  /oauth/refresh:
+                    - grant_type
+                    - refresh_token
+                    - client_id
+  /auth/oauth2/revoke:
     post:
-      operationId: postOauthRefresh
+      operationId: postAuthOauth2Revoke
       tags:
         - auth
-      summary: Refresh
-      description: Issues a new access token and rotates the refresh token,
-        invalidating the previous one.
+      summary: Revoke
+      description: Revokes a token (RFC 7009). Revoking a refresh token also drops the
+        access tokens of the same grant. Always responds 200, even for an
+        unknown or already-revoked token.
       responses:
         "200":
-          description: Tokens
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  accessToken:
-                    type: string
-                  tokenType:
-                    const: Bearer
-                  expiresIn:
-                    type: number
-                  refreshToken:
-                    type: string
-                  scope:
-                    type: string
-                required:
-                  - accessToken
-                  - tokenType
-                  - expiresIn
-                  - refreshToken
-        "400":
-          description: Invalid refresh token
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                  message:
-                    type: string
-                required:
-                  - error
+          description: Revoked
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
-                refreshToken:
+                token:
                   type: string
-                clientId:
+                token_type_hint:
+                  enum:
+                    - access_token
+                    - refresh_token
+                  type: string
+                client_id:
                   type: string
               required:
-                - refreshToken
-                - clientId
-  /oauth/session:
+                - token
+                - client_id
+  /auth/oauth2/session:
     delete:
-      operationId: deleteOauthSession
+      operationId: deleteAuthOauth2Session
       tags:
         - auth
       summary: Logout
@@ -386,30 +428,30 @@ paths:
                     type: string
                 required:
                   - error
-  /oauth/userinfo:
+  /auth/oauth2/userinfo:
     get:
-      operationId: getOauthUserinfo
+      operationId: getAuthOauth2Userinfo
       tags:
         - auth
-      summary: Get user
-      description: Returns the signed-in user's profile.
+      summary: User info
+      description: Returns the signed-in user's OpenID Connect claims.
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: User
+          description: Claims
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  id:
+                  sub:
                     type: string
-                  username:
+                  name:
                     type: string
                 required:
-                  - id
-                  - username
+                  - sub
+                  - name
         "401":
           description: Unauthorized
           content:

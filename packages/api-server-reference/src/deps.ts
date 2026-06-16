@@ -8,6 +8,7 @@ export interface ServerConfig {
   accessTokenTtlMs: number;
   refreshTokenTtlMs: number;
   authCodeTtlMs: number;
+  sessionTtlMs: number;
 }
 
 export const defaultConfig: ServerConfig = {
@@ -16,6 +17,7 @@ export const defaultConfig: ServerConfig = {
   accessTokenTtlMs: 60 * 60 * 1000, // 1 hour
   refreshTokenTtlMs: 30 * 24 * 60 * 60 * 1000, // 30 days
   authCodeTtlMs: 5 * 60 * 1000, // 5 minutes
+  sessionTtlMs: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
 
 export interface Deps {

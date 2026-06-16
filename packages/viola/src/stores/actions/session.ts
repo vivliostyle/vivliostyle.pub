@@ -113,3 +113,25 @@ export async function logout(): Promise<void> {
   }
   await discoverProjects().catch(() => {});
 }
+
+export async function applyBearerSession(sessionToken: string): Promise<void> {
+  $session.status = 'authenticating';
+  try {
+    await $session.auth.exchangeSession(sessionToken);
+    const user = await $session.auth.getUser();
+    if (!user) {
+      throw new SessionError('Signed in, but failed to load profile.');
+    }
+    $session.user = user;
+    $session.status = 'authenticated';
+  } catch (error) {
+    $session.user = null;
+    $session.status = 'anonymous';
+    throw describeAuthFailure(error, 'Sign-in failed');
+  }
+  await discoverProjects().catch(() => {});
+}
+
+export async function clearBearerSession(): Promise<void> {
+  await logout();
+}
