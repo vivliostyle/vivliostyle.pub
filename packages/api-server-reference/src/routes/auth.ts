@@ -39,6 +39,7 @@ export function authRoutes({ store, config }: Deps) {
     store.saveAccessToken({
       token: accessToken,
       userId,
+      clientId,
       grantId,
       scope,
       expiresAt: Date.now() + config.accessTokenTtlMs,
@@ -66,7 +67,7 @@ export function authRoutes({ store, config }: Deps) {
       tags: ['auth'],
       summary: 'Register',
       description:
-        'Creates a new user account; sign in via `/auth/oauth2/authorize` afterwards to obtain access tokens.',
+        'Creates a new user account; sign in via `/auth/sign-in` afterwards, then `/auth/oauth2/authorize` → `/auth/oauth2/token` to obtain access tokens.',
       responses: {
         201: { description: 'Created', content: jsonContent(UserSchema) },
         409: {
@@ -264,17 +265,12 @@ export function authRoutes({ store, config }: Deps) {
     validator('form', RevokeRequestSchema),
     (c) => {
       const { token, client_id } = c.req.valid('form');
-      const refresh = store.findRefreshToken(token);
-      if (refresh) {
-        // Only the client the token was issued to may revoke it (RFC 7009 §2.1).
-        if (refresh.clientId === client_id) {
-          store.revokeGrant(refresh.grantId);
-        }
-      } else {
-        const access = store.findAccessToken(token);
-        if (access) {
-          store.revokeGrant(access.grantId);
-        }
+      // Only the client the token was issued to may revoke it (RFC 7009 §2.1);
+      // both token types carry their issuing client.
+      const grant =
+        store.findRefreshToken(token) ?? store.findAccessToken(token);
+      if (grant && grant.clientId === client_id) {
+        store.revokeGrant(grant.grantId);
       }
       return c.body(null, 200);
     },

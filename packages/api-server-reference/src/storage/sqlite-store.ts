@@ -33,6 +33,7 @@ export interface RefreshToken {
 export interface AccessToken {
   token: string;
   userId: string;
+  clientId: string;
   grantId: string;
   scope?: string;
   expiresAt: number;
@@ -70,6 +71,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 CREATE TABLE IF NOT EXISTS access_tokens (
   token TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  client_id TEXT NOT NULL,
   grant_id TEXT NOT NULL,
   scope TEXT,
   expires_at INTEGER NOT NULL
@@ -127,6 +129,7 @@ interface RefreshTokenRow {
 interface AccessTokenRow {
   token: string;
   user_id: string;
+  client_id: string;
   grant_id: string;
   scope: Nullable<string>;
   expires_at: number;
@@ -183,6 +186,7 @@ function toAccessToken(row: AccessTokenRow): AccessToken {
   return {
     token: row.token,
     userId: row.user_id,
+    clientId: row.client_id,
     grantId: row.grant_id,
     scope: row.scope ?? undefined,
     expiresAt: row.expires_at,
@@ -363,12 +367,14 @@ export class SqliteStore {
   saveAccessToken(token: AccessToken): void {
     this.db
       .prepare(
-        `INSERT INTO access_tokens (token, user_id, grant_id, scope, expires_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO access_tokens
+           (token, user_id, client_id, grant_id, scope, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .run(
         token.token,
         token.userId,
+        token.clientId,
         token.grantId,
         token.scope ?? null,
         token.expiresAt,

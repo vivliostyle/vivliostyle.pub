@@ -113,11 +113,11 @@ const hostApiRegistry: HostApiRegistry = {
   },
   applyBearerSession: {
     permission: 'session:write',
-    impl: (token) => applyBearerSession(token),
+    impl: (token) => runAuth(() => applyBearerSession(token)),
   },
   clearBearerSession: {
     permission: 'session:write',
-    impl: () => clearBearerSession(),
+    impl: () => runAuth(() => clearBearerSession()),
   },
   getViewerUrl: {
     permission: 'viewer:read',

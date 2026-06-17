@@ -149,6 +149,41 @@ describe('AuthClient (OIDC)', () => {
     expect(await auth.getAccessToken()).toBe('fresh');
   });
 
+  it('keeps the stored tokens when a refresh fails transiently (5xx)', async () => {
+    const store = new MemoryTokenStore();
+    await store.save({
+      accessToken: 'old',
+      refreshToken: 'refresh-1',
+      accessTokenExpiresAt: Date.now() - 1000,
+    });
+    const auth = client((url) => {
+      if (url.pathname === '/auth/oauth2/token') {
+        return jsonResponse({ error: 'server_error' }, 500);
+      }
+      return jsonResponse({ error: 'unexpected' }, 500);
+    }, store);
+    expect(await auth.getAccessToken()).toBeNull();
+    // A 5xx is transient: the refresh token survives for a later retry.
+    expect((await store.load())?.refreshToken).toBe('refresh-1');
+  });
+
+  it('clears the store when a refresh is definitively rejected (400)', async () => {
+    const store = new MemoryTokenStore();
+    await store.save({
+      accessToken: 'old',
+      refreshToken: 'refresh-1',
+      accessTokenExpiresAt: Date.now() - 1000,
+    });
+    const auth = client((url) => {
+      if (url.pathname === '/auth/oauth2/token') {
+        return jsonResponse({ error: 'invalid_grant' }, 400);
+      }
+      return jsonResponse({ error: 'unexpected' }, 500);
+    }, store);
+    expect(await auth.getAccessToken()).toBeNull();
+    expect(await store.load()).toBeNull();
+  });
+
   it('loads the user from /oauth2/userinfo claims', async () => {
     const store = new MemoryTokenStore();
     await store.save({

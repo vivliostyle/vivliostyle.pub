@@ -48,6 +48,7 @@ describe('SqliteStore', () => {
     store.saveAccessToken({
       token: 'expired',
       userId: 'u',
+      clientId: 'c',
       grantId: 'g',
       expiresAt: Date.now() - 1000,
     });
@@ -56,6 +57,7 @@ describe('SqliteStore', () => {
     store.saveAccessToken({
       token: 'expired',
       userId: 'u',
+      clientId: 'c',
       grantId: 'g',
       expiresAt: Date.now() + 60_000,
     });
@@ -73,12 +75,14 @@ describe('SqliteStore', () => {
     store.saveAccessToken({
       token: 'a1',
       userId: 'u',
+      clientId: 'c',
       grantId: 'g',
       expiresAt: Date.now() + 1000,
     });
     store.saveAccessToken({
       token: 'keep',
       userId: 'other',
+      clientId: 'c',
       grantId: 'g2',
       expiresAt: Date.now() + 1000,
     });
@@ -99,12 +103,14 @@ describe('SqliteStore', () => {
     store.saveAccessToken({
       token: 'a1',
       userId: 'u',
+      clientId: 'c',
       grantId: 'g1',
       expiresAt: Date.now() + 1000,
     });
     store.saveAccessToken({
       token: 'a2',
       userId: 'u',
+      clientId: 'c',
       grantId: 'g2',
       expiresAt: Date.now() + 1000,
     });

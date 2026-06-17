@@ -142,12 +142,11 @@ export class AuthClient {
     return this.persist(token);
   }
 
-  private async token(
+  private async tokenRequest(
     params: Record<string, string>,
-  ): Promise<OidcTokenResponse | null> {
-    let res: Response;
+  ): Promise<Response | null> {
     try {
-      res = await this.fetchImpl(`${this.baseUrl}/auth/oauth2/token`, {
+      return await this.fetchImpl(`${this.baseUrl}/auth/oauth2/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams(params).toString(),
@@ -155,7 +154,13 @@ export class AuthClient {
     } catch {
       return null;
     }
-    return res.ok ? ((await res.json()) as OidcTokenResponse) : null;
+  }
+
+  private async token(
+    params: Record<string, string>,
+  ): Promise<OidcTokenResponse | null> {
+    const res = await this.tokenRequest(params);
+    return res?.ok ? ((await res.json()) as OidcTokenResponse) : null;
   }
 
   /** Register a new user (reference-server convenience). */
@@ -217,15 +222,20 @@ export class AuthClient {
     if (!current?.refreshToken) {
       return null;
     }
-    const token = await this.token({
+    const res = await this.tokenRequest({
       grant_type: 'refresh_token',
       refresh_token: current.refreshToken,
       client_id: this.clientId,
     });
-    if (token) {
-      return this.persist(token);
+    if (res?.ok) {
+      return this.persist((await res.json()) as OidcTokenResponse);
     }
-    await this.store.clear();
+    // Only a definitive rejection (the refresh token is invalid or expired)
+    // clears the stored tokens; a network error or 5xx leaves them intact so a
+    // later attempt can still recover.
+    if (res && (res.status === 400 || res.status === 401)) {
+      await this.store.clear();
+    }
     return null;
   }
 

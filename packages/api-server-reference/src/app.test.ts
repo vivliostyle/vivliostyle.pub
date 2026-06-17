@@ -287,6 +287,43 @@ describe('auth', () => {
     expect(reuse.status).toBe(400);
   });
 
+  it('revokes a grant via its access token', async () => {
+    await register(app);
+    const tokens = await authenticate(app);
+    const revoked = await app.request(
+      '/auth/oauth2/revoke',
+      postForm({
+        client_id: CLIENT_ID,
+        token: tokens.accessToken,
+        token_type_hint: 'access_token',
+      }),
+    );
+    expect(revoked.status).toBe(200);
+    expect(
+      (await app.request('/projects', { headers: bearer(tokens.accessToken) }))
+        .status,
+    ).toBe(401);
+  });
+
+  it('does not revoke a token presented by another client', async () => {
+    await register(app);
+    const tokens = await authenticate(app);
+    const res = await app.request(
+      '/auth/oauth2/revoke',
+      postForm({
+        client_id: 'someone-else',
+        token: tokens.accessToken,
+        token_type_hint: 'access_token',
+      }),
+    );
+    expect(res.status).toBe(200);
+    // The access token still works: a client cannot revoke another's grant.
+    expect(
+      (await app.request('/projects', { headers: bearer(tokens.accessToken) }))
+        .status,
+    ).toBe(200);
+  });
+
   it('responds 200 when revoking an unknown token', async () => {
     const res = await app.request(
       '/auth/oauth2/revoke',
