@@ -35,7 +35,7 @@ export interface paths {
         put?: never;
         /**
          * Register
-         * @description Creates a new user account; sign in via `/auth/oauth2/authorize` afterwards to obtain access tokens.
+         * @description Creates a new user account; sign in via `/auth/sign-in` afterwards, then `/auth/oauth2/authorize` → `/auth/oauth2/token` to obtain access tokens.
          */
         post: operations["postAuthRegister"];
         delete?: never;
@@ -492,7 +492,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": {
+                "application/x-www-form-urlencoded": {
                     /** @constant */
                     grant_type: "authorization_code";
                     code: string;
@@ -548,7 +548,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": {
+                "application/x-www-form-urlencoded": {
                     token: string;
                     /** @enum {string} */
                     token_type_hint?: "access_token" | "refresh_token";

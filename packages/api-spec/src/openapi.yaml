@@ -109,8 +109,9 @@ paths:
       tags:
         - auth
       summary: Register
-      description: Creates a new user account; sign in via `/auth/oauth2/authorize`
-        afterwards to obtain access tokens.
+      description: Creates a new user account; sign in via `/auth/sign-in` afterwards,
+        then `/auth/oauth2/authorize` → `/auth/oauth2/token` to obtain access
+        tokens.
       responses:
         "201":
           description: Created
@@ -338,7 +339,7 @@ paths:
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/x-www-form-urlencoded:
             schema:
               oneOf:
                 - type: object
@@ -387,7 +388,7 @@ paths:
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/x-www-form-urlencoded:
             schema:
               type: object
               properties:
