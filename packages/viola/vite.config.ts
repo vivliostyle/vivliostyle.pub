@@ -138,16 +138,22 @@ const discoverViolaExtensions = (): { id: string; packageDir: string }[] => {
       encoding: 'utf8',
     }),
   );
-  return projects.flatMap((project) =>
-    project.name?.startsWith('@v/viola-extension-')
-      ? [
-          {
-            id: project.name.slice('@v/viola-extension-'.length),
-            packageDir: project.path,
-          },
-        ]
-      : [],
-  );
+  const prefix = '@v/viola-extension-';
+  const referenceSuffix = '-reference';
+  const byId = new Map<string, { packageDir: string; isReference: boolean }>();
+  for (const project of projects) {
+    if (!project.name?.startsWith(prefix)) {
+      continue;
+    }
+    const rawId = project.name.slice(prefix.length);
+    const isReference = rawId.endsWith(referenceSuffix);
+    const id = isReference ? rawId.slice(0, -referenceSuffix.length) : rawId;
+    const existing = byId.get(id);
+    if (!existing || (existing.isReference && !isReference)) {
+      byId.set(id, { packageDir: project.path, isReference });
+    }
+  }
+  return [...byId].map(([id, { packageDir }]) => ({ id, packageDir }));
 };
 
 const installedExtensions = () => {

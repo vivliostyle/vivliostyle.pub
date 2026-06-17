@@ -21,6 +21,7 @@ export {
   type AccessToken,
   type AuthCode,
   type RefreshToken,
+  type Session,
   SqliteStore,
   type SqliteStoreOptions,
   type StoredUser,

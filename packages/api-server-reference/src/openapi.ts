@@ -28,7 +28,13 @@ export function openApiDocumentation(): GenerateSpecOptions['documentation'] {
           type: 'http',
           scheme: 'bearer',
           description:
-            'Access token obtained from `POST /oauth/token`. Send it as `Authorization: Bearer <token>`.',
+            'Access token obtained from `POST /auth/oauth2/token`. Send it as `Authorization: Bearer <token>`.',
+        },
+        sessionAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          description:
+            'Session token obtained from `POST /auth/sign-in`. Send it as `Authorization: Bearer <token>`.',
         },
       },
     },
@@ -67,8 +73,30 @@ export function openApiDocumentation(): GenerateSpecOptions['documentation'] {
   };
 }
 
-export function generateSpec(app: Hono) {
-  return generateSpecs(app, { documentation: openApiDocumentation() });
+export async function generateSpec(app: Hono) {
+  const spec = await generateSpecs(app, {
+    documentation: openApiDocumentation(),
+  });
+  // hono-openapi documents every `validator('form', …)` body as
+  // `multipart/form-data`, but these are OAuth2 endpoints whose clients send
+  // `application/x-www-form-urlencoded` (this API has no multipart upload), so
+  // relabel them to match the wire format. The plugin's `media` override option
+  // can't be used: in 1.3.0 it mis-parses and yields `application/json`.
+  for (const pathItem of Object.values(spec.paths ?? {})) {
+    for (const operation of Object.values(pathItem ?? {})) {
+      const content = (
+        operation as {
+          requestBody?: { content?: Record<string, unknown> };
+        }
+      )?.requestBody?.content;
+      if (content?.['multipart/form-data']) {
+        content['application/x-www-form-urlencoded'] =
+          content['multipart/form-data'];
+        delete content['multipart/form-data'];
+      }
+    }
+  }
+  return spec;
 }
 
 export interface OpenApiReferencePageOptions {

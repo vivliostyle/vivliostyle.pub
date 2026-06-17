@@ -14,55 +14,72 @@ export const UserSchema = v.object({
 });
 export type User = v.InferOutput<typeof UserSchema>;
 
-export const AuthorizeRequestSchema = v.object({
-  clientId: v.string(),
-  redirectUri: v.pipe(v.string(), v.url()),
-  codeChallenge: v.string(),
-  codeChallengeMethod: v.optional(v.literal('S256'), 'S256'),
-  scope: v.optional(v.string()),
-  state: v.optional(v.string()),
+export const SignInRequestSchema = v.object({
   username: v.string(),
   password: v.string(),
+});
+export type SignInRequest = v.InferOutput<typeof SignInRequestSchema>;
+
+export const SignInResponseSchema = v.object({
+  token: v.string(),
+  user: UserSchema,
+});
+export type SignInResponse = v.InferOutput<typeof SignInResponseSchema>;
+
+export const AuthorizeRequestSchema = v.object({
+  response_type: v.optional(v.literal('code'), 'code'),
+  client_id: v.string(),
+  redirect_uri: v.pipe(v.string(), v.url()),
+  scope: v.optional(v.string()),
+  state: v.optional(v.string()),
+  code_challenge: v.string(),
+  code_challenge_method: v.optional(v.literal('S256'), 'S256'),
 });
 export type AuthorizeRequest = v.InferOutput<typeof AuthorizeRequestSchema>;
 
 export const AuthorizeResponseSchema = v.object({
-  code: v.string(),
-  state: v.optional(v.string()),
-  redirectUri: v.string(),
+  redirect: v.boolean(),
+  url: v.string(),
 });
 export type AuthorizeResponse = v.InferOutput<typeof AuthorizeResponseSchema>;
 
-export const TokenRequestSchema = v.variant('grantType', [
+export const TokenRequestSchema = v.variant('grant_type', [
   v.object({
-    grantType: v.literal('authorization_code'),
+    grant_type: v.literal('authorization_code'),
     code: v.string(),
-    codeVerifier: v.string(),
-    redirectUri: v.pipe(v.string(), v.url()),
-    clientId: v.string(),
+    code_verifier: v.string(),
+    redirect_uri: v.pipe(v.string(), v.url()),
+    client_id: v.string(),
   }),
   v.object({
-    grantType: v.literal('refresh_token'),
-    refreshToken: v.string(),
-    clientId: v.string(),
+    grant_type: v.literal('refresh_token'),
+    refresh_token: v.string(),
+    client_id: v.string(),
   }),
 ]);
 export type TokenRequest = v.InferOutput<typeof TokenRequestSchema>;
 
 export const TokenResponseSchema = v.object({
-  accessToken: v.string(),
-  tokenType: v.literal('Bearer'),
-  expiresIn: v.number(),
-  refreshToken: v.string(),
+  access_token: v.string(),
+  token_type: v.literal('Bearer'),
+  expires_in: v.number(),
+  refresh_token: v.string(),
   scope: v.optional(v.string()),
 });
 export type TokenResponse = v.InferOutput<typeof TokenResponseSchema>;
 
-export const RefreshRequestSchema = v.object({
-  refreshToken: v.string(),
-  clientId: v.string(),
+export const RevokeRequestSchema = v.object({
+  token: v.string(),
+  token_type_hint: v.optional(v.picklist(['access_token', 'refresh_token'])),
+  client_id: v.string(),
 });
-export type RefreshRequest = v.InferOutput<typeof RefreshRequestSchema>;
+export type RevokeRequest = v.InferOutput<typeof RevokeRequestSchema>;
+
+export const UserInfoSchema = v.object({
+  sub: v.string(),
+  name: v.string(),
+});
+export type UserInfo = v.InferOutput<typeof UserInfoSchema>;
 
 // --- Projects ---
 

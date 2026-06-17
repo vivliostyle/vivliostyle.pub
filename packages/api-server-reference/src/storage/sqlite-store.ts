@@ -25,6 +25,7 @@ export interface RefreshToken {
   token: string;
   userId: string;
   clientId: string;
+  grantId: string;
   scope?: string;
   expiresAt: number;
 }
@@ -32,7 +33,15 @@ export interface RefreshToken {
 export interface AccessToken {
   token: string;
   userId: string;
+  clientId: string;
+  grantId: string;
   scope?: string;
+  expiresAt: number;
+}
+
+export interface Session {
+  token: string;
+  userId: string;
   expiresAt: number;
 }
 
@@ -55,13 +64,21 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   token TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   client_id TEXT NOT NULL,
+  grant_id TEXT NOT NULL,
   scope TEXT,
   expires_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS access_tokens (
   token TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  grant_id TEXT NOT NULL,
   scope TEXT,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
   expires_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS projects (
@@ -104,6 +121,7 @@ interface RefreshTokenRow {
   token: string;
   user_id: string;
   client_id: string;
+  grant_id: string;
   scope: Nullable<string>;
   expires_at: number;
 }
@@ -111,7 +129,15 @@ interface RefreshTokenRow {
 interface AccessTokenRow {
   token: string;
   user_id: string;
+  client_id: string;
+  grant_id: string;
   scope: Nullable<string>;
+  expires_at: number;
+}
+
+interface SessionRow {
+  token: string;
+  user_id: string;
   expires_at: number;
 }
 
@@ -150,6 +176,7 @@ function toRefreshToken(row: RefreshTokenRow): RefreshToken {
     token: row.token,
     userId: row.user_id,
     clientId: row.client_id,
+    grantId: row.grant_id,
     scope: row.scope ?? undefined,
     expiresAt: row.expires_at,
   };
@@ -159,7 +186,17 @@ function toAccessToken(row: AccessTokenRow): AccessToken {
   return {
     token: row.token,
     userId: row.user_id,
+    clientId: row.client_id,
+    grantId: row.grant_id,
     scope: row.scope ?? undefined,
+    expiresAt: row.expires_at,
+  };
+}
+
+function toSession(row: SessionRow): Session {
+  return {
+    token: row.token,
+    userId: row.user_id,
     expiresAt: row.expires_at,
   };
 }
@@ -262,16 +299,24 @@ export class SqliteStore {
     this.db
       .prepare(
         `INSERT INTO refresh_tokens
-           (token, user_id, client_id, scope, expires_at)
-         VALUES (?, ?, ?, ?, ?)`,
+           (token, user_id, client_id, grant_id, scope, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .run(
         token.token,
         token.userId,
         token.clientId,
+        token.grantId,
         token.scope ?? null,
         token.expiresAt,
       );
+  }
+
+  findRefreshToken(token: string): RefreshToken | undefined {
+    const row = this.db
+      .prepare('SELECT * FROM refresh_tokens WHERE token = ?')
+      .get(token) as RefreshTokenRow | undefined;
+    return row ? toRefreshToken(row) : undefined;
   }
 
   takeRefreshToken(token: string): RefreshToken | undefined {
@@ -286,15 +331,54 @@ export class SqliteStore {
   revokeUserTokens(userId: string): void {
     this.db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').run(userId);
     this.db.prepare('DELETE FROM access_tokens WHERE user_id = ?').run(userId);
+    this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  }
+
+  /** Drops every access and refresh token sharing the grant (RFC 7009). */
+  revokeGrant(grantId: string): void {
+    this.db
+      .prepare('DELETE FROM refresh_tokens WHERE grant_id = ?')
+      .run(grantId);
+    this.db
+      .prepare('DELETE FROM access_tokens WHERE grant_id = ?')
+      .run(grantId);
+  }
+
+  saveSession(session: Session): void {
+    this.db
+      .prepare(
+        'INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+      )
+      .run(session.token, session.userId, session.expiresAt);
+  }
+
+  findSession(token: string): Session | undefined {
+    const row = this.db
+      .prepare('SELECT * FROM sessions WHERE token = ?')
+      .get(token) as SessionRow | undefined;
+    if (!row) return undefined;
+    if (row.expires_at < Date.now()) {
+      this.db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+      return undefined;
+    }
+    return toSession(row);
   }
 
   saveAccessToken(token: AccessToken): void {
     this.db
       .prepare(
-        `INSERT INTO access_tokens (token, user_id, scope, expires_at)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO access_tokens
+           (token, user_id, client_id, grant_id, scope, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(token.token, token.userId, token.scope ?? null, token.expiresAt);
+      .run(
+        token.token,
+        token.userId,
+        token.clientId,
+        token.grantId,
+        token.scope ?? null,
+        token.expiresAt,
+      );
   }
 
   findAccessToken(token: string): AccessToken | undefined {

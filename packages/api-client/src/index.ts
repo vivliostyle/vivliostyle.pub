@@ -28,7 +28,7 @@ export type ProjectList = Ok200<Operation<'/projects', 'get'>>;
 export type FileEntry = Ok200<
   Operation<'/projects/{id}/files', 'get'>
 >['files'][number];
-export type TokenResponse = Ok200<Operation<'/oauth/token', 'post'>>;
+export type TokenResponse = Ok200<Operation<'/auth/oauth2/token', 'post'>>;
 export type AttachmentResult = Ok201<
   Operation<'/projects/{id}/attachments/{sha256}', 'put'>
 >;

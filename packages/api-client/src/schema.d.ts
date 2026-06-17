@@ -35,7 +35,7 @@ export interface paths {
         put?: never;
         /**
          * Register
-         * @description Creates a new user account; sign in via `/oauth/authorize` afterwards to obtain access tokens.
+         * @description Creates a new user account; sign in via `/auth/sign-in` afterwards, then `/auth/oauth2/authorize` → `/auth/oauth2/token` to obtain access tokens.
          */
         post: operations["postAuthRegister"];
         delete?: never;
@@ -44,7 +44,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/oauth/authorize": {
+    "/auth/sign-in": {
         parameters: {
             query?: never;
             header?: never;
@@ -54,17 +54,37 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Authorize
-         * @description Verifies the username and password and returns a short-lived authorization code to exchange via `/oauth/token` with the matching PKCE verifier.
+         * Sign in
+         * @description Verifies the username and password and starts a session, returning the session token to authorize `/auth/oauth2/authorize`.
          */
-        post: operations["postOauthAuthorize"];
+        post: operations["postAuthSignIn"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/oauth/token": {
+    "/auth/oauth2/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Authorize
+         * @description Issues a short-lived authorization code for the session given in the `Authorization: Bearer <session token>` header (from `/auth/sign-in`), returning the redirect URI carrying the code to exchange via `/auth/oauth2/token` with the matching PKCE verifier.
+         */
+        get: operations["getAuthOauth2Authorize"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oauth2/token": {
         parameters: {
             query?: never;
             header?: never;
@@ -75,16 +95,16 @@ export interface paths {
         put?: never;
         /**
          * Token
-         * @description Exchanges an authorization code (after `/oauth/authorize`) or a refresh token for an access token.
+         * @description Exchanges an authorization code (after `/auth/oauth2/authorize`) or a refresh token for an access token. The refresh token is rotated, invalidating the previous one.
          */
-        post: operations["postOauthToken"];
+        post: operations["postAuthOauth2Token"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/oauth/refresh": {
+    "/auth/oauth2/revoke": {
         parameters: {
             query?: never;
             header?: never;
@@ -94,17 +114,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Refresh
-         * @description Issues a new access token and rotates the refresh token, invalidating the previous one.
+         * Revoke
+         * @description Revokes a token (RFC 7009). Revoking a refresh token also drops the access tokens of the same grant. Always responds 200, even for an unknown or already-revoked token.
          */
-        post: operations["postOauthRefresh"];
+        post: operations["postAuthOauth2Revoke"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/oauth/session": {
+    "/auth/oauth2/session": {
         parameters: {
             query?: never;
             header?: never;
@@ -118,13 +138,13 @@ export interface paths {
          * Logout
          * @description Revokes every access and refresh token issued to the signed-in user.
          */
-        delete: operations["deleteOauthSession"];
+        delete: operations["deleteAuthOauth2Session"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/oauth/userinfo": {
+    "/auth/oauth2/userinfo": {
         parameters: {
             query?: never;
             header?: never;
@@ -132,10 +152,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get user
-         * @description Returns the signed-in user's profile.
+         * User info
+         * @description Returns the signed-in user's OpenID Connect claims.
          */
-        get: operations["getOauthUserinfo"];
+        get: operations["getAuthOauth2Userinfo"];
         put?: never;
         post?: never;
         delete?: never;
@@ -375,7 +395,7 @@ export interface operations {
             };
         };
     };
-    postOauthAuthorize: {
+    postAuthSignIn: {
         parameters: {
             query?: never;
             header?: never;
@@ -385,33 +405,24 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    clientId: string;
-                    /** Format: uri */
-                    redirectUri: string;
-                    codeChallenge: string;
-                    /**
-                     * @default S256
-                     * @constant
-                     */
-                    codeChallengeMethod?: "S256";
-                    scope?: string;
-                    state?: string;
                     username: string;
                     password: string;
                 };
             };
         };
         responses: {
-            /** @description Authorization code */
+            /** @description Session */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        code: string;
-                        state?: string;
-                        redirectUri: string;
+                        token: string;
+                        user: {
+                            id: string;
+                            username: string;
+                        };
                     };
                 };
             };
@@ -429,7 +440,50 @@ export interface operations {
             };
         };
     };
-    postOauthToken: {
+    getAuthOauth2Authorize: {
+        parameters: {
+            query: {
+                response_type?: "code";
+                client_id: string;
+                redirect_uri: string;
+                scope?: string;
+                state?: string;
+                code_challenge: string;
+                code_challenge_method?: "S256";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorization redirect */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        redirect: boolean;
+                        url: string;
+                    };
+                };
+            };
+            /** @description Invalid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postAuthOauth2Token: {
         parameters: {
             query?: never;
             header?: never;
@@ -438,19 +492,19 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
+                "application/x-www-form-urlencoded": {
                     /** @constant */
-                    grantType: "authorization_code";
+                    grant_type: "authorization_code";
                     code: string;
-                    codeVerifier: string;
+                    code_verifier: string;
                     /** Format: uri */
-                    redirectUri: string;
-                    clientId: string;
+                    redirect_uri: string;
+                    client_id: string;
                 } | {
                     /** @constant */
-                    grantType: "refresh_token";
-                    refreshToken: string;
-                    clientId: string;
+                    grant_type: "refresh_token";
+                    refresh_token: string;
+                    client_id: string;
                 };
             };
         };
@@ -462,11 +516,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        accessToken: string;
+                        access_token: string;
                         /** @constant */
-                        tokenType: "Bearer";
-                        expiresIn: number;
-                        refreshToken: string;
+                        token_type: "Bearer";
+                        expires_in: number;
+                        refresh_token: string;
                         scope?: string;
                     };
                 };
@@ -485,7 +539,7 @@ export interface operations {
             };
         };
     };
-    postOauthRefresh: {
+    postAuthOauth2Revoke: {
         parameters: {
             query?: never;
             header?: never;
@@ -494,44 +548,25 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    refreshToken: string;
-                    clientId: string;
+                "application/x-www-form-urlencoded": {
+                    token: string;
+                    /** @enum {string} */
+                    token_type_hint?: "access_token" | "refresh_token";
+                    client_id: string;
                 };
             };
         };
         responses: {
-            /** @description Tokens */
+            /** @description Revoked */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": {
-                        accessToken: string;
-                        /** @constant */
-                        tokenType: "Bearer";
-                        expiresIn: number;
-                        refreshToken: string;
-                        scope?: string;
-                    };
-                };
-            };
-            /** @description Invalid refresh token */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
+                content?: never;
             };
         };
     };
-    deleteOauthSession: {
+    deleteAuthOauth2Session: {
         parameters: {
             query?: never;
             header?: never;
@@ -561,7 +596,7 @@ export interface operations {
             };
         };
     };
-    getOauthUserinfo: {
+    getAuthOauth2Userinfo: {
         parameters: {
             query?: never;
             header?: never;
@@ -570,15 +605,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description User */
+            /** @description Claims */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        username: string;
+                        sub: string;
+                        name: string;
                     };
                 };
             };

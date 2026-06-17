@@ -48,6 +48,8 @@ describe('SqliteStore', () => {
     store.saveAccessToken({
       token: 'expired',
       userId: 'u',
+      clientId: 'c',
+      grantId: 'g',
       expiresAt: Date.now() - 1000,
     });
     expect(store.findAccessToken('expired')).toBeUndefined();
@@ -55,6 +57,8 @@ describe('SqliteStore', () => {
     store.saveAccessToken({
       token: 'expired',
       userId: 'u',
+      clientId: 'c',
+      grantId: 'g',
       expiresAt: Date.now() + 60_000,
     });
     expect(store.findAccessToken('expired')?.userId).toBe('u');
@@ -65,22 +69,55 @@ describe('SqliteStore', () => {
       token: 'r1',
       userId: 'u',
       clientId: 'c',
+      grantId: 'g',
       expiresAt: Date.now() + 1000,
     });
     store.saveAccessToken({
       token: 'a1',
       userId: 'u',
+      clientId: 'c',
+      grantId: 'g',
       expiresAt: Date.now() + 1000,
     });
     store.saveAccessToken({
       token: 'keep',
       userId: 'other',
+      clientId: 'c',
+      grantId: 'g2',
       expiresAt: Date.now() + 1000,
     });
     store.revokeUserTokens('u');
     expect(store.takeRefreshToken('r1')).toBeUndefined();
     expect(store.findAccessToken('a1')).toBeUndefined();
     expect(store.findAccessToken('keep')).toBeDefined();
+  });
+
+  it('revokes only the tokens sharing a grant', () => {
+    store.saveRefreshToken({
+      token: 'r1',
+      userId: 'u',
+      clientId: 'c',
+      grantId: 'g1',
+      expiresAt: Date.now() + 1000,
+    });
+    store.saveAccessToken({
+      token: 'a1',
+      userId: 'u',
+      clientId: 'c',
+      grantId: 'g1',
+      expiresAt: Date.now() + 1000,
+    });
+    store.saveAccessToken({
+      token: 'a2',
+      userId: 'u',
+      clientId: 'c',
+      grantId: 'g2',
+      expiresAt: Date.now() + 1000,
+    });
+    store.revokeGrant('g1');
+    expect(store.findRefreshToken('r1')).toBeUndefined();
+    expect(store.findAccessToken('a1')).toBeUndefined();
+    expect(store.findAccessToken('a2')).toBeDefined();
   });
 
   it('lists projects scoped to the owner and orders by updatedAt desc', () => {
@@ -148,34 +185,42 @@ describe('SqliteStore end-to-end via createApp', () => {
     });
     expect(reg.status).toBe(201);
 
-    const verifier = 'verifier-abcdefghijklmnopqrstuvwxyz-0123456789';
-    const authorize = await app.request('/oauth/authorize', {
+    const signIn = await app.request('/auth/sign-in', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientId: 'cli',
-        redirectUri: 'https://app/cb',
-        codeChallenge: pkceChallengeS256(verifier),
-        codeChallengeMethod: 'S256',
-        username: 'alice',
-        password: 'password123',
-      }),
+      body: JSON.stringify({ username: 'alice', password: 'password123' }),
     });
-    const { code } = (await authorize.json()) as { code: string };
+    const { token: sessionToken } = (await signIn.json()) as { token: string };
 
-    const tokenRes = await app.request('/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grantType: 'authorization_code',
-        code,
-        codeVerifier: verifier,
-        redirectUri: 'https://app/cb',
-        clientId: 'cli',
-      }),
+    const verifier = 'verifier-abcdefghijklmnopqrstuvwxyz-0123456789';
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: 'cli',
+      redirect_uri: 'https://app/cb',
+      code_challenge: pkceChallengeS256(verifier),
+      code_challenge_method: 'S256',
+    }).toString();
+    const authorize = await app.request(`/auth/oauth2/authorize?${query}`, {
+      headers: { Authorization: `Bearer ${sessionToken}` },
     });
-    const { accessToken } = (await tokenRes.json()) as { accessToken: string };
-    const auth = { Authorization: `Bearer ${accessToken}` };
+    const { url } = (await authorize.json()) as { url: string };
+    const code = new URL(url).searchParams.get('code');
+
+    const tokenRes = await app.request('/auth/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code as string,
+        code_verifier: verifier,
+        redirect_uri: 'https://app/cb',
+        client_id: 'cli',
+      }).toString(),
+    });
+    const { access_token } = (await tokenRes.json()) as {
+      access_token: string;
+    };
+    const auth = { Authorization: `Bearer ${access_token}` };
 
     const create = await app.request('/projects', {
       method: 'POST',

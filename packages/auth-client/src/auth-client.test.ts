@@ -4,7 +4,8 @@ import { AuthClient } from './auth-client';
 import { challengeS256 } from './pkce';
 import { MemoryTokenStore } from './token-store';
 
-const BASE = 'https://sync.example';
+const BASE = 'https://api.example';
+const REDIRECT = 'https://app.example/cb';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -13,23 +14,28 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function client(
-  handler: (url: string, method: string, body: unknown) => Response,
-  tokenStore = new MemoryTokenStore(),
-) {
+type Handler = (url: URL, method: string, init?: RequestInit) => Response;
+
+function client(handler: Handler, tokenStore = new MemoryTokenStore()) {
   const fetchImpl = ((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.toString();
-    const method = init?.method ?? 'GET';
-    const body = init?.body ? JSON.parse(init.body as string) : undefined;
-    return Promise.resolve(handler(url, method, body));
+    const url = new URL(typeof input === 'string' ? input : input.toString());
+    return Promise.resolve(handler(url, init?.method ?? 'GET', init));
   }) as typeof fetch;
   return new AuthClient({
     baseUrl: BASE,
-    clientId: 'client-1',
-    redirectUri: 'https://app.example/cb',
+    clientId: 'web',
+    redirectUri: REDIRECT,
     tokenStore,
     fetch: fetchImpl,
   });
+}
+
+function jsonBody(init?: RequestInit): Record<string, string> {
+  return init?.body ? JSON.parse(init.body as string) : {};
+}
+
+function form(init?: RequestInit): URLSearchParams {
+  return new URLSearchParams((init?.body as string) ?? '');
 }
 
 describe('pkce', () => {
@@ -41,82 +47,197 @@ describe('pkce', () => {
   });
 });
 
-describe('AuthClient', () => {
-  it('logs in via the PKCE authorization-code flow', async () => {
-    let sentChallenge: string | undefined;
+describe('AuthClient (OIDC)', () => {
+  it('logs in via sign-in then the authorization-code + PKCE flow (password)', async () => {
+    let signInBody: Record<string, string> = {};
+    let authorizeBearer: string | undefined;
+    let sentChallenge: string | null = null;
     let sentVerifier: string | undefined;
-    const auth = client((url, _method, body) => {
-      const b = body as Record<string, string>;
-      if (url.endsWith('/oauth/authorize')) {
-        sentChallenge = b.codeChallenge;
-        return jsonResponse({ code: 'AUTH_CODE', redirectUri: b.redirectUri });
-      }
-      if (url.endsWith('/oauth/token')) {
-        sentVerifier = b.codeVerifier;
+    const auth = client((url, _method, init) => {
+      if (url.pathname === '/auth/sign-in') {
+        signInBody = jsonBody(init);
         return jsonResponse({
-          accessToken: 'access-1',
-          tokenType: 'Bearer',
-          expiresIn: 3600,
-          refreshToken: 'refresh-1',
+          token: 'session-1',
+          user: { id: 'u1', username: 'alice' },
+        });
+      }
+      if (url.pathname === '/auth/oauth2/authorize') {
+        authorizeBearer = (init?.headers as Record<string, string>)
+          .Authorization;
+        sentChallenge = url.searchParams.get('code_challenge');
+        return jsonResponse({
+          redirect: true,
+          url: `${REDIRECT}?code=AUTH_CODE&state=x`,
+        });
+      }
+      if (url.pathname === '/auth/oauth2/token') {
+        sentVerifier = form(init).get('code_verifier') ?? undefined;
+        return jsonResponse({
+          access_token: 'access-1',
+          refresh_token: 'refresh-1',
+          expires_in: 3600,
         });
       }
       return jsonResponse({ error: 'unexpected' }, 500);
     });
 
     const tokens = await auth.login('alice', 'password123');
+    expect(signInBody).toEqual({ username: 'alice', password: 'password123' });
+    expect(authorizeBearer).toBe('Bearer session-1');
     expect(tokens.accessToken).toBe('access-1');
     expect(sentChallenge).toBe(await challengeS256(sentVerifier ?? ''));
     expect(await auth.getAccessToken()).toBe('access-1');
   });
 
+  it('exchanges a session bearer for tokens (email-OTP path)', async () => {
+    let bearer: string | undefined;
+    const auth = client((url, _method, init) => {
+      if (url.pathname === '/auth/oauth2/authorize') {
+        bearer = (init?.headers as Record<string, string>).Authorization;
+        return jsonResponse({ redirect: true, url: `${REDIRECT}?code=CODE2` });
+      }
+      if (url.pathname === '/auth/oauth2/token') {
+        expect(form(init).get('code')).toBe('CODE2');
+        return jsonResponse({
+          access_token: 'access-2',
+          refresh_token: 'r',
+          expires_in: 3600,
+        });
+      }
+      return jsonResponse({ error: 'unexpected' }, 500);
+    });
+
+    const tokens = await auth.exchangeSession('session-token');
+    expect(bearer).toBe('Bearer session-token');
+    expect(tokens.accessToken).toBe('access-2');
+  });
+
+  it('reads the code from a 302 Location when not answered as JSON', async () => {
+    const auth = client((url) => {
+      if (url.pathname === '/auth/oauth2/authorize') {
+        return new Response(null, {
+          status: 302,
+          headers: { location: `${REDIRECT}?code=CODE_302` },
+        });
+      }
+      if (url.pathname === '/auth/oauth2/token') {
+        return jsonResponse({ access_token: 'a', expires_in: 3600 });
+      }
+      return jsonResponse({ error: 'unexpected' }, 500);
+    });
+    expect((await auth.exchangeSession('s')).accessToken).toBe('a');
+  });
+
   it('refreshes an expired access token', async () => {
     const store = new MemoryTokenStore();
     await store.save({
-      accessToken: 'old-access',
+      accessToken: 'old',
       refreshToken: 'refresh-1',
       accessTokenExpiresAt: Date.now() - 1000,
     });
-    let refreshCalls = 0;
-    const auth = client((url) => {
-      if (url.endsWith('/oauth/refresh')) {
-        refreshCalls += 1;
+    const auth = client((url, _method, init) => {
+      if (url.pathname === '/auth/oauth2/token') {
+        expect(form(init).get('grant_type')).toBe('refresh_token');
         return jsonResponse({
-          accessToken: 'new-access',
-          tokenType: 'Bearer',
-          expiresIn: 3600,
-          refreshToken: 'refresh-2',
+          access_token: 'fresh',
+          refresh_token: 'refresh-2',
+          expires_in: 3600,
         });
       }
       return jsonResponse({ error: 'unexpected' }, 500);
     }, store);
-
-    expect(await auth.getAccessToken()).toBe('new-access');
-    expect(refreshCalls).toBe(1);
+    expect(await auth.getAccessToken()).toBe('fresh');
   });
 
-  it('clears tokens on logout', async () => {
+  it('keeps the stored tokens when a refresh fails transiently (5xx)', async () => {
+    const store = new MemoryTokenStore();
+    await store.save({
+      accessToken: 'old',
+      refreshToken: 'refresh-1',
+      accessTokenExpiresAt: Date.now() - 1000,
+    });
+    const auth = client((url) => {
+      if (url.pathname === '/auth/oauth2/token') {
+        return jsonResponse({ error: 'server_error' }, 500);
+      }
+      return jsonResponse({ error: 'unexpected' }, 500);
+    }, store);
+    expect(await auth.getAccessToken()).toBeNull();
+    // A 5xx is transient: the refresh token survives for a later retry.
+    expect((await store.load())?.refreshToken).toBe('refresh-1');
+  });
+
+  it('clears the store when a refresh is definitively rejected (400)', async () => {
+    const store = new MemoryTokenStore();
+    await store.save({
+      accessToken: 'old',
+      refreshToken: 'refresh-1',
+      accessTokenExpiresAt: Date.now() - 1000,
+    });
+    const auth = client((url) => {
+      if (url.pathname === '/auth/oauth2/token') {
+        return jsonResponse({ error: 'invalid_grant' }, 400);
+      }
+      return jsonResponse({ error: 'unexpected' }, 500);
+    }, store);
+    expect(await auth.getAccessToken()).toBeNull();
+    expect(await store.load()).toBeNull();
+  });
+
+  it('loads the user from /oauth2/userinfo claims', async () => {
     const store = new MemoryTokenStore();
     await store.save({
       accessToken: 'access-1',
+      refreshToken: 'r',
+      accessTokenExpiresAt: Date.now() + 60_000,
+    });
+    const auth = client((url) => {
+      if (url.pathname === '/auth/oauth2/userinfo') {
+        return jsonResponse({ sub: 'user-1', email: 'a@example.com' });
+      }
+      return jsonResponse({ error: 'unexpected' }, 500);
+    }, store);
+    expect(await auth.getUser()).toEqual({
+      id: 'user-1',
+      username: 'a@example.com',
+    });
+  });
+
+  it('revokes the refresh token on logout, then clears the store', async () => {
+    const store = new MemoryTokenStore();
+    await store.save({
+      accessToken: 'a',
       refreshToken: 'refresh-1',
       accessTokenExpiresAt: Date.now() + 60_000,
     });
-    let revoked = false;
-    const auth = client((url, method) => {
-      if (url.endsWith('/oauth/session') && method === 'DELETE') {
-        revoked = true;
-        return new Response(null, { status: 204 });
+    let revoked: URLSearchParams | undefined;
+    const auth = client((url, _method, init) => {
+      if (url.pathname === '/auth/oauth2/revoke') {
+        revoked = form(init);
+        return new Response(null, { status: 200 });
       }
       return jsonResponse({ error: 'unexpected' }, 500);
     }, store);
 
     await auth.logout();
-    expect(revoked).toBe(true);
-    expect(await auth.getAccessToken()).toBeNull();
+    expect(revoked?.get('client_id')).toBe('web');
+    expect(revoked?.get('token')).toBe('refresh-1');
+    expect(revoked?.get('token_type_hint')).toBe('refresh_token');
+    expect(await store.load()).toBeNull();
   });
 
-  it('throws when registration is rejected', async () => {
-    const auth = client(() => jsonResponse({ error: 'conflict' }, 409));
-    await expect(auth.register('alice', 'password123')).rejects.toThrow();
+  it('clears the store even when revocation fails', async () => {
+    const store = new MemoryTokenStore();
+    await store.save({
+      accessToken: 'a',
+      refreshToken: 'refresh-1',
+      accessTokenExpiresAt: Date.now() + 60_000,
+    });
+    const auth = client(() => {
+      throw new Error('network down');
+    }, store);
+
+    await auth.logout();
+    expect(await store.load()).toBeNull();
   });
 });

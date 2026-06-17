@@ -16,32 +16,38 @@ async function register(baseUrl: string, username: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password: 'password123' }),
   });
-  const authorize = await fetch(`${baseUrl}/api/oauth/authorize`, {
+  const signIn = await fetch(`${baseUrl}/api/auth/sign-in`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      clientId: 'c',
-      redirectUri: 'http://r',
-      codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
-      codeChallengeMethod: 'S256',
-      username,
-      password: 'password123',
-    }),
+    body: JSON.stringify({ username, password: 'password123' }),
   });
-  const { code } = (await authorize.json()) as { code: string };
-  const tokenRes = await fetch(`${baseUrl}/api/oauth/token`, {
+  const { token: sessionToken } = (await signIn.json()) as { token: string };
+  const query = new URLSearchParams({
+    response_type: 'code',
+    client_id: 'c',
+    redirect_uri: 'http://r',
+    code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+    code_challenge_method: 'S256',
+  }).toString();
+  const authorize = await fetch(
+    `${baseUrl}/api/auth/oauth2/authorize?${query}`,
+    { headers: { Authorization: `Bearer ${sessionToken}` } },
+  );
+  const { url } = (await authorize.json()) as { url: string };
+  const code = new URL(url).searchParams.get('code');
+  const tokenRes = await fetch(`${baseUrl}/api/auth/oauth2/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      grantType: 'authorization_code',
-      code,
-      codeVerifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
-      redirectUri: 'http://r',
-      clientId: 'c',
-    }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code as string,
+      code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
+      redirect_uri: 'http://r',
+      client_id: 'c',
+    }).toString(),
   });
-  const { accessToken } = (await tokenRes.json()) as { accessToken: string };
-  return accessToken;
+  const { access_token } = (await tokenRes.json()) as { access_token: string };
+  return access_token;
 }
 
 async function createProject(baseUrl: string, token: string) {
