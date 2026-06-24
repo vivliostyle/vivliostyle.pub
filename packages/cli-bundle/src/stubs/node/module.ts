@@ -155,4 +155,10 @@ const moduleSelfExport = {
   _resolveFilename,
 };
 
+// Vite 8.1's config/SSR dependency tracker feature-detects `Module.registerHooks`
+// / `Module.register` and silently no-ops when a runtime exposes neither (its
+// documented fallback). Exposing the named `Module` without either hook keeps
+// vite on that fallback path instead of trying to register a Node loader.
+export const Module = moduleSelfExport;
+
 export default moduleSelfExport;
