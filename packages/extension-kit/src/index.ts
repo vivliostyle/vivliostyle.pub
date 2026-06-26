@@ -69,7 +69,7 @@ export type ExtensionSessionListener = (
  * granted permissions unlock:
  *   - `session:read`  → `getSessionSnapshot`, `subscribeSession`
  *   - `session:write` → `login`, `register`, `logout`, `applyBearerSession`,
- *                       `clearBearerSession`
+ *                       `clearBearerSession`, `startProviderSignIn`
  *   - `viewer:read`   → `getViewerUrl`
  */
 export type ExtensionPermission =
@@ -97,6 +97,7 @@ export interface ExtensionHostApi {
   logout(): Promise<void>;
   applyBearerSession(token: string): Promise<void>;
   clearBearerSession(): Promise<void>;
+  startProviderSignIn(provider: string): Promise<void>;
   getLocale(): string;
   getViewerUrl(): Promise<string>;
 }

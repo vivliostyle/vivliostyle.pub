@@ -50,6 +50,9 @@ export function restoreSession(): Promise<void> {
       discoverProjects().catch(() => {});
       return;
     }
+    if (await completePendingProviderSignIn()) {
+      return;
+    }
     try {
       const user = await $session.auth.getUser();
       if (user) {
@@ -134,4 +137,64 @@ export async function applyBearerSession(sessionToken: string): Promise<void> {
 
 export async function clearBearerSession(): Promise<void> {
   await logout();
+}
+
+const PROVIDER_NONCE_PARAM = 'vp_provider_signin';
+
+function providerApiBase(): string {
+  return new URL($session.baseUrl || '/', location.origin).href.replace(
+    /\/+$/,
+    '',
+  );
+}
+
+export function startProviderSignIn(provider: string): void {
+  const nonce = (crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', '');
+  const returnUrl = new URL(location.href);
+  returnUrl.searchParams.set(PROVIDER_NONCE_PARAM, nonce);
+  const start = new URL(`${providerApiBase()}/auth/provider/start`);
+  start.searchParams.set('provider', provider);
+  start.searchParams.set('return', returnUrl.href);
+  location.assign(start.href);
+}
+
+async function claimProviderToken(
+  base: string,
+  nonce: string,
+): Promise<string | null> {
+  const url = `${base}/auth/provider/claim?nonce=${encodeURIComponent(nonce)}`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as { status?: string; token?: string };
+        if (data.status === 'ok' && data.token) {
+          return data.token;
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+async function completePendingProviderSignIn(): Promise<boolean> {
+  if (typeof location === 'undefined') {
+    return false;
+  }
+  const url = new URL(location.href);
+  const nonce = url.searchParams.get(PROVIDER_NONCE_PARAM);
+  if (!nonce) {
+    return false;
+  }
+  const token = await claimProviderToken(providerApiBase(), nonce);
+  if (!token) {
+    return false;
+  }
+  url.searchParams.delete(PROVIDER_NONCE_PARAM);
+  history.replaceState(history.state, '', url.href);
+  await applyBearerSession(token);
+  return true;
 }
