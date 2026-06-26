@@ -39,3 +39,5 @@ vivliostyle-pub/
 /secrets/*/*
 !/secrets/**/*.sample
 !/secrets/**/README.md
+enterprise/
+tmp/
