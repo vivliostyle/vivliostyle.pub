@@ -33,7 +33,7 @@ catalog:
   '@jsonjoy.com/fs-snapshot': 4.57.2
   '@jsonjoy.com/json-pack': 18.23.0
   '@platformatic/vfs': 0.4.0
-  '@rolldown/browser': 1.0.0-rc.18
+  '@rolldown/browser': 1.1.2
   '@standard-community/standard-json': 0.3.5
   '@standard-community/standard-openapi': 0.2.9
   '@tailwindcss/vite': 4.3.0
