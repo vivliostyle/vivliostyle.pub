@@ -189,12 +189,12 @@ async function completePendingProviderSignIn(): Promise<boolean> {
   if (!nonce) {
     return false;
   }
+  url.searchParams.delete(PROVIDER_NONCE_PARAM);
+  history.replaceState(history.state, '', url.href);
   const token = await claimProviderToken(providerApiBase(), nonce);
   if (!token) {
     return false;
   }
-  url.searchParams.delete(PROVIDER_NONCE_PARAM);
-  history.replaceState(history.state, '', url.href);
   await applyBearerSession(token);
   return true;
 }
