@@ -211,24 +211,30 @@ const redirectRolldownToBrowserPlugin: Plugin = {
   },
 };
 
-// Replaces `import.meta.url` / `.env` / `.require` MemberExpression AST nodes.
-// We can't use a regex over the source: vite's bundled code contains the literal
-// string "import.meta.url" inside a template literal it emits, and naive text
-// replacement breaks that string. Walking the oxc AST avoids string contexts.
+// Replaces `import.meta.url` / `.filename` / `.dirname` / `.env` / `.require`
+// MemberExpression AST nodes. We can't use a regex over the source: vite's
+// bundled code contains the literal string "import.meta.url" inside a template
+// literal it emits, and naive text replacement breaks that string. Walking the
+// oxc AST avoids string contexts.
 const resolveImportMetaPlugin: Plugin = {
   name: 'resolve-import-meta',
   transform: {
     filter: { id: /\.(?:js|mjs|cjs|ts|tsx)$/ },
     handler(code, id) {
-      if (!/import\.meta\.(?:url|env|require)\b/.test(code)) return null;
+      if (!/import\.meta\.(?:url|filename|dirname|env|require)\b/.test(code)) {
+        return null;
+      }
       const pkg = resolvePkgDir(id);
       if (!pkg) return null;
       const { root, name } = pkg;
-      const virtualUrl = JSON.stringify(
-        pathToFileURL(
-          path.join('/workdir/node_modules', name, path.relative(root, id)),
-        ).href,
+      const virtualPath = path.join(
+        '/workdir/node_modules',
+        name,
+        path.relative(root, id),
       );
+      const virtualUrl = JSON.stringify(pathToFileURL(virtualPath).href);
+      const virtualFilename = JSON.stringify(virtualPath);
+      const virtualDirname = JSON.stringify(path.dirname(virtualPath));
 
       let program: ReturnType<typeof parseAst>;
       try {
@@ -247,15 +253,15 @@ const resolveImportMetaPlugin: Plugin = {
         if (typeof node.start !== 'number' || typeof node.end !== 'number') {
           return null;
         }
-        const value =
-          node.property?.name === 'url'
-            ? virtualUrl
-            : node.property?.name === 'env'
-              ? '({})'
-              : // https://github.com/vitejs/vite/blob/0b17ab3727202b8c87cb0e747c192e3527a5e1ee/packages/vite/src/node/server/ws.ts#L27
-                node.property?.name === 'require'
-                ? '(() => ({}))'
-                : null;
+        const valueByProp: Record<string, string> = {
+          url: virtualUrl,
+          filename: virtualFilename,
+          dirname: virtualDirname,
+          env: '({})',
+          // https://github.com/vitejs/vite/blob/0b17ab3727202b8c87cb0e747c192e3527a5e1ee/packages/vite/src/node/server/ws.ts#L27
+          require: '(() => ({}))',
+        };
+        const value = valueByProp[node.property?.name] ?? null;
         if (value === null) return null;
         return { start: node.start, end: node.end, value };
       };
