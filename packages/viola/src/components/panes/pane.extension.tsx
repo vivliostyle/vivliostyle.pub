@@ -23,6 +23,7 @@ import {
   logout,
   register,
   SessionError,
+  startProviderSignIn,
 } from '../../stores/actions/session';
 import {
   type ExtensionId,
@@ -118,6 +119,12 @@ const hostApiRegistry: HostApiRegistry = {
   clearBearerSession: {
     permission: 'session:write',
     impl: () => runAuth(() => clearBearerSession()),
+  },
+  startProviderSignIn: {
+    permission: 'session:write',
+    impl: async (provider) => {
+      startProviderSignIn(provider);
+    },
   },
   getViewerUrl: {
     permission: 'viewer:read',
