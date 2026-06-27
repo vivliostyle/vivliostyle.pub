@@ -9,21 +9,36 @@ You can try the development version of Vivliostyle Pub at: https://alpha.vivlios
 ### Usage
 
 1. Open the URL in your web browser.
-2. Click the "Create a new file" button to create an empty file.
-3. Click the "Empty file" to open the file in the editor.
-4. You can start typing in the editor. To insert a heading, type `# Heading` and press Enter. To insert a paragraph, just type your text and press Enter.
-5. You can check the page preview in the right pane.
-6. Click "Vivliostyle Pub" menu in the top left corner to open the submenu:
+2. To create a project, click "Create a new project."
+    - Choose an initial content for your project with the "Template" option.
+    - Set your publication's metadata using the "Book title, Author, and Language" option.
+    - Select your project's appearance with the "Theme" option.
+3. Click "Create Project" to generate the new project.
+4. Begin typing in the editor.
+    - To insert a heading, type `# Heading` and press Enter.
+    - To insert a paragraph, simply type your text and press Enter.
+    - To insert an image, type `!` to open a context menu, or drag and drop your desired image onto the editor area.
+5. Click the "Vivliostyle Pub" menu in the top-left corner to open the submenu:
+  - Vivliostyle Pub menu
+    - Open Project
+    - New Project
+    - Open Print Preview
+      - You can check the page preview using Vivliostyle.js.
+    - Print PDF
+    - Export EPUB
+    - Export Web Publication
+    - Export Vivliostyle Project Files
+    - Language
+  - Project menu
     - Title and metadata
-      - Book metadata settings such as title and author
+      - Book metadata settings (e.g., title, author)
       - Table of Contents settings
+    - Media
+      - Manage inserted images
     - Customize theme
       - Vivliostyle Theme selection
       - Install themes from npm
       - Edit custom CSS
-    - Export EPUB
-    - Export Web Publication
-    - Export Vivliostyle Project files
 
 ## Credits
 
