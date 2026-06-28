@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as syncProtocol from 'y-protocols/sync';
 import * as Y from 'yjs';
 
-import { createApiDevServer } from '../dev-server';
+import { createApiMiddleware } from '../middleware';
 
 const MESSAGE_SYNC = 0;
 
@@ -78,7 +78,7 @@ describe('sync WebSocket', () => {
   let wsBase: string;
 
   beforeEach(async () => {
-    const api = createApiDevServer();
+    const api = createApiMiddleware();
     const http = createServer((req, res) => {
       api.middleware(req, res, () => {
         res.statusCode = 404;

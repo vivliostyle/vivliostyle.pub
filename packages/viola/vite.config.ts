@@ -7,10 +7,17 @@ import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
+import { invariant } from 'outvariant';
 import { visualizer } from 'rollup-plugin-visualizer';
 import sirv from 'sirv';
 import * as tar from 'tar';
-import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
+import {
+  defineConfig,
+  loadEnv,
+  type Plugin,
+  type PluginOption,
+  type ResolvedConfig,
+} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // @ts-expect-error
@@ -39,10 +46,14 @@ const createTemplateTgz = (templateName: string): Promise<Buffer> => {
   });
 };
 
-const serveTemplates = () =>
-  ({
+const serveTemplates = () => {
+  let config: ResolvedConfig | undefined;
+  return {
     name: 'serve-templates',
     enforce: 'pre',
+    configResolved(resolvedConfig) {
+      config = resolvedConfig;
+    },
     configureServer(server) {
       server.middlewares.use('/_templates', async (req, res, next) => {
         const match = req.url?.match(/^\/([^/]+)\.tar\.gz$/);
@@ -62,21 +73,27 @@ const serveTemplates = () =>
       });
     },
     async closeBundle() {
+      invariant(config, 'Vite config not resolved');
       const entries = fs.readdirSync(templatesDir, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         const buf = await createTemplateTgz(entry.name);
-        const destDir = path.join(dirname, 'dist/_templates');
+        const destDir = path.join(config.build.outDir, '_templates');
         fs.mkdirSync(destDir, { recursive: true });
         fs.writeFileSync(path.join(destDir, `${entry.name}.tar.gz`), buf);
       }
     },
-  }) satisfies Plugin;
+  } satisfies Plugin;
+};
 
-const serveCli = () =>
-  ({
+const serveCli = () => {
+  let config: ResolvedConfig | undefined;
+  return {
     name: 'serve-cli',
     enforce: 'pre',
+    configResolved(resolvedConfig) {
+      config = resolvedConfig;
+    },
     configureServer(server) {
       const dir = path.resolve(
         require.resolve('@v/cli-bundle/package.json'),
@@ -117,15 +134,17 @@ const serveCli = () =>
       }
     },
     closeBundle() {
+      invariant(config, 'Vite config not resolved');
       const src = path.resolve(
         require.resolve('@v/cli-bundle/package.json'),
         '../dist',
       );
-      const dest = path.join(dirname, 'dist/_cli');
+      const dest = path.join(config.build.outDir, '_cli');
       fs.mkdirSync(dest, { recursive: true });
       fs.cpSync(src, dest, { recursive: true });
     },
-  }) satisfies Plugin;
+  } satisfies Plugin;
+};
 
 // Extensions are the workspace packages named `@v/viola-extension-<id>`,
 // enumerated through pnpm itself so they are found wherever the workspace
@@ -253,9 +272,9 @@ const serveApi = ({
       // through vite's plugin pipeline and resolves them correctly.
       const loadApi = async () => {
         const mod = (await server.ssrLoadModule(
-          '@v/api-server-reference/dev-server',
-        )) as typeof import('@v/api-server-reference/dev-server');
-        return mod.createApiDevServer({ sqlitePath, projectFilePath });
+          '@v/api-server-reference/middleware',
+        )) as typeof import('@v/api-server-reference/middleware');
+        return mod.createApiMiddleware({ sqlitePath, projectFilePath });
       };
 
       let api = await loadApi();
@@ -336,75 +355,82 @@ const serveApi = ({
   };
 };
 
-const serviceWorker = () => [
-  VitePWA({
-    strategies: 'injectManifest',
-    srcDir: 'src/client',
-    filename: 'sw.ts',
-    injectRegister: null,
-    manifest: false,
-    injectManifest: {
-      injectionPoint: undefined,
-    },
-    devOptions: {
-      enabled: true,
-      type: 'module',
-    },
-  }),
-  {
-    name: 'iframe-html-dev',
-    enforce: 'post',
-    apply: 'serve',
-    config(config) {
-      // The iframe HTML is served raw by the service worker, bypassing Vite's
-      // index-HTML transform, so the React Refresh preamble that
-      // @vitejs/plugin-react-swc normally injects is missing.
-      const preamble = `<script type="module">
+const serviceWorker = () => {
+  let config: ResolvedConfig | undefined;
+  return [
+    VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src/client',
+      filename: 'sw.ts',
+      injectRegister: null,
+      manifest: false,
+      injectManifest: {
+        injectionPoint: undefined,
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
+    }),
+    {
+      name: 'iframe-html-dev',
+      enforce: 'post',
+      apply: 'serve',
+      config(config) {
+        // The iframe HTML is served raw by the service worker, bypassing Vite's
+        // index-HTML transform, so the React Refresh preamble that
+        // @vitejs/plugin-react-swc normally injects is missing.
+        const preamble = `<script type="module">
         import { injectIntoGlobalHook } from "/@react-refresh";
         injectIntoGlobalHook(window);
         window.$RefreshReg$ = () => {};
         window.$RefreshSig$ = () => (type) => type;
       </script>`;
-      const html = fs
-        .readFileSync(path.join(dirname, 'iframe.html'), 'utf8')
-        .replace('<script', `${preamble}\n<script`);
-      config.define = {
-        ...config.define,
-        'import.meta.env.VITE_IFRAME_HTML': JSON.stringify(html),
-      };
-      return config;
-    },
-  } satisfies Plugin,
-  {
-    name: 'iframe-html-build',
-    enforce: 'post',
-    apply: 'build',
-    config(config) {
-      config.define = {
-        ...config.define,
-        'import.meta.env.VITE_IFRAME_HTML': JSON.stringify('__IFRAME_HTML__'),
-      };
-      return config;
-    },
-    closeBundle: {
-      sequential: true,
-      handler() {
-        const html = fs.readFileSync(
-          path.join(dirname, 'dist/iframe.html'),
-          'utf8',
-        );
-        const swFilename = path.join(dirname, 'dist/sw.js');
-        fs.writeFileSync(
-          swFilename,
-          fs
-            .readFileSync(swFilename, 'utf8')
-            .replace(/(["'`])__IFRAME_HTML__\1/g, () => JSON.stringify(html)),
-          'utf8',
-        );
+        const html = fs
+          .readFileSync(path.join(dirname, 'iframe.html'), 'utf8')
+          .replace('<script', `${preamble}\n<script`);
+        config.define = {
+          ...config.define,
+          'import.meta.env.VITE_IFRAME_HTML': JSON.stringify(html),
+        };
+        return config;
       },
-    },
-  } satisfies Plugin,
-];
+    } satisfies Plugin,
+    {
+      name: 'iframe-html-build',
+      enforce: 'post',
+      apply: 'build',
+      config(config) {
+        config.define = {
+          ...config.define,
+          'import.meta.env.VITE_IFRAME_HTML': JSON.stringify('__IFRAME_HTML__'),
+        };
+        return config;
+      },
+      configResolved(resolvedConfig) {
+        config = resolvedConfig;
+      },
+      closeBundle: {
+        sequential: true,
+        handler() {
+          invariant(config, 'Vite config not resolved');
+          const html = fs.readFileSync(
+            path.join(config.build.outDir, 'iframe.html'),
+            'utf8',
+          );
+          const swFilename = path.join(config.build.outDir, 'sw.js');
+          fs.writeFileSync(
+            swFilename,
+            fs
+              .readFileSync(swFilename, 'utf8')
+              .replace(/(["'`])__IFRAME_HTML__\1/g, () => JSON.stringify(html)),
+            'utf8',
+          );
+        },
+      },
+    } satisfies Plugin,
+  ];
+};
 
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
@@ -417,6 +443,8 @@ export default defineConfig(({ mode, command }) => {
   const apiBaseUrl =
     env.VITE_API_BASE_URL || (command === 'serve' ? '/api' : '');
   const cloudEnabled = env.VITE_DISABLE_CLOUD !== 'true' && Boolean(apiBaseUrl);
+  const apiServerEnabled =
+    env.VITE_DISABLE_REFERENCE_API_SERVER !== 'true' && cloudEnabled;
 
   return {
     define: {
@@ -450,7 +478,7 @@ export default defineConfig(({ mode, command }) => {
       serveTemplates(),
       serveCli(),
       installedExtensions(),
-      ...(cloudEnabled
+      ...(apiServerEnabled
         ? [
             serveApi({
               sqlitePath: env.API_SQLITE_PATH

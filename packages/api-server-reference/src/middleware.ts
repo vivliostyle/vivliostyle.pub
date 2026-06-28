@@ -21,7 +21,7 @@ import { registerSyncWebSocket } from './sync/websocket';
  */
 type AnyHttpServer = HttpServer | Http2Server | Http2SecureServer;
 
-export interface CreateApiDevServerOptions extends CreateAppOptions {
+export interface CreateApiMiddlewareOptions extends CreateAppOptions {
   /**
    * Path prefix the API is mounted under on the host dev server.
    *
@@ -67,8 +67,8 @@ export interface ApiDevServer {
  * be wired into any Node http server (e.g. Vite's `server.httpServer`) so the
  * app and API share a single origin during local development.
  */
-export function createApiDevServer(
-  options: CreateApiDevServerOptions = {},
+export function createApiMiddleware(
+  options: CreateApiMiddlewareOptions = {},
 ): ApiDevServer {
   const {
     basePath: rawBasePath = '/api',
