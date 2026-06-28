@@ -16,10 +16,17 @@ export function sandboxBaseOrigin(): string {
     : appOrigin();
 }
 
+// Optional identifier for the sandbox subdomain
+function sandboxSubdomainIdentifier(): string {
+  return import.meta.env.VITE_SANDBOX_SUBDOMAIN_IDENTIFIER
+    ? `--${import.meta.env.VITE_SANDBOX_SUBDOMAIN_IDENTIFIER}`
+    : '';
+}
+
 // Origin for a sandbox subdomain with the given hostname-label prefix, e.g.
 // `sandbox-<projectId>` or `sandbox-ext-<extensionId>`.
 export function sandboxOrigin(label: string): string {
   const url = new URL(sandboxBaseOrigin());
-  url.hostname = `${label}.${url.hostname}`;
+  url.hostname = `${label}${sandboxSubdomainIdentifier()}.${url.hostname}`;
   return url.origin;
 }
