@@ -2,6 +2,7 @@ import * as nodeFs from 'node:fs/promises';
 import { create as createVfs, type VirtualFileSystem } from '@platformatic/vfs';
 import { dirname, join, normalize } from 'pathe';
 
+import { sha256Hex } from '../crypto';
 import type { FileEntry } from '../schemas';
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -176,6 +177,7 @@ export class FileStore {
       size: stat.size,
       contentType: guessMimeType(rel),
       updatedAt: Math.floor(stat.mtimeMs),
+      hash: sha256Hex(data),
     };
   }
 
@@ -248,11 +250,13 @@ export class FileStore {
         await this.walkFiles(child, rel, out);
       } else if (entry.isFile()) {
         const stat = await this.fs.stat(child);
+        const data = await this.fs.readFile(child);
         out.push({
           path: rel,
           size: stat.size,
           contentType: guessMimeType(rel),
           updatedAt: Math.floor(stat.mtimeMs),
+          hash: sha256Hex(toUint8Array(data)),
         });
       }
     }

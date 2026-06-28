@@ -89,6 +89,106 @@ describe('ApiClient', () => {
     expect(files[0]?.path).toBe('a.md');
   });
 
+  it('requests download URLs via the download query flag', async () => {
+    let url = '';
+    const api = new ApiClient({
+      baseUrl: BASE,
+      fetch: mockFetch((req) => {
+        url = req.url;
+        return new Response(
+          JSON.stringify({
+            files: [
+              {
+                path: 'a.md',
+                size: 5,
+                contentType: 'text/markdown',
+                updatedAt: 1,
+                hash: 'deadbeef',
+                downloadUrl: 'https://r2.example/a.md?sig=1',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }),
+    });
+    const files = await api.listFiles('p1', { download: true });
+    expect(url).toBe(`${BASE}/projects/p1/files?download=true`);
+    expect(files[0]?.hash).toBe('deadbeef');
+    expect(files[0]?.downloadUrl).toBe('https://r2.example/a.md?sig=1');
+  });
+
+  it('batch-writes files as multipart and returns the entries', async () => {
+    let method = '';
+    let url = '';
+    let auth: string | null = null;
+    const names: string[] = [];
+    const deletes: string[] = [];
+    const api = new ApiClient({
+      baseUrl: BASE,
+      getAccessToken: () => 'tok',
+      fetch: mockFetch(async (req) => {
+        method = req.method;
+        url = req.url;
+        auth = req.headers.get('Authorization');
+        const form = await req.formData();
+        for (const [name, value] of form.entries()) {
+          if (name === '$delete') deletes.push(value as string);
+          else names.push(name);
+        }
+        return new Response(
+          JSON.stringify({
+            files: [
+              {
+                path: 'a.md',
+                size: 5,
+                contentType: 'text/markdown',
+                updatedAt: 1,
+                hash: 'h',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }),
+    });
+    const result = await api.writeFiles('p1', {
+      writes: [
+        {
+          path: 'a.md',
+          data: new Uint8Array([1]),
+          contentType: 'text/markdown',
+        },
+        { path: 'css/b.css', data: new Uint8Array([2]) },
+      ],
+      deletes: ['old.md'],
+    });
+    expect(method).toBe('POST');
+    expect(url).toBe(`${BASE}/projects/p1/files`);
+    expect(auth).toBe('Bearer tok');
+    expect(names.sort()).toEqual(['a.md', 'css/b.css']);
+    expect(deletes).toEqual(['old.md']);
+    expect(result[0]?.hash).toBe('h');
+  });
+
+  it('fetches a download URL without attaching the bearer token', async () => {
+    let auth: string | null = 'unset';
+    let url = '';
+    const api = new ApiClient({
+      baseUrl: BASE,
+      getAccessToken: () => 'tok',
+      fetch: mockFetch((req) => {
+        auth = req.headers.get('Authorization');
+        url = req.url;
+        return new Response(new Uint8Array([4, 2]), { status: 200 });
+      }),
+    });
+    const bytes = await api.fetchDownloadUrl('https://r2.example/a.md?sig=1');
+    expect(url).toBe('https://r2.example/a.md?sig=1');
+    expect(auth).toBeNull();
+    expect(bytes).toEqual(new Uint8Array([4, 2]));
+  });
+
   it('round-trips binary sync payloads', async () => {
     let seenUrl = '';
     const api = new ApiClient({

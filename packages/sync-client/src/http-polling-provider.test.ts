@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 
 import { HttpPollingSyncProvider } from './http-polling-provider';
@@ -71,6 +71,55 @@ describe('HttpPollingSyncProvider', () => {
     await provider.connect();
     expect(provider.status).toBe('connected');
     provider.disconnect();
+  });
+
+  it('skips the round trip on idle interval ticks and resumes after a local edit', async () => {
+    vi.useFakeTimers();
+    try {
+      let pushCalls = 0;
+      const serverDoc = new Y.Doc();
+      const transport: SyncTransport = {
+        async syncPull(_projectId, _filename, stateVector) {
+          return Y.encodeStateAsUpdate(serverDoc, stateVector);
+        },
+        async syncPush(_projectId, _filename, update, stateVector) {
+          pushCalls++;
+          if (update.byteLength > 0) {
+            Y.applyUpdate(serverDoc, update);
+          }
+          return Y.encodeStateAsUpdate(serverDoc, stateVector);
+        },
+      };
+
+      const doc = new Y.Doc();
+      const provider = new HttpPollingSyncProvider({
+        transport,
+        projectId: 'p',
+        filename: 'f.md',
+        doc,
+        intervalMs: 1000,
+      });
+      await provider.connect();
+      const afterConnect = pushCalls;
+
+      // Idle: several interval ticks elapse with no local changes.
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(pushCalls).toBe(afterConnect);
+
+      // A local edit re-arms the poll loop.
+      doc.getText('t').insert(0, 'edit');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(pushCalls).toBe(afterConnect + 1);
+      expect(serverDoc.getText('t').toString()).toBe('edit');
+
+      // Idle again afterwards.
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(pushCalls).toBe(afterConnect + 1);
+
+      provider.disconnect();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('re-queues local changes when a push fails', async () => {

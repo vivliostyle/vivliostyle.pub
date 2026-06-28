@@ -349,14 +349,29 @@ export class Sandbox {
       recursive: true,
       ignore: [/^node_modules/, /^\.vivliostyle/],
     });
-    await Promise.all(
-      entries.map(async (entry) => {
-        if (entry.kind !== 'file') return;
-        if (entry.path === 'vivliostyle.config.json') return;
-        const bytes = await this.provider.read(entry.path);
-        newFiles[entry.path] = ref(new SandboxFile('', bytes));
-      }),
-    );
+    const paths = entries
+      .filter(
+        (entry) =>
+          entry.kind === 'file' && entry.path !== 'vivliostyle.config.json',
+      )
+      .map((entry) => entry.path);
+    // Pull all files in one shot when the provider can (remote: direct from the
+    // blob store, bypassing the API), falling back to per-file reads otherwise.
+    const bytesByPath = this.provider.readMany
+      ? await this.provider.readMany(paths)
+      : new Map(
+          await Promise.all(
+            paths.map(
+              async (path) => [path, await this.provider.read(path)] as const,
+            ),
+          ),
+        );
+    for (const path of paths) {
+      const bytes = bytesByPath.get(path);
+      if (bytes) {
+        newFiles[path] = ref(new SandboxFile('', bytes));
+      }
+    }
 
     for (const k in this.files) {
       delete this.files[k];
@@ -385,7 +400,11 @@ export class Sandbox {
     const cbor = await cli.toBinarySnapshot({ path: '/workdir' });
     const rootNode = new CborDecoder().decode(cbor) as SnapshotNode;
 
-    const traverse = async (snapshot: SnapshotNode, path = '') => {
+    // Mutate `files` synchronously so valtio batches every change into a single
+    // subscriber notification; `handleFileUpdate` then persists them in one
+    // request instead of one PUT per file. Persistence is awaited via
+    // `lastPersist` below.
+    const traverse = (snapshot: SnapshotNode, path = '') => {
       if (!snapshot) {
         return;
       }
@@ -394,14 +413,13 @@ export class Sandbox {
           {
             const [, , entries] = snapshot;
             for (const [name, entry] of Object.entries(entries)) {
-              await traverse(entry, join(path, name));
+              traverse(entry, join(path, name));
             }
             break;
           }
         case 1 /* File */:
           {
             const [, , data] = snapshot;
-            await this.provider.write(path, data);
             // FIXME: Get proper MIME type
             const mimeType =
               {
@@ -415,9 +433,10 @@ export class Sandbox {
           }
       }
     };
-    await traverse(rootNode);
-    // Wait the subscriber callback ends
+    traverse(rootNode);
+    // Let the `files` subscriber fire, then await the persistence it started.
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    await this.lastPersist;
   }
 
   protected async saveToFileSystem(
@@ -433,6 +452,29 @@ export class Sandbox {
         // ignore missing entries (matches prior best-effort delete behavior)
       }
     }
+  }
+
+  // Tracks the latest provider persistence so a bulk operation can await the
+  // writes the `files` subscriber kicks off (see `saveMemoryToFileSystem`).
+  protected lastPersist: Promise<unknown> = Promise.resolve();
+
+  // Persist a set of changes in one shot, collapsing the per-file round-trips
+  // into a single request on providers that support batching.
+  protected async persistChanges(
+    writes: { path: string; data: Uint8Array }[],
+    deletes: string[],
+  ) {
+    if (writes.length === 0 && deletes.length === 0) {
+      return;
+    }
+    if (this.provider.applyBatch) {
+      await this.provider.applyBatch({ writes, deletes });
+      return;
+    }
+    await Promise.all([
+      ...writes.map((write) => this.saveToFileSystem(write.path, write.data)),
+      ...deletes.map((path) => this.saveToFileSystem(path, null)),
+    ]);
   }
 
   protected async handleFileUpdate(ops: INTERNAL_Op[]) {
@@ -451,14 +493,15 @@ export class Sandbox {
         updates[op[1][0]] = null;
       }
     }
-    await Promise.all([
-      (async () => {
-        const cli = await this.cli.createRemotePromise();
-        await cli.fromJSON(updates, '/workdir');
-      })(),
-      ...Object.entries(updates).map(([path, content]) =>
-        this.saveToFileSystem(path, content),
-      ),
-    ]);
+    const writes: { path: string; data: Uint8Array }[] = [];
+    const deletes: string[] = [];
+    for (const [path, content] of Object.entries(updates)) {
+      if (content) writes.push({ path, data: content });
+      else deletes.push(path);
+    }
+    const persist = this.persistChanges(writes, deletes);
+    this.lastPersist = persist;
+    const cli = await this.cli.createRemotePromise();
+    await Promise.all([cli.fromJSON(updates, '/workdir'), persist]);
   }
 }

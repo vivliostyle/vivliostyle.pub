@@ -249,9 +249,33 @@ export interface paths {
         };
         /**
          * List files
-         * @description Returns every file currently stored in the project.
+         * @description Returns every file currently stored in the project, each with a SHA-256 `hash` of its content. Pass `download=true` to also receive a short-lived `downloadUrl` for fetching each file directly, bypassing this API.
          */
         get: operations["getProjectsByIdFiles"];
+        put?: never;
+        /**
+         * Write files (batch)
+         * @description Creates or replaces multiple files and deletes others in a single request, to avoid one round-trip per file. Send `multipart/form-data` where each file part is named by its project-relative path, and each form field named `$delete` carries one path to remove. Returns the resulting entries (with hashes) for the written files.
+         */
+        post: operations["postProjectsByIdFiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files-download/{id}/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a file via a signed URL
+         * @description Returns the file's raw bytes for a URL minted by the file listing's `download=true` mode. Authorized by the `exp`/`sig` query pair rather than a bearer token.
+         */
+        get: operations["getFilesDownloadByIdByPath"];
         put?: never;
         post?: never;
         delete?: never;
@@ -899,7 +923,10 @@ export interface operations {
     };
     getProjectsByIdFiles: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When `true`, include a short-lived direct-download URL on every entry. */
+                download?: boolean;
+            };
             header?: never;
             path: {
                 id: string;
@@ -920,7 +947,108 @@ export interface operations {
                             size: number;
                             contentType: string;
                             updatedAt: number;
+                            hash?: string;
+                            downloadUrl?: string;
                         }[];
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postProjectsByIdFiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** @description Project-relative paths to delete. */
+                    $delete?: string[];
+                } & {
+                    [key: string]: Uint8Array;
+                };
+            };
+        };
+        responses: {
+            /** @description Written files */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        files: {
+                            path: string;
+                            size: number;
+                            contentType: string;
+                            updatedAt: number;
+                            hash?: string;
+                            downloadUrl?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getFilesDownloadByIdByPath: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File contents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": Uint8Array;
+                };
+            };
+            /** @description Invalid signature */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
                     };
                 };
             };

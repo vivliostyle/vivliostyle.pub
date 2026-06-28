@@ -49,6 +49,15 @@ export class HttpPollingSyncProvider extends BaseSyncProvider {
     this.pending.push(Y.encodeStateAsUpdate(this.doc));
     await this.sync();
     this.timer = setInterval(() => {
+      // Skip the round trip when there is nothing to push. Otherwise an open but
+      // untouched editor would poll the server forever; with one provider per
+      // entry file that is a flood of idle traffic. Local edits re-fill
+      // `pending`, and remote changes arrive via the realtime WebSocket (the
+      // primary channel) or on the next push. `sync()` stays a full round trip
+      // for explicit/forced flushes.
+      if (this.pending.length === 0) {
+        return;
+      }
       void this.sync();
     }, this.intervalMs);
   }
