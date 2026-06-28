@@ -2,6 +2,7 @@ import { join } from 'pathe';
 
 import { StorageError, StorageNotFoundError } from '../errors';
 import type {
+  BatchChanges,
   FileMeta,
   ListEntry,
   ListOptions,
@@ -20,6 +21,16 @@ interface RemoteFileEntry {
   size: number;
   contentType: string;
   updatedAt: number;
+  /** SHA-256 hex of the content, when the server provides it. */
+  hash?: string;
+  /** Short-lived URL for fetching the bytes directly, when requested. */
+  downloadUrl?: string;
+}
+
+interface RemoteFileWrite {
+  path: string;
+  data: Uint8Array;
+  contentType?: string;
 }
 
 /**
@@ -27,7 +38,10 @@ interface RemoteFileEntry {
  * `ApiClient` satisfies this structurally.
  */
 export interface RemoteFileApi {
-  listFiles(projectId: string): Promise<RemoteFileEntry[]>;
+  listFiles(
+    projectId: string,
+    options?: { download?: boolean },
+  ): Promise<RemoteFileEntry[]>;
   readFile(projectId: string, path: string): Promise<Uint8Array | null>;
   writeFile(
     projectId: string,
@@ -35,7 +49,29 @@ export interface RemoteFileApi {
     data: Uint8Array,
     contentType?: string,
   ): Promise<void>;
+  writeFiles(
+    projectId: string,
+    changes: { writes?: RemoteFileWrite[]; deletes?: string[] },
+  ): Promise<RemoteFileEntry[]>;
   deleteFile(projectId: string, path: string): Promise<void>;
+  fetchDownloadUrl(url: string): Promise<Uint8Array>;
+}
+
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  const buffer = new ArrayBuffer(data.byteLength);
+  new Uint8Array(buffer).set(data);
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function hasStatus(error: unknown, status: number): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { status?: unknown }).status === status
+  );
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -129,6 +165,78 @@ export class RemoteHttpStorageProvider implements StorageProvider {
     } catch (cause) {
       throw new StorageError(`Failed to write ${path}`, { cause });
     }
+  }
+
+  async applyBatch(changes: BatchChanges): Promise<void> {
+    const writes: RemoteFileWrite[] = (changes.writes ?? []).map((write) => ({
+      path: normalize(write.path),
+      data: write.data,
+      contentType: write.mimeType ?? guessMimeType(write.path),
+    }));
+    const deletes = (changes.deletes ?? []).map(normalize);
+    if (writes.length === 0 && deletes.length === 0) {
+      return;
+    }
+    try {
+      await this.api.writeFiles(this.projectId, { writes, deletes });
+    } catch (cause) {
+      // Older servers without the batch endpoint answer 404; fall back to the
+      // per-file endpoints so a version skew still completes.
+      if (!hasStatus(cause, 404)) {
+        throw new StorageError('Failed to write files', { cause });
+      }
+      await Promise.all([
+        ...writes.map((write) =>
+          this.api.writeFile(
+            this.projectId,
+            write.path,
+            write.data,
+            write.contentType,
+          ),
+        ),
+        ...deletes.map((path) => this.api.deleteFile(this.projectId, path)),
+      ]);
+    }
+  }
+
+  async readMany(paths: readonly string[]): Promise<Map<string, Uint8Array>> {
+    const result = new Map<string, Uint8Array>();
+    if (paths.length === 0) {
+      return result;
+    }
+    const wanted = new Set(paths.map(normalize));
+    let entries: RemoteFileEntry[];
+    try {
+      entries = await this.api.listFiles(this.projectId, { download: true });
+    } catch (cause) {
+      throw new StorageError('Failed to list files', { cause });
+    }
+    await Promise.all(
+      entries
+        .filter((entry) => wanted.has(entry.path))
+        .map(async (entry) => {
+          const bytes = await this.fetchEntryBytes(entry);
+          if (bytes) {
+            result.set(entry.path, bytes);
+          }
+        }),
+    );
+    return result;
+  }
+
+  // Prefer the direct-download URL (free egress, no API hop) and fall back to
+  // the API byte endpoint when the server did not hand one out.
+  private async fetchEntryBytes(
+    entry: RemoteFileEntry,
+  ): Promise<Uint8Array | null> {
+    if (entry.downloadUrl) {
+      try {
+        return await this.api.fetchDownloadUrl(entry.downloadUrl);
+      } catch {
+        // fall through to the API endpoint
+      }
+    }
+    return this.api.readFile(this.projectId, entry.path);
   }
 
   async remove(path: string, options?: RemoveOptions): Promise<void> {
@@ -234,14 +342,16 @@ export class RemoteHttpStorageProvider implements StorageProvider {
     const normalized = normalize(path);
     const prefix = normalized ? `${normalized}/` : '';
     const ignore = options?.ignore ?? [];
-    const files = await this.api.listFiles(this.projectId);
+    const entries = await this.api.listFiles(this.projectId, {
+      download: true,
+    });
     const data: Record<string, Uint8Array> = {};
     await Promise.all(
-      files.map(async (file) => {
-        if (prefix && !file.path.startsWith(prefix)) {
+      entries.map(async (entry) => {
+        if (prefix && !entry.path.startsWith(prefix)) {
           return;
         }
-        const rel = file.path.slice(prefix.length);
+        const rel = entry.path.slice(prefix.length);
         if (!rel) {
           return;
         }
@@ -250,7 +360,7 @@ export class RemoteHttpStorageProvider implements StorageProvider {
         if (ignore.some((re) => re.test(rel))) {
           return;
         }
-        const bytes = await this.api.readFile(this.projectId, file.path);
+        const bytes = await this.fetchEntryBytes(entry);
         if (bytes) {
           data[`/${rel}`] = bytes;
         }
@@ -270,9 +380,7 @@ export class RemoteHttpStorageProvider implements StorageProvider {
       );
     }
     const prefix = normalize(path);
-    if (options?.clean) {
-      await this.remove(prefix, { recursive: true });
-    }
+    const desired = new Map<string, Uint8Array>();
     for (const [filePath, content] of Object.entries(snapshot.data)) {
       if (content === null) {
         continue;
@@ -280,11 +388,50 @@ export class RemoteHttpStorageProvider implements StorageProvider {
       const targetPath = prefix
         ? join(prefix, normalize(filePath))
         : normalize(filePath);
-      const bytes =
+      desired.set(
+        targetPath,
         typeof content === 'string'
           ? new TextEncoder().encode(content)
-          : content;
-      await this.write(targetPath, bytes);
+          : content,
+      );
     }
+
+    // Diff against the server so unchanged files are not re-uploaded.
+    let serverEntries: RemoteFileEntry[] = [];
+    try {
+      serverEntries = await this.api.listFiles(this.projectId);
+    } catch {
+      // Treat an unreadable listing as an empty project: upload everything.
+    }
+    const serverHashes = new Map(
+      serverEntries.map((entry) => [entry.path, entry.hash]),
+    );
+
+    const writes: { path: string; data: Uint8Array }[] = [];
+    for (const [targetPath, bytes] of desired) {
+      const existing = serverHashes.get(targetPath);
+      if (existing && existing === (await sha256Hex(bytes))) {
+        continue;
+      }
+      writes.push({ path: targetPath, data: bytes });
+    }
+
+    const deletes: string[] = [];
+    if (options?.clean) {
+      for (const entry of serverEntries) {
+        if (
+          prefix &&
+          entry.path !== prefix &&
+          !entry.path.startsWith(`${prefix}/`)
+        ) {
+          continue;
+        }
+        if (!desired.has(entry.path)) {
+          deletes.push(entry.path);
+        }
+      }
+    }
+
+    await this.applyBatch({ writes, deletes });
   }
 }

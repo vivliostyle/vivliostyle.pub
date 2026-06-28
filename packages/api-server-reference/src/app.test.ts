@@ -439,6 +439,73 @@ describe('files', () => {
     );
     expect(await get.text()).toBe('cover');
   });
+
+  it('lists files with a content hash and a signed download URL', async () => {
+    await app.request(`/projects/${projectId}/files/a.md`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/markdown', ...bearer(token) },
+      body: 'alpha',
+    });
+    const list = await app.request(
+      `/projects/${projectId}/files?download=true`,
+      { headers: bearer(token) },
+    );
+    const { files } = await readJson<{
+      files: { path: string; hash?: string; downloadUrl?: string }[];
+    }>(list);
+    expect(files[0].hash).toBe(sha256Hex(new TextEncoder().encode('alpha')));
+    expect(files[0].downloadUrl).toBeTruthy();
+
+    // The signed URL serves the bytes without a bearer token.
+    const url = new URL(files[0].downloadUrl as string);
+    const ok = await app.request(`${url.pathname}${url.search}`);
+    expect(ok.status).toBe(200);
+    expect(await ok.text()).toBe('alpha');
+
+    // A tampered signature is rejected.
+    const tampered = await app.request(
+      `${url.pathname}?exp=${url.searchParams.get('exp')}&sig=forged`,
+    );
+    expect(tampered.status).toBe(403);
+  });
+
+  it('batch-writes and deletes files in one request', async () => {
+    const form = new FormData();
+    form.append('a.md', new Blob(['alpha'], { type: 'text/markdown' }), 'a.md');
+    form.append(
+      'css/b.css',
+      new Blob(['body{}'], { type: 'text/css' }),
+      'b.css',
+    );
+    const res = await app.request(`/projects/${projectId}/files`, {
+      method: 'POST',
+      headers: bearer(token),
+      body: form,
+    });
+    expect(res.status).toBe(200);
+    const { files } = await readJson<{
+      files: { path: string; hash?: string }[];
+    }>(res);
+    expect(files.map((f) => f.path).sort()).toEqual(['a.md', 'css/b.css']);
+    expect(files.find((f) => f.path === 'a.md')?.hash).toBe(
+      sha256Hex(new TextEncoder().encode('alpha')),
+    );
+
+    const del = new FormData();
+    del.append('$delete', 'a.md');
+    const delRes = await app.request(`/projects/${projectId}/files`, {
+      method: 'POST',
+      headers: bearer(token),
+      body: del,
+    });
+    expect(delRes.status).toBe(200);
+
+    const list = await app.request(`/projects/${projectId}/files`, {
+      headers: bearer(token),
+    });
+    const after = (await readJson<{ files: { path: string }[] }>(list)).files;
+    expect(after.map((f) => f.path)).toEqual(['css/b.css']);
+  });
 });
 
 describe('attachments', () => {

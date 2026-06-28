@@ -112,6 +112,14 @@ export const FileEntrySchema = v.object({
   size: v.number(),
   contentType: v.string(),
   updatedAt: v.number(),
+  // SHA-256 hex of the file content. Lets a client diff its local copy against
+  // the server and upload only the files that actually changed. Optional so a
+  // backend that cannot derive it cheaply may omit it.
+  hash: v.optional(v.string()),
+  // Short-lived URL for fetching the bytes directly from the underlying blob
+  // store, bypassing this API. Present only when the listing was requested with
+  // `download=true`, and only for backends that can mint one.
+  downloadUrl: v.optional(v.string()),
 });
 export type FileEntry = v.InferOutput<typeof FileEntrySchema>;
 

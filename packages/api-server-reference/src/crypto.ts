@@ -1,5 +1,6 @@
 import {
   createHash,
+  createHmac,
   randomBytes,
   randomUUID,
   scryptSync,
@@ -45,4 +46,38 @@ export function verifyPkce(verifier: string, challenge: string): boolean {
   const a = Buffer.from(computed);
   const b = Buffer.from(challenge);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * HMAC that authorizes a single direct file download (the reference server's
+ * stand-in for an object-store presigned URL): it binds the project, path, and
+ * expiry so the unauthenticated download route can serve the bytes without a
+ * bearer token while still scoping access to exactly one file for a short time.
+ */
+export function signDownloadToken(
+  secret: string,
+  projectId: string,
+  filePath: string,
+  expiresAt: number,
+): string {
+  return createHmac('sha256', secret)
+    .update(`${projectId}\n${filePath}\n${expiresAt}`)
+    .digest('base64url');
+}
+
+export function verifyDownloadToken(
+  secret: string,
+  projectId: string,
+  filePath: string,
+  expiresAt: number,
+  signature: string,
+): boolean {
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+    return false;
+  }
+  const expected = Buffer.from(
+    signDownloadToken(secret, projectId, filePath, expiresAt),
+  );
+  const actual = Buffer.from(signature);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }

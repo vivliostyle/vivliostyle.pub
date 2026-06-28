@@ -67,6 +67,17 @@ export type ChangeEvent =
   | { type: 'write'; path: string }
   | { type: 'remove'; path: string };
 
+export interface BatchWrite {
+  path: string;
+  data: Uint8Array;
+  mimeType?: string;
+}
+
+export interface BatchChanges {
+  writes?: readonly BatchWrite[];
+  deletes?: readonly string[];
+}
+
 export interface StorageProvider {
   readonly metadata: ProviderMetadata;
   readonly capabilities: ProviderCapabilities;
@@ -86,6 +97,25 @@ export interface StorageProvider {
   ): Promise<void>;
 
   subscribe?(path: string, listener: (event: ChangeEvent) => void): () => void;
+
+  /**
+   * Apply several writes and deletes in one operation. Providers backed by a
+   * remote API override this to collapse the per-file round-trips into a single
+   * request; callers must fall back to per-file `write`/`remove` when it is
+   * absent.
+   */
+  applyBatch?(changes: BatchChanges, options?: WriteOptions): Promise<void>;
+
+  /**
+   * Read several files at once. Remote providers override this to fetch the
+   * bytes directly from their blob store (bypassing the API), so callers should
+   * prefer it over a loop of `read` when pulling many files. Missing paths are
+   * omitted from the returned map.
+   */
+  readMany?(
+    paths: readonly string[],
+    options?: ReadOptions,
+  ): Promise<Map<string, Uint8Array>>;
 }
 
 export interface CommitRef {

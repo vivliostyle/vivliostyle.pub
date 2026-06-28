@@ -190,15 +190,85 @@ export class ApiClient {
     }
   }
 
-  async listFiles(projectId: string): Promise<FileEntry[]> {
+  async listFiles(
+    projectId: string,
+    options?: { download?: boolean },
+  ): Promise<FileEntry[]> {
     const { data, error, response } = await this.client.GET(
       '/projects/{id}/files',
-      { params: { path: { id: projectId } } },
+      {
+        params: {
+          path: { id: projectId },
+          query: options?.download ? { download: true } : undefined,
+        },
+      },
     );
     if (!response.ok || !data) {
       throw new ApiError('Failed to list files', response.status, error);
     }
     return data.files;
+  }
+
+  /**
+   * Create/replace and delete several files in one request. Returns the
+   * resulting entries (with hashes) for the written files. Avoids the
+   * per-file round-trip of repeated {@link writeFile}/{@link deleteFile} calls.
+   */
+  async writeFiles(
+    projectId: string,
+    changes: {
+      writes?: { path: string; data: Uint8Array; contentType?: string }[];
+      deletes?: string[];
+    },
+  ): Promise<FileEntry[]> {
+    const form = new FormData();
+    for (const write of changes.writes ?? []) {
+      const copy = new Uint8Array(write.data.byteLength);
+      copy.set(write.data);
+      form.append(
+        write.path,
+        new Blob([copy.buffer], {
+          type: write.contentType ?? 'application/octet-stream',
+        }),
+        write.path.split('/').pop() || write.path,
+      );
+    }
+    for (const path of changes.deletes ?? []) {
+      form.append('$delete', path);
+    }
+    const token = await this.getAccessToken?.();
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/files`,
+      {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: form,
+      },
+    );
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = undefined;
+      }
+      throw new ApiError('Failed to write files', response.status, body);
+    }
+    const data = (await response.json()) as { files: FileEntry[] };
+    return data.files;
+  }
+
+  /**
+   * Fetch bytes from a direct-download URL handed out by {@link listFiles} with
+   * `download: true`. The URL is self-authenticating (presigned / signed), so
+   * no bearer token is attached.
+   */
+  async fetchDownloadUrl(url: string): Promise<Uint8Array> {
+    const response = await this.fetchImpl(url);
+    if (!response.ok) {
+      throw new ApiError('Failed to download file', response.status);
+    }
+    return new Uint8Array(await response.arrayBuffer());
   }
 
   async readFile(

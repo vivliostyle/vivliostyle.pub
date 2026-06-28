@@ -78,11 +78,13 @@ export async function generateSpec(app: Hono) {
     documentation: openApiDocumentation(),
   });
   // hono-openapi documents every `validator('form', …)` body as
-  // `multipart/form-data`, but these are OAuth2 endpoints whose clients send
-  // `application/x-www-form-urlencoded` (this API has no multipart upload), so
-  // relabel them to match the wire format. The plugin's `media` override option
-  // can't be used: in 1.3.0 it mis-parses and yields `application/json`.
-  for (const pathItem of Object.values(spec.paths ?? {})) {
+  // `multipart/form-data`, but the OAuth2 endpoints' clients send
+  // `application/x-www-form-urlencoded`, so relabel those to match the wire
+  // format. The plugin's `media` override option can't be used: in 1.3.0 it
+  // mis-parses and yields `application/json`. The batch file-write endpoint is
+  // genuine multipart, so this is scoped to `/auth/*` to leave it untouched.
+  for (const [path, pathItem] of Object.entries(spec.paths ?? {})) {
+    if (!path.startsWith('/auth')) continue;
     for (const operation of Object.values(pathItem ?? {})) {
       const content = (
         operation as {

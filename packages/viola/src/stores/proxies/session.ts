@@ -10,6 +10,18 @@ export type SessionStatus =
   | 'authenticated'
   | 'authenticating';
 
+// Extensions read `baseUrl` (via the session snapshot) and fetch the API from
+// their own cross-origin sandbox iframe, where a relative base (e.g. `/api`)
+// would resolve against the sandbox origin instead of the host. Anchor a
+// relative base to the host origin so `baseUrl` is always absolute; an empty
+// base is left untouched (see `DEFAULT_BASE_URL`).
+function toAbsoluteBaseUrl(baseUrl: string): string {
+  if (!baseUrl || typeof location === 'undefined') {
+    return baseUrl;
+  }
+  return new URL(baseUrl, location.origin).href.replace(/\/+$/, '');
+}
+
 // `__API_BASE_URL__` is `''` when the build was made without an API server
 // configured. The session is still constructed so the proxy stays shaped the
 // same, but we deliberately do NOT fall back to `/api` here: callers must
@@ -17,7 +29,7 @@ export type SessionStatus =
 // `'anonymous'`) so a stray auth call when cloud is disabled fails loudly
 // against an empty base URL instead of silently hitting a non-existent
 // local endpoint.
-const DEFAULT_BASE_URL = __API_BASE_URL__;
+const DEFAULT_BASE_URL = toAbsoluteBaseUrl(__API_BASE_URL__);
 const CLIENT_ID = 'vivliostyle-pub-web';
 
 function buildRedirectUri(): string {
@@ -58,8 +70,9 @@ export const session = proxy({
 });
 
 export function rebuildClients(baseUrl: string) {
-  const auth = createAuthClient(baseUrl);
-  session.baseUrl = baseUrl;
+  const absoluteBaseUrl = toAbsoluteBaseUrl(baseUrl);
+  const auth = createAuthClient(absoluteBaseUrl);
+  session.baseUrl = absoluteBaseUrl;
   session.auth = ref(auth);
-  session.api = ref(createApiClient(baseUrl, auth));
+  session.api = ref(createApiClient(absoluteBaseUrl, auth));
 }
