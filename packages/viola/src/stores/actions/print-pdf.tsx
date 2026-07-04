@@ -2,8 +2,9 @@ import { invariant } from 'outvariant';
 import { subscribe } from 'valtio';
 
 import { extensionSandboxOrigin } from '../../extensions/sandbox-origin';
+import { m } from '../../generated/paraglide/messages';
 import { generateId } from '../../libs/generate-id';
-import { $ui } from '../accessors';
+import { $cli, $ui } from '../accessors';
 import {
   type ExtensionId,
   extensionFrameKey,
@@ -44,7 +45,33 @@ function waitForPrintReady(frame: HTMLIFrameElement): Promise<boolean> {
   });
 }
 
+// Firefox crashes the sandbox-origin content process while generating its
+// print preview (the static document clone) for the nested cross-origin
+// isolated viewer iframe, so print from a top-level tab there instead.
+// https://github.com/vivliostyle/vivliostyle.pub/issues/64
+async function printPdfInNewTab() {
+  // Open the tab synchronously so the browser attributes it to the user
+  // gesture; navigate once the viewer URL resolves. The viewer prints itself
+  // when it sees the `print` hash parameter (see cli-bundle's viewer-adapter).
+  const printWindow = window.open('about:blank', '_blank');
+  invariant(printWindow, 'Failed to open a tab for printing');
+  printWindow.document.title = m.print_pdf_preparing();
+  printWindow.document.body.textContent = m.print_pdf_preparing();
+  try {
+    const cli = await $cli.awaiter();
+    const viewerUrl = await cli.createViewerUrlPromise();
+    printWindow.location.href = `${viewerUrl}&print=true`;
+  } catch (error) {
+    printWindow.close();
+    throw error;
+  }
+}
+
 export async function printPdf() {
+  if (navigator.userAgent.includes('Firefox')) {
+    return await printPdfInNewTab();
+  }
+
   // Ensure the viewer pane is visible
   if (
     !$ui.tabs.some(
