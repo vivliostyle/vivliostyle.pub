@@ -6,7 +6,7 @@ import '@v/extension-kit/styles.css';
 
 export default function PreviewPane({ host, t }: ExtensionMountContext) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const viewerLoadedRef = useRef(false);
+  const hostOriginRef = useRef<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,29 +21,37 @@ export default function PreviewPane({ host, t }: ExtensionMountContext) {
     };
   }, [host]);
 
-  // Relays host print commands to the nested viewer, which the host can't
-  // reach itself. Only answer `print-pdf-query` once the viewer has loaded
-  // (`load` implies its message listener is in place).
+  // Relays print messages between the host and the nested viewer, which can't
+  // reach each other directly. Readiness is answered by the viewer itself
+  // (cli-bundle's viewer-adapter), the only party that knows when every page
+  // has rendered.
   useEffect(() => {
     if (!url) return;
     const viewerOrigin = new URL(url).origin;
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== window.parent) return;
-      switch (event.data?.type) {
-        case 'print-pdf-query':
-          if (viewerLoadedRef.current) {
-            window.parent.postMessage(
-              { type: 'print-pdf-ready' },
-              event.origin,
+      if (event.source === window.parent) {
+        switch (event.data?.type) {
+          case 'print-pdf-query':
+          case 'print-pdf':
+            hostOriginRef.current = event.origin;
+            iframeRef.current?.contentWindow?.postMessage(
+              event.data,
+              viewerOrigin,
             );
-          }
-          break;
-        case 'print-pdf':
-          iframeRef.current?.contentWindow?.postMessage(
-            { type: 'print-pdf' },
-            viewerOrigin,
-          );
-          break;
+            break;
+        }
+      } else if (
+        event.source === iframeRef.current?.contentWindow &&
+        event.origin === viewerOrigin
+      ) {
+        switch (event.data?.type) {
+          case 'print-pdf-ready':
+          case 'print-pdf-done':
+            if (hostOriginRef.current) {
+              window.parent.postMessage(event.data, hostOriginRef.current);
+            }
+            break;
+        }
       }
     };
     window.addEventListener('message', onMessage);
@@ -59,9 +67,6 @@ export default function PreviewPane({ host, t }: ExtensionMountContext) {
       ref={iframeRef}
       title={t('preview_iframe_title')}
       src={url}
-      onLoad={() => {
-        viewerLoadedRef.current = true;
-      }}
       className="block size-full"
       sandbox="allow-same-origin allow-scripts allow-modals"
       allow="cross-origin-isolated"
