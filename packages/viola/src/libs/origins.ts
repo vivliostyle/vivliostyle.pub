@@ -27,6 +27,12 @@ function sandboxSubdomainIdentifier(): string {
 // `sandbox-<projectId>` or `sandbox-ext-<extensionId>`.
 export function sandboxOrigin(label: string): string {
   const url = new URL(sandboxBaseOrigin());
-  url.hostname = `${label}${sandboxSubdomainIdentifier()}.${url.hostname}`;
+  const subdomain = `${label}${sandboxSubdomainIdentifier()}`;
+  if (subdomain.length > 63) {
+    console.error(
+      `Sandbox subdomain "${subdomain}" exceeds the 63-character DNS label limit and will not resolve`,
+    );
+  }
+  url.hostname = `${subdomain}.${url.hostname}`;
   return url.origin;
 }
