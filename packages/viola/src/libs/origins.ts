@@ -28,9 +28,6 @@ function sandboxSubdomainIdentifier(): string {
 export function sandboxOrigin(label: string): string {
   const url = new URL(sandboxBaseOrigin());
   const subdomain = `${label}${sandboxSubdomainIdentifier()}`;
-  // DNS caps each hostname label at 63 characters; an oversized subdomain
-  // fails with an unhelpful NAME_NOT_RESOLVED long after this call, so make
-  // the misconfiguration diagnosable at the source.
   if (subdomain.length > 63) {
     console.error(
       `Sandbox subdomain "${subdomain}" exceeds the 63-character DNS label limit and will not resolve`,
