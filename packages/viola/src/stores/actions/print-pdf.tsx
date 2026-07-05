@@ -1,121 +1,38 @@
 import { invariant } from 'outvariant';
-import { subscribe } from 'valtio';
 
-import { extensionSandboxOrigin } from '../../extensions/sandbox-origin';
 import { m } from '../../generated/paraglide/messages';
-import { generateId } from '../../libs/generate-id';
-import { $cli, $ui } from '../accessors';
-import {
-  type ExtensionId,
-  extensionFrameKey,
-  extensionFrames,
-} from '../proxies/extension';
+import { $cli } from '../accessors';
 
-const previewExtensionId = 'preview' as ExtensionId;
-const previewPanePath = '.';
+let printing = false;
 
-// Polls `print-pdf-query` until the view answers `print-pdf-ready` (the nested
-// viewer has loaded). Polling stays correct across view reloads, unlike a
-// one-shot ready announcement.
-function waitForPrintReady(frame: HTMLIFrameElement): Promise<boolean> {
-  const targetOrigin = extensionSandboxOrigin(previewExtensionId);
-  return new Promise((resolve) => {
-    const query = () => {
-      frame.contentWindow?.postMessage(
-        { type: 'print-pdf-query' },
-        targetOrigin,
-      );
-    };
-    const finish = (ready: boolean) => {
-      clearInterval(interval);
-      clearTimeout(timer);
-      window.removeEventListener('message', onMessage);
-      resolve(ready);
-    };
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== targetOrigin) return;
-      if (event.source !== frame.contentWindow) return;
-      if (event.data?.type !== 'print-pdf-ready') return;
-      finish(true);
-    };
-    window.addEventListener('message', onMessage);
-    const interval = setInterval(query, 250);
-    const timer = setTimeout(() => finish(false), 30_000);
-    query();
-  });
-}
-
+// Printing happens in a top-level tab rather than the nested preview pane:
 // Firefox crashes the sandbox-origin content process while generating its
-// print preview (the static document clone) for the nested cross-origin
-// isolated viewer iframe, so print from a top-level tab there instead.
+// print preview (the static document clone) for the doubly-nested
+// cross-origin isolated viewer iframe.
 // https://github.com/vivliostyle/vivliostyle.pub/issues/64
-async function printPdfInNewTab() {
-  // Open the tab synchronously so the browser attributes it to the user
-  // gesture; navigate once the viewer URL resolves. The viewer prints itself
-  // when it sees the `print` hash parameter (see cli-bundle's viewer-adapter).
-  const printWindow = window.open('about:blank', '_blank');
-  invariant(printWindow, 'Failed to open a tab for printing');
-  printWindow.document.title = m.print_pdf_preparing();
-  printWindow.document.body.textContent = m.print_pdf_preparing();
-  try {
-    const cli = await $cli.awaiter();
-    const viewerUrl = await cli.createViewerUrlPromise();
-    printWindow.location.href = `${viewerUrl}&print=true`;
-  } catch (error) {
-    printWindow.close();
-    throw error;
-  }
-}
-
 export async function printPdf() {
-  if (navigator.userAgent.includes('Firefox')) {
-    return await printPdfInNewTab();
+  if (printing) {
+    return;
   }
-
-  // Ensure the viewer pane is visible
-  if (
-    !$ui.tabs.some(
-      (tab) =>
-        tab.type === 'extension' &&
-        tab.extensionId === previewExtensionId &&
-        tab.panePath === previewPanePath,
-    )
-  ) {
-    $ui.tabs = [
-      ...$ui.tabs,
-      {
-        id: generateId(),
-        type: 'extension',
-        extensionId: previewExtensionId,
-        panePath: previewPanePath,
-      },
-    ];
+  printing = true;
+  try {
+    // Open the tab synchronously so the browser attributes it to the user
+    // gesture; navigate once the viewer URL resolves. The viewer prints
+    // itself when it sees the `print` hash parameter and closes the tab when
+    // the dialog is dismissed (see cli-bundle's viewer-adapter).
+    const printWindow = window.open('about:blank', '_blank');
+    invariant(printWindow, 'Failed to open a tab for printing');
+    printWindow.document.title = m.print_pdf_preparing();
+    printWindow.document.body.textContent = m.print_pdf_preparing();
+    try {
+      const cli = await $cli.awaiter();
+      const viewerUrl = await cli.createViewerUrlPromise();
+      printWindow.location.href = `${viewerUrl}&print=true`;
+    } catch (error) {
+      printWindow.close();
+      throw error;
+    }
+  } finally {
+    printing = false;
   }
-
-  const frameKey = extensionFrameKey(previewExtensionId, previewPanePath);
-  if (!extensionFrames[frameKey]) {
-    await new Promise<void>((resolve) => {
-      const unsubscribe = subscribe(extensionFrames, check);
-      const timer = setTimeout(finish, 10_000);
-      function finish() {
-        clearTimeout(timer);
-        unsubscribe();
-        resolve();
-      }
-      function check() {
-        if (extensionFrames[frameKey]) finish();
-      }
-      check();
-    });
-  }
-
-  const element = extensionFrames[frameKey];
-  invariant(element, 'Preview extension frame is not mounted');
-
-  const ready = await waitForPrintReady(element);
-  invariant(ready, 'Preview pane did not become ready for printing');
-  element.contentWindow?.postMessage(
-    { type: 'print-pdf' },
-    extensionSandboxOrigin(previewExtensionId),
-  );
 }
