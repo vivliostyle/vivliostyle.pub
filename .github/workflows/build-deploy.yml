@@ -42,7 +42,10 @@ jobs:
             echo "preview=true" >> $GITHUB_OUTPUT
             echo "preview-alias=pr-preview-${{ github.event.number }}" >> $GITHUB_OUTPUT
             echo "hostname=pr-preview-${{ github.event.number }}-vivliostyle-pub-app.vivliostyle.workers.dev" >> $GITHUB_OUTPUT
-            echo "sandbox-identifier=pr-preview-${{ github.event.number }}-vivliostyle-pub" >> $GITHUB_OUTPUT
+            # Sandbox subdomain labels are `sandbox-<25-char projectId>--<identifier>`
+            # and must stay within the 63-character DNS label limit, so the
+            # identifier can be at most 28 characters.
+            echo "sandbox-identifier=pr-${{ github.event.number }}-vivliostyle-pub" >> $GITHUB_OUTPUT
           fi
       - run: pnpm build
         env:
