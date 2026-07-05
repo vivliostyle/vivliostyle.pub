@@ -19,9 +19,8 @@ export const Route = createFileRoute(
     } catch {
       throw redirect({ to: '/' });
     }
-    // Reuse an existing preview tab (keeping its id so the viewer iframe
-    // doesn't remount) while still trimming any other panes, so this route is
-    // a reliable escape from a split layout.
+    // Keep an existing preview tab's id so the viewer iframe doesn't remount
+    // when trimming other panes away.
     const existingTab = $ui.tabs.find(
       (tab) => tab.type === 'extension' && tab.extensionId === 'preview',
     );

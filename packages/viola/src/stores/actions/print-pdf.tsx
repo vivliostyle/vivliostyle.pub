@@ -15,10 +15,8 @@ const previewExtensionId = 'preview' as ExtensionId;
 const previewPanePath = '.';
 
 // Polls `print-pdf-query` until the viewer answers `print-pdf-ready` (every
-// page is rendered). Polling stays correct across view reloads, unlike a
-// one-shot ready announcement. The timeout must accommodate a full book
-// render from a cold start; the preview pane doubles as the progress
-// indication while the user waits.
+// page is rendered); polling stays correct across view reloads. The timeout
+// must accommodate a full book render from a cold start.
 function waitForPrintReady(frame: HTMLIFrameElement): Promise<boolean> {
   const targetOrigin = extensionSandboxOrigin(previewExtensionId);
   return new Promise((resolve) => {
@@ -62,8 +60,6 @@ function waitForPrintDone(frame: HTMLIFrameElement): Promise<boolean> {
       finish(true);
     };
     window.addEventListener('message', onMessage);
-    // The dialog can stay open indefinitely; on timeout just leave the pane
-    // in place instead of yanking it out from under a live print preview.
     const timer = setTimeout(() => finish(false), 600_000);
   });
 }
@@ -133,9 +129,8 @@ async function printPdfViaPreviewPane() {
     extensionSandboxOrigin(previewExtensionId),
   );
 
-  // If this action opened the pane, restore the previous layout — but only
-  // after the dialog closes, since the print preview is fed live from the
-  // pane's iframe.
+  // Restore the layout only after the dialog closes — the print preview is
+  // fed live from the pane's iframe.
   if (addedTabId && (await printDone)) {
     $ui.tabs = $ui.tabs.filter((tab) => tab.id !== addedTabId);
   }

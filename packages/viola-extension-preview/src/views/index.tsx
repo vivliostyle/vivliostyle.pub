@@ -21,10 +21,8 @@ export default function PreviewPane({ host, t }: ExtensionMountContext) {
     };
   }, [host]);
 
-  // Relays print messages between the host and the nested viewer, which can't
-  // reach each other directly. Readiness is answered by the viewer itself
-  // (cli-bundle's viewer-adapter), the only party that knows when every page
-  // has rendered.
+  // Relays print messages between the host and the nested viewer, which
+  // can't reach each other directly.
   useEffect(() => {
     if (!url) return;
     const viewerOrigin = new URL(url).origin;
