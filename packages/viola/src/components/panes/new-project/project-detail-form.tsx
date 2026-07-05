@@ -48,7 +48,7 @@ function BookTitleInput({ children }: React.PropsWithChildren) {
     <label className="grid gap-2">
       {children}
       <div>
-        <Input type="text" name="bookTitle" required {...inputProps} />
+        <Input type="text" name="bookTitle" {...inputProps} />
       </div>
     </label>
   );
@@ -70,7 +70,7 @@ function AuthorInput({ children }: React.PropsWithChildren) {
     <label className="grid gap-2">
       {children}
       <div>
-        <Input type="text" name="author" required {...inputProps} />
+        <Input type="text" name="author" {...inputProps} />
       </div>
     </label>
   );
@@ -99,7 +99,6 @@ function LanguageSelect({ children }: React.PropsWithChildren) {
           <input
             type="text"
             name="language"
-            required
             value={snap.bibliography.language}
             tabIndex={-1}
             className="sr-only inset-0 size-auto pointer-events-none"
