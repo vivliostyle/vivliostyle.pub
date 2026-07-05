@@ -1,3 +1,4 @@
+import './stubs/install-symbol-dispose';
 import './stubs/install-process-global';
 import path from 'node:path';
 import type stream from 'node:stream';

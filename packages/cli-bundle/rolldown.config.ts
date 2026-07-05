@@ -459,6 +459,13 @@ const workerConfig = defineConfig({
     alias: aliasMap,
   },
   transform: {
+    // Lower syntax Safari cannot parse — @vivliostyle/cli's dist ships
+    // `using` declarations (unsupported in every Safari) and `v`-flag regex
+    // literals (Safari <17). Oxc only lowers `using` for targets es2023 and
+    // below; `es2024`/`esnext`/browser-style targets leave it untouched.
+    // Safari additionally lacks the Symbol.dispose API itself — see
+    // src/stubs/install-symbol-dispose.ts.
+    target: 'es2022',
     inject: {
       // unenv's preset injects `process` (unenv/node/process), `Buffer`
       // (node:buffer's Buffer), `setImmediate`/`clearImmediate` (node:timers),
@@ -500,6 +507,9 @@ const rolldownWorkerConfig = defineConfig({
     codeSplitting: false,
   },
   platform: 'browser',
+  transform: {
+    target: 'es2022',
+  },
   plugins: [patchEmnapiEnvDetectionPlugin],
 });
 
@@ -538,6 +548,9 @@ const clientConfig = defineConfig({
     format: 'es',
   },
   platform: 'browser',
+  transform: {
+    target: 'es2022',
+  },
   plugins: [resolveViteClientPlugin],
 });
 
