@@ -39,16 +39,23 @@ async function readLocalEntry(
 }
 
 async function listLocalProjects(): Promise<ProjectEntry[]> {
-  const root = await OPFSStorageProvider.open();
-  const dirs = await root.list('');
-  const entries = await Promise.all(
-    dirs
-      .filter(
-        (entry) => entry.kind === 'directory' && entry.path !== draftProjectId,
-      )
-      .map((entry) => readLocalEntry(root, entry.path as ProjectId)),
-  );
-  return entries.filter((e): e is ProjectEntry => e !== null);
+  // OPFS can be unavailable (e.g. Safari private browsing rejects
+  // getDirectory); show an empty list instead of failing the route load.
+  try {
+    const root = await OPFSStorageProvider.open();
+    const dirs = await root.list('');
+    const entries = await Promise.all(
+      dirs
+        .filter(
+          (entry) =>
+            entry.kind === 'directory' && entry.path !== draftProjectId,
+        )
+        .map((entry) => readLocalEntry(root, entry.path as ProjectId)),
+    );
+    return entries.filter((e): e is ProjectEntry => e !== null);
+  } catch {
+    return [];
+  }
 }
 
 async function listRemoteProjects(): Promise<ProjectEntry[]> {
