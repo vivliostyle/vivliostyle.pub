@@ -232,13 +232,16 @@ export class Project {
 }
 
 export interface ProjectChannel {
-  serve: (url: string, init: RequestInit) => Promise<[BodyInit, ResponseInit]>;
+  serve: (
+    url: string,
+    init: RequestInit,
+  ) => Promise<ConstructorParameters<typeof Response>>;
 }
 
 const channel = new BroadcastChannel('host:project');
 Comlink.expose(
   {
-    async serve(url: string, _init: RequestInit) {
+    async serve(url: string, init: RequestInit) {
       const { pathname } = new URL(url);
       const project =
         projects.currentProjectId && projects.value[projects.currentProjectId];
@@ -246,23 +249,34 @@ Comlink.expose(
         return ['', { status: 404 }];
       }
       const sandbox = await project.sandboxPromise;
-      const entryContext = sandbox.vivliostyleConfig.entryContext || '';
-      const filename = join(entryContext, relative('/vivliostyle', pathname));
-      const content = sandbox.files[filename];
-      if (!content) {
+      if (pathname.startsWith('/vivliostyle/')) {
+        const entryContext = sandbox.vivliostyleConfig.entryContext || '';
+        const filename = join(entryContext, relative('/vivliostyle', pathname));
+        const content = sandbox.files[filename];
+        if (content) {
+          const contentType = content.type || 'application/octet-stream';
+          return [
+            await content.buffer(),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': contentType,
+                'Cache-Control': 'no-store',
+              },
+            },
+          ];
+        }
+      }
+      // Vite-generated resources (publication.json, entry HTML, the viewer
+      // client module) exist only in the CLI worker. The host-origin print tab
+      // reaches them through this relay because its own sandbox-origin SW sits
+      // in another storage partition and cannot see the worker.
+      try {
+        const cli = await sandbox.cli.createRemotePromise();
+        return await cli.serve(url, init);
+      } catch {
         return ['', { status: 404 }];
       }
-      const contentType = content.type || 'application/octet-stream';
-      return [
-        await content.buffer(),
-        {
-          status: 200,
-          headers: {
-            'Content-Type': contentType,
-            'Cache-Control': 'no-store',
-          },
-        },
-      ];
     },
   } satisfies ProjectChannel,
   channel,

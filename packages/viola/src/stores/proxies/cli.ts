@@ -1,6 +1,7 @@
 import * as Comlink from 'comlink';
 import { proxy, ref } from 'valtio';
 
+import { appOrigin } from '../../libs/origins';
 import type { Sandbox } from './sandbox';
 
 export type RemoteCli = Comlink.Remote<typeof import('@v/cli-bundle')>;
@@ -15,6 +16,7 @@ export class Cli {
   protected sandbox: Sandbox;
   protected remoteDeferred: PromiseWithResolvers<RemoteCli> | undefined;
   protected lazyViewerUrlPromise: Promise<string> | undefined;
+  protected lazyPrintViewerUrlPromise: Promise<string> | undefined;
 
   protected constructor(sandbox: Sandbox) {
     this.sandbox = ref(sandbox);
@@ -36,6 +38,20 @@ export class Cli {
       return `${this.sandbox.iframeOrigin}/__vivliostyle-viewer/index.html#src=${this.sandbox.iframeOrigin}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`;
     })();
     return this.lazyViewerUrlPromise;
+  }
+
+  // Viewer URL for the top-level print tab, served from the app origin. A
+  // top-level tab on the sandbox origin lives in its own storage partition,
+  // where the sandbox SW cannot reach the CLI worker over BroadcastChannel;
+  // the host SW instead relays requests through the host page (see
+  // `ProjectChannel`).
+  createPrintViewerUrlPromise() {
+    this.lazyPrintViewerUrlPromise ??= (async () => {
+      const remote = await this.createRemotePromise();
+      await remote.setupServer();
+      return `${appOrigin()}/_cli/viewer/index.html#src=${appOrigin()}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`;
+    })();
+    return this.lazyPrintViewerUrlPromise;
   }
 
   createRemoteResolver() {
@@ -60,5 +76,6 @@ export class Cli {
     this.remoteDeferred?.reject(new Error('CLI remote disposed'));
     this.remoteDeferred = undefined;
     this.lazyViewerUrlPromise = undefined;
+    this.lazyPrintViewerUrlPromise = undefined;
   }
 }
