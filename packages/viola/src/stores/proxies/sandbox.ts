@@ -458,23 +458,32 @@ export class Sandbox {
   // writes the `files` subscriber kicks off (see `saveMemoryToFileSystem`).
   protected lastPersist: Promise<unknown> = Promise.resolve();
 
+  // Serializes overlapping batches: OPFS write streams take an exclusive
+  // per-file lock in Chromium, and two in-flight writes to the same path
+  // throw NoModificationAllowedError, silently dropping one of them.
+  protected persistQueue: Promise<unknown> = Promise.resolve();
+
   // Persist a set of changes in one shot, collapsing the per-file round-trips
   // into a single request on providers that support batching.
-  protected async persistChanges(
+  protected persistChanges(
     writes: { path: string; data: Uint8Array }[],
     deletes: string[],
   ) {
     if (writes.length === 0 && deletes.length === 0) {
-      return;
+      return Promise.resolve();
     }
-    if (this.provider.applyBatch) {
-      await this.provider.applyBatch({ writes, deletes });
-      return;
-    }
-    await Promise.all([
-      ...writes.map((write) => this.saveToFileSystem(write.path, write.data)),
-      ...deletes.map((path) => this.saveToFileSystem(path, null)),
-    ]);
+    const run = this.persistQueue.then(async () => {
+      if (this.provider.applyBatch) {
+        await this.provider.applyBatch({ writes, deletes });
+        return;
+      }
+      await Promise.all([
+        ...writes.map((write) => this.saveToFileSystem(write.path, write.data)),
+        ...deletes.map((path) => this.saveToFileSystem(path, null)),
+      ]);
+    });
+    this.persistQueue = run.catch(() => {});
+    return run;
   }
 
   protected async handleFileUpdate(ops: INTERNAL_Op[]) {
