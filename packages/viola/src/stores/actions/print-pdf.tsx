@@ -1,94 +1,38 @@
 import { invariant } from 'outvariant';
-import { subscribe } from 'valtio';
 
-import { extensionSandboxOrigin } from '../../extensions/sandbox-origin';
-import { generateId } from '../../libs/generate-id';
-import { $ui } from '../accessors';
-import {
-  type ExtensionId,
-  extensionFrameKey,
-  extensionFrames,
-} from '../proxies/extension';
+import { m } from '../../generated/paraglide/messages';
+import { $cli } from '../accessors';
 
-const previewExtensionId = 'preview' as ExtensionId;
-const previewPanePath = '.';
+let printWindow: Window | null = null;
+let printSession = 0;
 
-// Polls `print-pdf-query` until the view answers `print-pdf-ready` (the nested
-// viewer has loaded). Polling stays correct across view reloads, unlike a
-// one-shot ready announcement.
-function waitForPrintReady(frame: HTMLIFrameElement): Promise<boolean> {
-  const targetOrigin = extensionSandboxOrigin(previewExtensionId);
-  return new Promise((resolve) => {
-    const query = () => {
-      frame.contentWindow?.postMessage(
-        { type: 'print-pdf-query' },
-        targetOrigin,
-      );
-    };
-    const finish = (ready: boolean) => {
-      clearInterval(interval);
-      clearTimeout(timer);
-      window.removeEventListener('message', onMessage);
-      resolve(ready);
-    };
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== targetOrigin) return;
-      if (event.source !== frame.contentWindow) return;
-      if (event.data?.type !== 'print-pdf-ready') return;
-      finish(true);
-    };
-    window.addEventListener('message', onMessage);
-    const interval = setInterval(query, 250);
-    const timer = setTimeout(() => finish(false), 30_000);
-    query();
-  });
-}
-
+// Printing happens in a top-level tab because Firefox crashes generating its
+// print preview for the nested cross-origin isolated viewer iframe (#64).
 export async function printPdf() {
-  // Ensure the viewer pane is visible
-  if (
-    !$ui.tabs.some(
-      (tab) =>
-        tab.type === 'extension' &&
-        tab.extensionId === previewExtensionId &&
-        tab.panePath === previewPanePath,
-    )
-  ) {
-    $ui.tabs = [
-      ...$ui.tabs,
-      {
-        id: generateId(),
-        type: 'extension',
-        extensionId: previewExtensionId,
-        panePath: previewPanePath,
-      },
-    ];
+  // A COOP-severed handle (after navigation) also reports `closed`, so each
+  // click after a successful navigation starts a fresh tab.
+  if (printWindow && !printWindow.closed) {
+    printWindow.focus();
+    return;
   }
+  const session = ++printSession;
 
-  const frameKey = extensionFrameKey(previewExtensionId, previewPanePath);
-  if (!extensionFrames[frameKey]) {
-    await new Promise<void>((resolve) => {
-      const unsubscribe = subscribe(extensionFrames, check);
-      const timer = setTimeout(finish, 10_000);
-      function finish() {
-        clearTimeout(timer);
-        unsubscribe();
-        resolve();
-      }
-      function check() {
-        if (extensionFrames[frameKey]) finish();
-      }
-      check();
-    });
+  // Open synchronously to stay within the user gesture; the viewer prints
+  // itself and closes the tab when it sees the `print` hash parameter.
+  const openedWindow = window.open('about:blank', '_blank');
+  invariant(openedWindow, 'Failed to open a tab for printing');
+  printWindow = openedWindow;
+  openedWindow.document.title = m.print_pdf_preparing();
+  openedWindow.document.body.textContent = m.print_pdf_preparing();
+  try {
+    const cli = await $cli.awaiter();
+    const viewerUrl = await cli.createViewerUrlPromise();
+    if (openedWindow.closed || session !== printSession) {
+      return;
+    }
+    openedWindow.location.href = `${viewerUrl}&print=true`;
+  } catch (error) {
+    openedWindow.close();
+    throw error;
   }
-
-  const element = extensionFrames[frameKey];
-  invariant(element, 'Preview extension frame is not mounted');
-
-  const ready = await waitForPrintReady(element);
-  invariant(ready, 'Preview pane did not become ready for printing');
-  element.contentWindow?.postMessage(
-    { type: 'print-pdf' },
-    extensionSandboxOrigin(previewExtensionId),
-  );
 }
