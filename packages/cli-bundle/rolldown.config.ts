@@ -362,6 +362,32 @@ const patchRolldownBindingPlugin: Plugin = {
   },
 };
 
+// `@bluwy/giget-core` writes the downloaded template tarball with
+// `pipeline(response.body, fss.createWriteStream(...))`. Piping a web
+// ReadableStream through the readable-stream polyfill breaks on Safari, and
+// giget swallows the failure whenever the (already-created, empty) file
+// exists, so node-tar later dies with `TAR_BAD_ARCHIVE: Unrecognized archive
+// format`. Buffer the body and write it in one shot instead — templates are
+// a few kilobytes, streaming buys nothing inside the worker's memfs.
+const patchGigetDownloadPlugin: Plugin = {
+  name: 'patch-giget-download',
+  transform: {
+    filter: { id: /[\\/]@bluwy[\\/]giget-core[\\/]src[\\/]utils\.js$/ },
+    handler(code) {
+      const patched = code.replace(
+        /const stream = fss\.createWriteStream\(filePath\)\s*\n\s*await promisify\(pipeline\)\(response\.body, stream\)/,
+        'fss.writeFileSync(filePath, new Uint8Array(await response.arrayBuffer()))',
+      );
+      if (patched === code) {
+        throw new Error(
+          'patch-giget-download: target code not found in giget-core utils.js',
+        );
+      }
+      return patched;
+    },
+  },
+};
+
 // `parse-entities@2`'s package.json ships a `browser` field that swaps
 // `./decode-entity.js` (a static lookup table) for `./decode-entity.browser.js`,
 // which decodes via `document.createElement('i').innerHTML = '&...;'`. With
@@ -491,6 +517,7 @@ const workerConfig = defineConfig({
     // rewrites the same expression into a virtual file:// URL.
     patchRolldownBindingPlugin,
     patchEmnapiEnvDetectionPlugin,
+    patchGigetDownloadPlugin,
     redirectRolldownToBrowserPlugin,
     resolveImportMetaPlugin,
     undoParseEntitiesBrowserPlugin,
