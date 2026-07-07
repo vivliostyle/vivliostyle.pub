@@ -40,8 +40,19 @@ function sendHotPayload(payload: HotPayload) {
 }
 
 let server: ViteDevServer | undefined;
+let setupServerPromise: Promise<void> | undefined;
 
-export async function setupServer() {
+// Memoized: callers race (preview pane, print tab, EPUB/WebPub exports), and a
+// second createServer would orphan the first instance's middleware stack.
+export function setupServer() {
+  setupServerPromise ??= doSetupServer().catch((error) => {
+    setupServerPromise = undefined;
+    throw error;
+  });
+  return setupServerPromise;
+}
+
+async function doSetupServer() {
   // The @rolldown/browser WASI binding finishes its top-level await
   // (`init_rolldown_binding_wasi_browser`) when the napi instance exists,
   // but the WASI Worker (`/_cli/rolldown-wasi-worker.js`) is spawned
@@ -78,6 +89,7 @@ export async function setupServer() {
 }
 
 export async function teardownServer() {
+  setupServerPromise = undefined;
   await server?.close();
   server = undefined;
 }
@@ -186,9 +198,7 @@ export async function serve(
 }
 
 export async function buildEpub() {
-  if (!server) {
-    throw new Error('Server is not ready');
-  }
+  await setupServer();
   await vivliostyleBuild({
     cwd: '/workdir',
     logLevel: 'info',
@@ -199,9 +209,7 @@ export async function buildEpub() {
 }
 
 export async function buildWebPub() {
-  if (!server) {
-    throw new Error('Server is not ready');
-  }
+  await setupServer();
   await vivliostyleBuild({
     cwd: '/workdir',
     logLevel: 'info',

@@ -159,10 +159,15 @@ export class OPFSStorageProvider implements StorageProvider {
     const [parent, name] = await this.resolveParent(path, true);
     const fileHandle = await parent.getFileHandle(name, { create: true });
     const writable = await fileHandle.createWritable();
-    // FileSystemWritableFileStream accepts BufferSource directly; the cast
-    // widens Uint8Array<ArrayBufferLike> to satisfy TS expecting
-    // ArrayBufferView<ArrayBuffer>.
-    await writable.write(data as unknown as BufferSource);
+    // Copy partial views before writing: WebKit's write() ignores a view's
+    // byteOffset/byteLength and writes the entire underlying ArrayBuffer,
+    // corrupting the file. The cast widens Uint8Array<ArrayBufferLike> to
+    // satisfy TS expecting ArrayBufferView<ArrayBuffer>.
+    const chunk =
+      data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
+        ? data
+        : data.slice();
+    await writable.write(chunk as unknown as BufferSource);
     await writable.close();
   }
 

@@ -1,3 +1,7 @@
+import {
+  DEFAULT_PROJECT_AUTHOR,
+  DEFAULT_PROJECT_TITLE,
+} from '@vivliostyle/cli/constants';
 import type { BuildTask } from '@vivliostyle/cli/schema';
 import { deepClone } from 'valtio/utils';
 
@@ -81,10 +85,12 @@ export async function setupProjectFromDraft({
       (await $$draftProject.theme.installPromise)?.packageName ??
       '@vivliostyle/theme-base';
 
+    // Empty values would send `vivliostyle create` into its interactive
+    // prompts, which never resolve inside the worker.
     await cli.setupTemplate({
-      title: $$draftProject.bibliography.title,
-      author: $$draftProject.bibliography.author,
-      language: $$draftProject.bibliography.language,
+      title: $$draftProject.bibliography.title || DEFAULT_PROJECT_TITLE,
+      author: $$draftProject.bibliography.author || DEFAULT_PROJECT_AUTHOR,
+      language: $$draftProject.bibliography.language || 'en',
       template: template.source,
       theme: themePackageName,
     });

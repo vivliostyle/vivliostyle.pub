@@ -26,7 +26,7 @@ export async function printPdf() {
   openedWindow.document.body.textContent = m.print_pdf_preparing();
   try {
     const cli = await $cli.awaiter();
-    const viewerUrl = await cli.createViewerUrlPromise();
+    const viewerUrl = await cli.createPrintViewerUrlPromise();
     if (openedWindow.closed || session !== printSession) {
       return;
     }

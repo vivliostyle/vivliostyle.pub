@@ -37,10 +37,13 @@ class MockFileSystemFileHandle {
     } as unknown as File;
   }
 
+  lastWrittenChunk: Blob | Uint8Array | string | null = null;
+
   async createWritable() {
     let buffered: Uint8Array | null = null;
     return {
       write: async (chunk: Blob | Uint8Array | string) => {
+        this.lastWrittenChunk = chunk;
         if (chunk instanceof Blob) {
           buffered = new Uint8Array(await chunk.arrayBuffer());
         } else if (chunk instanceof Uint8Array) {
@@ -194,6 +197,23 @@ describe('OPFSStorageProvider', () => {
       await provider.write('mut.txt', encode('first'));
       await provider.write('mut.txt', encode('second'));
       expect(decode(await provider.read('mut.txt'))).toBe('second');
+    });
+
+    // WebKit's FileSystemWritableFileStream.write() ignores a view's
+    // byteOffset/byteLength and writes the entire underlying ArrayBuffer.
+    it('never passes a partial view to createWritable', async () => {
+      const root = new MockFileSystemDirectoryHandle();
+      const p = new OPFSStorageProvider(
+        root as unknown as FileSystemDirectoryHandle,
+      );
+      const backing = new Uint8Array(64).fill(0x41);
+      const view = backing.subarray(8, 16).fill(0x42);
+      await p.write('view.bin', view);
+      const handle = root.children.get('view.bin') as MockFileSystemFileHandle;
+      const chunk = handle.lastWrittenChunk as Uint8Array;
+      expect(chunk.byteOffset).toBe(0);
+      expect(chunk.byteLength).toBe(chunk.buffer.byteLength);
+      expect(decode(await p.read('view.bin'))).toBe('BBBBBBBB');
     });
 
     it('throws StorageNotFoundError when reading a missing file', async () => {
