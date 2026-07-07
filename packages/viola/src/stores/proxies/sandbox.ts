@@ -263,6 +263,7 @@ export class Sandbox {
     return MIME_BY_EXT[ext.toLowerCase()];
   }
 
+  projectId: ProjectId;
   iframeOrigin: string;
   provider: StorageProvider;
   files: Record<string, ReturnType<typeof ref<SandboxFile>>> = proxy({});
@@ -283,6 +284,7 @@ export class Sandbox {
     projectId: ProjectId;
     provider: StorageProvider;
   }) {
+    this.projectId = projectId;
     this.iframeOrigin = sandboxOrigin(`sandbox-${projectId}`);
     this.provider = ref(provider);
   }

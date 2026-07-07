@@ -44,12 +44,13 @@ export class Cli {
   // top-level tab on the sandbox origin lives in its own storage partition,
   // where the sandbox SW cannot reach the CLI worker over BroadcastChannel;
   // the host SW instead relays requests through the host page (see
-  // `ProjectChannel`).
+  // `serveProjectResource`). The `/p/<projectId>/` prefix routes the request
+  // to the tab that owns this project.
   createPrintViewerUrlPromise() {
     this.lazyPrintViewerUrlPromise ??= (async () => {
       const remote = await this.createRemotePromise();
       await remote.setupServer();
-      return `${appOrigin()}/_cli/viewer/index.html#src=${appOrigin()}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`;
+      return `${appOrigin()}/_cli/viewer/index.html#src=${appOrigin()}/vivliostyle/p/${this.sandbox.projectId}/publication.json&bookMode=true&renderAllPages=true`;
     })();
     return this.lazyPrintViewerUrlPromise;
   }
