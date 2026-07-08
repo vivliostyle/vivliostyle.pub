@@ -1,12 +1,12 @@
 /// <reference lib="webworker" />
 
-import * as Comlink from 'comlink';
-
-import type { ProjectChannel } from '../stores/proxies/project';
+import type {
+  ProjectServeRequest,
+  ProjectServeResponse,
+} from '../stores/proxies/project';
 import {
   buildRequestInit,
   createHeadResponse,
-  serveViaComlink,
   setupSwLifecycle,
 } from './sw-utils';
 
@@ -36,7 +36,52 @@ export function setupSwHost() {
 }
 
 const channel = new BroadcastChannel('host:project');
-const cli = Comlink.wrap<ProjectChannel>(channel);
+const pending = new Map<
+  string,
+  (result: ConstructorParameters<typeof Response>) => void
+>();
+channel.addEventListener('message', (event: MessageEvent) => {
+  const data = event.data as Partial<ProjectServeResponse> | undefined;
+  if (data?.type !== 'vs:project-serve-result' || !data.id || !data.result) {
+    return;
+  }
+  const resolve = pending.get(data.id);
+  if (resolve) {
+    pending.delete(data.id);
+    resolve(data.result);
+  }
+});
+
+// Broadcast the request to every tab; only the tab owning the requested
+// project replies (see `serveProjectResource`), so first-reply-wins is safe.
+async function serveViaProjectChannel(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  try {
+    const result = await new Promise<ConstructorParameters<typeof Response>>(
+      (resolve, reject) => {
+        const id = crypto.randomUUID();
+        pending.set(id, resolve);
+        setTimeout(() => {
+          if (pending.delete(id)) {
+            reject(new Error(`Request timeout: ${url}`));
+          }
+        }, 5000);
+        channel.postMessage({
+          type: 'vs:project-serve',
+          id,
+          url,
+          init,
+        } satisfies ProjectServeRequest);
+      },
+    );
+    return new Response(...result);
+  } catch (error) {
+    console.error(error);
+    return new Response('', { status: 500 });
+  }
+}
 
 async function handleRequest(event: FetchEvent) {
   const { request } = event;
@@ -44,5 +89,5 @@ async function handleRequest(event: FetchEvent) {
     return createHeadResponse();
   }
   const requestInit = await buildRequestInit(request);
-  return serveViaComlink(cli.serve, request.url, requestInit);
+  return serveViaProjectChannel(request.url, requestInit);
 }
