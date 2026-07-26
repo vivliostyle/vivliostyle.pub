@@ -3,7 +3,6 @@ import { Blockquote } from '@tiptap/extension-blockquote';
 import { Bold } from '@tiptap/extension-bold';
 import { BulletList } from '@tiptap/extension-bullet-list';
 import { Code } from '@tiptap/extension-code';
-import { CodeBlock } from '@tiptap/extension-code-block';
 import { Document } from '@tiptap/extension-document';
 import { HardBreak } from '@tiptap/extension-hard-break';
 import { Heading } from '@tiptap/extension-heading';
@@ -20,6 +19,7 @@ import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import { join } from 'pathe';
 
+import { CodeBlockPrism } from './code-block-prism';
 import {
   CustomDragHandler,
   type CustomDragPayload,
@@ -91,7 +91,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       Blockquote.configure({}),
       BulletList.configure({}),
       Code.configure({}),
-      CodeBlock.configure({}),
+      CodeBlockPrism.configure({}),
       Document.configure({}),
       Dropcursor.configure({}),
       Gapcursor.configure({}),

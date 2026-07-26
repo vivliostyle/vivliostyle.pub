@@ -35,6 +35,7 @@
     "@tiptap/extensions": "catalog:",
     "@tiptap/markdown": "catalog:",
     "@tiptap/pm": "catalog:",
+    "@types/refractor": "3.4.1",
     "@v/config": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
@@ -45,6 +46,7 @@
   "dependencies": {
     "@handlewithcare/remark-prosemirror": "0.1.5",
     "prosemirror-model": "1.25.5",
+    "refractor": "3.6.0",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "remark-stringify": "11.0.0",
