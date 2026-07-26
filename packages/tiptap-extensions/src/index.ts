@@ -25,6 +25,7 @@ import {
   type CustomDragPayload,
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
+import { Frontmatter } from './frontmatter';
 
 export {
   type AssetDragPayload,
@@ -140,6 +141,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
         },
       }).configure({}),
       Markdown.configure({}),
+      Frontmatter,
     ];
   },
 });
