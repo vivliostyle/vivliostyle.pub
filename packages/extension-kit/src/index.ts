@@ -71,11 +71,34 @@ export type ExtensionSessionListener = (
  *   - `session:write` → `login`, `register`, `logout`, `applyBearerSession`,
  *                       `clearBearerSession`, `startProviderSignIn`
  *   - `viewer:read`   → `getViewerUrl`
+ *   - `api:request`   → `apiFetch`
  */
 export type ExtensionPermission =
   | 'session:read'
   | 'session:write'
-  | 'viewer:read';
+  | 'viewer:read'
+  | 'api:request';
+
+/** Request shape for {@link ExtensionHostApi.apiFetch}. */
+export interface ExtensionApiRequestInit {
+  method?: string;
+  headers?: Record<string, string>;
+  /** Request body; for the project API this is a JSON string. */
+  body?: string;
+}
+
+/**
+ * Response from {@link ExtensionHostApi.apiFetch}. The body is returned as raw
+ * bytes so the same call serves both JSON endpoints (decode with `TextDecoder`)
+ * and binary downloads (use the `ArrayBuffer` directly); a `Response`/`Headers`
+ * pair would not survive Comlink's structured clone.
+ */
+export interface ExtensionApiResponse {
+  ok: boolean;
+  status: number;
+  headers: Record<string, string>;
+  body: ArrayBuffer;
+}
 
 /**
  * Capabilities the host exposes to an extension view over Comlink.
@@ -100,6 +123,17 @@ export interface ExtensionHostApi {
   startProviderSignIn(provider: string): Promise<void>;
   getLocale(): string;
   getViewerUrl(): Promise<string>;
+  /**
+   * Make an authenticated request to the connected API server. `path` is
+   * resolved against the session's server base URL, and the host attaches the
+   * signed-in user's bearer token — the token itself never enters the extension
+   * sandbox. Lets an extension call server endpoints (its own or the core ones)
+   * on behalf of the current user.
+   */
+  apiFetch(
+    path: string,
+    init?: ExtensionApiRequestInit,
+  ): Promise<ExtensionApiResponse>;
 }
 
 /** The host API as seen from inside the iframe (Comlink-proxied). */

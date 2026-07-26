@@ -28,7 +28,10 @@ export const awaiter = async <T>({
         // timeout
         return reject(new Error(`Awaiter timeout: ${name}`));
       }
-      requestAnimationFrame(loop);
+      // Poll via setTimeout, not requestAnimationFrame: rAF is paused while the
+      // document is hidden, which would stall this loop — and its timeout — until
+      // the tab is shown again.
+      setTimeout(loop, 50);
     };
     loop();
   });
