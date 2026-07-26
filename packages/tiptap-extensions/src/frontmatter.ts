@@ -1,7 +1,11 @@
 import { Extension } from '@tiptap/core';
 
+// Mirrors VFM (remark-frontmatter): blank lines before the opening fence are
+// allowed, the opening fence must be exactly `---` on its own line, and the
+// closing fence is the first subsequent line starting with `---` (anything
+// after those dashes is left in the source, as VFM does).
 const FRONTMATTER_RE =
-  /^---[ \t]*\r?\n(?:[\s\S]*?\r?\n)?---[ \t]*(?:(?:\r?\n)+|$)/;
+  /^(?:[ \t]*\r?\n)*---\r?\n(?:[\s\S]*?\r?\n)?---(?:(?:[ \t]*\r?\n)+|[ \t]*$)?/;
 
 /**
  * Consumes a leading YAML frontmatter block as a single token so marked does
