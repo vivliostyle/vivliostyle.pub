@@ -436,8 +436,12 @@ export class Sandbox {
       }
     };
     traverse(rootNode);
-    // Let the `files` subscriber fire, then await the persistence it started.
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    // Yield a macrotask so the `files` subscriber (valtio batches it onto a
+    // microtask) runs and sets `lastPersist`, then await it. Uses `setTimeout`
+    // rather than `requestAnimationFrame`: rAF is paused while the tab is hidden,
+    // so it would never fire — hanging this save, and thus project creation, in a
+    // background tab.
+    await new Promise((resolve) => setTimeout(resolve));
     await this.lastPersist;
   }
 

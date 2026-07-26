@@ -133,6 +133,26 @@ const hostApiRegistry: HostApiRegistry = {
       return await cli.createViewerUrlPromise();
     },
   },
+  apiFetch: {
+    permission: 'api:request',
+    impl: async (path, init) => {
+      const token = await $session.auth.getAccessToken();
+      const res = await fetch(`${$session.baseUrl}${path}`, {
+        method: init?.method ?? 'GET',
+        headers: {
+          ...init?.headers,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: init?.body,
+      });
+      const body = await res.arrayBuffer();
+      const headers: Record<string, string> = {};
+      res.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      return { ok: res.ok, status: res.status, headers, body };
+    },
+  },
 };
 
 function denyPermission(
