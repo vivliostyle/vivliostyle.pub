@@ -44,3 +44,5 @@ You can try the development version of Vivliostyle Pub at: https://alpha.vivlios
 
 Vivliostyle Pub is being developed with the support of NLnet Foundation's NGI Zero Commons grant.
 For more information, see the article on the Vivliostyle site: [Obtained a grant from NLnet](https://vivliostyle.org/blog/2025/07/07/obtained-a-grant-from-nlnet/).
+
+This project uses generative AI tools in its development and discloses that use in [AI_POLICY.md](AI_POLICY.md), following NLnet's generative AI policy.
