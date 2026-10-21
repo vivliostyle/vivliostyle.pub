@@ -13,6 +13,12 @@ export interface PackageJson {
     tarball: string;
     unpackedSize: number;
   };
+  vivliostyle?: {
+    template?: Record<
+      string,
+      { name?: string; description?: string; source?: string }
+    >;
+  };
 }
 
 export interface IdealTree {

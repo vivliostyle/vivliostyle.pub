@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_APP_HOSTNAME: string;
   readonly VITE_SANDBOX_HOSTNAME?: string;
   readonly VITE_SANDBOX_SUBDOMAIN_IDENTIFIER?: string;
+  readonly VITE_THEME_SITE_URL?: string;
 }
 
 interface ImportMeta {
