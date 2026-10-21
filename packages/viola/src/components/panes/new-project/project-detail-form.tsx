@@ -25,11 +25,11 @@ import { cn } from '@v/ui/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@v/ui/popover';
 import { m } from '../../../generated/paraglide/messages';
 import { useLiveInputField } from '../../../hooks/use-live-field';
+import { useOfficialThemes } from '../../../hooks/use-official-themes';
 import { usePromiseState } from '../../../hooks/use-promise-state';
-import { getOfficialThemeTitle } from '../../../libs/official-theme-title';
-import { $draftProject, $project } from '../../../stores/accessors';
+import { generateId } from '../../../libs/generate-id';
+import { $draftProject, $project, $ui } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
-import { Theme } from '../../../stores/proxies/theme';
 import { TemplateStoreMolecule } from './store';
 
 function BookTitleInput({ children }: React.PropsWithChildren) {
@@ -144,6 +144,7 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
   const handleSelect = useCallback((value: string) => {
     $draftProject.valueOrThrow().theme.install(value);
   }, []);
+  const themes = useOfficialThemes();
 
   return (
     <div className="grid gap-2">
@@ -153,12 +154,33 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
         value={currentPackageName}
         onValueChange={handleSelect}
       >
-        {Object.entries(Theme.officialThemes).map(([value, { title }]) => (
-          <StackedRadioGroupItem key={value} value={value} required>
-            {getOfficialThemeTitle(value, title)}
+        {themes.map(({ name, title }) => (
+          <StackedRadioGroupItem key={name} value={name} required>
+            {title}
           </StackedRadioGroupItem>
         ))}
+        {currentPackageName &&
+          !themes.some(({ name }) => name === currentPackageName) && (
+            <StackedRadioGroupItem value={currentPackageName} required>
+              {currentPackageName}
+            </StackedRadioGroupItem>
+          )}
       </StackedRadioGroup>
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            $ui.dedicatedModal = {
+              id: generateId(),
+              type: 'theme-browser',
+              target: 'draft',
+            };
+          }}
+        >
+          {m.theme_browse_button()}
+        </Button>
+      </div>
     </div>
   );
 }

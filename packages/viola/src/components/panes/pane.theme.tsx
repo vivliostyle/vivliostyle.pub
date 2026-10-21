@@ -7,11 +7,11 @@ import { Check, Loader2 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
+import { useOfficialThemes } from '../../hooks/use-official-themes';
 import { usePromiseState } from '../../hooks/use-promise-state';
-import { getOfficialThemeTitle } from '../../libs/official-theme-title';
-import { $sandbox, $theme } from '../../stores/accessors';
+import { generateId } from '../../libs/generate-id';
+import { $sandbox, $theme, $ui } from '../../stores/accessors';
 import { SandboxFile } from '../../stores/proxies/sandbox';
-import { Theme } from '../../stores/proxies/theme';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
 type ThemePaneProperty = object;
@@ -55,11 +55,12 @@ function Content(_: ThemePaneProperty) {
   const currentPackageName =
     themeSnap.installingPackageName || installedTheme?.packageName;
 
+  const officialThemes = useOfficialThemes();
   const [packageNameInput, setPackageNameInput] = useState('');
   useEffect(() => {
     if (
       installedTheme &&
-      !(installedTheme.packageName in Theme.officialThemes)
+      !officialThemes.some(({ name }) => name === installedTheme.packageName)
     ) {
       setPackageNameInput(installedTheme.packageName);
     }
@@ -81,37 +82,48 @@ function Content(_: ThemePaneProperty) {
       <section className="grid gap-2">
         <h3 className="text-l font-bold">{m.theme_official_section_title()}</h3>
         <ul className="grid grid-cols-2 gap-2">
-          {Object.entries(Theme.officialThemes).map(
-            ([packageName, { title }]) => {
-              return (
-                <li key={packageName}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      'size-full text-left',
-                      packageName === currentPackageName && 'border-primary',
-                    )}
-                    onClick={() => $theme.valueOrThrow().install(packageName)}
-                  >
-                    <span className="flex-1">
-                      {getOfficialThemeTitle(packageName, title)}
-                    </span>
-                    {packageName === themeSnap.installingPackageName ? (
-                      <LoadingIcon />
-                    ) : (
-                      <InstalledIcon
-                        className={cn(
-                          packageName !== currentPackageName && 'invisible',
-                        )}
-                      />
-                    )}
-                  </Button>
-                </li>
-              );
-            },
-          )}
+          {officialThemes.map(({ name: packageName, title }) => {
+            return (
+              <li key={packageName}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    'size-full text-left',
+                    packageName === currentPackageName && 'border-primary',
+                  )}
+                  onClick={() => $theme.valueOrThrow().install(packageName)}
+                >
+                  <span className="flex-1">{title}</span>
+                  {packageName === themeSnap.installingPackageName ? (
+                    <LoadingIcon />
+                  ) : (
+                    <InstalledIcon
+                      className={cn(
+                        packageName !== currentPackageName && 'invisible',
+                      )}
+                    />
+                  )}
+                </Button>
+              </li>
+            );
+          })}
         </ul>
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              $ui.dedicatedModal = {
+                id: generateId(),
+                type: 'theme-browser',
+                target: 'current',
+              };
+            }}
+          >
+            {m.theme_browse_button()}
+          </Button>
+        </div>
       </section>
 
       <section className="grid gap-2">
