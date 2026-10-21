@@ -5,6 +5,7 @@ import { deepClone } from 'valtio/utils';
 
 import { type EditorSyncContext, setupEditor } from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
+import { isThemePackageSpecifier } from '../../libs/theme-site';
 import { Content, type ContentId } from './content';
 import { Sandbox, SandboxFile } from './sandbox';
 import { session } from './session';
@@ -179,9 +180,11 @@ export class Project {
       this.theme.customCss = '';
       sandbox.files['style.css'] = ref(new SandboxFile('text/css', ''));
     }
+    // Any theme package, not only the official ones, provides the CSS that
+    // the editor shows.
     if (
       Array.isArray(sandbox.vivliostyleConfig.theme) &&
-      sandbox.vivliostyleConfig.theme[0] in Theme.officialThemes
+      isThemePackageSpecifier(sandbox.vivliostyleConfig.theme[0])
     ) {
       this.theme.install(sandbox.vivliostyleConfig.theme[0]);
     }
