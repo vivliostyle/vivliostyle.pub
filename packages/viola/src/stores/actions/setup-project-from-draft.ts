@@ -10,6 +10,7 @@ import { $draftProject, $projects, $session } from '../accessors';
 import { Project, type ProjectEntry, type ProjectId } from '../proxies/project';
 import { Sandbox } from '../proxies/sandbox';
 import { discoverProjects } from './discover-projects';
+import { resolveTemplateSource } from './resolve-template-source';
 
 export interface SetupProjectFromDraftResult {
   projectId: ProjectId;
@@ -22,10 +23,6 @@ export async function setupProjectFromDraft({
   templateValue: string;
 }): Promise<SetupProjectFromDraftResult> {
   const $$draftProject = $draftProject.valueOrThrow();
-  const template =
-    Sandbox.officialTemplates[
-      templateValue as keyof typeof Sandbox.officialTemplates
-    ];
 
   $projects.currentProjectId = null;
 
@@ -91,7 +88,11 @@ export async function setupProjectFromDraft({
       title: $$draftProject.bibliography.title || DEFAULT_PROJECT_TITLE,
       author: $$draftProject.bibliography.author || DEFAULT_PROJECT_AUTHOR,
       language: $$draftProject.bibliography.language || 'en',
-      template: template.source,
+      template: await resolveTemplateSource({
+        templateValue,
+        project: $$draftProject,
+        cli,
+      }),
       theme: themePackageName,
     });
     await sandbox.saveMemoryToFileSystem();

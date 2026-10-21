@@ -1,9 +1,8 @@
 import { createScope, molecule, use } from 'bunshi';
-import { invariant } from 'outvariant';
 import { proxy } from 'valtio';
 
 import { $draftProject } from '../../../stores/accessors';
-import { Sandbox } from '../../../stores/proxies/sandbox';
+import { resolveTemplateSource } from '../../../stores/actions/resolve-template-source';
 
 export const NewProjectPaneScope = createScope(undefined);
 
@@ -16,11 +15,6 @@ export const TemplateStoreMolecule = molecule(() => {
 
     selectTemplate(value: string) {
       const project = $draftProject.valueOrThrow();
-      const template =
-        Sandbox.officialTemplates[
-          value as keyof typeof Sandbox.officialTemplates
-        ];
-      invariant(template, 'Template not found: %s', value);
       this.selected = value;
       this.installTemplatePromise = (async () => {
         const sandbox = await project.sandboxPromise;
@@ -29,7 +23,11 @@ export const TemplateStoreMolecule = molecule(() => {
           title: 'Title',
           author: 'Author',
           language: 'en',
-          template: template.source,
+          template: await resolveTemplateSource({
+            templateValue: value,
+            project,
+            cli,
+          }),
           theme: false,
         });
       })();
