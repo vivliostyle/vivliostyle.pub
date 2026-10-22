@@ -115,6 +115,21 @@ async function initLightningCss() {
   return await init(wasmUrl);
 }
 
+// `@import url("...")` arrives as a url value and `@import "..."` as a string
+// token, which the themes of `@vivliostyle/theme-base` 3 use for package names.
+function importUrl(prelude: lightningCss.TokenOrValue[]): string | undefined {
+  const first = prelude.find(
+    (item) => !(item.type === 'token' && item.value.type === 'white-space'),
+  );
+  if (first?.type === 'url') {
+    return first.value.url;
+  }
+  if (first?.type === 'token' && first.value.type === 'string') {
+    return first.value.value;
+  }
+  return undefined;
+}
+
 export async function bundleCss(source: string) {
   await initLightningCss();
 
@@ -148,17 +163,12 @@ export async function bundleCss(source: string) {
     visitor: {
       Rule: {
         unknown(rule: lightningCss.UnknownAtRule) {
-          if (rule.name === '-import') {
-            const firstToken = rule.prelude[0];
+          const url =
+            rule.name === '-import' ? importUrl(rule.prelude) : undefined;
+          if (url !== undefined) {
             return {
               type: 'import',
-              value: {
-                loc: rule.loc,
-                url:
-                  firstToken.type === 'url'
-                    ? firstToken.value.url
-                    : (firstToken.value as string),
-              },
+              value: { loc: rule.loc, url },
             } satisfies lightningCss.ReturnedRule;
           }
           // Suppress output of unknown rules
