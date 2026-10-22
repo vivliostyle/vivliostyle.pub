@@ -22,6 +22,8 @@ function DedicatedModal() {
     if (uiSnap.dedicatedModal) {
       setModalContent(uiSnap.dedicatedModal);
       setOpen(true);
+    } else {
+      setOpen(false);
     }
   }, [uiSnap.dedicatedModal]);
 
