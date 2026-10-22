@@ -106,13 +106,12 @@ function resolve(specifier: string, from: string): string {
   throw new Error(`Invalid specifier: ${specifier}`);
 }
 
-let initialized = false;
-async function initLightningCss() {
-  if (initialized) {
-    return;
-  }
-  initialized = true;
-  return await init(wasmUrl);
+// Shared so that a theme installed while another one is still loading the wasm
+// waits for it, instead of calling into an uninitialized module.
+let initPromise: Promise<void> | undefined;
+function initLightningCss(): Promise<void> {
+  initPromise ??= init(wasmUrl);
+  return initPromise;
 }
 
 // `@import url("...")` arrives as a url value and `@import "..."` as a string
