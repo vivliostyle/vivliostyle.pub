@@ -16,7 +16,6 @@ import { Strike } from '@tiptap/extension-strike';
 import { Text } from '@tiptap/extension-text';
 import { Underline } from '@tiptap/extension-underline';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
-import { Markdown } from '@tiptap/markdown';
 import { join } from 'pathe';
 
 import { CodeBlockPrism } from './code-block-prism';
@@ -26,6 +25,7 @@ import {
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
 import { Frontmatter } from './frontmatter';
+import { PubMarkdown } from './markdown';
 
 export {
   type AssetDragPayload,
@@ -140,7 +140,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           ];
         },
       }).configure({}),
-      Markdown.configure({}),
+      PubMarkdown.configure({}),
       Frontmatter,
     ];
   },
