@@ -1,12 +1,6 @@
-import {
-  type ChainedCommands,
-  CommandManager,
-  type Editor,
-} from '@tiptap/core';
-import { setBlockType } from '@tiptap/pm/commands';
-import type { ResolvedPos } from '@tiptap/pm/model';
 import type { ComponentType } from 'react';
 
+import { type BlockFormat, getBlockFormat } from '@v/tiptap-extensions';
 import {
   Heading1Icon,
   Heading2Icon,
@@ -24,52 +18,12 @@ import { m } from '../../../../generated/paraglide/messages';
 import { registerEditorMenuCommand } from '../registry';
 import { splitKeywords } from './utils';
 
-function blockTypeAt($pos: ResolvedPos): string {
-  const { parent } = $pos;
-  if (parent.type.spec.code) {
-    return 'code-block';
-  }
-  // The nearest wrapper decides, so a paragraph inside a list reads as a list.
-  for (let depth = $pos.depth - 1; depth > 0; depth--) {
-    switch ($pos.node(depth).type.name) {
-      case 'bulletList':
-        return 'bullet-list';
-      case 'orderedList':
-        return 'ordered-list';
-      case 'blockquote':
-        return 'blockquote';
-    }
-  }
-  if (parent.type.name === 'heading') {
-    return `heading-${parent.attrs.level}`;
-  }
-  return 'paragraph';
-}
-
-export function getSelectionBlockType(editor: Editor): string | null {
-  const { $from, $to } = editor.state.selection;
-  const type = blockTypeAt($from);
-  return blockTypeAt($to) === type ? type : null;
-}
-
-// can() checks each step against the unchanged document, so a step that relies
-// on an earlier one (wrapping in a list after clearNodes) always fails there.
-function canRunChain(
-  editor: Editor,
-  build: (chain: ChainedCommands) => ChainedCommands,
-): boolean {
-  return build(
-    new CommandManager({ editor, state: editor.state }).createChain(),
-  ).run();
-}
-
 interface BlockCommandSpec {
-  type: string;
+  type: BlockFormat;
   label: () => string;
   keywords: () => readonly string[];
   icon: ComponentType<{ className?: string }>;
   shortcut?: string;
-  apply: (chain: ChainedCommands) => ChainedCommands;
 }
 
 function registerBlockCommand({
@@ -78,24 +32,7 @@ function registerBlockCommand({
   keywords,
   icon,
   shortcut,
-  apply,
 }: BlockCommandSpec): void {
-  const convert = (chain: ChainedCommands) =>
-    apply(
-      chain
-        // ProseMirror's setBlockType turns code newlines into hard breaks;
-        // clearNodes alone would leave raw "\n" in the paragraph.
-        .command(({ state, dispatch }) => {
-          const paragraph = state.schema.nodes.paragraph;
-          if (paragraph) {
-            setBlockType(paragraph)(state, dispatch);
-          }
-          return true;
-        })
-        // Lifts the block out of lists and quotes so "turn into" doesn't nest
-        // the new type inside them.
-        .clearNodes(),
-    );
   registerEditorMenuCommand({
     id: `block.${type}`,
     surfaces: ['selection', 'trigger'],
@@ -103,11 +40,10 @@ function registerBlockCommand({
     keywords,
     icon,
     shortcut,
-    isActive: (editor) => getSelectionBlockType(editor) === type,
-    isEnabled: (editor) =>
-      getSelectionBlockType(editor) !== type && canRunChain(editor, convert),
+    isActive: (editor) => getBlockFormat(editor.state) === type,
+    isEnabled: (editor) => editor.can().setBlockFormat(type),
     run: ({ editor }) => {
-      convert(editor.chain().focus()).run();
+      editor.chain().focus().setBlockFormat(type).run();
     },
   });
 }
@@ -120,7 +56,6 @@ registerBlockCommand({
     'p',
   ],
   icon: PilcrowIcon,
-  apply: (chain) => chain,
 });
 
 const headingIcons = [
@@ -143,7 +78,6 @@ for (const level of [1, 2, 3, 4, 5, 6] as const) {
     ],
     icon: headingIcons[level - 1] ?? PilcrowIcon,
     shortcut: `Mod-Alt-${level}`,
-    apply: (chain) => chain.setHeading({ level }),
   });
 }
 
@@ -157,7 +91,6 @@ registerBlockCommand({
   ],
   icon: TextQuoteIcon,
   shortcut: 'Mod-Shift-b',
-  apply: (chain) => chain.setBlockquote(),
 });
 
 registerBlockCommand({
@@ -170,7 +103,6 @@ registerBlockCommand({
   ],
   icon: ListIcon,
   shortcut: 'Mod-Shift-8',
-  apply: (chain) => chain.toggleBulletList(),
 });
 
 registerBlockCommand({
@@ -183,7 +115,6 @@ registerBlockCommand({
   ],
   icon: ListOrderedIcon,
   shortcut: 'Mod-Shift-7',
-  apply: (chain) => chain.toggleOrderedList(),
 });
 
 registerBlockCommand({
@@ -196,5 +127,4 @@ registerBlockCommand({
   ],
   icon: SquareCodeIcon,
   shortcut: 'Mod-Alt-c',
-  apply: (chain) => chain.setCodeBlock(),
 });

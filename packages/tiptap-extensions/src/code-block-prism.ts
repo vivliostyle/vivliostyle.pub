@@ -136,4 +136,23 @@ export const CodeBlockPrism = CodeBlock.extend({
   addProseMirrorPlugins() {
     return [...(this.parent?.() ?? []), prismHighlightPlugin(this.name)];
   },
+
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      // The inherited handler clears the node, which also lifts it out of
+      // every list and quote around it.
+      Backspace: () => {
+        const { empty, $anchor } = this.editor.state.selection;
+        if (
+          !empty ||
+          $anchor.parent.type !== this.type ||
+          ($anchor.pos !== 1 && $anchor.parent.content.size > 0)
+        ) {
+          return false;
+        }
+        return this.editor.commands.setBlockFormat('paragraph');
+      },
+    };
+  },
 });
