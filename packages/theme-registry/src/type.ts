@@ -1,6 +1,20 @@
+export type PackageExports =
+  | string
+  | null
+  | PackageExports[]
+  | { [key: string]: PackageExports };
+
 export interface PackageJson {
   name: string;
   version: string;
+  main?: string;
+  style?: string;
+  exports?: PackageExports;
+  vivliostyle?: {
+    theme?: {
+      style?: string;
+    };
+  };
   dependencies?: Record<string, string>;
   dist?: {
     fileCount: number;

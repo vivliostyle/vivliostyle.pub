@@ -7,9 +7,8 @@ import { locateDefaultThemeFile } from './css-bundler';
 import { npa } from './npm-package-arg';
 import {
   contentCache,
-  directorySourceMap,
-  fileMap,
   metadataCache,
+  mountPackageContent,
   type RegistryUrl,
 } from './store';
 import type { IdealTree, PackageJson, PackageMetadata } from './type';
@@ -62,40 +61,36 @@ export async function fetchPackageContent(
           return [];
         }
         const tarballUrl = pkg.dist.tarball as RegistryUrl;
-        const cached = contentCache.get(tarballUrl);
-        if (cached) {
-          return cached.map((file) => ({
+        let data = contentCache.get(tarballUrl);
+        if (!data) {
+          const tarball = await fetch(tarballUrl).then((res) =>
+            res.arrayBuffer(),
+          );
+          const hashBuffer = await crypto.subtle.digest('SHA-1', tarball);
+          const hash = Array.from(new Uint8Array(hashBuffer))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+          if (hash !== pkg.dist.shasum) {
+            throw new Error(`Incorrect shasum for package ${pkg.name}`);
+          }
+          // https://github.com/101arrowz/fflate/issues/207
+          let unzipped: Uint8Array | undefined;
+          new Gunzip((chunk) => {
+            unzipped = chunk;
+          }).push(new Uint8Array(tarball), true);
+          invariant(
+            unzipped,
+            `Failed to unzip tarball for package ${pkg.name}`,
+          );
+          data = untar(unzipped as unknown as ArrayBuffer).map((file) => ({
             ...file,
-            name: [pkgPath, file.name].join('/'),
+            name: file.name.replace(/^package\//, ''),
           }));
         }
 
-        const tarball = await fetch(tarballUrl).then((res) =>
-          res.arrayBuffer(),
-        );
-        const hashBuffer = await crypto.subtle.digest('SHA-1', tarball);
-        const hash = Array.from(new Uint8Array(hashBuffer))
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join('');
-        if (hash !== pkg.dist.shasum) {
-          throw new Error(`Incorrect shasum for package ${pkg.name}`);
-        }
-        // https://github.com/101arrowz/fflate/issues/207
-        let unzipped: Uint8Array | undefined;
-        new Gunzip((chunk) => {
-          unzipped = chunk;
-        }).push(new Uint8Array(tarball), true);
-        invariant(unzipped, `Failed to unzip tarball for package ${pkg.name}`);
-        const data = untar(unzipped as unknown as ArrayBuffer).map((file) => ({
-          ...file,
-          name: file.name.replace(/^package\//, ''),
-        }));
-
-        contentCache.set(tarballUrl, data);
-        directorySourceMap.set(pkgPath, tarballUrl);
-        for (const file of data) {
-          fileMap.set([pkgPath, file.name].join('/'), file);
-        }
+        // A cached tarball may have been mounted at another path, or another
+        // version may occupy this one, so the mount is refreshed every time.
+        mountPackageContent(pkgPath, tarballUrl, data);
         return data.map((file) => ({
           ...file,
           name: [pkgPath, file.name].join('/'),

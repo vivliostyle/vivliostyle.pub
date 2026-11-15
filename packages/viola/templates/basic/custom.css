@@ -8,13 +8,24 @@
  * - https://github.com/vivliostyle/themes/tree/main/packages/%40vivliostyle/theme-base
  */
 
-/* Import partial CSS modules as needed */
-/* This example includes footnote external link styling */
-/* @import url(themes/node_modules/@vivliostyle/theme-base/css/partial/footnote-external-link.css); */
+/* Import theme-base modules as needed */
+/* @vivliostyle/theme-base alone loads only the basic styles. The page, footnote,
+ * table of contents, section, and cross-reference examples below need these
+ * modules, which most official themes (e.g., @vivliostyle/theme-techbook) already include. */
+/* @import '@vivliostyle/theme-base/page'; */
+/* @import '@vivliostyle/theme-base/footnote'; */
+/* @import '@vivliostyle/theme-base/toc'; */
+/* @import '@vivliostyle/theme-base/section'; */
+/* @import '@vivliostyle/theme-base/figure'; */
+/* @import '@vivliostyle/theme-base/table'; */
+/* @import '@vivliostyle/theme-base/citation'; */
+
+/* Turn external links into footnotes when printing */
+/* @import '@vivliostyle/theme-base/footnote/external-links'; */
 
 /* Import Prism.js CSS module for code syntax highlighting */
-/* @import url(themes/node_modules/@vivliostyle/theme-base/css/lib/prism/base.css); */
-/* @import url(themes/node_modules/@vivliostyle/theme-base/css/lib/prism/theme-okaidia.css); */
+/* @import '@vivliostyle/theme-base/prism'; */
+/* @import '@vivliostyle/theme-base/prism/theme-okaidia'; */
 
 :root {
   /* ===================================
@@ -25,7 +36,7 @@
   --vs-font-family:
     system-ui, -apple-system, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
 
-  /* Base font size (default: 10pt for print, 16px for screen) */
+  /* Base font size (default: 100%) */
   /* --vs-font-size: 11pt; */
 
   /* Line height */
@@ -53,11 +64,11 @@
    * =================================== */
 
   /* Text colors */
-  /* --vs-color-body: #5b4030; */
-  /* --vs--anchor-color: #0066cc; */
+  /* --vs-color-foreground: #5b4030; */
+  /* --vs--anchor-text-color: #0066cc; */
 
   /* Background colors */
-  /* --vs-color-bg: rgb(232, 220, 207); */
+  /* --vs-color-background: rgb(232, 220, 207); */
 
   /* ===================================
    * Spacing
@@ -79,18 +90,18 @@
   /* Page margins */
   /* --vs-page--margin-top: 20mm; */
   /* --vs-page--margin-bottom: 20mm; */
-  /* --vs-page--margin-inner: 25mm; */
-  /* --vs-page--margin-outer: 25mm; */
+  /* --vs-page--margin-inside: 25mm; */
+  /* --vs-page--margin-outside: 25mm; */
 
   /* Headers and footers */
   /* Page numbers in bottom center */
-  /* --vs-page--mbox-content-bottom-center: counter(page); */
+  /* --vs-page--mbox-bottom-center-content: counter(page); */
 
   /* Document title in top left */
-  /* --vs-page--mbox-content-top-left: env(pub-title); */
+  /* --vs-page--mbox-top-left-content: env(pub-title); */
 
   /* Chapter title in top right */
-  /* --vs-page--mbox-content-top-right: env(doc-title); */
+  /* --vs-page--mbox-top-right-content: env(doc-title); */
 
   /* ===================================
    * Code Blocks (Prism.js)
@@ -100,8 +111,8 @@
 
   /* Code block styling */
   /* --vs-prism--background: #101842; */
-  /* --vs-prism--color: #eff4b8; */
-  /* --vs-prism--color-comment: #869db7; */
+  /* --vs-prism--text-color: #eff4b8; */
+  /* --vs-prism--comment-text-color: #869db7; */
   /* --vs-prism--block-code-padding: 0.5em 1.5em; */
 
   /* ===================================
@@ -121,10 +132,8 @@
    * Table of Contents
    * =================================== */
 
-  /* TOC indentation */
-  /* --vs-toc--indent-level-1: 0; */
-  /* --vs-toc--indent-level-2: 1em; */
-  /* --vs-toc--indent-level-3: 2em; */
+  /* TOC indentation per level */
+  /* --vs-toc--ol-indent-size: 1em; */
 
   /* TOC page content style */
   /* --vs-toc--page-counter-style: roman; */
@@ -141,16 +150,22 @@
   /* --vs-section--h2-marker-display: inline; */
   /* --vs-section--h2-marker-content: counter(vs-counter-sec-h2) ". "; */
 
-  /* Section reference format */
+  /* Section reference format (for Japanese documents, set it on :root:lang(ja)) */
   /* --vs-section--call-content: '†' target-counters(attr(href), vs-counter-sections,'.', decimal); */
 
   /* ===================================
    * Cross-References
    * =================================== */
 
+  /* Numbering style shared by figures, tables, and citations */
+  /* --vs-counter-style: decimal; */
+
   /* Figure and table reference format */
-  /* --vs-crossref--counter-style: decimal; */
-  /* --vs-crossref--marker-cite-content: "[" target-counter(attr(href), citation) "]"; */
+  /* --vs-figure--call-content: "Fig. " target-counter(attr(href), vs-counter-fig); */
+  /* --vs-table--call-content: "Table " target-counter(attr(href), vs-counter-tbl); */
+
+  /* Citation reference format */
+  /* --vs-citation--call-content: "[" target-counter(attr(href), vs-counter-cite) "]"; */
 
   /* ===================================
    * Tables
@@ -175,7 +190,7 @@
    * =================================== */
 
   /* --vs--ul-list-style-type: "▶︎"; */
-  /* --vs--ul-minimum-inline-indent-size: 3rem; */
+  /* --vs--ul-padding-inline-start: 3rem; */
   /* --vs--ol-list-style-type: lower-roman; */
   /* --vs--ol-padding-inline-start: 2.5em; */
 
@@ -184,7 +199,7 @@
    * =================================== */
   /* column-count: 2; */
   /* column-gap: 2em; */
-  /* column-rule: 1px solid var(--vs-border-color); */
+  /* column-rule: 1px solid var(--vs-color-border); */
 }
 
 /* ===================================
@@ -201,11 +216,11 @@
 /* Left and right pages with different layouts */
 
 /* @page :left {
-  --vs-page--mbox-content-bottom-left: counter(page);
+  --vs-page--mbox-bottom-left-content: counter(page);
 }
 
 @page :right {
-  --vs-page--mbox-content-bottom-right: counter(page);
+  --vs-page--mbox-bottom-right-content: counter(page);
 } */
 
 /* ===================================

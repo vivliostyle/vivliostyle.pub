@@ -486,9 +486,9 @@ const workerConfig = defineConfig({
   },
   transform: {
     // Lower syntax Safari cannot parse — @vivliostyle/cli's dist ships
-    // `using` declarations (unsupported in every Safari) and `v`-flag regex
-    // literals (Safari <17). Oxc only lowers `using` for targets es2023 and
-    // below; `es2024`/`esnext`/browser-style targets leave it untouched.
+    // `v`-flag regex literals (Safari <17). Keep this at es2023 or below: oxc
+    // leaves `using` declarations (unsupported in every Safari) untouched for
+    // `es2024`/`esnext`/browser-style targets.
     // Safari additionally lacks the Symbol.dispose API itself — see
     // src/stubs/install-symbol-dispose.ts.
     target: 'es2022',
