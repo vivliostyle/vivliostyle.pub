@@ -18,10 +18,8 @@ import {
   useState,
 } from 'react';
 import { useDebounce } from 'react-use';
-import { ref } from 'valtio';
 
 import { PubExtensions } from '@v/tiptap-extensions';
-import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { cn } from '@v/ui/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@v/ui/tabs';
 import CodeEditor from '../../../../components/code-editor';
@@ -30,15 +28,11 @@ import {
   EditorStyleContainer,
 } from '../../../../components/content-editor';
 import { ImageMenu } from '../../../../components/content-editor/image-menu';
-import { InlineMenu } from '../../../../components/content-editor/inline-menu';
+import { SelectionToolbar } from '../../../../components/content-editor/selection-toolbar';
+import { TriggerMenu } from '../../../../components/content-editor/trigger-menu';
 import { createObjectUrlImageSaver } from '../../../../libs/editor/image-saver';
-import {
-  getAllTriggers,
-  inlineMenuState,
-} from '../../../../libs/editor/inline-menu';
 import { insertImageFiles } from '../../../../libs/editor/insert-image';
-
-import '../../../../libs/editor/inline-menu.media';
+import { createEditorMenuExtensions } from '../../../../libs/editor/menu/extensions';
 
 type AstTabType = 'tree' | 'html' | 'json';
 
@@ -94,17 +88,7 @@ export function RichEditorPane() {
         placeholder: 'Start typing...',
       }),
       UndoRedo.configure({}),
-      InlineTrigger.configure({
-        triggers: getAllTriggers(),
-        isMenuOpen: () => inlineMenuState.trigger !== null,
-        onDismiss: () => inlineMenuState.closeInlineMenu(),
-        onTrigger: (editor, trigger, from, coords) => {
-          inlineMenuState.trigger = trigger;
-          inlineMenuState.editor = ref(editor);
-          inlineMenuState.from = from;
-          inlineMenuState.coords = coords;
-        },
-      }),
+      ...createEditorMenuExtensions(),
     ],
     onMount: ({ editor }) => {
       editor.once('update', () => {
@@ -144,7 +128,8 @@ export function RichEditorPane() {
         <EditorStyleContainer customCss={context.css}>
           <EditArea />
         </EditorStyleContainer>
-        <InlineMenu containerRef={wrapperRef} />
+        <TriggerMenu />
+        <SelectionToolbar containerRef={wrapperRef} />
         <ImageMenu containerRef={wrapperRef} />
       </div>
     </EditorContext.Provider>

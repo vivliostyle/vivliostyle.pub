@@ -3,28 +3,22 @@ import { Collaboration } from '@tiptap/extension-collaboration';
 import { Placeholder } from '@tiptap/extensions';
 import { EditorContext, useEditor } from '@tiptap/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ref } from 'valtio';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 
 import { PubExtensions } from '@v/tiptap-extensions';
-import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { Button } from '@v/ui/button';
 import {
   EditArea,
   EditorStyleContainer,
 } from '../../../components/content-editor';
 import { ImageMenu } from '../../../components/content-editor/image-menu';
-import { InlineMenu } from '../../../components/content-editor/inline-menu';
+import { SelectionToolbar } from '../../../components/content-editor/selection-toolbar';
+import { TriggerMenu } from '../../../components/content-editor/trigger-menu';
 import { createObjectUrlImageSaver } from '../../../libs/editor/image-saver';
-import {
-  getAllTriggers,
-  inlineMenuState,
-} from '../../../libs/editor/inline-menu';
 import { insertImageFiles } from '../../../libs/editor/insert-image';
+import { createEditorMenuExtensions } from '../../../libs/editor/menu/extensions';
 import { YUndoCursorFix } from '../../../libs/editor/y-undo-cursor-fix';
-
-import '../../../libs/editor/inline-menu.media';
 
 const PERSISTENCE_NAME = 'viola:debug:indexeddb-persistence';
 
@@ -113,17 +107,7 @@ function EditorPane({ doc }: { doc: Y.Doc }) {
         placeholder:
           'Start typing — every keystroke is persisted to IndexedDB…',
       }),
-      InlineTrigger.configure({
-        triggers: getAllTriggers(),
-        isMenuOpen: () => inlineMenuState.trigger !== null,
-        onDismiss: () => inlineMenuState.closeInlineMenu(),
-        onTrigger: (editor, trigger, from, coords) => {
-          inlineMenuState.trigger = trigger;
-          inlineMenuState.editor = ref(editor);
-          inlineMenuState.from = from;
-          inlineMenuState.coords = coords;
-        },
-      }),
+      ...createEditorMenuExtensions(),
       Collaboration.configure({ document: doc }),
       YUndoCursorFix,
     ],
@@ -135,7 +119,8 @@ function EditorPane({ doc }: { doc: Y.Doc }) {
         <EditorStyleContainer>
           <EditArea />
         </EditorStyleContainer>
-        <InlineMenu containerRef={wrapperRef} />
+        <TriggerMenu />
+        <SelectionToolbar containerRef={wrapperRef} />
         <ImageMenu containerRef={wrapperRef} />
       </div>
     </EditorContext.Provider>

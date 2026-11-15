@@ -10,7 +10,8 @@ import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
 import { ImageMenu } from './image-menu';
-import { InlineMenu } from './inline-menu';
+import { SelectionToolbar } from './selection-toolbar';
+import { TriggerMenu } from './trigger-menu';
 
 function ShadowContent({
   children,
@@ -95,7 +96,8 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
         >
           <EditArea />
         </EditorStyleContainer>
-        <InlineMenu containerRef={wrapperRef} />
+        <TriggerMenu />
+        <SelectionToolbar containerRef={wrapperRef} />
         <ImageMenu containerRef={wrapperRef} />
       </div>
     </EditorContext.Provider>

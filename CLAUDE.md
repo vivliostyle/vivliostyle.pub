@@ -158,7 +158,7 @@ All i18n data, config, and scripts live inside the **`@v/viola` package** (`pack
 ### Message key naming (flat snake_case)
 
 - Flat, underscore-separated keys with a feature-area prefix: **`{area}_{element}[_{descriptor}]`** — e.g. `side_menu_open_project`, `bibliography_book_title_label`. No nesting. Call as `m.side_menu_open_project()`.
-- area prefixes mirror the source location: `side_menu_`, `bibliography_`, `theme_`, `media_`, `start_`/`new_project_`, `preview_`/`edit_`, `image_menu_`. Use `common_` only for genuinely shared words (`common_cancel`, `common_untitled`).
+- area prefixes mirror the source location: `side_menu_`, `bibliography_`, `theme_`, `media_`, `start_`/`new_project_`, `preview_`/`edit_`, `image_menu_`, `selection_menu_`, `trigger_menu_`, `link_panel_`. Editor menu commands (`libs/editor/menu/commands/`) use `editor_command_<name>`, plus `editor_command_<name>_keywords` (space-separated search terms, including kana readings in `ja`) for commands shown in trigger menus. Use `common_` only for genuinely shared words (`common_cancel`, `common_untitled`).
 - **Don't reuse** keys across contexts (unique key per instance) except the governed `common_` namespace — identical English can translate differently by context.
 - Accessibility strings take a `_aria` suffix (`side_menu_open_workspace_aria`). Interpolation uses ICU `{name}` placeholders; pluralization/gender uses ICU `plural`/`select`.
 - Name keys semantically by hand — do **not** derive them from the English text (so editing copy never churns keys).
