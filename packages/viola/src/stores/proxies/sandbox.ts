@@ -23,6 +23,10 @@ import {
   readProjectFiles,
 } from '../../libs/sandbox/persistence';
 import { listSnapshotFiles } from '../../libs/sandbox/snapshot';
+import {
+  DEFAULT_USER_STYLESHEET_PATH,
+  toConfigThemeEntries,
+} from '../../libs/user-stylesheets';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { ProjectId } from './project';
@@ -268,9 +272,13 @@ export class Sandbox {
   }) {
     this.updateVivliostyleConfig((config) => {
       config.entry = entry;
-      config.theme = [themePackageName, './style.css'];
+      config.theme = toConfigThemeEntries(themePackageName, [
+        DEFAULT_USER_STYLESHEET_PATH,
+      ]);
     });
-    this.files['style.css'] = ref(new SandboxFile('text/css', defaultCss));
+    this.files[DEFAULT_USER_STYLESHEET_PATH] = ref(
+      new SandboxFile('text/css', defaultCss),
+    );
   }
 
   async saveMemoryToFileSystem() {
