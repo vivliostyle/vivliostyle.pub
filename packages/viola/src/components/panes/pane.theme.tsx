@@ -1,4 +1,4 @@
-import { lazy, useEffect, useId, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { useDebounce } from 'react-use';
 import { useSnapshot } from 'valtio';
 
@@ -32,7 +32,7 @@ export const Pane = createPane<ThemePaneProperty>({
   ),
 });
 
-const CodeEditor = lazy(() => import('../code-editor'));
+const ThemeCssEditor = lazy(() => import('../theme-settings'));
 
 function InstalledIcon({ className, ...props }: React.ComponentProps<'svg'>) {
   return <Check {...props} strokeWidth={4} className={cn(className)} />;
@@ -172,11 +172,15 @@ function Content(_: ThemePaneProperty) {
         <h3 className="text-l font-bold">
           {m.theme_custom_css_section_title()}
         </h3>
-        <CodeEditor
-          aria-label={m.theme_custom_css_editor_aria()}
-          code={customCss}
-          onCodeUpdate={setCustomCss}
-        />
+        <Suspense
+          fallback={
+            <div className="grid place-items-center py-8">
+              <Loader2 className="size-8 animate-spin text-gray-300" />
+            </div>
+          }
+        >
+          <ThemeCssEditor css={customCss} onCssChange={setCustomCss} />
+        </Suspense>
       </section>
     </div>
   );
