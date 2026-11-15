@@ -184,6 +184,14 @@ function Content(_: ThemePaneProperty) {
         >
           <ThemeCssEditor css={css} onCssChange={setCss} />
         </Suspense>
+        {themeSnap.stylesheetBundleError?.kind === 'import' && (
+          <p className="text-sm text-destructive" aria-live="polite">
+            {m.theme_import_error({
+              target: themeSnap.stylesheetBundleError.target ?? '',
+              message: themeSnap.stylesheetBundleError.message,
+            })}
+          </p>
+        )}
       </section>
     </div>
   );

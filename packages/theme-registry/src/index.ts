@@ -7,6 +7,7 @@ import { locateDefaultThemeFile } from './css-bundler';
 import { npa } from './npm-package-arg';
 import {
   contentCache,
+  fileMap,
   metadataCache,
   mountPackageContent,
   type RegistryUrl,
@@ -14,6 +15,10 @@ import {
 import type { IdealTree, PackageJson, PackageMetadata } from './type';
 
 export { bundleCss } from './css-bundler';
+
+export function isPackageInstalled(packageName: string): boolean {
+  return fileMap.has(`node_modules/${packageName}/package.json`);
+}
 
 const registryOrigin = 'https://registry.npmjs.org';
 
