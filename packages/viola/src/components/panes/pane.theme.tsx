@@ -186,10 +186,14 @@ function Content(_: ThemePaneProperty) {
         </Suspense>
         {themeSnap.stylesheetBundleError?.kind === 'import' && (
           <p className="text-sm text-destructive" aria-live="polite">
-            {m.theme_import_error({
-              target: themeSnap.stylesheetBundleError.target ?? '',
-              message: themeSnap.stylesheetBundleError.message,
-            })}
+            {themeSnap.stylesheetBundleError.target
+              ? m.theme_import_error({
+                  target: themeSnap.stylesheetBundleError.target,
+                  message: themeSnap.stylesheetBundleError.message,
+                })
+              : m.theme_import_error_no_target({
+                  message: themeSnap.stylesheetBundleError.message,
+                })}
           </p>
         )}
       </section>

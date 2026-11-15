@@ -129,6 +129,7 @@
   "theme_custom_css_editor_aria": "カスタムCSSのコードエディター",
   "theme_custom_css_section_title": "カスタムCSSを編集",
   "theme_import_error": "CSSの@importを読み込めませんでした（{target}）：{message}",
+  "theme_import_error_no_target": "CSSの@importを読み込めませんでした：{message}",
   "theme_install_button": "インストール",
   "theme_install_error": "エラー: {message}",
   "theme_install_other_section_title": "npmから他のテーマをインストール",

@@ -87,18 +87,35 @@ export class Theme {
           },
         );
         if (result && seq === state.seq) {
-          this.bundledStylesheetCss = result.css;
-          this.stylesheetBundleError = result.error;
+          this.applyStylesheetBundle(result.css, result.error);
         }
       } catch (error) {
         if (seq === state.seq) {
-          this.stylesheetBundleError = {
+          this.applyStylesheetBundle(this.bundledStylesheetCss, {
             kind: 'syntax',
             message: error instanceof Error ? error.message : String(error),
-          };
+          });
         }
       }
     }, delay);
+  }
+
+  // Unchanged values are not assigned because every theme mutation triggers a config write
+  protected applyStylesheetBundle(
+    css: string | undefined,
+    error: StylesheetBundleError | undefined,
+  ) {
+    if (this.bundledStylesheetCss !== css) {
+      this.bundledStylesheetCss = css;
+    }
+    const current = this.stylesheetBundleError;
+    if (
+      current?.kind !== error?.kind ||
+      current?.target !== error?.target ||
+      current?.message !== error?.message
+    ) {
+      this.stylesheetBundleError = error;
+    }
   }
 
   updateStylesheet(path: string, css: string) {
@@ -133,5 +150,6 @@ export class Theme {
         this.installingPackageName = undefined;
       }
     })();
+    this.installPromise.then(() => this.refreshStylesheetBundle(0));
   }
 }

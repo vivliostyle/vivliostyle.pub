@@ -305,11 +305,19 @@ export class Project {
     if (!installedTheme?.packageName || this.theme.stylesheets.length === 0) {
       return;
     }
+    const entries = toConfigThemeEntries(
+      installedTheme.packageName,
+      this.theme.stylesheets.map((it) => it.path),
+    );
+    // Derived theme state also notifies the subscription; don't rewrite an unchanged config
+    if (
+      JSON.stringify(sandbox.vivliostyleConfig.theme) ===
+      JSON.stringify(entries)
+    ) {
+      return;
+    }
     sandbox.updateVivliostyleConfig((config) => {
-      config.theme = toConfigThemeEntries(
-        installedTheme.packageName,
-        this.theme.stylesheets.map((it) => it.path),
-      );
+      config.theme = entries;
     });
   }
 }
