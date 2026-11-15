@@ -10,6 +10,7 @@ import {
 } from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
 import { SandboxFile } from '../../libs/sandbox/file';
+import { toConfigThemeEntries } from '../../libs/user-stylesheets';
 import { officialThemes } from '../catalog';
 import { Content, type ContentId } from './content';
 import { Sandbox } from './sandbox';
@@ -185,13 +186,7 @@ export class Project {
       });
     }
     this.content.readingOrder = readingOrder;
-    const styleCss = sandbox.files['style.css'];
-    if (styleCss) {
-      this.theme.customCss = await styleCss.text();
-    } else {
-      this.theme.customCss = '';
-      sandbox.files['style.css'] = ref(new SandboxFile('text/css', ''));
-    }
+    await this.theme.loadStylesheets(sandbox);
     if (
       Array.isArray(sandbox.vivliostyleConfig.theme) &&
       sandbox.vivliostyleConfig.theme[0] in officialThemes
@@ -240,14 +235,6 @@ export class Project {
     this.sandbox.files[file.filename] = ref(
       new SandboxFile('text/markdown', markdown),
     );
-  }
-
-  updateCustomCss(css: string) {
-    if (!this.sandbox) {
-      return;
-    }
-    this.theme.customCss = css;
-    this.sandbox.files['style.css'] = ref(new SandboxFile('text/css', css));
   }
 
   dispose(): Promise<void> {
@@ -318,7 +305,10 @@ export class Project {
       return;
     }
     sandbox.updateVivliostyleConfig((config) => {
-      config.theme = [installedTheme.packageName, './style.css'];
+      config.theme = toConfigThemeEntries(
+        installedTheme.packageName,
+        this.theme.stylesheets.map((it) => it.path),
+      );
     });
   }
 }

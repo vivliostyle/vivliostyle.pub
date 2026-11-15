@@ -9,7 +9,7 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import { usePromiseState } from '../../hooks/use-promise-state';
 import { getOfficialThemeTitle } from '../../libs/official-theme-title';
-import { $project, $theme } from '../../stores/accessors';
+import { $theme } from '../../stores/accessors';
 import { officialThemes } from '../../stores/catalog';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -49,7 +49,8 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
 function Content(_: ThemePaneProperty) {
   const themeSnap = useSnapshot($theme).valueOrThrow();
   const packageNameInputDescriptionId = useId();
-  const [customCss, setCustomCss] = useState(() => themeSnap.customCss);
+  const [stylesheetPath] = useState(() => themeSnap.stylesheets[0]?.path);
+  const [css, setCss] = useState(() => themeSnap.stylesheets[0]?.css ?? '');
   const { value: installedTheme } = usePromiseState(themeSnap.installPromise);
   const currentPackageName =
     themeSnap.installingPackageName || installedTheme?.packageName;
@@ -63,10 +64,12 @@ function Content(_: ThemePaneProperty) {
 
   useDebounce(
     () => {
-      $project.valueOrThrow().updateCustomCss(customCss);
+      if (stylesheetPath) {
+        $theme.valueOrThrow().updateStylesheet(stylesheetPath, css);
+      }
     },
     1000,
-    [customCss],
+    [css],
   );
 
   return (
@@ -179,7 +182,7 @@ function Content(_: ThemePaneProperty) {
             </div>
           }
         >
-          <ThemeCssEditor css={customCss} onCssChange={setCustomCss} />
+          <ThemeCssEditor css={css} onCssChange={setCss} />
         </Suspense>
       </section>
     </div>
