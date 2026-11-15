@@ -81,13 +81,13 @@ Configure headers and footers using CSS custom properties for professional-looki
 ```css
 :root {
   /* Display page numbers in bottom center */
-  --vs-page--mbox-content-bottom-center: counter(page);
+  --vs-page--mbox-bottom-center-content: counter(page);
 
   /* Display document title in top left */
-  --vs-page--mbox-content-top-left: env(doc-title);
+  --vs-page--mbox-top-left-content: env(doc-title);
 
   /* Display chapter title in top right */
-  --vs-page--mbox-content-top-right: env(pub-title);
+  --vs-page--mbox-top-right-content: env(pub-title);
 }
 ```
 
@@ -95,9 +95,9 @@ Configure headers and footers using CSS custom properties for professional-looki
 
 Control page breaks for better layout:
 
-<div class="break-after-page"></div>
+<div style="break-after: page;"></div>
 
-Use the `.break-after-page` class to force a page break, or `.break-inside-avoid` to prevent breaking within an element.
+Set `break-after: page` on an element to force a page break, or `break-inside: avoid` to prevent breaking within an element. The page break above comes from `<div style="break-after: page;"></div>`.
 
 ## Color Schemes
 
@@ -107,9 +107,9 @@ Define a consistent color scheme:
 
 ```css
 :root {
-  --vs-color-bg: #ffffff;
-  --vs-color-body: #2c3e50;
-  --vs--anchor-color: #3498db;
+  --vs-color-background: #ffffff;
+  --vs-color-foreground: #2c3e50;
+  --vs--anchor-text-color: #3498db;
 }
 ```
 
@@ -120,8 +120,8 @@ Customize code block appearance:
 ```css
 :root {
   --vs-prism--background: #f8f8f8;
-  --vs-prism--color: #2c3e50;
-  --vs-prism--color-comment: #6a737d;
+  --vs-prism--text-color: #2c3e50;
+  --vs-prism--comment-text-color: #6a737d;
 }
 ```
 
@@ -261,11 +261,11 @@ Create asymmetric margins for two-sided printing:
 
 ```css
 @page :left {
-  --vs-page--mbox-content-bottom-left: counter(page);
+  --vs-page--mbox-bottom-left-content: counter(page);
 }
 
 @page :right {
-  --vs-page--mbox-content-bottom-right: counter(page);
+  --vs-page--mbox-bottom-right-content: counter(page);
 }
 ```
 

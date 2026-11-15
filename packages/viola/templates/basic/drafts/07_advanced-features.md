@@ -214,7 +214,7 @@ The data in [](#results-summary){data-ref="tbl"} shows...
 Reference other sections:
 
 ```md
-For more information, see Section [](#advanced-techniques){data-ref="sec"}.
+For more information, see [](#advanced-techniques){data-ref="sec"}.
 
 ## Advanced Techniques {#advanced-techniques}
 ```
@@ -305,7 +305,7 @@ Change the syntax highlighting theme in `custom.css`:
 
 ```css
 /* Use Okaidia theme for code blocks */
-@import url('./node_modules/@vivliostyle/theme-base/css/prism/theme-okaidia.css');
+@import '@vivliostyle/theme-base/prism/theme-okaidia';
 ```
 
 ## Mathematical Typesetting
