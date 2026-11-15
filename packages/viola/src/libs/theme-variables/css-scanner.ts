@@ -381,7 +381,8 @@ export class CssScanner {
   scanStylesheet(): CssRule[] {
     const { css } = this;
     const rules: CssRule[] = [];
-    let i = 0;
+    // A byte order mark is not part of the first rule's prelude.
+    let i = css.startsWith('\ufeff') ? 1 : 0;
     while (true) {
       i = this.#skipTrivia(i, css.length, ['<!--', '-->']);
       if (i >= css.length) {

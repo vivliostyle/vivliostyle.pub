@@ -191,8 +191,13 @@ function isMinified(css: string): boolean {
   return /[{}]/.test(css) && !/[\r\n]|\s[{}]|[{}]\s/.test(css.trim());
 }
 
+// Nothing may be written or cut ahead of a byte order mark.
+function contentStartOf(css: string): number {
+  return css.startsWith('\ufeff') ? 1 : 0;
+}
+
 function lineStartOf(css: string, offset: number): number {
-  return css.lastIndexOf('\n', offset - 1) + 1;
+  return Math.max(css.lastIndexOf('\n', offset - 1) + 1, contentStartOf(css));
 }
 
 function lineIndentOf(css: string, offset: number): string {
@@ -227,7 +232,7 @@ function removeRule(css: string, start: number, end: number): string {
     const blankBefore = css.slice(0, from).match(/(?:^|\n)([ \t]*\r?\n)$/);
     const blankAfter = css.slice(to).match(/^[ \t]*\r?\n/);
     // A rule is set off by blank lines; keep a single one where it stood.
-    if (blankAfter && (from === 0 || blankBefore)) {
+    if (blankAfter && (from === contentStartOf(css) || blankBefore)) {
       to += blankAfter[0].length;
     } else if (blankBefore && css.slice(to).trim() === '') {
       from -= blankBefore[1].length;
@@ -245,11 +250,17 @@ function deleteDeclaration(
   const out = css.slice(0, from) + css.slice(to);
   const removed = to - from;
   const close = block.close - removed;
-  if (!block.closed || out.slice(block.open + 1, close).trim() !== '') {
+  // A comment in the prelude would go with the rule, so such a rule stays.
+  const hasComment = (r: CssRule) => r.prelude.includes('/*');
+  if (
+    !block.closed ||
+    hasComment(rule) ||
+    out.slice(block.open + 1, close).trim() !== ''
+  ) {
     return out;
   }
   const outer = container.block;
-  if (container !== rule && outer?.closed) {
+  if (container !== rule && outer?.closed && !hasComment(container)) {
     const rest =
       out.slice(outer.open + 1, rule.start) +
       out.slice(close + 1, outer.close - removed);
@@ -399,14 +410,17 @@ function insertRule(
 
   if (preceding.length === 0 && following.length > 0) {
     const first = Math.min(...following.map((r) => r.start));
-    const at = findAttachedCommentStart(css, rules, first);
+    const at = Math.max(
+      findAttachedCommentStart(css, rules, first),
+      contentStartOf(css),
+    );
     const separator = minified ? '' : eol + eol;
     return css.slice(0, at) + text + separator + css.slice(at);
   }
   const at =
     preceding.length > 0
       ? Math.max(...preceding.map((r) => r.end))
-      : findPrologueEnd(css, rules);
+      : Math.max(findPrologueEnd(css, rules), contentStartOf(css));
   const head = css.slice(0, at);
   const tail = css.slice(at);
   if (minified) {
@@ -419,6 +433,29 @@ function insertRule(
       ? eol.repeat(leadingEols > 1 ? 0 : 1)
       : eol.repeat(Math.max(0, 3 - leadingEols));
   return head + prefix + text + suffix + tail;
+}
+
+/**
+ * The rule a new declaration goes into: the last one of the scope, except
+ * that a `:root` declaration must stay ahead of the `@media` scopes for them
+ * to keep overriding it.
+ */
+function pickRuleForInsertion(
+  scopes: Analysis['scopes'],
+  scope: ThemeScopeId,
+): ScopeRule | undefined {
+  const scopeRules = scopes[scope];
+  if (scope !== 'root') {
+    return scopeRules.at(-1);
+  }
+  const firstOverride = Math.min(
+    ...THEME_SCOPES.filter(({ media }) => media !== null).flatMap(({ id }) =>
+      scopes[id].map((r) => r.container.start),
+    ),
+  );
+  return (
+    scopeRules.findLast((r) => r.rule.end <= firstOverride) ?? scopeRules.at(-1)
+  );
 }
 
 function assertName(name: string): void {
@@ -469,7 +506,7 @@ export function setVariable(
   }
 
   const [entry] = entries;
-  const scopeRule = analysis.scopes[scope].at(-1);
+  const scopeRule = pickRuleForInsertion(analysis.scopes, scope);
   if (entry) {
     const { valueStart, valueEnd } = entry.declaration;
     const gap = valueStart === valueEnd && out[valueStart - 1] === ':';
