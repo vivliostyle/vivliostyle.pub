@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyCssImport, extractCssImportSpecifiers } from './css-imports';
+import {
+  classifyCssImport,
+  extractCssImportSpecifiers,
+  scanCssImports,
+} from './css-imports';
 
 describe('extractCssImportSpecifiers', () => {
   it('reads string and url() forms with conditions', () => {
@@ -48,6 +52,22 @@ describe('extractCssImportSpecifiers', () => {
       [],
     );
     expect(extractCssImportSpecifiers('')).toEqual([]);
+  });
+});
+
+describe('scanCssImports', () => {
+  it('returns the whole rule range including conditions', () => {
+    const css = '@import url("a;b.css") layer(x) screen;\n.a{}';
+    const [rule] = scanCssImports(css);
+    expect(css.slice(rule.start, rule.end)).toBe(
+      '@import url("a;b.css") layer(x) screen;',
+    );
+  });
+
+  it('stops an unterminated rule before a block', () => {
+    const css = '@import "a.css"\n.b{}';
+    const [rule] = scanCssImports(css);
+    expect(css.slice(rule.start, rule.end)).toBe('@import "a.css"\n.b');
   });
 });
 

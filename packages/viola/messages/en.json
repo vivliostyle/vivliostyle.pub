@@ -129,6 +129,7 @@
   "theme_custom_css_editor_aria": "Code editor of custom CSS",
   "theme_custom_css_section_title": "Edit custom CSS",
   "theme_import_error": "Failed to load an @import in the CSS ({target}): {message}",
+  "theme_import_error_no_target": "Failed to load an @import in the CSS: {message}",
   "theme_install_button": "Install",
   "theme_install_error": "Error: {message}",
   "theme_install_other_section_title": "Install other themes from npm",

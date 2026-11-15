@@ -62,12 +62,45 @@ function readImportTarget(css: string, start: number): [string, number] | null {
   return null;
 }
 
+export interface CssImportRule {
+  specifier: string;
+  /** Source range of the whole rule, from `@import` through its `;`. */
+  start: number;
+  end: number;
+}
+
+function findRuleEnd(css: string, start: number): number {
+  let i = start;
+  let parens = 0;
+  while (i < css.length) {
+    const char = css[i];
+    if (css.startsWith('/*', i)) {
+      i = skipSpaceAndComments(css, i);
+    } else if (char === '"' || char === "'") {
+      i = readString(css, i)[1];
+    } else if (char === '(') {
+      parens++;
+      i++;
+    } else if (char === ')') {
+      parens = Math.max(0, parens - 1);
+      i++;
+    } else if (char === ';' && parens === 0) {
+      return i + 1;
+    } else if ((char === '{' || char === '}') && parens === 0) {
+      return i;
+    } else {
+      i++;
+    }
+  }
+  return css.length;
+}
+
 /**
- * Returns the targets of top-level `@import` rules in source order. It is a
- * tolerant scanner rather than a parser, because the CSS is usually mid-edit.
+ * Returns top-level `@import` rules in source order. It is a tolerant
+ * scanner rather than a parser, because the CSS is usually mid-edit.
  */
-export function extractCssImportSpecifiers(css: string): string[] {
-  const specifiers: string[] = [];
+export function scanCssImports(css: string): CssImportRule[] {
+  const rules: CssImportRule[] = [];
   let depth = 0;
   let i = 0;
   while (i < css.length) {
@@ -90,15 +123,21 @@ export function extractCssImportSpecifiers(css: string): string[] {
     ) {
       const target = readImportTarget(css, i + 7);
       if (target?.[0]) {
-        specifiers.push(target[0]);
+        const end = findRuleEnd(css, target[1]);
+        rules.push({ specifier: target[0], start: i, end });
+        i = Math.max(end, i + 7);
+      } else {
+        i = target ? target[1] : i + 7;
       }
-      i = target ? target[1] : i + 7;
     } else {
       i++;
     }
   }
-  return specifiers;
+  return rules;
 }
+
+export const extractCssImportSpecifiers = (css: string): string[] =>
+  scanCssImports(css).map((rule) => rule.specifier);
 
 const packageSpecifierPattern =
   /^(?<name>@[^/@]+\/[^/@]+|[^@/.][^/@]*)(?:@(?<version>[^/]+))?(?:\/.*)?$/;
