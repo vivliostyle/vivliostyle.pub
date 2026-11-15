@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   bundleCss,
+  locateDefaultThemeFile,
   locateThemeFileFromImportPath,
   resolvePackageExports,
 } from './css-bundler';
@@ -160,6 +161,30 @@ describe('resolvePackageExports', () => {
 
   it('returns undefined without an exports field', () => {
     expect(resolvePackageExports(pkg({}), './a')).toBeUndefined();
+  });
+});
+
+describe('locateDefaultThemeFile', () => {
+  it('accepts the entries the bundler resolves', () => {
+    expect(locateDefaultThemeFile({ packageJson: themeBase })).toBe(
+      'theme.css',
+    );
+    expect(
+      locateDefaultThemeFile({
+        packageJson: pkg({
+          main: 'index.js',
+          exports: { '.': { style: './dist/a.css', default: './index.js' } },
+        }),
+      }),
+    ).toBe('./dist/a.css');
+  });
+
+  it('rejects packages without a style entry', () => {
+    expect(() =>
+      locateDefaultThemeFile({
+        packageJson: pkg({ main: 'index.js', exports: './index.js' }),
+      }),
+    ).toThrow('Could not find a style file');
   });
 });
 

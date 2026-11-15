@@ -9,21 +9,35 @@ import { validate as validatePackageName } from './validate-npm-package-name';
 // Same conditions as @vivliostyle/cli, so the editor picks the files the preview does
 const exportConditions = new Set(['style', 'default']);
 
+const missingStyleMessage = (packageJson: PackageJson) =>
+  `Could not find a style file for the theme: ${packageJson.name}. Please ensure this package satisfies a \`vivliostyle.theme.style\` property.`;
+
+function declaredThemeStyle(packageJson: PackageJson): string | undefined {
+  const style = packageJson.vivliostyle?.theme?.style ?? packageJson.style;
+  return typeof style === 'string' && style ? style : undefined;
+}
+
+function fallbackThemeStyles(packageJson: PackageJson): string[] {
+  let exported: string | undefined;
+  try {
+    exported = resolvePackageExports(packageJson, '.');
+  } catch {}
+  return [exported, packageJson.main].filter(
+    (file): file is string => typeof file === 'string' && file.endsWith('.css'),
+  );
+}
+
 export function locateDefaultThemeFile({
   packageJson,
 }: {
   packageJson: PackageJson;
 }): string {
-  const maybeStyle =
-    packageJson.vivliostyle?.theme?.style ??
-    packageJson.style ??
-    packageJson.main;
-  if (typeof maybeStyle !== 'string' || !maybeStyle.endsWith('.css')) {
-    throw new Error(
-      `Could not find a style file for the theme: ${packageJson.name}. Please ensure this package satisfies a \`vivliostyle.theme.style\` property.`,
-    );
+  const style =
+    declaredThemeStyle(packageJson) ?? fallbackThemeStyles(packageJson)[0];
+  if (!style) {
+    throw new Error(missingStyleMessage(packageJson));
   }
-  return maybeStyle;
+  return style;
 }
 
 function normalizePath(path: string): string | undefined {
@@ -152,9 +166,8 @@ export function locateThemeFileFromImportPath({
     );
   }
   if (!subpath) {
-    const declaredStyle =
-      packageJson.vivliostyle?.theme?.style ?? packageJson.style;
-    if (typeof declaredStyle === 'string' && declaredStyle) {
+    const declaredStyle = declaredThemeStyle(packageJson);
+    if (declaredStyle) {
       const file = findFile(declaredStyle);
       if (!file) {
         throw new Error(
@@ -163,19 +176,9 @@ export function locateThemeFileFromImportPath({
       }
       return file;
     }
-    let exported: string | undefined;
-    try {
-      exported = resolvePackageExports(packageJson, '.');
-    } catch {}
-    const file =
-      (exported?.endsWith('.css') && findFile(exported)) ||
-      (typeof packageJson.main === 'string' &&
-        packageJson.main.endsWith('.css') &&
-        findFile(packageJson.main));
+    const file = fallbackThemeStyles(packageJson).map(findFile).find(Boolean);
     if (!file) {
-      throw new Error(
-        `Could not find a style file for the theme: ${packageJson.name}. Please ensure this package satisfies a \`vivliostyle.theme.style\` property.`,
-      );
+      throw new Error(missingStyleMessage(packageJson));
     }
     return file;
   }
