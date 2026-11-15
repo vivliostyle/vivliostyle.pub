@@ -14,8 +14,19 @@ import type * as ThemeRegistry from '@v/theme-registry';
 import type { IdealTree } from '@v/theme-registry/type';
 
 interface Node {
+  version?: string;
   children: Map<string, Node>;
 }
+
+const readInstalledVersion = (pkgDir: string): string | undefined => {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.resolve(pkgDir, 'package.json'), 'utf8') as string,
+    ).version;
+  } catch {
+    return undefined;
+  }
+};
 
 const parseSpecifier = (specifier: string) => {
   const { name, type, fetchSpec } = npa(specifier);
@@ -63,7 +74,13 @@ export default class NpmRegistry {
     const children = traverse(rootNodeModules);
     return {
       children: new Map(
-        children.map((name) => [name, { children: new Map() }]),
+        children.map((name) => [
+          name,
+          {
+            version: readInstalledVersion(path.resolve(rootNodeModules, name)),
+            children: new Map(),
+          },
+        ]),
       ),
     };
   }

@@ -33,7 +33,7 @@ catalog:
   '@jsonjoy.com/fs-snapshot': 4.57.2
   '@jsonjoy.com/json-pack': 18.23.0
   '@platformatic/vfs': 0.4.0
-  '@rolldown/browser': 1.1.2
+  '@rolldown/browser': 1.1.8
   '@standard-community/standard-json': 0.3.5
   '@standard-community/standard-openapi': 0.2.9
   '@tailwindcss/vite': 4.3.0
@@ -74,10 +74,10 @@ catalog:
   '@vitejs/plugin-react-swc': 4.3.1
   '@vitest/coverage-v8': 4.1.9
   '@vitest/ui': 4.1.9
-  '@vivliostyle/cli': 11.0.3
+  '@vivliostyle/cli': 11.5.0
   '@vivliostyle/theme-base': 3.1.0
-  '@vivliostyle/vfm': 2.7.0
-  '@vivliostyle/viewer': 2.43.2
+  '@vivliostyle/vfm': 2.7.2
+  '@vivliostyle/viewer': 2.46.0
   base-x: 5.0.1
   browserify-zlib: 0.2.0
   bunshi: 2.2.0
@@ -106,7 +106,7 @@ catalog:
   react: 19.2.6
   react-dom: 19.2.6
   react-use: 17.6.0
-  rolldown: 1.1.2
+  rolldown: 1.1.8
   rolldown-plugin-dts: 0.26.0
   rollup-plugin-visualizer: 7.0.1
   semver: 7.8.0
@@ -119,7 +119,7 @@ catalog:
   valibot: 1.4.0
   valtio: 2.3.2
   valtio-reactive: 0.2.0
-  vite: 8.1.0
+  vite: 8.1.6
   vite-plugin-pwa: 1.3.0
   vitest: 4.1.9
   y-indexeddb: 9.0.12
