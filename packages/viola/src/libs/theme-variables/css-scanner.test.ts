@@ -68,6 +68,14 @@ h1, h2 > a[href$="}"] { color: blue }`;
     expect(scan('} :root { --a: 1 }').names).toEqual(['} :root']);
   });
 
+  it('skips a byte order mark only at the very start', () => {
+    const { rules } = scan('\ufeff@page { --a: 1 }\n\ufeff:root {}');
+    expect(rules.map((r) => [r.atName, r.start, r.prelude])).toEqual([
+      ['page', 1, ' '],
+      [null, 18, '\ufeff:root '],
+    ]);
+  });
+
   it('skips HTML comment delimiters', () => {
     expect(scan('<!-- :root {} -->').names).toEqual([':root']);
   });

@@ -107,6 +107,15 @@ describe('parseThemeCss', () => {
     expect(model.scopes.page.exists).toBe(false);
   });
 
+  it('reads past a leading byte order mark', () => {
+    const css =
+      '\ufeff@media print {\n  :root { --a: 1; }\n}\n:root { --b: 2; }\n';
+    expect(valuesOf(css, 'print-root')).toEqual({ '--a': '1' });
+    expect(valuesOf(css, 'root')).toEqual({ '--b': '2' });
+    expect(valuesOf('\ufeff@page { --a: 1; }', 'page')).toEqual({ '--a': '1' });
+    expect(valuesOf('\ufeff:root{--a:1}')).toEqual({ '--a': '1' });
+  });
+
   it('reports the declaration that wins the cascade', () => {
     const css = lines(
       ':root { --a: 1; --a: 2; --b: 1 !important; --b: 2 }',
@@ -310,6 +319,43 @@ describe('setVariable', () => {
   it('appends a rule to a stylesheet without a final newline', () => {
     expect(setVariable("@import 'a.css';", 'root', '--vs-a', '1')).toBe(
       lines("@import 'a.css';", '', ':root {', '  --vs-a: 1;', '}'),
+    );
+  });
+
+  it('never writes ahead of a byte order mark', () => {
+    expect(
+      setVariable(
+        '\ufeff@media print {\n  :root { --a: 1; }\n}\n:root { --b: 2; }\n',
+        'print-root',
+        '--a',
+        '3',
+      ),
+    ).toBe('\ufeff@media print {\n  :root { --a: 3; }\n}\n:root { --b: 2; }\n');
+    expect(
+      setVariable(
+        '\ufeff@charset "utf-8";\n:root {\n  --a: 1;\n}\n',
+        'root',
+        '--b',
+        '2',
+      ),
+    ).toBe('\ufeff@charset "utf-8";\n:root {\n  --a: 1;\n  --b: 2;\n}\n');
+    expect(setVariable('\ufeff@charset "utf-8";\n', 'root', '--b', '2')).toBe(
+      '\ufeff@charset "utf-8";\n\n:root {\n  --b: 2;\n}\n',
+    );
+    expect(setVariable('\ufeff', 'root', '--b', '2')).toBe(
+      '\ufeff:root {\n  --b: 2;\n}\n',
+    );
+    expect(setVariable('\ufeffh1 {}\n', 'root', '--b', '2')).toBe(
+      '\ufeff:root {\n  --b: 2;\n}\n\nh1 {}\n',
+    );
+    expect(setVariable('\ufeff@page { --a: 1; }', 'root', '--b', '2')).toBe(
+      '\ufeff:root {\n  --b: 2;\n}\n\n@page { --a: 1; }',
+    );
+    expect(
+      setVariable('\ufeff/* Page */\n@page {}\n', 'root', '--b', '2'),
+    ).toBe('\ufeff:root {\n  --b: 2;\n}\n\n/* Page */\n@page {}\n');
+    expect(setVariable('\ufeffh1{}', 'page', '--b', '2')).toBe(
+      '\ufeff@page{--b:2}h1{}',
     );
   });
 
@@ -585,6 +631,43 @@ describe('setVariable', () => {
     );
   });
 
+  it('keeps a new `:root` declaration ahead of the `@media` overrides', () => {
+    const css = lines(
+      ':root { --a: 1 }',
+      '@media print { :root { --b: 1 } }',
+      ':root { --c: 0 }',
+    );
+    expect(setVariable(css, 'root', '--b', '2')).toBe(
+      css.replace(':root { --a: 1 }', ':root { --a: 1; --b: 2; }'),
+    );
+    expect(setVariable(css, 'root', '--c', '2')).toBe(
+      css.replace('--c: 0', '--c: 2'),
+    );
+    expect(
+      setVariable(
+        lines(
+          ':root { --a: 1 }',
+          ':root { --d: 1 }',
+          '@media screen { :root {} }',
+          ...css.split('\n').slice(1, 3),
+        ),
+        'root',
+        '--b',
+        '2',
+      ),
+    ).toContain(':root { --d: 1; --b: 2; }');
+  });
+
+  it('falls back to the last `:root` rule when none precedes the overrides', () => {
+    const css = lines('@media print { :root { --b: 1 } }', ':root { --c: 0 }');
+    expect(setVariable(css, 'root', '--b', '2')).toBe(
+      css.replace(':root { --c: 0 }', ':root { --c: 0; --b: 2; }'),
+    );
+    expect(setVariable(css, 'print-root', '--c', '2')).toBe(
+      css.replace(':root { --b: 1 }', ':root { --b: 1; --c: 2; }'),
+    );
+  });
+
   it('leaves a single declaration of a duplicated variable', () => {
     const css = lines(
       ':root {',
@@ -834,6 +917,41 @@ describe('removeVariable', () => {
     expect(
       removeVariable('@media print{:root{--a:1}h1{}}', 'print-root', '--a'),
     ).toBe('@media print{h1{}}');
+  });
+
+  it('keeps a byte order mark when the first rule goes', () => {
+    expect(removeVariable('\ufeff:root {\n  --a: 1;\n}\n', 'root', '--a')).toBe(
+      '\ufeff',
+    );
+    expect(
+      removeVariable('\ufeff:root {\n  --a: 1;\n}\n\nh1 {}\n', 'root', '--a'),
+    ).toBe('\ufeffh1 {}\n');
+    expect(removeVariable('\ufeff:root{--a:1}h1{}', 'root', '--a')).toBe(
+      '\ufeffh1{}',
+    );
+  });
+
+  it('keeps an emptied rule whose prelude holds a comment', () => {
+    expect(
+      removeVariable(':root /* my vars */ {\n  --a: 1;\n}\n', 'root', '--a'),
+    ).toBe(':root /* my vars */ {\n}\n');
+    expect(
+      removeVariable('@page/* sheet */:left{--a:1}', 'page-left', '--a'),
+    ).toBe('@page/* sheet */:left{}');
+    expect(
+      removeVariable(
+        '@media print /* print only */ {\n  :root { --a: 1; }\n}\n',
+        'print-root',
+        '--a',
+      ),
+    ).toBe('@media print /* print only */ {\n}\n');
+    expect(
+      removeVariable(
+        '@media print {\n  :root /* vars */ { --a: 1; }\n}\n',
+        'print-root',
+        '--a',
+      ),
+    ).toBe('@media print {\n  :root /* vars */ { }\n}\n');
   });
 
   it('keeps a rule that still holds a comment or another declaration', () => {
