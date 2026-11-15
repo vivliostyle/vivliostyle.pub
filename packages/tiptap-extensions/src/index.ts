@@ -18,6 +18,7 @@ import { Underline } from '@tiptap/extension-underline';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 import { join } from 'pathe';
 
+import { ChainSafeClearNodes } from './clear-nodes';
 import { CodeBlockPrism } from './code-block-prism';
 import {
   CustomDragHandler,
@@ -110,6 +111,8 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       Text.configure({}),
       Underline.configure({}),
       // TrailingNode.configure({}),
+
+      ChainSafeClearNodes,
 
       FileMediaHandler.configure({
         allowedMimeTypes: IMAGE_MIME_TYPES,
