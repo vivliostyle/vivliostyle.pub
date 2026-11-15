@@ -1,9 +1,11 @@
+import type { Editor } from '@tiptap/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   collapseSeparators,
   defaultEditorMenuConfig,
   editorMenuConfig,
+  filterVisibleEntries,
   flattenCommands,
   getActiveTriggers,
   resolveMenuEntries,
@@ -101,6 +103,41 @@ describe('collapseSeparators', () => {
         { type: 'separator' },
       ]).map((entry) => entry.type),
     ).toEqual(['command', 'separator', 'command']);
+  });
+});
+
+describe('filterVisibleEntries', () => {
+  it('drops hidden commands, groups left empty and their separators', () => {
+    const editor = {} as Editor;
+    const hidden: EditorMenuCommand = {
+      id: 'test.hidden',
+      surfaces: ['selection'],
+      label: () => 'hidden',
+      isVisible: (target) => target !== editor,
+    };
+    const entries = filterVisibleEntries(
+      [
+        { type: 'command', command: alpha },
+        { type: 'separator' },
+        { type: 'command', command: hidden },
+        { type: 'separator' },
+        { type: 'group', id: 'g', label: () => 'g', commands: [hidden] },
+        { type: 'separator' },
+        {
+          type: 'dropdown',
+          id: 'd',
+          label: () => 'd',
+          commands: [hidden, beta],
+        },
+      ],
+      editor,
+    );
+    expect(entries.map((entry) => entry.type)).toEqual([
+      'command',
+      'separator',
+      'dropdown',
+    ]);
+    expect(flattenCommands(entries)).toEqual([alpha, beta]);
   });
 });
 

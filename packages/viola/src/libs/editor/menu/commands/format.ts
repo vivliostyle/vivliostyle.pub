@@ -12,6 +12,10 @@ import {
 import { LinkPanel } from '../../../../components/content-editor/link-panel';
 import { m } from '../../../../generated/paraglide/messages';
 import { registerEditorMenuCommand } from '../registry';
+import { isInCodeBlock } from './utils';
+
+// Code blocks cannot hold marks, so these never apply there.
+const isOutsideCodeBlock = (editor: Editor) => !isInCodeBlock(editor);
 
 interface MarkCommandSpec {
   id: string;
@@ -38,6 +42,7 @@ function registerMarkCommand({
     shortcut,
     isActive: (editor: Editor) => editor.isActive(mark),
     isEnabled: (editor: Editor) => toggle(editor.can().chain()).run(),
+    isVisible: isOutsideCodeBlock,
     run: ({ editor }) => {
       toggle(editor.chain().focus()).run();
     },
@@ -98,5 +103,6 @@ registerEditorMenuCommand({
   icon: LinkIcon,
   isActive: (editor) => editor.isActive('link'),
   isEnabled: (editor) => editor.can().setMark('link'),
+  isVisible: isOutsideCodeBlock,
   panel: LinkPanel,
 });

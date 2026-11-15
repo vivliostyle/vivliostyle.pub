@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core';
-import type { EditorState, Selection } from '@tiptap/pm/state';
+import type { EditorState } from '@tiptap/pm/state';
 import { AllSelection, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { useCurrentEditor, useEditorState } from '@tiptap/react';
 import { BubbleMenu, type BubbleMenuProps } from '@tiptap/react/menus';
@@ -8,6 +8,7 @@ import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
+import { findSelectedCodeBlock } from '@v/tiptap-extensions';
 import { Button } from '@v/ui/button';
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
   editorMenuConfig,
+  filterVisibleEntries,
   resolveMenuEntries,
 } from '../../libs/editor/menu/config';
 import { runEditorMenuCommand } from '../../libs/editor/menu/registry';
@@ -46,6 +48,12 @@ function hasTextSelection(state: EditorState): boolean {
   return state.doc.textBetween(selection.from, selection.to).length > 0;
 }
 
+function selectedCodeBlockDom(editor: Editor): HTMLElement | null {
+  const block = findSelectedCodeBlock(editor.state);
+  const dom = block && editor.view.nodeDOM(block.pos);
+  return dom instanceof HTMLElement ? dom : null;
+}
+
 function commandTitle(command: EditorMenuCommand): string {
   const label = command.label();
   return command.shortcut
@@ -67,12 +75,14 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         : [],
     [configSnap.selection],
   );
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
   const [panel, setPanel] = useState<EditorMenuCommand | null>(null);
   const [focusIndex, setFocusIndex] = useState(0);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const visibleRef = useRef(false);
   const pointerDownRef = useRef(false);
-  const dismissedRef = useRef<Selection | null>(null);
+  const dismissedRef = useRef<((state: EditorState) => boolean) | null>(null);
 
   // Re-render on every transaction so active/enabled states stay current.
   useEditorState({
@@ -87,13 +97,16 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         !hasFocus ||
         pointerDownRef.current ||
         triggerMenuState.session?.editor === target ||
-        !hasTextSelection(state)
+        // A code block's own settings need no text to act on, so a caret in
+        // one is enough.
+        !(hasTextSelection(state) || findSelectedCodeBlock(state)) ||
+        filterVisibleEntries(entriesRef.current, target).length === 0
       ) {
         return false;
       }
       const dismissed = dismissedRef.current;
       if (dismissed) {
-        if (dismissed.eq(state.selection)) {
+        if (dismissed(state)) {
           return false;
         }
         dismissedRef.current = null;
@@ -118,13 +131,27 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
     [containerRef],
   );
 
+  // In a code block the toolbar sits on the block's corner instead of
+  // following the caret, so it stays clear of the code being typed.
+  const getReferencedVirtualElement = useCallback(() => {
+    const dom = editor && selectedCodeBlockDom(editor);
+    return dom && { getBoundingClientRect: () => dom.getBoundingClientRect() };
+  }, [editor]);
+
   const options = useMemo<BubbleMenuProps['options']>(
     () => ({
       // On touch devices the native selection callout sits above the text.
       placement: window.matchMedia('(pointer: coarse)').matches
         ? 'bottom'
         : 'top',
-      offset: 8,
+      // Right-aligned on a code block, where lines start on the left.
+      offset: ({ rects }) => ({
+        mainAxis: 8,
+        crossAxis:
+          editor && findSelectedCodeBlock(editor.state)
+            ? Math.max(0, (rects.reference.width - rects.floating.width) / 2)
+            : 0,
+      }),
       flip: { padding: 8 },
       shift: { padding: 8 },
       onShow: () => {
@@ -136,14 +163,32 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         setPanel(null);
       },
     }),
-    [],
+    [editor],
   );
+
+  // Opening or closing a panel changes the toolbar's size.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && visibleRef.current) {
+      editor.view.dispatch(
+        editor.state.tr.setMeta(selectionToolbarPluginKey, 'updatePosition'),
+      );
+    }
+  }, [editor, panel]);
 
   useEffect(() => {
     if (!editor) {
       return;
     }
     const dom = editor.view.dom;
+    const show = () => {
+      editor.view.dispatch(
+        editor.state.tr.setMeta(selectionToolbarPluginKey, 'show'),
+      );
+      // BubbleMenu skips positioning while it is still hidden.
+      editor.view.dispatch(
+        editor.state.tr.setMeta(selectionToolbarPluginKey, 'updatePosition'),
+      );
+    };
     const handleMouseDown = (event: MouseEvent) => {
       if (event.button === 0) {
         pointerDownRef.current = true;
@@ -163,25 +208,32 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         ) {
           return;
         }
-        editor.view.dispatch(
-          editor.state.tr.setMeta(selectionToolbarPluginKey, 'show'),
-        );
-        // BubbleMenu skips positioning while it is still hidden.
-        editor.view.dispatch(
-          editor.state.tr.setMeta(selectionToolbarPluginKey, 'updatePosition'),
-        );
+        show();
       });
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.isComposing || !visibleRef.current) {
+      if (event.isComposing) {
         return;
       }
-      if (event.key === 'Escape') {
-        dismissedRef.current = editor.state.selection;
+      if (event.key === 'Escape' && visibleRef.current) {
+        const { selection } = editor.state;
+        const block = findSelectedCodeBlock(editor.state);
+        // Typing in a code block keeps moving the caret, so the toolbar stays
+        // away until the selection leaves the block.
+        dismissedRef.current = block
+          ? (state) => findSelectedCodeBlock(state)?.pos === block.pos
+          : (state) => state.selection.eq(selection);
         editor.view.dispatch(
           editor.state.tr.setMeta(selectionToolbarPluginKey, 'hide'),
         );
       } else if (event.altKey && event.key === 'F10') {
+        if (!visibleRef.current) {
+          dismissedRef.current = null;
+          if (!canShow(editor, editor.state, true)) {
+            return;
+          }
+          show();
+        }
         event.preventDefault();
         const toolbar = toolbarRef.current;
         (
@@ -207,7 +259,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
   const closePanel = useCallback(() => setPanel(null), []);
 
   const handleToolbarKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    // Ignore keys bubbling up from the dropdown content or the link panel.
+    // Ignore keys bubbling up from the dropdown content or a panel.
     if (
       !(event.target instanceof HTMLElement) ||
       !event.target.hasAttribute('data-toolbar-item')
@@ -248,6 +300,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
   if (!editor || entries.length === 0) {
     return null;
   }
+  const visibleEntries = filterVisibleEntries(entries, editor);
 
   const Panel = panel?.panel;
   let itemIndex = 0;
@@ -318,6 +371,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
       pluginKey={selectionToolbarPluginKey}
       appendTo={appendTo}
       shouldShow={shouldShow}
+      getReferencedVirtualElement={getReferencedVirtualElement}
       options={options}
       className="z-50"
     >
@@ -332,7 +386,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         {Panel ? (
           <Panel editor={editor} close={closePanel} />
         ) : (
-          entries.map(renderEntry)
+          visibleEntries.map(renderEntry)
         )}
       </div>
     </BubbleMenu>
@@ -357,15 +411,21 @@ function ToolbarButton({
 }) {
   const Icon = command.icon;
   const label = command.label();
+  const value = command.value?.(editor);
   const active = command.isActive?.(editor) ?? false;
   const enabled = command.isEnabled?.(editor) ?? true;
   return (
     <Button
       type="button"
       variant="ghost"
-      size="icon"
-      className={cn('h-7 w-7', active && 'bg-accent text-accent-foreground')}
-      aria-label={label}
+      size={value === undefined ? 'icon' : 'sm'}
+      className={cn(
+        value === undefined ? 'h-7 w-7' : 'h-7 gap-1 px-2',
+        active && 'bg-accent text-accent-foreground',
+      )}
+      // Like the dropdown, a button showing a value is named by it and
+      // described by its title.
+      aria-label={value === undefined ? label : undefined}
       aria-pressed={command.panel ? undefined : active}
       title={commandTitle(command)}
       disabled={!enabled}
@@ -380,7 +440,18 @@ function ToolbarButton({
       }}
       {...itemProps}
     >
-      {Icon ? <Icon /> : label}
+      {value === undefined ? (
+        Icon ? (
+          <Icon />
+        ) : (
+          label
+        )
+      ) : (
+        <>
+          {Icon && <Icon />}
+          <span className="max-w-32 truncate">{value}</span>
+        </>
+      )}
     </Button>
   );
 }

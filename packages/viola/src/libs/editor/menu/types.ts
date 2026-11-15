@@ -25,6 +25,13 @@ export interface EditorMenuCommand {
   shortcut?: string;
   isActive?: (editor: Editor) => boolean;
   isEnabled?: (editor: Editor) => boolean;
+  /**
+   * Selection toolbar only: hides the command where it can never apply, such
+   * as marks inside a code block, instead of showing it disabled.
+   */
+  isVisible?: (editor: Editor) => boolean;
+  /** Selection toolbar only: a current value shown as the button's text. */
+  value?: (editor: Editor) => string;
   run?: (ctx: EditorMenuRunContext) => void | Promise<void>;
   /**
    * Opened instead of running: in place of the selection toolbar's buttons, or

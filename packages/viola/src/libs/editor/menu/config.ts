@@ -1,3 +1,4 @@
+import type { Editor } from '@tiptap/core';
 import { proxy } from 'valtio';
 
 import type { TriggerDefinition } from '@v/tiptap-extensions/trigger-menu';
@@ -28,6 +29,7 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
           'block.code-block',
         ],
       },
+      'code-block.info',
       { type: 'separator' },
       'format.bold',
       'format.italic',
@@ -170,6 +172,28 @@ export function resolveMenuEntries(
     });
   }
   return collapseSeparators(resolved);
+}
+
+export function filterVisibleEntries(
+  entries: readonly ResolvedMenuEntry[],
+  editor: Editor,
+): ResolvedMenuEntry[] {
+  const isVisible = (command: EditorMenuCommand) =>
+    command.isVisible?.(editor) ?? true;
+  return collapseSeparators(
+    entries.flatMap((entry): ResolvedMenuEntry[] => {
+      switch (entry.type) {
+        case 'separator':
+          return [entry];
+        case 'command':
+          return isVisible(entry.command) ? [entry] : [];
+        default: {
+          const commands = entry.commands.filter(isVisible);
+          return commands.length > 0 ? [{ ...entry, commands }] : [];
+        }
+      }
+    }),
+  );
 }
 
 export function flattenCommands(

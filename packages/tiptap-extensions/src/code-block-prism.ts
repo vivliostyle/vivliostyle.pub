@@ -1,10 +1,94 @@
-import { findChildren, mergeAttributes } from '@tiptap/core';
+import { type Attribute, findChildren, mergeAttributes } from '@tiptap/core';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { EditorState } from '@tiptap/pm/state';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { RefractorNode } from 'refractor';
 import refractor from 'refractor';
+
+/**
+ * The fence's info string split like mdast's `code.lang` / `code.meta`: the
+ * first word, which carries VFM's `lang:title` form as is, and the rest.
+ */
+export interface CodeBlockInfo {
+  language: string | null;
+  meta: string | null;
+}
+
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    codeBlockInfo: {
+      /**
+       * Sets the language and meta of the code block holding the selection.
+       * Omitted fields keep their current value.
+       */
+      setCodeBlockInfo: (info: Partial<CodeBlockInfo>) => ReturnType;
+    };
+  }
+}
+
+// Markdown splits the info string at spaces and tabs only, so other
+// whitespace such as U+3000 belongs to the word it touches.
+const INFO_STRING_RE = /^[ \t]*([^ \t]*)[ \t]*(.*?)[ \t]*$/;
+
+export function parseCodeBlockInfo(
+  infoString: string | null | undefined,
+): CodeBlockInfo {
+  const [, language, meta] = infoString?.match(INFO_STRING_RE) ?? [];
+  return { language: language || null, meta: meta || null };
+}
+
+export function formatCodeBlockInfo({ language, meta }: CodeBlockInfo): string {
+  const clean = (value: string | null) =>
+    value?.replace(/[\r\n]+/g, ' ').replace(/^[ \t]+|[ \t]+$/g, '') ?? '';
+  const rest = clean(meta);
+  if (!rest) {
+    return clean(language);
+  }
+  // Without a language the meta's first word would be read as one. VFM
+  // renders `text` exactly like a block without a language.
+  return `${clean(language) || 'text'} ${rest}`;
+}
+
+/**
+ * Reads the info back through markdown's own split, so attributes stored
+ * before `meta` existed, with the whole info string in `language`, come out
+ * the same as freshly parsed ones.
+ */
+export function getCodeBlockInfo(node: ProseMirrorNode): CodeBlockInfo {
+  return parseCodeBlockInfo(
+    formatCodeBlockInfo({
+      language: node.attrs.language ?? null,
+      meta: node.attrs.meta ?? null,
+    }),
+  );
+}
+
+/** The code block that holds the whole text selection. */
+export function findSelectedCodeBlock(
+  state: EditorState,
+): { pos: number; node: ProseMirrorNode } | null {
+  const { $from, $to } = state.selection;
+  if ($from.parent.type.name !== 'codeBlock' || !$from.sameParent($to)) {
+    return null;
+  }
+  return { pos: $from.before(), node: $from.parent };
+}
+
+/** Language names and aliases the editor and VFM can highlight. */
+export function listHighlightLanguages(): string[] {
+  return [...refractor.listLanguages()].sort();
+}
+
+// A fence must be longer than any run of its character that could close it
+// early, and a backtick fence cannot carry backticks in its info string.
+function codeFence(infoString: string, code: string): string {
+  const char = infoString.includes('`') ? '~' : '`';
+  const runs = code.match(char === '`' ? /^ {0,3}`+/gm : /^ {0,3}~+/gm);
+  const longest = Math.max(0, ...(runs ?? []).map((run) => run.trim().length));
+  return char.repeat(Math.max(3, longest + 1));
+}
 
 /**
  * Derives the highlight language the same way VFM does: remark splits the
@@ -121,6 +205,82 @@ function prismHighlightPlugin(nodeName: string) {
  * generated with the same refractor version VFM uses.
  */
 export const CodeBlockPrism = CodeBlock.extend({
+  addAttributes() {
+    const parentAttributes: Record<string, Attribute | undefined> =
+      this.parent?.() ?? {};
+    const parseLanguageClass = parentAttributes.language?.parseHTML;
+    return {
+      language: {
+        default: this.options.defaultLanguage,
+        // The `language-*` class only names the highlight language, without
+        // VFM's `:title`, so copy and paste keep the attribute itself.
+        parseHTML: (element) =>
+          element.dataset.language ?? parseLanguageClass?.(element) ?? null,
+        renderHTML: ({ language }) =>
+          language ? { 'data-language': language } : {},
+      },
+      meta: {
+        default: null,
+        parseHTML: (element) => element.dataset.meta ?? null,
+        renderHTML: ({ meta }) => (meta ? { 'data-meta': meta } : {}),
+      },
+    };
+  },
+
+  parseMarkdown(token, helpers) {
+    // marked's `lang` has backslash escapes removed and the upstream check
+    // drops fences indented by one to three spaces, so read the raw line.
+    const infoString = token.raw?.match(/^ {0,3}(?:`{3,}|~{3,})(.*)/)?.[1];
+    if (infoString === undefined && token.codeBlockStyle !== 'indented') {
+      return [];
+    }
+    return helpers.createNode(
+      'codeBlock',
+      parseCodeBlockInfo(infoString),
+      token.text ? [helpers.createTextNode(token.text)] : [],
+    );
+  },
+
+  renderMarkdown(node, h) {
+    const infoString = formatCodeBlockInfo({
+      language: node.attrs?.language ?? null,
+      meta: node.attrs?.meta ?? null,
+    });
+    const code = node.content ? h.renderChildren(node.content) : '';
+    const fence = codeFence(infoString, code);
+    return `${fence}${infoString}\n${code}\n${fence}`;
+  },
+
+  addCommands() {
+    return {
+      ...this.parent?.(),
+      setCodeBlockInfo:
+        (info) =>
+        ({ state, tr, dispatch }) => {
+          const block = findSelectedCodeBlock(state);
+          if (!block) {
+            return false;
+          }
+          const current = getCodeBlockInfo(block.node);
+          const next = parseCodeBlockInfo(
+            formatCodeBlockInfo({
+              language:
+                info.language === undefined ? current.language : info.language,
+              meta: info.meta === undefined ? current.meta : info.meta,
+            }),
+          );
+          const { attrs } = block.node;
+          if (
+            dispatch &&
+            (next.language !== attrs.language || next.meta !== attrs.meta)
+          ) {
+            tr.setNodeMarkup(block.pos, undefined, { ...attrs, ...next });
+          }
+          return true;
+        },
+    };
+  },
+
   renderHTML({ node, HTMLAttributes }) {
     const language = resolveVfmLanguage(node.attrs.language) ?? 'text';
     const languageClass = `language-${language}`;

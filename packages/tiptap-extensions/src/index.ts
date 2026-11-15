@@ -31,6 +31,12 @@ import { PubMarkdown } from './markdown';
 
 export { type BlockFormat, getBlockFormat } from './block-format';
 export {
+  type CodeBlockInfo,
+  findSelectedCodeBlock,
+  getCodeBlockInfo,
+  listHighlightLanguages,
+} from './code-block-prism';
+export {
   type AssetDragPayload,
   CUSTOM_DRAG_MIME_NAME,
   type CustomDragPayload,

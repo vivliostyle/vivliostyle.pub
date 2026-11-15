@@ -2,6 +2,7 @@ import { m } from '../../../../generated/paraglide/messages';
 import { registerEditorMenuGroupLabel } from '../registry';
 
 import './block';
+import './code-block';
 import './format';
 import './insert';
 
