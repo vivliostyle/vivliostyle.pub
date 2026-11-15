@@ -199,8 +199,8 @@ catalogs:
       specifier: 11.0.3
       version: 11.0.3
     '@vivliostyle/theme-base':
-      specifier: 2.1.0
-      version: 2.1.0
+      specifier: 3.1.0
+      version: 3.1.0
     '@vivliostyle/vfm':
       specifier: 2.7.0
       version: 2.7.0
@@ -1020,7 +1020,7 @@ importers:
         version: 11.0.3(typescript@6.0.3)(vite@8.1.0(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0))
       '@vivliostyle/theme-base':
         specifier: 'catalog:'
-        version: 2.1.0(@vivliostyle/cli@11.0.3(typescript@6.0.3)(vite@8.1.0(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0)))
+        version: 3.1.0(@vivliostyle/cli@11.0.3(typescript@6.0.3)(vite@8.1.0(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0)))
       '@vivliostyle/vfm':
         specifier: 'catalog:'
         version: 2.7.0(typescript@6.0.3)
@@ -4053,10 +4053,10 @@ packages:
       '@napi-rs/canvas':
         optional: true
 
-  '@vivliostyle/theme-base@2.1.0':
-    resolution: {integrity: sha512-ahsuiSMjqnI0qrGocbUfOkrQ+u/aU0w0+Lg78IjftSvU/S3vZy2KAlidLyiECxNxmEDoUi+UWbHgerjg74qoyg==}
+  '@vivliostyle/theme-base@3.1.0':
+    resolution: {integrity: sha512-bJTGcUNZFifDUH9diDFmOdPGYjJ8KF6Zrypz0CnG5JLUDAteldGTwyGDUk8U0RHF7JopHWs67ukCWULHrtR8Mg==}
     peerDependencies:
-      '@vivliostyle/cli': '>=7'
+      '@vivliostyle/cli': '>=11.3.1'
     peerDependenciesMeta:
       '@vivliostyle/cli':
         optional: true
@@ -11056,7 +11056,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@vivliostyle/theme-base@2.1.0(@vivliostyle/cli@11.0.3(typescript@6.0.3)(vite@8.1.0(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0)))':
+  '@vivliostyle/theme-base@3.1.0(@vivliostyle/cli@11.0.3(typescript@6.0.3)(vite@8.1.0(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0)))':
     optionalDependencies:
       '@vivliostyle/cli': 11.0.3(typescript@6.0.3)(vite@8.1.0(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0))
 

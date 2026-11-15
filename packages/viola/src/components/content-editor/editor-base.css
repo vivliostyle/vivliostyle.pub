@@ -1,7 +1,7 @@
 @layer vs-theme;
 
-@import "@vivliostyle/theme-base/css/common/meta-properties.css" layer(vs-theme);
-@import "@vivliostyle/theme-base/css/common/basic.css" layer(vs-theme);
+@import "@vivliostyle/theme-base/define" layer(vs-theme);
+@import "@vivliostyle/theme-base/basic" layer(vs-theme);
 
 .editor-root {
   height: 100%;
