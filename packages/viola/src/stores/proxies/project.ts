@@ -301,7 +301,8 @@ export class Project {
   protected async handleThemeUpdate() {
     const sandbox = await this.sandboxPromise;
     const installedTheme = await this.theme.installPromise;
-    if (!installedTheme?.packageName) {
+    // An empty list means `loadStylesheets` has not run yet; writing now would drop the stylesheet entries
+    if (!installedTheme?.packageName || this.theme.stylesheets.length === 0) {
       return;
     }
     sandbox.updateVivliostyleConfig((config) => {

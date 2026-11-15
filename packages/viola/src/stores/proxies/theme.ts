@@ -2,6 +2,11 @@ import { invariant } from 'outvariant';
 import { proxy, ref } from 'valtio';
 
 import { SandboxFile } from '../../libs/sandbox/file';
+import {
+  bundleUserStylesheets,
+  createStylesheetBundleCache,
+  type StylesheetBundleError,
+} from '../../libs/user-stylesheet-bundle';
 import { resolveUserStylesheetPaths } from '../../libs/user-stylesheets';
 import type { Project } from './project';
 import type { Sandbox } from './sandbox';
@@ -27,7 +32,18 @@ export class Theme {
   /** Project-local stylesheets applied after the theme package, in cascade order. */
   stylesheets: UserStylesheet[] = [];
 
+  /** `stylesheets` with `@import`s inlined; `undefined` until computed or when there is nothing to inline. */
+  bundledStylesheetCss: string | undefined;
+  stylesheetBundleError: StylesheetBundleError | undefined;
+
   protected project: Project;
+  // Behind `ref` so bookkeeping never notifies subscribers
+  protected stylesheetBundleState = ref({
+    seq: 0,
+    timer: undefined as ReturnType<typeof setTimeout> | undefined,
+    sandbox: undefined as Sandbox | undefined,
+    cache: createStylesheetBundleCache(),
+  });
 
   protected constructor(project: Project) {
     this.project = ref(project);
@@ -48,6 +64,41 @@ export class Theme {
         return { path, css: '' };
       }),
     );
+    this.stylesheetBundleState.sandbox = sandbox;
+    this.refreshStylesheetBundle(0);
+  }
+
+  refreshStylesheetBundle(delay = 300) {
+    const state = this.stylesheetBundleState;
+    const seq = ++state.seq;
+    clearTimeout(state.timer);
+    state.timer = setTimeout(async () => {
+      try {
+        // The theme package itself may be imported by a stylesheet and is still being fetched
+        await this.installPromise;
+        const files = state.sandbox?.files ?? {};
+        const result = await bundleUserStylesheets(
+          this.stylesheets.map(({ path, css }) => ({ path, css })),
+          {
+            isProjectFile: (path) => path in files,
+            readProjectFile: (path) => files[path]?.text(),
+            cache: state.cache,
+            isStale: () => seq !== state.seq,
+          },
+        );
+        if (result && seq === state.seq) {
+          this.bundledStylesheetCss = result.css;
+          this.stylesheetBundleError = result.error;
+        }
+      } catch (error) {
+        if (seq === state.seq) {
+          this.stylesheetBundleError = {
+            kind: 'syntax',
+            message: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+    }, delay);
   }
 
   updateStylesheet(path: string, css: string) {
@@ -57,6 +108,7 @@ export class Theme {
     invariant(sandbox, 'Sandbox is not ready');
     stylesheet.css = css;
     sandbox.files[path] = ref(new SandboxFile('text/css', css));
+    this.refreshStylesheetBundle();
   }
 
   install(specifier: string) {

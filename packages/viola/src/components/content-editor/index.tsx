@@ -92,7 +92,10 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
       <div ref={wrapperRef} className="relative h-full">
         <EditorStyleContainer
           bundledCss={installedTheme?.bundledCss ?? ''}
-          customCss={themeSnap.stylesheets.map((it) => it.css).join('\n')}
+          customCss={
+            themeSnap.bundledStylesheetCss ??
+            themeSnap.stylesheets.map((it) => it.css).join('\n')
+          }
         >
           <EditArea />
         </EditorStyleContainer>
