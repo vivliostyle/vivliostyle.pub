@@ -139,6 +139,7 @@ function SettingRow({
         invalid={error !== null}
         onCommit={commit}
         onRevert={revert}
+        onError={setError}
       />
       {variable.defaultValue && (
         <p

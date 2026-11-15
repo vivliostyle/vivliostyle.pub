@@ -33,7 +33,9 @@ export default function CodeEditor({
     language?: 'css' | 'markdown';
     lineWrapping?: boolean;
   }) {
-  const currentCode = useRef('');
+  const currentCode = useRef<string | null>(null);
+  const codeProp = useRef(code);
+  codeProp.current = code;
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView>(null);
 
@@ -42,7 +44,12 @@ export default function CodeEditor({
       return;
     }
 
+    // Seeding the doc keeps the initial content out of the undo history, where
+    // a first undo would empty the editor and report that as an edit.
+    const doc = currentCode.current ?? codeProp.current;
+    currentCode.current = doc;
     const editorView = new EditorView({
+      doc,
       extensions: [
         lineNumbers(),
         highlightSpecialChars(),

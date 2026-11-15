@@ -8,15 +8,18 @@ import {
   type ValueDescriptor,
 } from '../../libs/theme-variables';
 import { toPickerColor } from './color';
+import type { CommitError } from './commit';
 import {
-  composeDimension,
   decodeOption,
   encodeOption,
   type FieldOverride,
   type FieldShape,
   getDefaultUnit,
   getSelectedOption,
+  type NumberCommit,
   parseFieldValue,
+  planNumberCommit,
+  planUnitChange,
   resolveFieldView,
 } from './field-state';
 import { NativeSelect } from './native-select';
@@ -35,6 +38,8 @@ export interface FieldProps {
   onCommit: (value: string) => void;
   /** Drops the error of a failed commit. */
   onRevert: () => void;
+  /** Reports input that is rejected before reaching `onCommit`. */
+  onError: (error: CommitError) => void;
 }
 
 const GENERIC_FONT_FAMILIES = [
@@ -139,7 +144,15 @@ function fieldAria({ labelId, describedBy, invalid }: FieldProps) {
  * text behind "Custom value…" for anything the two cannot express.
  */
 function KeywordUnitField(props: FieldProps) {
-  const { value, descriptor, defaultValue, label, onCommit, onRevert } = props;
+  const {
+    value,
+    descriptor,
+    defaultValue,
+    label,
+    onCommit,
+    onRevert,
+    onError,
+  } = props;
   const shape = useMemo<FieldShape>(
     () => ({
       keywords: descriptor.keywords,
@@ -150,26 +163,23 @@ function KeywordUnitField(props: FieldProps) {
   const defaultUnit = getDefaultUnit(shape, defaultValue);
   const [override, setOverride] = useState<FieldOverride>(null);
   const view = resolveFieldView(value, override, shape, defaultUnit);
-  const committed = parseFieldValue(value, shape);
-  const [number, setNumber] = useDraft(
-    view.kind === 'dimension' ? view.number : '',
-  );
+  const displayed = view.kind === 'dimension' ? view.number : '';
+  const [number, setNumber] = useDraft(displayed);
   const defaultView = defaultValue
     ? parseFieldValue(defaultValue, shape)
     : null;
 
-  const commitNumber = (unit: string) => {
-    const next = composeDimension(number, unit);
-    // Leaving the number empty must not drop a keyword or custom value.
-    if (
-      next === value.trim() ||
-      (next === '' && committed.kind !== 'dimension')
-    ) {
-      onRevert();
+  const apply = (plan: NumberCommit) => {
+    if (plan.kind === 'commit') {
+      onCommit(plan.value);
+    } else if (plan.kind === 'error') {
+      onError(plan.error);
     } else {
-      onCommit(next);
+      onRevert();
     }
   };
+  const commitNumber = (unit: string) =>
+    apply(planNumberCommit({ draft: number, displayed, unit, value }));
 
   const handleSelect = (encoded: string) => {
     const option = decodeOption(encoded);
@@ -187,9 +197,7 @@ function KeywordUnitField(props: FieldProps) {
         break;
       case 'unit':
         setOverride({ kind: 'dimension', unit: option.unit });
-        if (number.trim() !== '') {
-          commitNumber(option.unit);
-        }
+        apply(planUnitChange({ draft: number, unit: option.unit, value }));
         break;
     }
   };
@@ -199,9 +207,12 @@ function KeywordUnitField(props: FieldProps) {
       {view.kind === 'dimension' && (
         <Input
           {...fieldAria(props)}
-          type="number"
-          step="any"
+          // Text rather than `type="number"`, which reports unparsable input
+          // as an empty value and changes it on wheel scroll.
+          type="text"
           inputMode="decimal"
+          autoComplete="off"
+          spellCheck={false}
           className="h-8 w-28 font-mono text-xs md:text-xs"
           value={number}
           placeholder={
@@ -219,7 +230,7 @@ function KeywordUnitField(props: FieldProps) {
               event.preventDefault();
               commitNumber(view.unit);
             } else if (event.key === 'Escape') {
-              setNumber(committed.kind === 'dimension' ? committed.number : '');
+              setNumber(displayed);
               onRevert();
             }
           }}

@@ -48,6 +48,7 @@ const ERROR_MESSAGES: Record<CommitError, () => string> = {
   'missing-unit': m.theme_settings_error_missing_unit,
   'unknown-unit': m.theme_settings_error_unknown_unit,
   'not-allowed': m.theme_settings_error_not_allowed,
+  'not-a-number': m.theme_settings_error_not_a_number,
   'invalid-name': m.theme_settings_error_invalid_name,
   'invalid-value': m.theme_settings_error_invalid_value,
   'unsafe-edit': m.theme_settings_error_unsafe_edit,
