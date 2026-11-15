@@ -210,6 +210,19 @@ export default function ThemeCssEditor({
   onCssChange,
 }: ThemeCssEditorProps) {
   const [mode, setMode] = useState<Mode>('gui');
+  const guiPanelRef = useRef<HTMLDivElement>(null);
+  const switchMode = (next: Mode) => {
+    // Radix activates a tab on mousedown and unmounts the inactive panel right
+    // away, before a focused field gets the blur that commits its draft.
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      guiPanelRef.current?.contains(active)
+    ) {
+      active.blur();
+    }
+    setMode(next);
+  };
   const cssRef = useRef(css);
   const onCssChangeRef = useRef(onCssChange);
   useLayoutEffect(() => {
@@ -253,7 +266,7 @@ export default function ThemeCssEditor({
   const settings = useThemeSettings(schema, model);
 
   return (
-    <Tabs value={mode} onValueChange={(value) => setMode(value as Mode)}>
+    <Tabs value={mode} onValueChange={(value) => switchMode(value as Mode)}>
       <div className="sticky top-0 z-10 grid gap-2 bg-background py-2">
         <TabsList aria-label={m.theme_settings_mode_aria()} className="w-full">
           <TabsTrigger value="gui">
@@ -269,7 +282,7 @@ export default function ThemeCssEditor({
           <SettingsToolbar {...settings.toolbar} />
         )}
       </div>
-      <TabsContent value="gui" className="grid gap-2">
+      <TabsContent ref={guiPanelRef} value="gui" className="grid gap-2">
         {model && model.diagnostics.length > 0 && (
           <div
             role="status"
@@ -285,7 +298,7 @@ export default function ThemeCssEditor({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setMode('css')}
+                onClick={() => switchMode('css')}
               >
                 {m.theme_settings_open_css_editor()}
               </Button>

@@ -1,4 +1,4 @@
-import { joinDimension, splitDimension } from '../../libs/theme-variables';
+import { splitDimension } from '../../libs/theme-variables';
 
 /**
  * What the combined number + unit/keyword field shows. `custom` falls back to
@@ -43,16 +43,19 @@ export function parseFieldValue(
   }
   const dimension = units.length > 0 ? splitDimension(text) : null;
   if (dimension) {
+    // The number as written, so that showing it and committing it untouched
+    // does not respell the value (`.5em`, `1.50em`, `1e2px`).
+    const number = text.slice(0, text.length - dimension.unit.length);
     const unit = units.find(
       (u) => u.toLowerCase() === dimension.unit.toLowerCase(),
     );
     if (unit !== undefined) {
-      return { kind: 'dimension', number: String(dimension.number), unit };
+      return { kind: 'dimension', number, unit };
     }
     // A unitless zero is a valid length; show it with the first unit rather
     // than as custom text, since any unit means the same.
     if (dimension.unit === '' && dimension.number === 0) {
-      return { kind: 'dimension', number: '0', unit: units[0] };
+      return { kind: 'dimension', number, unit: units[0] };
     }
   }
   return { kind: 'custom' };
@@ -122,14 +125,65 @@ export function getSelectedOption(view: FieldView): FieldOption {
   }
 }
 
-/** The value to commit for a number typed next to `unit`; empty unsets. */
-export function composeDimension(number: string, unit: string): string {
+const NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+
+/**
+ * The value for a number typed next to `unit`, as typed: `''` unsets, and
+ * `null` means the text is no number.
+ */
+export function composeDimension(number: string, unit: string): string | null {
   const text = number.trim();
   if (text === '') {
     return '';
   }
-  const parsed = Number(text);
-  return Number.isFinite(parsed) && /^[+-]?[\d.]/.test(text)
-    ? joinDimension({ number: parsed, unit })
-    : `${text}${unit}`;
+  return NUMBER.test(text) ? `${text}${unit}` : null;
+}
+
+export type NumberCommit =
+  | { kind: 'none' }
+  | { kind: 'commit'; value: string }
+  | { kind: 'error'; error: 'not-a-number' };
+
+function plan(number: string, unit: string, value: string): NumberCommit {
+  const next = composeDimension(number, unit);
+  if (next === null) {
+    return { kind: 'error', error: 'not-a-number' };
+  }
+  return next === value.trim()
+    ? { kind: 'none' }
+    : { kind: 'commit', value: next };
+}
+
+/**
+ * What leaving the number input commits. Only an edit of the displayed
+ * number counts, so that a value spelled differently from what the field
+ * would compose (`0`, `10PX`) survives focus and blur.
+ */
+export function planNumberCommit({
+  draft,
+  displayed,
+  unit,
+  value,
+}: {
+  draft: string;
+  displayed: string;
+  unit: string;
+  value: string;
+}): NumberCommit {
+  return draft.trim() === displayed.trim()
+    ? { kind: 'none' }
+    : plan(draft, unit, value);
+}
+
+/** What picking `unit` commits next to the number in the input. */
+export function planUnitChange({
+  draft,
+  unit,
+  value,
+}: {
+  draft: string;
+  unit: string;
+  value: string;
+}): NumberCommit {
+  return draft.trim() === '' ? { kind: 'none' } : plan(draft, unit, value);
 }

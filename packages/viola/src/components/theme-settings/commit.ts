@@ -9,7 +9,11 @@ import {
   validateValue,
 } from '../../libs/theme-variables';
 
-export type CommitError = ValueValidationReason | ThemeCssEditErrorCode;
+export type CommitError =
+  | ValueValidationReason
+  | ThemeCssEditErrorCode
+  /** Text in a number input that is no number. */
+  | 'not-a-number';
 
 export type CommitResult =
   | { ok: true; css: string }
