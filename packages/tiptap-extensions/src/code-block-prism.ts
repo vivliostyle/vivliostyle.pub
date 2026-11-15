@@ -7,62 +7,16 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { RefractorNode } from 'refractor';
 import refractor from 'refractor';
 
-/**
- * The fence's info string split like mdast's `code.lang` / `code.meta`: the
- * first word, which carries VFM's `lang:title` form as is, and the rest.
- */
-export interface CodeBlockInfo {
-  language: string | null;
-  meta: string | null;
-}
-
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     codeBlockInfo: {
       /**
-       * Sets the language and meta of the code block holding the selection.
-       * Omitted fields keep their current value.
+       * Replaces the info string, everything after the opening fence, of the
+       * code block holding the selection.
        */
-      setCodeBlockInfo: (info: Partial<CodeBlockInfo>) => ReturnType;
+      setCodeBlockInfo: (infoString: string) => ReturnType;
     };
   }
-}
-
-// Markdown splits the info string at spaces and tabs only, so other
-// whitespace such as U+3000 belongs to the word it touches.
-const INFO_STRING_RE = /^[ \t]*([^ \t]*)[ \t]*(.*?)[ \t]*$/;
-
-export function parseCodeBlockInfo(
-  infoString: string | null | undefined,
-): CodeBlockInfo {
-  const [, language, meta] = infoString?.match(INFO_STRING_RE) ?? [];
-  return { language: language || null, meta: meta || null };
-}
-
-export function formatCodeBlockInfo({ language, meta }: CodeBlockInfo): string {
-  const clean = (value: string | null) =>
-    value?.replace(/[\r\n]+/g, ' ').replace(/^[ \t]+|[ \t]+$/g, '') ?? '';
-  const rest = clean(meta);
-  if (!rest) {
-    return clean(language);
-  }
-  // Without a language the meta's first word would be read as one. VFM
-  // renders `text` exactly like a block without a language.
-  return `${clean(language) || 'text'} ${rest}`;
-}
-
-/**
- * Reads the info back through markdown's own split, so attributes stored
- * before `meta` existed, with the whole info string in `language`, come out
- * the same as freshly parsed ones.
- */
-export function getCodeBlockInfo(node: ProseMirrorNode): CodeBlockInfo {
-  return parseCodeBlockInfo(
-    formatCodeBlockInfo({
-      language: node.attrs.language ?? null,
-      meta: node.attrs.meta ?? null,
-    }),
-  );
 }
 
 /** The code block that holds the whole text selection. */
@@ -79,6 +33,12 @@ export function findSelectedCodeBlock(
 /** Language names and aliases the editor and VFM can highlight. */
 export function listHighlightLanguages(): string[] {
   return [...refractor.listLanguages()].sort();
+}
+
+// A line break would end the fence line early and turn the rest of the info
+// string into markdown outside the code block.
+function toInfoString(value: string | null | undefined): string | null {
+  return value?.replace(/[\r\n]+/g, ' ') || null;
 }
 
 // A fence must be longer than any run of its character that could close it
@@ -98,7 +58,7 @@ function codeFence(infoString: string, code: string): string {
 export function resolveVfmLanguage(
   infoString: string | null | undefined,
 ): string | null {
-  const word = infoString?.match(/^[^ \t]+/)?.[0];
+  const word = infoString?.match(/^[ \t]*([^ \t]+)/)?.[1];
   if (!word) {
     return null;
   }
@@ -210,71 +170,63 @@ export const CodeBlockPrism = CodeBlock.extend({
       this.parent?.() ?? {};
     const parseLanguageClass = parentAttributes.language?.parseHTML;
     return {
+      // Holds the whole info string as written, like TipTap's own parser
+      // does with marked's `lang`; the highlight language is its first word.
       language: {
         default: this.options.defaultLanguage,
-        // The `language-*` class only names the highlight language, without
-        // VFM's `:title`, so copy and paste keep the attribute itself.
+        // The `language-*` class only names the highlight language, so copy
+        // and paste keep the info string itself.
         parseHTML: (element) =>
-          element.dataset.language ?? parseLanguageClass?.(element) ?? null,
+          toInfoString(
+            element.dataset.language ?? parseLanguageClass?.(element),
+          ),
         renderHTML: ({ language }) =>
           language ? { 'data-language': language } : {},
-      },
-      meta: {
-        default: null,
-        parseHTML: (element) => element.dataset.meta ?? null,
-        renderHTML: ({ meta }) => (meta ? { 'data-meta': meta } : {}),
       },
     };
   },
 
   parseMarkdown(token, helpers) {
-    // marked's `lang` has backslash escapes removed and the upstream check
-    // drops fences indented by one to three spaces, so read the raw line.
+    // marked's `lang` is trimmed and has backslash escapes removed, and the
+    // upstream check drops fences indented by one to three spaces.
     const infoString = token.raw?.match(/^ {0,3}(?:`{3,}|~{3,})(.*)/)?.[1];
     if (infoString === undefined && token.codeBlockStyle !== 'indented') {
       return [];
     }
     return helpers.createNode(
       'codeBlock',
-      parseCodeBlockInfo(infoString),
+      { language: infoString || null },
       token.text ? [helpers.createTextNode(token.text)] : [],
     );
   },
 
   renderMarkdown(node, h) {
-    const infoString = formatCodeBlockInfo({
-      language: node.attrs?.language ?? null,
-      meta: node.attrs?.meta ?? null,
-    });
+    // Also covers values that arrive without setCodeBlockInfo, e.g. over Yjs.
+    const infoString = toInfoString(node.attrs?.language) ?? '';
     const code = node.content ? h.renderChildren(node.content) : '';
     const fence = codeFence(infoString, code);
-    return `${fence}${infoString}\n${code}\n${fence}`;
+    // Leading tildes would lengthen a tilde fence instead of starting the
+    // info string; markdown ignores the space.
+    const separator = infoString.startsWith(fence.charAt(0)) ? ' ' : '';
+    return `${fence}${separator}${infoString}\n${code}\n${fence}`;
   },
 
   addCommands() {
     return {
       ...this.parent?.(),
       setCodeBlockInfo:
-        (info) =>
+        (infoString) =>
         ({ state, tr, dispatch }) => {
           const block = findSelectedCodeBlock(state);
           if (!block) {
             return false;
           }
-          const current = getCodeBlockInfo(block.node);
-          const next = parseCodeBlockInfo(
-            formatCodeBlockInfo({
-              language:
-                info.language === undefined ? current.language : info.language,
-              meta: info.meta === undefined ? current.meta : info.meta,
-            }),
-          );
-          const { attrs } = block.node;
-          if (
-            dispatch &&
-            (next.language !== attrs.language || next.meta !== attrs.meta)
-          ) {
-            tr.setNodeMarkup(block.pos, undefined, { ...attrs, ...next });
+          const language = toInfoString(infoString);
+          if (dispatch && language !== block.node.attrs.language) {
+            tr.setNodeMarkup(block.pos, undefined, {
+              ...block.node.attrs,
+              language,
+            });
           }
           return true;
         },

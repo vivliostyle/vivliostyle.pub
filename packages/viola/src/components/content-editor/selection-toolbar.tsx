@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core';
-import type { EditorState } from '@tiptap/pm/state';
+import type { EditorState, Selection } from '@tiptap/pm/state';
 import { AllSelection, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { useCurrentEditor, useEditorState } from '@tiptap/react';
 import { BubbleMenu, type BubbleMenuProps } from '@tiptap/react/menus';
@@ -8,7 +8,6 @@ import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
-import { findSelectedCodeBlock } from '@v/tiptap-extensions';
 import { Button } from '@v/ui/button';
 import {
   DropdownMenu,
@@ -48,12 +47,6 @@ function hasTextSelection(state: EditorState): boolean {
   return state.doc.textBetween(selection.from, selection.to).length > 0;
 }
 
-function selectedCodeBlockDom(editor: Editor): HTMLElement | null {
-  const block = findSelectedCodeBlock(editor.state);
-  const dom = block && editor.view.nodeDOM(block.pos);
-  return dom instanceof HTMLElement ? dom : null;
-}
-
 function commandTitle(command: EditorMenuCommand): string {
   const label = command.label();
   return command.shortcut
@@ -82,7 +75,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const visibleRef = useRef(false);
   const pointerDownRef = useRef(false);
-  const dismissedRef = useRef<((state: EditorState) => boolean) | null>(null);
+  const dismissedRef = useRef<Selection | null>(null);
 
   // Re-render on every transaction so active/enabled states stay current.
   useEditorState({
@@ -97,16 +90,14 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         !hasFocus ||
         pointerDownRef.current ||
         triggerMenuState.session?.editor === target ||
-        // A code block's own settings need no text to act on, so a caret in
-        // one is enough.
-        !(hasTextSelection(state) || findSelectedCodeBlock(state)) ||
+        !hasTextSelection(state) ||
         filterVisibleEntries(entriesRef.current, target).length === 0
       ) {
         return false;
       }
       const dismissed = dismissedRef.current;
       if (dismissed) {
-        if (dismissed(state)) {
+        if (dismissed.eq(state.selection)) {
           return false;
         }
         dismissedRef.current = null;
@@ -131,27 +122,13 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
     [containerRef],
   );
 
-  // In a code block the toolbar sits on the block's corner instead of
-  // following the caret, so it stays clear of the code being typed.
-  const getReferencedVirtualElement = useCallback(() => {
-    const dom = editor && selectedCodeBlockDom(editor);
-    return dom && { getBoundingClientRect: () => dom.getBoundingClientRect() };
-  }, [editor]);
-
   const options = useMemo<BubbleMenuProps['options']>(
     () => ({
       // On touch devices the native selection callout sits above the text.
       placement: window.matchMedia('(pointer: coarse)').matches
         ? 'bottom'
         : 'top',
-      // Right-aligned on a code block, where lines start on the left.
-      offset: ({ rects }) => ({
-        mainAxis: 8,
-        crossAxis:
-          editor && findSelectedCodeBlock(editor.state)
-            ? Math.max(0, (rects.reference.width - rects.floating.width) / 2)
-            : 0,
-      }),
+      offset: 8,
       flip: { padding: 8 },
       shift: { padding: 8 },
       onShow: () => {
@@ -163,7 +140,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         setPanel(null);
       },
     }),
-    [editor],
+    [],
   );
 
   // Opening or closing a panel changes the toolbar's size.
@@ -216,13 +193,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         return;
       }
       if (event.key === 'Escape' && visibleRef.current) {
-        const { selection } = editor.state;
-        const block = findSelectedCodeBlock(editor.state);
-        // Typing in a code block keeps moving the caret, so the toolbar stays
-        // away until the selection leaves the block.
-        dismissedRef.current = block
-          ? (state) => findSelectedCodeBlock(state)?.pos === block.pos
-          : (state) => state.selection.eq(selection);
+        dismissedRef.current = editor.state.selection;
         editor.view.dispatch(
           editor.state.tr.setMeta(selectionToolbarPluginKey, 'hide'),
         );
@@ -371,7 +342,6 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
       pluginKey={selectionToolbarPluginKey}
       appendTo={appendTo}
       shouldShow={shouldShow}
-      getReferencedVirtualElement={getReferencedVirtualElement}
       options={options}
       className="z-50"
     >

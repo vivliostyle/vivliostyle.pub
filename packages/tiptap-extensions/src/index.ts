@@ -31,10 +31,9 @@ import { PubMarkdown } from './markdown';
 
 export { type BlockFormat, getBlockFormat } from './block-format';
 export {
-  type CodeBlockInfo,
   findSelectedCodeBlock,
-  getCodeBlockInfo,
   listHighlightLanguages,
+  resolveVfmLanguage,
 } from './code-block-prism';
 export {
   type AssetDragPayload,

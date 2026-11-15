@@ -89,28 +89,27 @@ const fenced = (info: string, fence = '```') =>
 
 describe('code block info string', () => {
   it.each([
-    ['no language', fenced(''), null, null],
-    ['a language', fenced('js'), 'js', null],
-    [
-      'a language and meta',
-      fenced('js title=example.js'),
-      'js',
-      'title=example.js',
-    ],
-    ['a VFM title', fenced('js:example.js'), 'js:example.js', null],
-    ['a VFM title and meta', fenced('js:a.js {.lines}'), 'js:a.js', '{.lines}'],
-    ['quoted meta', fenced('js title="a b" x=1'), 'js', 'title="a b" x=1'],
-    [
-      'an attribute block',
-      fenced('js {#id .c title="{a}"}'),
-      'js',
-      '{#id .c title="{a}"}',
-    ],
-    ['escapes', fenced('js title=a\\_b\\\\'), 'js', 'title=a\\_b\\\\'],
-    ['backticks', fenced('js title=`a`', '~~~'), 'js', 'title=`a`'],
-    ['wide spaces', fenced('js　x y'), 'js　x', 'y'],
-  ])('keeps %s as written', (_, markdown, language, meta) => {
-    expect(parse(markdown)[0]?.attrs).toEqual({ language, meta });
+    ['no info string', ''],
+    ['a language', 'js'],
+    ['a language and meta', 'js title=example.js'],
+    ['a VFM title', 'js:example.js'],
+    ['a VFM title and meta', 'js:a.js {.lines}'],
+    ['quoted meta', 'js title="a b" x=1'],
+    ['an attribute block', 'js {#id .c title="{a}"}'],
+    ['escapes', 'js title=a\\_b\\\\'],
+    ['runs of spaces and tabs', 'js  \ttitle=x'],
+    ['spaces around it', ' js title=x  '],
+    ['only spaces', '   '],
+    ['wide spaces', 'js　x y'],
+  ])('keeps %s as written', (_, info) => {
+    const markdown = fenced(info);
+    expect(parse(markdown)[0]?.attrs).toEqual({ language: info || null });
+    expect(roundTrip(markdown)).toBe(markdown);
+  });
+
+  it('keeps backticks in a tilde fence', () => {
+    const markdown = fenced('js title=`a`', '~~~');
+    expect(parse(markdown)[0]?.attrs).toEqual({ language: 'js title=`a`' });
     expect(roundTrip(markdown)).toBe(markdown);
   });
 
@@ -124,34 +123,10 @@ describe('code block info string', () => {
     expect(roundTrip(markdown)).toBe(markdown);
   });
 
-  it('writes a single space between the language and meta', () => {
-    expect(roundTrip(fenced('js \t title=x  '))).toBe(fenced('js title=x'));
-  });
-
   it('reads a fence indented by up to three spaces', () => {
     expect(roundTrip('   ```js title=x\n   a\n    b\n   ```')).toBe(
       '```js title=x\na\n b\n```',
     );
-  });
-
-  it('writes an info string stored whole in the language', () => {
-    expect(
-      serializeBlock({
-        type: 'codeBlock',
-        attrs: { language: 'js  title=x' },
-        content: [{ type: 'text', text: 'const a = 1;' }],
-      }),
-    ).toBe(fenced('js  title=x'));
-  });
-
-  it('writes meta without a language after `text`', () => {
-    expect(
-      serializeBlock({
-        type: 'codeBlock',
-        attrs: { meta: 'title=x' },
-        content: [{ type: 'text', text: 'const a = 1;' }],
-      }),
-    ).toBe(fenced('text title=x'));
   });
 
   it('makes the fence longer than any fence inside the code', () => {
@@ -160,5 +135,25 @@ describe('code block info string', () => {
       '`````md\n````js\n````\n`````',
     );
     expect(roundTrip('~~~~a`b\n ~~~\n~~~~')).toBe('~~~~a`b\n ~~~\n~~~~');
+  });
+
+  it('switches to tildes for an info string with backticks', () => {
+    expect(
+      serializeBlock({
+        type: 'codeBlock',
+        attrs: { language: 'js title=`a`' },
+        content: [{ type: 'text', text: 'const a = 1;' }],
+      }),
+    ).toBe(fenced('js title=`a`', '~~~'));
+  });
+
+  it('keeps leading tildes out of a tilde fence', () => {
+    const markdown = serializeBlock({
+      type: 'codeBlock',
+      attrs: { language: '~`' },
+      content: [{ type: 'text', text: 'const a = 1;' }],
+    });
+    expect(markdown).toBe(fenced(' ~`', '~~~'));
+    expect(parse(markdown)[0]?.attrs).toEqual({ language: ' ~`' });
   });
 });

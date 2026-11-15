@@ -1,54 +1,142 @@
 import type React from 'react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   findSelectedCodeBlock,
-  getCodeBlockInfo,
   listHighlightLanguages,
 } from '@v/tiptap-extensions';
 import { Button } from '@v/ui/button';
 import { CheckIcon } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
+import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
+import {
+  languageRange,
+  replaceLanguage,
+  suggestLanguages,
+} from '../../libs/editor/code-block-language';
 import type { EditorMenuPanelProps } from '../../libs/editor/menu/types';
 
+type ListMode = 'closed' | 'typing' | 'browsing';
+
 export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
-  const languageRef = useRef<HTMLInputElement>(null);
-  const metaRef = useRef<HTMLInputElement>(null);
-  const languageListId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
   const languages = useMemo(listHighlightLanguages, []);
-  const [initial] = useState(() => {
-    const block = findSelectedCodeBlock(editor.state);
-    return block
-      ? getCodeBlockInfo(block.node)
-      : { language: null, meta: null };
+  const [value, setValue] = useState<string>(
+    () => findSelectedCodeBlock(editor.state)?.node.attrs.language ?? '',
+  );
+  const [caret, setCaret] = useState(0);
+  const [listMode, setListMode] = useState<ListMode>('closed');
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const pendingCaretRef = useRef<number | null>(null);
+
+  const suggestions =
+    listMode === 'closed'
+      ? []
+      : suggestLanguages(languages, value, caret, {
+          browse: listMode === 'browsing',
+        });
+  const expanded = suggestions.length > 0;
+
+  // Selecting just the language lets typing replace it while the meta stays.
+  useEffect(() => {
+    const { from, to } = languageRange(inputRef.current?.value ?? '');
+    inputRef.current?.focus();
+    inputRef.current?.setSelectionRange(from, to);
+    setCaret(from);
+  }, []);
+
+  useLayoutEffect(() => {
+    const pending = pendingCaretRef.current;
+    if (pending !== null) {
+      pendingCaretRef.current = null;
+      inputRef.current?.setSelectionRange(pending, pending);
+      setCaret(pending);
+    }
   });
 
   useEffect(() => {
-    languageRef.current?.focus();
-    languageRef.current?.select();
-  }, []);
+    if (activeIndex >= 0) {
+      listboxRef.current
+        ?.querySelector('[aria-selected="true"]')
+        ?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
+
+  const updateCaret = () => {
+    setCaret(inputRef.current?.selectionStart ?? 0);
+  };
+
+  const closeList = () => {
+    setListMode('closed');
+    setActiveIndex(-1);
+  };
+
+  const pick = (language: string) => {
+    const next = replaceLanguage(value, language);
+    setValue(next.infoString);
+    pendingCaretRef.current = next.caret;
+    closeList();
+  };
 
   const apply = () => {
-    editor
-      .chain()
-      .focus()
-      .setCodeBlockInfo({
-        language: languageRef.current?.value ?? null,
-        meta: metaRef.current?.value ?? null,
-      })
-      .run();
+    editor.chain().focus().setCodeBlockInfo(value).run();
     close();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Escape' || event.nativeEvent.isComposing) {
+    if (event.nativeEvent.isComposing) {
       return;
     }
-    event.preventDefault();
-    event.stopPropagation();
-    close();
-    editor.commands.focus();
+    const active = suggestions[activeIndex];
+    switch (event.key) {
+      case 'ArrowDown':
+        if (expanded) {
+          event.preventDefault();
+          setActiveIndex((activeIndex + 1) % suggestions.length);
+        } else if (
+          suggestLanguages(languages, value, caret, { browse: true }).length
+        ) {
+          event.preventDefault();
+          setListMode('browsing');
+          setActiveIndex(0);
+        }
+        return;
+      case 'ArrowUp':
+        if (expanded) {
+          event.preventDefault();
+          setActiveIndex(
+            (activeIndex <= 0 ? suggestions.length : activeIndex) - 1,
+          );
+        }
+        return;
+      case 'Enter':
+      case 'Tab':
+        if (active !== undefined) {
+          event.preventDefault();
+          pick(active);
+        }
+        return;
+      case 'Escape':
+        event.preventDefault();
+        event.stopPropagation();
+        if (expanded) {
+          closeList();
+        } else {
+          close();
+          editor.commands.focus();
+        }
+        return;
+    }
   };
 
   return (
@@ -59,33 +147,64 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
         apply();
       }}
     >
-      <div className="flex flex-col gap-1">
+      <div className="relative">
         <Input
-          ref={languageRef}
-          defaultValue={initial.language ?? ''}
-          placeholder={m.code_block_panel_language_placeholder()}
-          aria-label={m.code_block_panel_language_aria()}
-          list={languageListId}
+          ref={inputRef}
+          value={value}
+          role="combobox"
+          aria-label={m.code_block_panel_info_aria()}
+          aria-autocomplete="list"
+          aria-expanded={expanded}
+          aria-controls={expanded ? listboxId : undefined}
+          aria-activedescendant={
+            expanded && activeIndex >= 0
+              ? `${listboxId}-${activeIndex}`
+              : undefined
+          }
+          placeholder={m.code_block_panel_info_placeholder()}
           autoComplete="off"
           spellCheck={false}
-          className="h-7 w-64"
+          className="h-7 w-80 font-mono"
+          onChange={(event) => {
+            setValue(event.target.value);
+            setListMode('typing');
+            setActiveIndex(-1);
+            updateCaret();
+          }}
+          onSelect={updateCaret}
+          onBlur={closeList}
           onKeyDown={handleKeyDown}
         />
-        <datalist id={languageListId}>
-          {languages.map((language) => (
-            <option key={language} value={language} />
-          ))}
-        </datalist>
-        <Input
-          ref={metaRef}
-          defaultValue={initial.meta ?? ''}
-          placeholder={m.code_block_panel_meta_placeholder()}
-          aria-label={m.code_block_panel_meta_aria()}
-          autoComplete="off"
-          spellCheck={false}
-          className="h-7 w-64"
-          onKeyDown={handleKeyDown}
-        />
+        {expanded && (
+          <div
+            ref={listboxRef}
+            id={listboxId}
+            role="listbox"
+            aria-label={m.code_block_panel_suggestions_aria()}
+            className="absolute top-full left-0 z-10 mt-1 max-h-48 min-w-40 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            // Keeps focus, and so the caret, in the field while picking.
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            {suggestions.map((language, index) => (
+              // biome-ignore lint/a11y/useKeyWithClickEvents: the field keeps focus and drives the keyboard
+              <div
+                key={language}
+                id={`${listboxId}-${index}`}
+                role="option"
+                aria-selected={index === activeIndex}
+                tabIndex={-1}
+                className={cn(
+                  'cursor-default rounded-sm px-2 py-1 font-mono text-sm',
+                  index === activeIndex && 'bg-accent text-accent-foreground',
+                )}
+                onMouseMove={() => setActiveIndex(index)}
+                onClick={() => pick(language)}
+              >
+                {language}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <Button
         type="submit"

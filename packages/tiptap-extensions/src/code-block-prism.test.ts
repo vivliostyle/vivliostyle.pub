@@ -5,14 +5,7 @@ import type { DecorationSet } from '@tiptap/pm/view';
 import refractor from 'refractor';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-  findSelectedCodeBlock,
-  flattenRefractorNodes,
-  formatCodeBlockInfo,
-  getCodeBlockInfo,
-  parseCodeBlockInfo,
-  resolveVfmLanguage,
-} from './code-block-prism';
+import { flattenRefractorNodes, resolveVfmLanguage } from './code-block-prism';
 import { PubExtensions } from './index';
 
 describe('resolveVfmLanguage', () => {
@@ -28,6 +21,11 @@ describe('resolveVfmLanguage', () => {
 
   it('strips the VFM `lang:title` suffix', () => {
     expect(resolveVfmLanguage('js:example.js')).toBe('js');
+  });
+
+  it('skips spaces before the first word, as markdown trims them', () => {
+    expect(resolveVfmLanguage(' \tjs title=x')).toBe('js');
+    expect(resolveVfmLanguage('   ')).toBeNull();
   });
 
   it('uses only the first word of the info string', () => {
@@ -70,43 +68,6 @@ describe('flattenRefractorNodes', () => {
   });
 });
 
-describe('parseCodeBlockInfo', () => {
-  it('splits the info string at the first spaces or tabs', () => {
-    expect(parseCodeBlockInfo('js:a.js  title="a b" {.c}')).toEqual({
-      language: 'js:a.js',
-      meta: 'title="a b" {.c}',
-    });
-    expect(parseCodeBlockInfo(' \tjs ')).toEqual({
-      language: 'js',
-      meta: null,
-    });
-    expect(parseCodeBlockInfo('')).toEqual({ language: null, meta: null });
-    expect(parseCodeBlockInfo(null)).toEqual({ language: null, meta: null });
-  });
-});
-
-describe('formatCodeBlockInfo', () => {
-  it('joins the language and meta with one space', () => {
-    expect(formatCodeBlockInfo({ language: ' js ', meta: ' a=1 ' })).toBe(
-      'js a=1',
-    );
-    expect(formatCodeBlockInfo({ language: 'js', meta: '' })).toBe('js');
-    expect(formatCodeBlockInfo({ language: null, meta: null })).toBe('');
-  });
-
-  it('keeps the info string on one line', () => {
-    expect(formatCodeBlockInfo({ language: 'js', meta: 'a\nb\r\nc' })).toBe(
-      'js a b c',
-    );
-  });
-
-  it('puts `text` before meta without a language', () => {
-    expect(formatCodeBlockInfo({ language: ' ', meta: 'title=x' })).toBe(
-      'text title=x',
-    );
-  });
-});
-
 let editor: Editor | undefined;
 
 afterEach(() => {
@@ -135,9 +96,8 @@ function createEditor(content: JSONContent[], caret: number): Editor {
   return editor;
 }
 
-function selectedInfo(editor: Editor) {
-  const block = findSelectedCodeBlock(editor.state);
-  return block && getCodeBlockInfo(block.node);
+function language(editor: Editor): unknown {
+  return editor.state.doc.firstChild?.attrs.language;
 }
 
 function highlightedTexts(editor: Editor): string[] {
@@ -154,77 +114,35 @@ function highlightedTexts(editor: Editor): string[] {
 }
 
 describe('setCodeBlockInfo', () => {
-  it('changes the language and meta in one undoable step', () => {
+  it('replaces the info string in one undoable step', () => {
     const editor = createEditor([codeBlock({ language: 'text' })], 5);
     expect(highlightedTexts(editor)).toEqual([]);
 
-    expect(
-      editor.commands.setCodeBlockInfo({ language: 'js', meta: 'title=a.js' }),
-    ).toBe(true);
+    expect(editor.commands.setCodeBlockInfo('js  title="a b"')).toBe(true);
 
-    expect(selectedInfo(editor)).toEqual({
-      language: 'js',
-      meta: 'title=a.js',
-    });
+    expect(language(editor)).toBe('js  title="a b"');
     expect(editor.state.doc.textContent).toBe(code);
     expect(editor.state.selection.from).toBe(5);
     expect(highlightedTexts(editor)).toContain('const');
-    expect(editor.getMarkdown()).toBe(`\`\`\`js title=a.js\n${code}\n\`\`\``);
+    expect(editor.getMarkdown()).toBe(`\`\`\`js  title="a b"\n${code}\n\`\`\``);
     expect(undoDepth(editor.state)).toBe(1);
 
     editor.commands.undo();
-    expect(selectedInfo(editor)).toEqual({ language: 'text', meta: null });
+    expect(language(editor)).toBe('text');
     expect(highlightedTexts(editor)).toEqual([]);
   });
 
-  it('keeps the field it is not given', () => {
-    const editor = createEditor(
-      [codeBlock({ language: 'js', meta: 'title=a.js' })],
-      2,
-    );
-    editor.commands.setCodeBlockInfo({ language: 'ts' });
-    expect(selectedInfo(editor)).toEqual({
-      language: 'ts',
-      meta: 'title=a.js',
-    });
-    editor.commands.setCodeBlockInfo({ meta: null });
-    expect(selectedInfo(editor)).toEqual({ language: 'ts', meta: null });
-  });
-
-  it('stores the values markdown reads back', () => {
+  it('keeps the info string on one line', () => {
     const editor = createEditor([codeBlock({ language: 'js' })], 2);
-    editor.commands.setCodeBlockInfo({ language: ' js:a.js  title=x ' });
-    expect(editor.state.doc.firstChild?.attrs).toMatchObject({
-      language: 'js:a.js',
-      meta: 'title=x',
-    });
-    editor.commands.setCodeBlockInfo({ language: '', meta: 'title=y' });
-    expect(editor.state.doc.firstChild?.attrs).toMatchObject({
-      language: 'text',
-      meta: 'title=y',
-    });
-    editor.commands.setCodeBlockInfo({ language: null, meta: '' });
-    expect(editor.state.doc.firstChild?.attrs).toMatchObject({
-      language: null,
-      meta: null,
-    });
-  });
-
-  it('splits an info string stored whole in the language', () => {
-    const editor = createEditor([codeBlock({ language: 'js  title=x' })], 2);
-    expect(selectedInfo(editor)).toEqual({ language: 'js', meta: 'title=x' });
-    editor.commands.setCodeBlockInfo({ meta: 'title=y' });
-    expect(editor.state.doc.firstChild?.attrs).toMatchObject({
-      language: 'js',
-      meta: 'title=y',
-    });
+    editor.commands.setCodeBlockInfo('js a\nb\r\nc');
+    expect(language(editor)).toBe('js a b c');
+    editor.commands.setCodeBlockInfo('');
+    expect(language(editor)).toBeNull();
   });
 
   it('adds no step when nothing changes', () => {
     const editor = createEditor([codeBlock({ language: 'js' })], 2);
-    expect(
-      editor.commands.setCodeBlockInfo({ language: 'js', meta: ' ' }),
-    ).toBe(true);
+    expect(editor.commands.setCodeBlockInfo('js')).toBe(true);
     expect(undoDepth(editor.state)).toBe(0);
   });
 
@@ -246,7 +164,7 @@ describe('setCodeBlockInfo', () => {
       ],
       8,
     );
-    editor.commands.setCodeBlockInfo({ language: 'js', meta: 'title=a.js' });
+    editor.commands.setCodeBlockInfo('js title=a.js');
     expect(editor.getMarkdown()).toBe(
       `- a\n\n  \`\`\`js title=a.js\n  ${code}\n  \`\`\``,
     );
@@ -260,10 +178,33 @@ describe('setCodeBlockInfo', () => {
       ],
       1,
     );
-    expect(editor.commands.setCodeBlockInfo({ language: 'ts' })).toBe(false);
+    expect(editor.commands.setCodeBlockInfo('ts')).toBe(false);
     editor.commands.setTextSelection({ from: 1, to: 6 });
-    expect(editor.commands.setCodeBlockInfo({ language: 'ts' })).toBe(false);
+    expect(editor.commands.setCodeBlockInfo('ts')).toBe(false);
     editor.commands.setTextSelection({ from: 5, to: 8 });
-    expect(editor.commands.setCodeBlockInfo({ language: 'ts' })).toBe(true);
+    expect(editor.commands.setCodeBlockInfo('ts')).toBe(true);
+  });
+});
+
+describe('info strings with line breaks', () => {
+  const injected = 'js\n<img src=x onerror=alert(1)>\r\n# heading';
+
+  it('are written on the fence line', () => {
+    const editor = createEditor([codeBlock({ language: injected })], 2);
+    expect(editor.getMarkdown()).toBe(
+      `\`\`\`js <img src=x onerror=alert(1)> # heading\n${code}\n\`\`\``,
+    );
+  });
+
+  it('are joined when pasted as HTML', () => {
+    const editor = createEditor([codeBlock({ language: 'js' })], 2);
+    const rule = editor.schema.nodes.codeBlock?.spec.parseDOM?.[0];
+    const element = {
+      dataset: { language: injected },
+      getAttribute: () => null,
+    } as unknown as HTMLElement;
+    expect(rule && 'getAttrs' in rule && rule.getAttrs?.(element)).toEqual({
+      language: 'js <img src=x onerror=alert(1)> # heading',
+    });
   });
 });

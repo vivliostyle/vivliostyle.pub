@@ -1,4 +1,7 @@
-import { findSelectedCodeBlock, getCodeBlockInfo } from '@v/tiptap-extensions';
+import {
+  findSelectedCodeBlock,
+  resolveVfmLanguage,
+} from '@v/tiptap-extensions';
 import { BracesIcon } from '@v/ui/icon';
 import { CodeBlockPanel } from '../../../../components/content-editor/code-block-panel';
 import { m } from '../../../../generated/paraglide/messages';
@@ -14,7 +17,7 @@ registerEditorMenuCommand({
   value: (editor) => {
     const block = findSelectedCodeBlock(editor.state);
     return (
-      (block && getCodeBlockInfo(block.node).language) ||
+      resolveVfmLanguage(block?.node.attrs.language) ??
       m.editor_command_code_block_info_plain_text()
     );
   },

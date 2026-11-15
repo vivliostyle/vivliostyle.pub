@@ -36,7 +36,7 @@ function command(id: string) {
   return found;
 }
 
-/** Puts the caret inside the nth text node. */
+/** Puts the caret at the start of the nth textblock. */
 function caretIn(editor: Editor, index: number): void {
   const positions: number[] = [];
   editor.state.doc.descendants((node, pos) => {
@@ -61,7 +61,7 @@ describe('code-block.info', () => {
     expect(info.isVisible?.(editor)).toBe(false);
     caretIn(editor, 1);
     expect(info.isVisible?.(editor)).toBe(true);
-    expect(info.value?.(editor)).toBe('js:a.js');
+    expect(info.value?.(editor)).toBe('js');
     caretIn(editor, 2);
     expect(info.value?.(editor)).toBe(
       m.editor_command_code_block_info_plain_text(),
@@ -78,15 +78,15 @@ describe('code-block.info', () => {
     }
   });
 
-  it('writes what VFM reads as the language and meta', () => {
+  it('writes the info string for VFM as typed', () => {
     const editor = createEditor('```\nconst a = 1;\n```');
     caretIn(editor, 0);
-    editor.commands.setCodeBlockInfo({
-      language: 'js',
-      meta: 'title="An example" {#code .lines}',
-    });
+    editor.commands.setCodeBlockInfo('js  title="An example" {#code .lines}');
     const markdown = editor.getMarkdown();
 
+    expect(markdown).toBe(
+      '```js  title="An example" {#code .lines}\nconst a = 1;\n```',
+    );
     expect(vfm.parse(markdown)).toMatchObject({
       children: [
         { type: 'code', lang: 'js', meta: 'title="An example" {#code .lines}' },
@@ -94,12 +94,6 @@ describe('code-block.info', () => {
     });
     expect(render(markdown)).toContain('<figcaption>An example</figcaption>');
     expect(render(markdown)).toContain('id="code"');
-
-    // Meta needs a language word before it; `text` renders like none.
-    editor.commands.setCodeBlockInfo({ language: '', meta: 'title=out' });
-    const output = render(editor.getMarkdown());
-    expect(output).toContain(render('```\nconst a = 1;\n```').trim());
-    expect(output).toContain('<figcaption>out</figcaption>');
   });
 });
 
@@ -110,6 +104,7 @@ describe('code block markdown', () => {
     '```js title=example.js\nconst a = 1;\n```',
     '```js:example.js\nconst a = 1;\n```',
     '```js   title="a b" {#id .c}\nconst a = 1;\n```',
+    '``` js\ttitle=x  \nconst a = 1;\n```',
     '```js {title="{a}"}\nconst a = 1;\n```',
     '~~~md\n```js\na\n```\n~~~',
     '   ```js title=x\n   a\n    b\n   ```',
