@@ -208,3 +208,109 @@ describe('info strings with line breaks', () => {
     });
   });
 });
+
+describe('opening fence typed in a paragraph', () => {
+  function paragraph(text: string): JSONContent {
+    return { type: 'paragraph', content: [{ type: 'text', text }] };
+  }
+
+  // A headless view has no someProp, so the plugins are asked directly, in
+  // the order the view would ask them.
+  function typeText(editor: Editor, text: string): boolean {
+    const { from, to } = editor.state.selection;
+    return editor.state.plugins.some((plugin) =>
+      plugin.props.handleTextInput?.call(plugin, editor.view, from, to, text),
+    );
+  }
+
+  function pressEnter(editor: Editor): boolean {
+    const event = { key: 'Enter', keyCode: 13 } as KeyboardEvent;
+    return editor.state.plugins.some((plugin) =>
+      plugin.props.handleKeyDown?.call(plugin, editor.view, event),
+    );
+  }
+
+  it('does not convert on a space, so that meta can follow', () => {
+    const editor = createEditor([paragraph('```js')], 6);
+
+    expect(typeText(editor, ' ')).toBe(false);
+    expect(editor.state.doc.firstChild?.type.name).toBe('paragraph');
+  });
+
+  it('converts on Enter, keeping the whole info string', () => {
+    const editor = createEditor([paragraph('```js title=a.js')], 17);
+
+    expect(pressEnter(editor)).toBe(true);
+
+    expect(editor.getJSON().content).toEqual([
+      { type: 'codeBlock', attrs: { language: 'js title=a.js' } },
+    ]);
+    expect(editor.state.selection.from).toBe(1);
+  });
+
+  it('converts a fence without an info string', () => {
+    const editor = createEditor([paragraph('~~~~')], 5);
+
+    expect(pressEnter(editor)).toBe(true);
+    expect(editor.getJSON().content).toEqual([
+      { type: 'codeBlock', attrs: { language: null } },
+    ]);
+  });
+
+  it('converts inside a list item instead of splitting it', () => {
+    const editor = createEditor(
+      [
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [paragraph('a'), paragraph('```js')],
+            },
+          ],
+        },
+      ],
+      11,
+    );
+
+    expect(pressEnter(editor)).toBe(true);
+    expect(editor.getJSON().content?.[0].content).toEqual([
+      {
+        type: 'listItem',
+        content: [
+          paragraph('a'),
+          { type: 'codeBlock', attrs: { language: 'js' } },
+        ],
+      },
+    ]);
+  });
+
+  it('leaves a fence where the schema allows no code block', () => {
+    const editor = createEditor(
+      [
+        {
+          type: 'bulletList',
+          content: [{ type: 'listItem', content: [paragraph('```js')] }],
+        },
+      ],
+      8,
+    );
+
+    pressEnter(editor);
+    expect(editor.getJSON().content?.[0].content).toHaveLength(2);
+  });
+
+  it('leaves Enter alone when the line is not a fence', () => {
+    for (const [text, caret] of [
+      ['```js', 3],
+      ['``js', 5],
+      ['a ```js', 8],
+      ['```a`b', 7],
+    ] as const) {
+      const editor = createEditor([paragraph(text)], caret);
+      pressEnter(editor);
+      expect(editor.state.doc.firstChild?.type.name).toBe('paragraph');
+      editor.destroy();
+    }
+  });
+});

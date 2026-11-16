@@ -1,7 +1,12 @@
-import { type Attribute, findChildren, mergeAttributes } from '@tiptap/core';
+import {
+  type Attribute,
+  Extension,
+  findChildren,
+  mergeAttributes,
+} from '@tiptap/core';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import type { EditorState } from '@tiptap/pm/state';
+import type { EditorState, Transaction } from '@tiptap/pm/state';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { RefractorNode } from 'refractor';
@@ -65,6 +70,66 @@ export function resolveVfmLanguage(
   const match = word.match(/^(.+?):(.+)$/);
   return match ? match[1] : word;
 }
+
+/**
+ * Turns the textblock at the caret into a code block when it holds nothing
+ * but an opening fence line, e.g. "```js title=a.js".
+ */
+export function convertFenceLine(
+  state: EditorState,
+  dispatch?: (tr: Transaction) => void,
+): boolean {
+  const { $from, empty } = state.selection;
+  const { parent } = $from;
+  const { codeBlock } = state.schema.nodes;
+  if (
+    !empty ||
+    !codeBlock ||
+    parent.type.spec.code ||
+    $from.parentOffset !== parent.content.size ||
+    parent.textContent.length !== parent.content.size
+  ) {
+    return false;
+  }
+  const match = parent.textContent.match(/^(`{3,}|~{3,})(.*)$/);
+  // Markdown does not read a backtick fence with backticks in its info string
+  // as a fence.
+  if (!match || (match[1].startsWith('`') && match[2].includes('`'))) {
+    return false;
+  }
+  const index = $from.index(-1);
+  if (!$from.node(-1).canReplaceWith(index, index + 1, codeBlock)) {
+    return false;
+  }
+  if (dispatch) {
+    const start = $from.start();
+    dispatch(
+      state.tr
+        .delete(start, $from.end())
+        .setBlockType(start, start, codeBlock, {
+          language: toInfoString(match[2].trim()),
+        })
+        .scrollIntoView(),
+    );
+  }
+  return true;
+}
+
+// Has to run before the Enter handlers of lists, which would split the item
+// holding the fence line instead.
+const CodeFenceEnter = Extension.create({
+  name: 'codeFenceEnter',
+  priority: 1000,
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: () =>
+        this.editor.commands.command(({ state, dispatch }) =>
+          convertFenceLine(state, dispatch),
+        ),
+    };
+  },
+});
 
 interface HighlightSpan {
   text: string;
@@ -209,6 +274,16 @@ export const CodeBlockPrism = CodeBlock.extend({
     // info string; markdown ignores the space.
     const separator = infoString.startsWith(fence.charAt(0)) ? ' ' : '';
     return `${fence}${separator}${infoString}\n${code}\n${fence}`;
+  },
+
+  addExtensions() {
+    return [CodeFenceEnter];
+  },
+
+  // The inherited rules convert on the first space after the fence, before
+  // an info string with meta can be typed; Enter converts instead.
+  addInputRules() {
+    return [];
   },
 
   addCommands() {
