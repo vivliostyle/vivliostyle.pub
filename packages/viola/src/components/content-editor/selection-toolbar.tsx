@@ -85,24 +85,20 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
 
   const canShow = useCallback(
     (target: Editor, state: EditorState, hasFocus: boolean) => {
-      if (
-        !target.isEditable ||
-        !hasFocus ||
-        pointerDownRef.current ||
-        triggerMenuState.session?.editor === target ||
-        !hasTextSelection(state) ||
-        filterVisibleEntries(entriesRef.current, target).length === 0
-      ) {
-        return false;
-      }
-      const dismissed = dismissedRef.current;
-      if (dismissed) {
-        if (dismissed.eq(state.selection)) {
-          return false;
-        }
+      // Checked first: a collapsed selection returns early below, and selecting
+      // the dismissed range again after that must show the toolbar.
+      if (dismissedRef.current && !dismissedRef.current.eq(state.selection)) {
         dismissedRef.current = null;
       }
-      return true;
+      return (
+        target.isEditable &&
+        hasFocus &&
+        !pointerDownRef.current &&
+        !dismissedRef.current &&
+        triggerMenuState.session?.editor !== target &&
+        hasTextSelection(state) &&
+        filterVisibleEntries(entriesRef.current, target).length > 0
+      );
     },
     [],
   );
@@ -217,13 +213,32 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         )?.focus();
       }
     };
+    // BubbleMenu ignores the first blur after a mousedown inside it, and the
+    // buttons leave that pending because they keep focus in the editor.
+    const handleBlur = () => {
+      setTimeout(() => {
+        if (
+          editor.isDestroyed ||
+          !visibleRef.current ||
+          editor.view.hasFocus() ||
+          toolbarRef.current?.contains(document.activeElement)
+        ) {
+          return;
+        }
+        editor.view.dispatch(
+          editor.state.tr.setMeta(selectionToolbarPluginKey, 'hide'),
+        );
+      });
+    };
     dom.addEventListener('mousedown', handleMouseDown);
     dom.addEventListener('keydown', handleKeyDown);
     window.addEventListener('mouseup', handleMouseUp);
+    editor.on('blur', handleBlur);
     return () => {
       dom.removeEventListener('mousedown', handleMouseDown);
       dom.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('mouseup', handleMouseUp);
+      editor.off('blur', handleBlur);
     };
   }, [editor, canShow]);
 
