@@ -51,6 +51,13 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
 }
 
 function Content(_: ThemePaneProperty) {
+  const { projectId } = useSnapshot($project).valueOrThrow();
+  // The pane survives navigating to another project's theme route, and the
+  // editor state it seeded from the previous project must not carry over.
+  return <ProjectThemeContent key={projectId} />;
+}
+
+function ProjectThemeContent() {
   const themeSnap = useSnapshot($theme).valueOrThrow();
   const packageNameInputDescriptionId = useId();
   const [stylesheetPath] = useState(() => themeSnap.stylesheets[0]?.path);
