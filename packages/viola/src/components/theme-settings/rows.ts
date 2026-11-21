@@ -53,6 +53,8 @@ export interface SettingsMatchInput {
   isModified: (name: string) => boolean;
   getGroupLabel: (groupId: string) => string;
   getCategoryLabel: (category: ThemeVariableCategory) => string;
+  /** Labels a subgroup that a module lends to a group of another name. */
+  qualifyLabel: (moduleLabel: string, label: string) => string;
 }
 
 export type SettingsRow =
@@ -64,10 +66,11 @@ export type SettingsRow =
 
 export const groupKey = (groupId: string) => `g:${groupId}`;
 
+/** Key of a subgroup by the tree group it belongs to. */
 export const subgroupKey = (
-  groupId: string,
+  treeGroup: string,
   { kind, id }: ThemeVariableSubgroupRef,
-) => `s:${groupId}/${kind}:${id}`;
+) => `s:${treeGroup}/${kind}:${id}`;
 
 export function isFiltering(filter: SettingsFilter): boolean {
   return filter.query.trim() !== '' || filter.modifiedOnly;
@@ -130,6 +133,7 @@ export function matchSettings({
   isModified,
   getGroupLabel,
   getCategoryLabel,
+  qualifyLabel,
 }: SettingsMatchInput): SettingsMatches {
   const tokens = tokenizeQuery(filter.query);
   const countModified = (variables: ThemeVariable[]) =>
@@ -138,15 +142,18 @@ export function matchSettings({
   let matchCount = 0;
 
   for (const group of groups) {
-    if (!isVariableGroupInScope(scope, group.id)) {
-      continue;
-    }
     const label = getGroupLabel(group.id);
     const subgroups = group.subgroups.flatMap((subgroup) => {
-      const subgroupLabel =
+      if (!isVariableGroupInScope(scope, subgroup.group)) {
+        return [];
+      }
+      const ownLabel =
         subgroup.kind === 'target'
           ? humanizeKey(subgroup.id)
           : getCategoryLabel(subgroup.id);
+      const subgroupLabel = subgroup.module
+        ? qualifyLabel(getGroupLabel(subgroup.module), ownLabel)
+        : ownLabel;
       const variables = subgroup.variables.filter(
         (variable) =>
           (!filter.modifiedOnly || isModified(variable.name)) &&
@@ -155,7 +162,7 @@ export function matchSettings({
       if (variables.length === 0) {
         return [];
       }
-      const key = subgroupKey(group.id, subgroup);
+      const key = subgroupKey(subgroup.group, subgroup);
       return [
         {
           section: {

@@ -7,8 +7,9 @@ export interface ThemeScope {
   /** CSS text identifying the scope, for display. */
   label: string;
   /**
-   * Schema groups whose variables take effect here; `null` means all. A page
-   * context only feeds `@page` rules and their margin boxes.
+   * Tree groups (`ThemeVariable.group`) whose variables take effect here;
+   * `null` means all. A page context only feeds `@page` rules and their
+   * margin boxes.
    */
   variableGroups: readonly string[] | null;
 }

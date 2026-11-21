@@ -6,6 +6,14 @@ import {
   THEME_VARIABLE_CATEGORIES,
   type ThemeVariableCategory,
 } from './categories';
+import {
+  BASIC_GROUP,
+  getForeignModule,
+  getSettingsGroupId,
+  getSettingsGroupRank,
+  getSourceRank,
+  META_GROUP,
+} from './subjects';
 
 export interface ThemeVariableDefault {
   value: string;
@@ -51,15 +59,26 @@ export type ThemeVariableSubgroupRef =
   | { kind: 'category'; id: ThemeVariableCategory };
 
 export type ThemeVariableSubgroup = ThemeVariableSubgroupRef & {
+  /** Tree group the subgroup belongs to. */
+  group: string;
+  /** Module to name in the label of the subgroup, if any. */
+  module: string | null;
   /** In source order, or by category within a target. */
   variables: ThemeVariable[];
 };
 
+/**
+ * A group of the settings: a group of the tree, or a subject that gathers
+ * parts of several, like the styles and the numbering of tables.
+ */
 export interface ThemeVariableGroup {
   id: string;
   /** Every variable of the group, in source order. */
   variables: ThemeVariable[];
-  /** Categories in their order, then targets in source order. */
+  /**
+   * Elements in the order of their subject, then each tree group with its
+   * categories in their order and its targets in source order.
+   */
   subgroups: ThemeVariableSubgroup[];
 }
 
@@ -80,13 +99,6 @@ interface RawVariable {
   _property?: string | string[];
   _define?: string | RawDefault[];
 }
-
-const META_GROUP = '_meta-properties';
-const BASIC_GROUP = '_basic';
-
-// The tree lists modules alphabetically; lead with what a book design starts
-// from instead.
-const LEADING_GROUPS = [META_GROUP, 'page', BASIC_GROUP];
 
 // The aliases theme-base generates variable names with. The `color` entry
 // comes from its own build config rather than the preset.
@@ -313,27 +325,48 @@ const subgroupRank = (subgroup: ThemeVariableSubgroupRef) =>
     ? categoryRank(subgroup.id)
     : THEME_VARIABLE_CATEGORIES.length;
 
+function compareRanks(a: readonly number[], b: readonly number[]): number {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i] !== b[i]) {
+      return a[i] - b[i];
+    }
+  }
+  return a.length - b.length;
+}
+
 export function groupThemeVariables(
   variables: readonly ThemeVariable[],
 ): ThemeVariableGroup[] {
   const groups = new Map<string, ThemeVariableGroup>();
   for (const variable of variables) {
-    let group = groups.get(variable.group);
+    const groupId = getSettingsGroupId(variable.group, variable.subgroup);
+    let group = groups.get(groupId);
     if (!group) {
-      group = { id: variable.group, variables: [], subgroups: [] };
-      groups.set(variable.group, group);
+      group = { id: groupId, variables: [], subgroups: [] };
+      groups.set(groupId, group);
     }
     group.variables.push(variable);
     const { kind, id } = variable.subgroup;
-    let subgroup = group.subgroups.find((s) => s.kind === kind && s.id === id);
+    let subgroup = group.subgroups.find(
+      (s) => s.group === variable.group && s.kind === kind && s.id === id,
+    );
     if (!subgroup) {
-      subgroup = { ...variable.subgroup, variables: [] };
+      subgroup = {
+        ...variable.subgroup,
+        group: variable.group,
+        module: getForeignModule(groupId, variable.group),
+        variables: [],
+      };
       group.subgroups.push(subgroup);
     }
     subgroup.variables.push(variable);
   }
   for (const group of groups.values()) {
-    group.subgroups.sort((a, b) => subgroupRank(a) - subgroupRank(b));
+    const rankOf = (subgroup: ThemeVariableSubgroup) => [
+      ...getSourceRank(group.id, subgroup.group, subgroup),
+      subgroupRank(subgroup),
+    ];
+    group.subgroups.sort((a, b) => compareRanks(rankOf(a), rankOf(b)));
     for (const subgroup of group.subgroups) {
       if (subgroup.kind === 'target') {
         subgroup.variables.sort(
@@ -342,11 +375,9 @@ export function groupThemeVariables(
       }
     }
   }
-  const rank = (id: string) => {
-    const index = LEADING_GROUPS.indexOf(id);
-    return index === -1 ? LEADING_GROUPS.length : index;
-  };
-  return [...groups.values()].sort((a, b) => rank(a.id) - rank(b.id));
+  return [...groups.values()].sort(
+    (a, b) => getSettingsGroupRank(a.id) - getSettingsGroupRank(b.id),
+  );
 }
 
 export function buildThemeVariableSchema(tree: unknown): ThemeVariableSchema {

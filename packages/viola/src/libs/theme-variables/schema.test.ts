@@ -421,6 +421,52 @@ describe('flattenThemeVariables', () => {
     expect(schema.byName.get('--vs--p-font-size')?.group).toBe('_basic');
   });
 
+  it('gathers the elements and modules of a subject', () => {
+    const v = (property: string) => ({ _syntax: '*', _property: property });
+    const schema = buildThemeVariableSchema({
+      _basic: {
+        'bold-emphasis-font-size': v('font-size'),
+        'bold-emphasis-font-weight': v('font-weight'),
+        'bold-font-size': v('font-size'),
+        'bold-font-weight': v('font-weight'),
+        'h1-font-size': v('font-size'),
+        'h1-margin-block': v('margin-block'),
+        'heading-font-size': v('font-size'),
+        'heading-margin-block': v('margin-block'),
+        'marquee-font-size': v('font-size'),
+        'marquee-color': v('color'),
+        'table-width': v('width'),
+        'table-height': v('height'),
+      },
+      section: { 'call-content': v('content'), 'call-display': v('display') },
+      table: { 'call-content': v('content'), 'call-display': v('display') },
+      widget: { 'foo-content': v('content'), 'foo-display': v('display') },
+      heading: { 'foo-content': v('content'), 'foo-display': v('display') },
+    });
+    expect(
+      schema.groups.map((group) => [
+        group.id,
+        group.subgroups.map(
+          (s) => `${s.group}/${s.id}${s.module ? ` (${s.module})` : ''}`,
+        ),
+      ]),
+    ).toEqual([
+      [
+        'heading',
+        [
+          '_basic/heading',
+          '_basic/h1',
+          'section/call (section)',
+          'heading/foo',
+        ],
+      ],
+      ['table', ['_basic/table', 'table/call']],
+      ['inline', ['_basic/bold', '_basic/bold-emphasis']],
+      ['_basic', ['_basic/marquee']],
+      ['widget', ['widget/foo']],
+    ]);
+  });
+
   it('tolerates malformed input', () => {
     expect(flattenThemeVariables(null)).toEqual([]);
     expect(flattenThemeVariables([{ _syntax: '*' }])).toEqual([]);
@@ -442,10 +488,24 @@ describe('loadThemeVariableSchema', () => {
   it('lists uniquely named variables in every group', () => {
     expect(schema.variables.length).toBeGreaterThan(1000);
     expect(schema.byName.size).toBe(schema.variables.length);
-    expect(schema.groups.slice(0, 3).map((g) => g.id)).toEqual([
+    expect(schema.groups.map((g) => g.id)).toEqual([
       '_meta-properties',
       'page',
-      '_basic',
+      'body',
+      'heading',
+      'list',
+      'table',
+      'figure',
+      'code',
+      'math',
+      'inline',
+      'appendix',
+      'citation',
+      'endnote',
+      'footnote',
+      'sidenote',
+      'theorem',
+      'toc',
     ]);
     for (const variable of schema.variables) {
       expect(variable.name).toMatch(/^--vs-[a-z0-9-]+$/);
@@ -463,7 +523,10 @@ describe('loadThemeVariableSchema', () => {
     const sections = Object.fromEntries(
       schema.groups.map((group) => [
         group.id,
-        group.subgroups.map((s) => `${s.kind}:${s.id} (${s.variables.length})`),
+        group.subgroups.map(
+          (s) =>
+            `${s.module ?? (s.group === group.id ? '' : s.group)}/${s.kind}:${s.id} (${s.variables.length})`,
+        ),
       ]),
     );
     expect(sections).toMatchSnapshot();

@@ -11,6 +11,11 @@ const GROUP_LABELS: Record<string, () => string> = {
   '_meta-properties': m.theme_settings_group_meta,
   _basic: m.theme_settings_group_basic,
   page: m.theme_settings_group_page,
+  body: m.theme_settings_group_body,
+  heading: m.theme_settings_group_heading,
+  list: m.theme_settings_group_list,
+  code: m.theme_settings_group_code,
+  inline: m.theme_settings_group_inline,
   appendix: m.theme_settings_group_appendix,
   citation: m.theme_settings_group_citation,
   endnote: m.theme_settings_group_endnote,
@@ -30,6 +35,10 @@ const GROUP_LABELS: Record<string, () => string> = {
 export function getGroupLabel(groupId: string): string {
   // A module added by a newer theme-base still gets a readable title.
   return GROUP_LABELS[groupId]?.() ?? humanizeKey(groupId.replace(/^_+/, ''));
+}
+
+export function qualifyLabel(moduleLabel: string, label: string): string {
+  return m.theme_settings_subgroup_of_module({ module: moduleLabel, label });
 }
 
 const CATEGORY_LABELS: Record<ThemeVariableCategory, () => string> = {
