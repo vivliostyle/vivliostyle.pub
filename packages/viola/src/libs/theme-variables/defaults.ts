@@ -558,6 +558,17 @@ function compareCascade(a: RankedDeclaration, b: RankedDeclaration): number {
   );
 }
 
+// Escapes are consumed as pairs so that the quote after `\\` is not taken
+// for an escaped one.
+function requoteStringBody(body: string): string {
+  return body.replace(/\\([\s\S])|"/g, (match, escaped?: string) => {
+    if (escaped === "'") {
+      return "'";
+    }
+    return match === '"' ? '\\"' : match;
+  });
+}
+
 /**
  * A form of a value that does not change with how lightningcss minifies the
  * bundle: `0.5em` becomes `.5em`, `'a'` becomes `"a"` and `var(--a, b)`
@@ -583,7 +594,7 @@ function normalizeValue(value: string): string {
         i + 1,
         end > i + 1 && value[end - 1] === c ? end - 1 : end,
       );
-      token = `"${body.replace(/\\(['"])/g, '$1').replace(/"/g, '\\"')}"`;
+      token = `"${requoteStringBody(body)}"`;
       i = end;
     } else if (number) {
       const sign = /^[+-]/.test(number) ? number[0] : '';
