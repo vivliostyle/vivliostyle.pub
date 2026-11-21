@@ -11,12 +11,14 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@v/config": "workspace:*",
     "@vivliostyle/core": "catalog:",
     "comlink": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

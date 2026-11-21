@@ -1,16 +1,25 @@
 import {
   CoreViewer,
   type CoreViewerOptions,
-  Navigation,
+  PageProgression,
   PageViewMode,
   ReadyState,
 } from '@vivliostyle/core';
 
-import type { StageState, StageStateListener, StageStatus } from './protocol';
-
-const a4PaperSize = { width: 794, height: 1123 };
+import { CommandGate } from './command-gate';
+import { paperSizeToPx } from './paper-size';
+import { Presentation, type PresentationSnapshot } from './presentation';
+import type {
+  PaperSize,
+  StageState,
+  StageStateListener,
+  StageStatus,
+  ViewMode,
+} from './protocol';
 
 const viewerOptions: CoreViewerOptions = {
+  // View modes are ours (see `Presentation`): core re-lays out everything
+  // when its own page view mode changes.
   pageViewMode: PageViewMode.SINGLE_PAGE,
   renderAllPages: true,
   // Pagination must never depend on the pane size, so the paper size is fixed
@@ -18,7 +27,6 @@ const viewerOptions: CoreViewerOptions = {
   autoResize: false,
   fitToScreen: false,
   zoom: 1,
-  defaultPaperSize: a4PaperSize,
 };
 
 const stageStatus: Record<ReadyState, StageStatus> = {
@@ -27,53 +35,108 @@ const stageStatus: Record<ReadyState, StageStatus> = {
   [ReadyState.COMPLETE]: 'complete',
 };
 
+export interface StageOptions {
+  viewMode: ViewMode;
+  paperSize: PaperSize;
+}
+
 export class Stage {
   readonly #viewer: CoreViewer;
+  readonly #gate: CommandGate;
+  readonly #presentation: Presentation;
   readonly #listeners = new Set<StageStateListener>();
   #publicationUrl: string | undefined;
-  #state: StageState = { status: 'loading', pageIndex: 0, pageCount: 0 };
-  #hasPages = false;
+  #state: StageState;
 
-  constructor(viewportElement: HTMLElement) {
-    this.#viewer = new CoreViewer({ viewportElement }, viewerOptions);
+  constructor(
+    viewportElement: HTMLElement,
+    { viewMode, paperSize }: StageOptions,
+  ) {
+    // Given up front, the stored paper size is in effect from the first
+    // layout on; a configure command would lay everything out a second time.
+    this.#viewer = new CoreViewer(
+      { viewportElement },
+      { ...viewerOptions, defaultPaperSize: paperSizeToPx(paperSize) },
+    );
+    this.#gate = new CommandGate(this.#viewer);
+    this.#state = {
+      status: 'loading',
+      viewMode,
+      paperSize,
+      pageProgression: 'ltr',
+      pageIndex: 0,
+      pageCount: 0,
+      canPrev: false,
+      canNext: false,
+    };
+    this.#presentation = new Presentation(viewportElement, {
+      viewMode,
+      fallbackPageSize: () => paperSizeToPx(this.#state.paperSize),
+      pageProgression: () => {
+        const progression = this.#viewer.getCurrentPageProgression();
+        return progression === null
+          ? null
+          : progression === PageProgression.RTL
+            ? 'rtl'
+            : 'ltr';
+      },
+      onChange: (snapshot: PresentationSnapshot) => this.#update(snapshot),
+    });
     this.#viewer.addListener('readystatechange', () => {
       const status = stageStatus[this.#viewer.readyState];
-      if (status !== 'loading') {
-        this.#hasPages = true;
-      }
+      this.#presentation.setComplete(status === 'complete');
       this.#update({ status });
-    });
-    this.#viewer.addListener('nav', ({ epage, epageCount }) => {
-      this.#update({
-        pageIndex: typeof epage === 'number' ? epage : this.#state.pageIndex,
-        pageCount:
-          typeof epageCount === 'number' ? epageCount : this.#state.pageCount,
-      });
     });
   }
 
   load(publicationUrl: string) {
     this.#publicationUrl = publicationUrl;
-    this.#viewer.loadPublication(publicationUrl);
+    this.reload();
   }
 
   reload() {
-    if (this.#publicationUrl) {
-      this.#viewer.loadPublication(this.#publicationUrl);
+    const publicationUrl = this.#publicationUrl;
+    if (publicationUrl) {
+      void this.#gate.run(
+        'loadPublication',
+        () => this.#viewer.loadPublication(publicationUrl),
+        { key: 'load' },
+      );
     }
   }
 
-  // Core navigates through a page view that its first layout creates, and
-  // throws when asked to navigate before that.
   next() {
-    if (this.#hasPages) {
-      this.#viewer.navigateToPage(Navigation.NEXT);
-    }
+    this.#presentation.move('next');
   }
 
   prev() {
-    if (this.#hasPages) {
-      this.#viewer.navigateToPage(Navigation.PREVIOUS);
+    this.#presentation.move('prev');
+  }
+
+  goTo(pageIndex: number) {
+    this.#presentation.goTo(pageIndex);
+  }
+
+  setViewMode(viewMode: ViewMode) {
+    this.#presentation.setViewMode(viewMode);
+    this.#update({ viewMode });
+  }
+
+  setDefaultPaperSize(paperSize: PaperSize) {
+    if (paperSize === this.#state.paperSize) {
+      return;
+    }
+    this.#update({ paperSize });
+    const configure = () =>
+      this.#viewer.setOptions({
+        defaultPaperSize: paperSizeToPx(this.#state.paperSize),
+      });
+    if (this.#publicationUrl) {
+      void this.#gate.run('configure', configure, { key: 'paperSize' });
+    } else {
+      // Core has no command loop before its first load, so no `done` would
+      // release the gate; it records the option for that load instead.
+      configure();
     }
   }
 
@@ -88,9 +151,9 @@ export class Stage {
   #update(patch: Partial<StageState>) {
     const next = { ...this.#state, ...patch };
     if (
-      next.status === this.#state.status &&
-      next.pageIndex === this.#state.pageIndex &&
-      next.pageCount === this.#state.pageCount
+      (Object.keys(next) as (keyof StageState)[]).every(
+        (key) => next[key] === this.#state[key],
+      )
     ) {
       return;
     }

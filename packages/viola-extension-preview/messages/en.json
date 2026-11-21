@@ -2,7 +2,20 @@
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "preview_iframe_title": "Preview",
   "preview_next_page_aria": "Next page",
+  "preview_page_number_aria": "Page number",
   "preview_pane_title": "Preview",
+  "preview_paper_size_a4": "A4",
+  "preview_paper_size_a5": "A5",
+  "preview_paper_size_a6": "A6",
+  "preview_paper_size_aria": "Default paper size",
+  "preview_paper_size_hint": "Paper size for documents that do not specify a page size",
+  "preview_paper_size_jis_b5": "JIS B5",
+  "preview_paper_size_jis_b6": "JIS B6",
+  "preview_paper_size_letter": "Letter",
   "preview_prev_page_aria": "Previous page",
-  "preview_rendering_aria": "Rendering pages"
+  "preview_rendering_aria": "Rendering pages",
+  "preview_view_mode_aria": "View mode",
+  "preview_view_mode_scroll": "Continuous scroll",
+  "preview_view_mode_single": "Single page",
+  "preview_view_mode_spread": "Spread"
 }
