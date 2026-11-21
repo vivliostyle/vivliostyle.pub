@@ -36,8 +36,8 @@ const resolvePkgDir = (cwd: string): { root: string; name: string } | null => {
   return { root, name };
 };
 
-const buildVolume = () =>
-  Object.fromEntries(
+const buildVolume = (): Record<string, string | null> => ({
+  ...Object.fromEntries(
     Object.entries({
       vite: {
         files: [
@@ -49,9 +49,6 @@ const buildVolume = () =>
       '@vivliostyle/cli': {
         files: ['package.json'],
       },
-      '@vivliostyle/viewer': {
-        files: ['package.json', 'lib/index.html'],
-      },
     }).flatMap(([name, { files }]) => {
       const root = path.dirname(require.resolve(`${name}/package.json`));
       return files.map((file) => [
@@ -59,7 +56,18 @@ const buildVolume = () =>
         fs.readFileSync(path.join(root, file), 'utf8'),
       ]);
     }),
-  );
+  ),
+  // The CLI reads the stock viewer's version at startup and its Vite plugin
+  // indexes the viewer's `lib/`. Pub never serves that viewer, so `lib/` is
+  // left empty (a null entry is a directory).
+  '/workdir/node_modules/@vivliostyle/viewer/package.json': fs.readFileSync(
+    createRequire(require.resolve('@vivliostyle/cli/package.json')).resolve(
+      '@vivliostyle/viewer/package.json',
+    ),
+    'utf8',
+  ),
+  '/workdir/node_modules/@vivliostyle/viewer/lib': null,
+});
 
 const stubPath = (segment: string) =>
   path.resolve(__dirname, 'src/stubs/node', segment);
@@ -423,49 +431,6 @@ const copyWasmFilePlugin: Plugin = {
   },
 };
 
-const resolveViteClientPlugin: Plugin = {
-  name: 'resolve-vite-client',
-  resolveId(id) {
-    if (id.startsWith('@vite/')) {
-      return id;
-    }
-    return null;
-  },
-  load(id) {
-    if (!id.startsWith('@vite/')) return null;
-    const code = fs.readFileSync(
-      path.resolve(
-        require.resolve('vite/package.json'),
-        '../dist/client',
-        `${id.replace(/^@vite\//, '')}.mjs`,
-      ),
-      'utf8',
-    );
-
-    // https://github.com/vitejs/vite/blob/HEAD/packages/vite/src/node/plugins/clientInjections.ts
-    const escapeReplacement = (value: unknown) => {
-      const jsonValue = JSON.stringify(value);
-      return () => jsonValue;
-    };
-    return code
-      .replace(/__DEFINES__/g, escapeReplacement({}))
-      .replace(`__MODE__`, escapeReplacement('development'))
-      .replace(/__BASE__/g, escapeReplacement('/'))
-      .replace(`__SERVER_HOST__`, escapeReplacement('localhost:5173/'))
-      .replace(`__HMR_PROTOCOL__`, escapeReplacement(null))
-      .replace(`__HMR_HOSTNAME__`, escapeReplacement(null))
-      .replace(`__HMR_PORT__`, escapeReplacement(null))
-      .replace(`__HMR_DIRECT_TARGET__`, escapeReplacement('localhost:5173/'))
-      .replace(`__HMR_BASE__`, escapeReplacement('/'))
-      .replace(`__HMR_TIMEOUT__`, escapeReplacement(30000))
-      .replace(`__HMR_ENABLE_OVERLAY__`, escapeReplacement(true))
-      .replace(`__HMR_CONFIG_NAME__`, escapeReplacement('vite.config.ts'))
-      .replace(`__WS_TOKEN__`, escapeReplacement('dummy'))
-      .replace(`__SERVER_FORWARD_CONSOLE__`, escapeReplacement(false))
-      .replaceAll(`__BUNDLED_DEV__`, escapeReplacement(false));
-  },
-};
-
 const workerConfig = defineConfig({
   input: 'src/index.ts',
   output: {
@@ -564,26 +529,4 @@ const dtsConfig = defineConfig({
   ],
 });
 
-const clientConfig = defineConfig({
-  input: [
-    'src/client/vite-client.ts',
-    'src/client/custom-hmr.ts',
-    'src/client/viewer-adapter.ts',
-  ],
-  output: {
-    dir: 'dist/client',
-    format: 'es',
-  },
-  platform: 'browser',
-  transform: {
-    target: 'es2022',
-  },
-  plugins: [resolveViteClientPlugin],
-});
-
-export default defineConfig([
-  workerConfig,
-  dtsConfig,
-  clientConfig,
-  rolldownWorkerConfig,
-]);
+export default defineConfig([workerConfig, dtsConfig, rolldownWorkerConfig]);

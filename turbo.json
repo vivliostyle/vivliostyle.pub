@@ -8,15 +8,6 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "dist/**"]
     },
-    "build:viewer-resource": {
-      "inputs": [],
-      "outputs": ["dist/viewer/**"]
-    },
-    "@v/cli-bundle#build": {
-      "dependsOn": ["^build", "@v/cli-bundle#build:viewer-resource"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**"]
-    },
     "@v/viola#build": {
       "dependsOn": ["^build"],
       "env": ["VITE_APP_*"],

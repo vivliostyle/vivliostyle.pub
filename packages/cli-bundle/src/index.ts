@@ -34,6 +34,8 @@ const commonHeaders = {
   'cross-origin-resource-policy': 'cross-origin',
 };
 
+// Read by the preview stage (`@v/viewer`), which reloads in place; no Vite
+// client ever connects to this server.
 const hmrChannel = new BroadcastChannel('worker:vite-hmr');
 function sendHotPayload(payload: HotPayload) {
   hmrChannel.postMessage(payload);
@@ -92,10 +94,6 @@ export async function teardownServer() {
   setupServerPromise = undefined;
   await server?.close();
   server = undefined;
-}
-
-export function webSocketConnect() {
-  sendHotPayload({ type: 'connected' });
 }
 
 function zipDirectory(pwd: string) {

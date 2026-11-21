@@ -1,0 +1,34 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: document scripts may set inline styles on what they add to the body */
+
+@media print {
+  /* Only core's pages are printed, not our status nor anything document
+     scripts put next to the viewport. */
+  body > :not(#vivliostyle-viewer-viewport) {
+    display: none !important;
+  }
+}
+
+@media screen {
+  [data-pub-print-status] {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    z-index: 1;
+    translate: -50%;
+    box-sizing: border-box;
+    max-width: calc(100% - 32px);
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: #fff;
+    color: #222;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 30%);
+    font:
+      14px / 1.5 system-ui,
+      sans-serif;
+  }
+
+  [data-pub-print-status="stalled"],
+  [data-pub-print-status="failed"] {
+    color: #b3261e;
+  }
+}

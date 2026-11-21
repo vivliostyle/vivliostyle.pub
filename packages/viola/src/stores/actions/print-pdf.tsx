@@ -1,7 +1,9 @@
 import { invariant } from 'outvariant';
 
+import { stageSearchParams } from '@v/viewer/protocol';
 import { m } from '../../generated/paraglide/messages';
-import { $cli } from '../accessors';
+import { getLocale } from '../../generated/paraglide/runtime';
+import { $cli, $viewer } from '../accessors';
 
 let printWindow: Window | null = null;
 let printSession = 0;
@@ -18,7 +20,7 @@ export async function printPdf() {
   const session = ++printSession;
 
   // Open synchronously to stay within the user gesture; the viewer prints
-  // itself and closes the tab when it sees the `print` hash parameter.
+  // itself and closes the tab when its URL asks it to print.
   const openedWindow = window.open('about:blank', '_blank');
   invariant(openedWindow, 'Failed to open a tab for printing');
   printWindow = openedWindow;
@@ -26,11 +28,13 @@ export async function printPdf() {
   openedWindow.document.body.textContent = m.print_pdf_preparing();
   try {
     const cli = await $cli.awaiter({ timeout: 10_000 });
-    const viewerUrl = await cli.createPrintViewerUrlPromise();
+    const viewerUrl = new URL(await cli.createPrintViewerUrlPromise());
     if (openedWindow.closed || session !== printSession) {
       return;
     }
-    openedWindow.location.href = `${viewerUrl}&print=true`;
+    viewerUrl.searchParams.set(stageSearchParams.paperSize, $viewer.paperSize);
+    viewerUrl.searchParams.set(stageSearchParams.locale, getLocale());
+    openedWindow.location.href = viewerUrl.href;
   } catch (error) {
     openedWindow.close();
     throw error;

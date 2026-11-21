@@ -1,6 +1,7 @@
 import * as Comlink from 'comlink';
 import { proxy, ref } from 'valtio';
 
+import { stageSearchParams } from '@v/viewer/protocol';
 import { appOrigin } from '../../libs/origins';
 import type { Sandbox } from './sandbox';
 
@@ -39,7 +40,7 @@ export class Cli {
       await remote.setupServer();
       const url = new URL('/_viewer/', this.sandbox.iframeOrigin);
       url.searchParams.set(
-        'src',
+        stageSearchParams.src,
         `${this.sandbox.iframeOrigin}/vivliostyle/publication.json`,
       );
       return url.href;
@@ -57,7 +58,13 @@ export class Cli {
     this.lazyPrintViewerUrlPromise ??= (async () => {
       const remote = await this.createRemotePromise();
       await remote.setupServer();
-      return `${appOrigin()}/_cli/viewer/index.html#src=${appOrigin()}/vivliostyle/p/${this.sandbox.projectId}/publication.json&bookMode=true&renderAllPages=true`;
+      const url = new URL('/_viewer/', appOrigin());
+      url.searchParams.set(
+        stageSearchParams.src,
+        `${appOrigin()}/vivliostyle/p/${this.sandbox.projectId}/publication.json`,
+      );
+      url.searchParams.set(stageSearchParams.print, 'true');
+      return url.href;
     })();
     return this.lazyPrintViewerUrlPromise;
   }

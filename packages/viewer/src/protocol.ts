@@ -70,11 +70,17 @@ export const stageBindCommand = 'viewer-stage-bind';
 /**
  * Search parameters of the stage URL. The view mode and paper size are
  * initial values, so that a stored preference holds from the first layout on.
+ *
+ * With `print=true` the stage is a top-level print tab instead: it lays the
+ * publication out, opens the print dialog once, then closes the tab. It has
+ * no controller then, and shows its status in the `locale` given.
  */
 export const stageSearchParams = {
   src: 'src',
   viewMode: 'viewMode',
   paperSize: 'paperSize',
+  print: 'print',
+  locale: 'locale',
 } as const;
 
 export function isViewMode(value: unknown): value is ViewMode {

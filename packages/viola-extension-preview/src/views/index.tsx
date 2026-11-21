@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type {
   ExtensionMountContext,
   ExtensionTranslate,
+  RemoteExtensionHostApi,
 } from '@v/extension-kit';
 import { stageSearchParams } from '@v/viewer/protocol';
 import {
@@ -34,10 +35,18 @@ export default function PreviewPane({ host, t }: ExtensionMountContext) {
     return null;
   }
 
-  return <Preview key={url} url={url} t={t} />;
+  return <Preview key={url} url={url} host={host} t={t} />;
 }
 
-function Preview({ url, t }: { url: string; t: ExtensionTranslate }) {
+function Preview({
+  url,
+  host,
+  t,
+}: {
+  url: string;
+  host: RemoteExtensionHostApi;
+  t: ExtensionTranslate;
+}) {
   const [preferences, setPreferences] = useState(loadPreferences);
   // Only the first value goes into the URL, so a preference change does not
   // reload the frame; later changes go through the stage controller.
@@ -57,6 +66,9 @@ function Preview({ url, t }: { url: string; t: ExtensionTranslate }) {
   useEffect(() => {
     savePreferences(preferences);
   }, [preferences]);
+  useEffect(() => {
+    void host.setViewerPaperSize(preferences.paperSize);
+  }, [host, preferences.paperSize]);
 
   // The stage ignores values it already has, so this costs nothing on a fresh
   // bind and brings a reloaded frame up to date.

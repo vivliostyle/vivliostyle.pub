@@ -71,12 +71,14 @@ export type ExtensionSessionListener = (
  *   - `session:write` → `login`, `register`, `logout`, `applyBearerSession`,
  *                       `clearBearerSession`, `startProviderSignIn`
  *   - `viewer:read`   → `getViewerUrl`
+ *   - `viewer:write`  → `setViewerPaperSize`
  *   - `api:request`   → `apiFetch`
  */
 export type ExtensionPermission =
   | 'session:read'
   | 'session:write'
   | 'viewer:read'
+  | 'viewer:write'
   | 'api:request';
 
 /** Request shape for {@link ExtensionHostApi.apiFetch}. */
@@ -123,6 +125,12 @@ export interface ExtensionHostApi {
   startProviderSignIn(provider: string): Promise<void>;
   getLocale(): string;
   getViewerUrl(): Promise<string>;
+  /**
+   * Tells the host the default paper size (one of `@v/viewer`'s paper sizes)
+   * the view lays out documents without a page size of their own on, so that
+   * printing lays them out on the same. Unknown sizes are ignored.
+   */
+  setViewerPaperSize(paperSize: string): void;
   /**
    * Make an authenticated request to the connected API server. `path` is
    * resolved against the session's server base URL, and the host attaches the

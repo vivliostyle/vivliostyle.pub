@@ -33,7 +33,6 @@ const expectedExports = [
   'fromBinarySnapshot',
   'toBinarySnapshot',
   'printTree',
-  'webSocketConnect',
 ] as const;
 
 const readBundle = () => fs.readFileSync(bundlePath, 'utf8');
@@ -73,6 +72,14 @@ describe('cli-bundle build artifact', () => {
     }
   });
 
+  it('bundles the viewer package files the CLI reads at startup', () => {
+    const bundle = readBundle();
+    for (const file of ['package.json', 'lib']) {
+      const entry = `/workdir/node_modules/@vivliostyle/viewer/${file}`;
+      expect(bundle.includes(`"${entry}"`), `missing "${entry}"`).toBe(true);
+    }
+  });
+
   it('emits the WebAssembly assets next to the bundle', () => {
     expect(
       fs.existsSync(path.join(distRoot, 'rolldown-binding.wasm32-wasi.wasm')),
@@ -83,15 +90,5 @@ describe('cli-bundle build artifact', () => {
     expect(fs.existsSync(path.join(distRoot, 'rolldown-wasi-worker.js'))).toBe(
       true,
     );
-  });
-
-  it('emits the client chunks consumed by vite', () => {
-    for (const file of [
-      'vite-client.js',
-      'custom-hmr.js',
-      'viewer-adapter.js',
-    ]) {
-      expect(fs.existsSync(path.join(distRoot, 'client', file))).toBe(true);
-    }
   });
 });

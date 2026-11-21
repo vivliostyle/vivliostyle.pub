@@ -60,10 +60,10 @@ async function serveProjectResource(
       ];
     }
   }
-  // Vite-generated resources (publication.json, entry HTML, the viewer
-  // client module) exist only in the CLI worker. The host-origin print tab
-  // reaches them through this relay because its own sandbox-origin SW sits
-  // in another storage partition and cannot see the worker.
+  // Vite-generated resources (publication.json, entry HTML) exist only in
+  // the CLI worker. The host-origin print tab reaches them through this relay
+  // because a sandbox-origin top-level tab would sit in another storage
+  // partition and could not see the worker.
   try {
     const cli = await sandbox.cli.createRemotePromise();
     return await cli.serve(target.href, init);
