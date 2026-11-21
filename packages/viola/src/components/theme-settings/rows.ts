@@ -11,46 +11,48 @@ export interface SettingsFilter {
   modifiedOnly: boolean;
 }
 
-export type SettingsRow =
-  | {
-      kind: 'group';
-      key: string;
-      groupId: string;
-      label: string;
-      count: number;
-      modified: number;
-      expanded: boolean;
-    }
-  | {
-      kind: 'subgroup';
-      key: string;
-      groupId: string;
-      subgroupId: string;
-      label: string;
-      count: number;
-      modified: number;
-      expanded: boolean;
-    }
-  | { kind: 'variable'; key: string; variable: ThemeVariable; nested: boolean }
-  /** `remaining` counts hidden variables, not hidden collapsed headers. */
-  | { kind: 'more'; key: string; remaining: number };
+/** A group or subgroup that the table of contents can select. */
+export interface SettingsSection {
+  key: string;
+  groupId: string;
+  subgroupId: string | null;
+  label: string;
+  /** Variables passing the filter. */
+  count: number;
+  modified: number;
+}
 
-export interface SettingsRowsInput {
+export interface SettingsTocGroup extends SettingsSection {
+  subgroupId: null;
+  subgroups: SettingsSection[];
+}
+
+interface MatchedGroup {
+  section: SettingsTocGroup;
+  ungrouped: ThemeVariable[];
+  subgroups: { section: SettingsSection; variables: ThemeVariable[] }[];
+}
+
+export interface SettingsMatches {
+  groups: MatchedGroup[];
+  /** Only the groups and subgroups that have matches. */
+  toc: SettingsTocGroup[];
+  matchCount: number;
+}
+
+export interface SettingsMatchInput {
   groups: readonly ThemeVariableGroup[];
   scope: ThemeScopeId;
   filter: SettingsFilter;
   isModified: (name: string) => boolean;
-  isExpanded: (key: string) => boolean;
-  /** Maximum number of variable rows to emit. */
-  limit: number;
   getGroupLabel: (groupId: string) => string;
 }
 
-export interface SettingsRows {
-  rows: SettingsRow[];
-  /** Variables passing the filter, collapsed or not. */
-  matchCount: number;
-}
+export type SettingsRow =
+  | { kind: 'group'; key: string; label: string }
+  | { kind: 'subgroup'; key: string; label: string }
+  | { kind: 'variable'; key: string; variable: ThemeVariable }
+  | { kind: 'more'; key: string; remaining: number };
 
 export const groupKey = (groupId: string) => `g:${groupId}`;
 
@@ -86,47 +88,18 @@ export function matchesQuery(
   return tokens.every((token) => haystack.includes(token));
 }
 
-/**
- * Flattens the schema tree into the rows to render: headers of the groups and
- * subgroups that have matches, and the variables of the expanded ones up to
- * `limit`, so that a huge group never mounts all of its rows at once.
- */
-export function buildSettingsRows({
+export function matchSettings({
   groups,
   scope,
   filter,
   isModified,
-  isExpanded,
-  limit,
   getGroupLabel,
-}: SettingsRowsInput): SettingsRows {
+}: SettingsMatchInput): SettingsMatches {
   const tokens = tokenizeQuery(filter.query);
-  const rows: SettingsRow[] = [];
-  let matchCount = 0;
-  let emitted = 0;
-  let remaining = 0;
-  let truncated = false;
-
-  const push = (row: SettingsRow) => {
-    if (emitted < limit) {
-      rows.push(row);
-    } else {
-      truncated = true;
-    }
-  };
-  const pushVariables = (variables: ThemeVariable[], nested: boolean) => {
-    for (const variable of variables) {
-      if (emitted < limit) {
-        rows.push({ kind: 'variable', key: variable.name, variable, nested });
-        emitted++;
-      } else {
-        remaining++;
-        truncated = true;
-      }
-    }
-  };
   const countModified = (variables: ThemeVariable[]) =>
     variables.filter((v) => isModified(v.name)).length;
+  const matched: MatchedGroup[] = [];
+  let matchCount = 0;
 
   for (const group of groups) {
     if (!isVariableGroupInScope(scope, group.id)) {
@@ -137,57 +110,126 @@ export function buildSettingsRows({
       (!filter.modifiedOnly || isModified(variable.name)) &&
       matchesQuery(variable, tokens, label);
     const ungrouped = group.ungrouped.filter(passes);
-    const subgroups = group.subgroups
-      .map((subgroup) => ({
-        id: subgroup.id,
-        variables: subgroup.variables.filter(passes),
-      }))
-      .filter((subgroup) => subgroup.variables.length > 0);
+    const subgroups = group.subgroups.flatMap((subgroup) => {
+      const variables = subgroup.variables.filter(passes);
+      return variables.length > 0
+        ? [
+            {
+              section: {
+                key: subgroupKey(group.id, subgroup.id),
+                groupId: group.id,
+                subgroupId: subgroup.id,
+                label: humanizeKey(subgroup.id),
+                count: variables.length,
+                modified: countModified(variables),
+              },
+              variables,
+            },
+          ]
+        : [];
+    });
+    const sections = subgroups.map((subgroup) => subgroup.section);
     const count =
-      ungrouped.length +
-      subgroups.reduce((sum, s) => sum + s.variables.length, 0);
+      ungrouped.length + sections.reduce((sum, s) => sum + s.count, 0);
     if (count === 0) {
       continue;
     }
     matchCount += count;
-
-    const key = groupKey(group.id);
-    const expanded = isExpanded(key);
-    push({
-      kind: 'group',
-      key,
-      groupId: group.id,
-      label,
-      count,
-      modified:
-        countModified(ungrouped) +
-        subgroups.reduce((sum, s) => sum + countModified(s.variables), 0),
-      expanded,
+    matched.push({
+      section: {
+        key: groupKey(group.id),
+        groupId: group.id,
+        subgroupId: null,
+        label,
+        count,
+        modified:
+          countModified(ungrouped) +
+          sections.reduce((sum, s) => sum + s.modified, 0),
+        subgroups: sections,
+      },
+      ungrouped,
+      subgroups,
     });
-    if (!expanded) {
+  }
+  return {
+    groups: matched,
+    toc: matched.map((group) => group.section),
+    matchCount,
+  };
+}
+
+export function findSection(
+  toc: readonly SettingsTocGroup[],
+  key: string,
+): SettingsSection | undefined {
+  for (const group of toc) {
+    if (group.key === key) {
+      return group;
+    }
+    const subgroup = group.subgroups.find((s) => s.key === key);
+    if (subgroup) {
+      return subgroup;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Lists the rows of one section, or of every match when `sectionKey` is
+ * `null`, up to `limit` variables, so that a huge group never mounts all of
+ * its rows at once.
+ */
+export function buildSettingsRows(
+  { groups }: SettingsMatches,
+  sectionKey: string | null,
+  limit: number,
+): SettingsRow[] {
+  const rows: SettingsRow[] = [];
+  let emitted = 0;
+  let remaining = 0;
+
+  const pushHeader = (row: SettingsRow) => {
+    if (emitted < limit) {
+      rows.push(row);
+    }
+  };
+  const pushVariables = (variables: ThemeVariable[]) => {
+    for (const variable of variables) {
+      if (emitted < limit) {
+        rows.push({ kind: 'variable', key: variable.name, variable });
+        emitted++;
+      } else {
+        remaining++;
+      }
+    }
+  };
+
+  for (const group of groups) {
+    const { section } = group;
+    const wholeGroup = sectionKey === null || sectionKey === section.key;
+    if (
+      !wholeGroup &&
+      !group.subgroups.some((s) => s.section.key === sectionKey)
+    ) {
       continue;
     }
-    pushVariables(ungrouped, false);
-    for (const subgroup of subgroups) {
-      const key = subgroupKey(group.id, subgroup.id);
-      const expanded = isExpanded(key);
-      push({
-        kind: 'subgroup',
-        key,
-        groupId: group.id,
-        subgroupId: subgroup.id,
-        label: humanizeKey(subgroup.id),
-        count: subgroup.variables.length,
-        modified: countModified(subgroup.variables),
-        expanded,
-      });
-      if (expanded) {
-        pushVariables(subgroup.variables, true);
+    pushHeader({ kind: 'group', key: section.key, label: section.label });
+    if (wholeGroup) {
+      pushVariables(group.ungrouped);
+    }
+    for (const subgroup of group.subgroups) {
+      if (wholeGroup || subgroup.section.key === sectionKey) {
+        pushHeader({
+          kind: 'subgroup',
+          key: subgroup.section.key,
+          label: subgroup.section.label,
+        });
+        pushVariables(subgroup.variables);
       }
     }
   }
-  if (truncated) {
+  if (remaining > 0) {
     rows.push({ kind: 'more', key: 'more', remaining });
   }
-  return { rows, matchCount };
+  return rows;
 }

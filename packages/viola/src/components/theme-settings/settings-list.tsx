@@ -1,6 +1,4 @@
 import { Button } from '@v/ui/button';
-import { ChevronRight } from '@v/ui/icon';
-import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
   THEME_SCOPES,
@@ -10,49 +8,11 @@ import {
 import type { SettingsRow } from './rows';
 import { type CommitHandler, SettingRow } from './setting-row';
 
-function HeaderButton({
-  row,
-  onToggle,
-}: {
-  row: Extract<SettingsRow, { kind: 'group' | 'subgroup' }>;
-  onToggle: (key: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-expanded={row.expanded}
-      className={cn(
-        'flex w-full cursor-pointer items-center gap-2 rounded-md px-1 py-1.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-        row.kind === 'group' ? 'font-semibold' : 'text-sm font-medium',
-      )}
-      onClick={() => onToggle(row.key)}
-    >
-      <ChevronRight
-        aria-hidden
-        className={cn(
-          'size-4 shrink-0 transition-transform',
-          row.expanded && 'rotate-90',
-        )}
-      />
-      <span className="min-w-0 flex-1 truncate">{row.label}</span>
-      {row.modified > 0 && (
-        <span className="shrink-0 text-xs font-normal text-primary">
-          {m.theme_settings_group_modified_count({ count: row.modified })}
-        </span>
-      )}
-      <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">
-        {row.count}
-      </span>
-    </button>
-  );
-}
-
 export function SettingsList({
   rows,
   model,
   scope,
   getDefaultValue,
-  onToggle,
   onShowMore,
   onCommit,
   onSwitchScope,
@@ -61,7 +21,6 @@ export function SettingsList({
   model: ThemeCssModel;
   scope: ThemeScopeId;
   getDefaultValue: (name: string) => string | undefined;
-  onToggle: (key: string) => void;
   onShowMore: () => void;
   onCommit: CommitHandler;
   onSwitchScope: (scope: ThemeScopeId) => void;
@@ -79,14 +38,17 @@ export function SettingsList({
         switch (row.kind) {
           case 'group':
             return (
-              <h4 key={row.key} className="mt-2 first:mt-0">
-                <HeaderButton row={row} onToggle={onToggle} />
+              <h4
+                key={row.key}
+                className="mt-6 pb-1 text-lg font-semibold first:mt-0"
+              >
+                {row.label}
               </h4>
             );
           case 'subgroup':
             return (
-              <h5 key={row.key} className="ml-3">
-                <HeaderButton row={row} onToggle={onToggle} />
+              <h5 key={row.key} className="mt-4 text-sm font-semibold">
+                {row.label}
               </h5>
             );
           case 'variable': {
@@ -105,7 +67,6 @@ export function SettingsList({
                 otherScopes={THEME_SCOPES.filter(
                   (s) => s.id !== scope && model.scopes[s.id].variables[name],
                 ).map((s) => s.id)}
-                nested={row.nested}
                 onCommit={onCommit}
                 onSwitchScope={onSwitchScope}
               />
@@ -121,9 +82,7 @@ export function SettingsList({
                 className="mt-2 justify-self-center"
                 onClick={onShowMore}
               >
-                {row.remaining > 0
-                  ? m.theme_settings_show_more_count({ count: row.remaining })
-                  : m.theme_settings_show_more()}
+                {m.theme_settings_show_more_count({ count: row.remaining })}
               </Button>
             );
           default:

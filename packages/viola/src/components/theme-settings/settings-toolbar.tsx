@@ -2,7 +2,7 @@ import { useId } from 'react';
 
 import { Button } from '@v/ui/button';
 import { Checkbox } from '@v/ui/checkbox';
-import { ChevronsDownUp, Search, X } from '@v/ui/icon';
+import { Search, X } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { Label } from '@v/ui/label';
 import { m } from '../../generated/paraglide/messages';
@@ -23,7 +23,6 @@ export function SettingsToolbar({
   modifiedOnly,
   onModifiedOnlyChange,
   matchCount,
-  onCollapseAll,
 }: {
   query: string;
   onQueryChange: (query: string, immediate?: boolean) => void;
@@ -35,7 +34,6 @@ export function SettingsToolbar({
   onModifiedOnlyChange: (modifiedOnly: boolean) => void;
   /** `null` while no filter is active. */
   matchCount: number | null;
-  onCollapseAll: () => void;
 }) {
   const scopeSelectId = useId();
   const modifiedOnlyId = useId();
@@ -117,17 +115,6 @@ export function SettingsToolbar({
             {m.theme_settings_modified_only()}
           </Label>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          aria-label={m.theme_settings_collapse_all()}
-          title={m.theme_settings_collapse_all()}
-          onClick={onCollapseAll}
-        >
-          <ChevronsDownUp />
-        </Button>
       </div>
       <div className="flex flex-wrap justify-between gap-x-3 text-xs text-muted-foreground">
         <p aria-live="polite">

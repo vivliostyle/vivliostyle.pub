@@ -33,9 +33,16 @@ import {
 } from '../../libs/theme-variables';
 import { commitValue } from './commit';
 import { getGroupLabel } from './messages';
-import { buildSettingsRows, groupKey, isFiltering } from './rows';
+import {
+  buildSettingsRows,
+  findSection,
+  isFiltering,
+  matchSettings,
+  type SettingsTocGroup,
+} from './rows';
 import type { CommitHandler } from './setting-row';
 import { SettingsList } from './settings-list';
+import { SettingsSectionSelect, SettingsToc } from './settings-toc';
 import { SettingsToolbar } from './settings-toolbar';
 
 const CodeEditor = lazy(() => import('../code-editor'));
@@ -82,18 +89,21 @@ function useFilterScopedState<T>(filterKey: string, initial: () => T) {
   return [state.value, set] as const;
 }
 
-const emptySet = () => new Set<string>();
 const pageSize = () => PAGE_SIZE;
-
-function toggle(set: ReadonlySet<string>, key: string): Set<string> {
-  const next = new Set(set);
-  if (!next.delete(key)) {
-    next.add(key);
-  }
-  return next;
-}
-
+const noSection = () => null;
 const noDefaults = () => undefined;
+
+function resolveSection(
+  toc: readonly SettingsTocGroup[],
+  requested: string | null,
+  filtering: boolean,
+): string | null {
+  if (requested !== null && findSection(toc, requested)) {
+    return requested;
+  }
+  // Only a filter narrows the list enough to show every section at once.
+  return filtering ? null : (toc[0]?.key ?? null);
+}
 
 function useThemeSettings(
   schema: ThemeVariableSchema | undefined,
@@ -106,7 +116,6 @@ function useThemeSettings(
   useDebounce(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS, [query]);
   const [modifiedOnly, setModifiedOnly] = useState(false);
   const [scope, setScope] = useState<ThemeScopeId>(DEFAULT_THEME_SCOPE);
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(emptySet);
 
   const filter = useMemo(
     () => ({ query: debouncedQuery, modifiedOnly }),
@@ -114,38 +123,41 @@ function useThemeSettings(
   );
   const filtering = isFiltering(filter);
   const filterKey = JSON.stringify([debouncedQuery, modifiedOnly, scope]);
-  // While filtering every match shows; what the user collapses then is
-  // tracked apart so that clearing the filter restores the previous tree.
-  const [collapsedInFilter, setCollapsedInFilter] = useFilterScopedState<
-    ReadonlySet<string>
-  >(filterKey, emptySet);
-  const [limit, setLimit] = useFilterScopedState(filterKey, pageSize);
+  // The section picked while filtering is tracked apart, so that clearing the
+  // filter returns to the section being browsed before.
+  const [browseSection, setBrowseSection] = useState<string | null>(null);
+  const [filterSection, setFilterSection] = useFilterScopedState<string | null>(
+    filterKey,
+    noSection,
+  );
 
-  const result = useMemo(() => {
+  const matches = useMemo(() => {
     if (!schema || !model) {
       return null;
     }
     const variables = model.scopes[scope].variables;
-    return buildSettingsRows({
+    return matchSettings({
       groups: schema.groups,
       scope,
       filter,
       isModified: (name) => Object.hasOwn(variables, name),
-      isExpanded: (key) =>
-        filtering ? !collapsedInFilter.has(key) : expanded.has(key),
-      limit,
       getGroupLabel,
     });
-  }, [
-    schema,
-    model,
-    scope,
-    filter,
+  }, [schema, model, scope, filter]);
+  const toc = matches?.toc ?? [];
+  const section = resolveSection(
+    toc,
+    filtering ? filterSection : browseSection,
     filtering,
-    collapsedInFilter,
-    expanded,
-    limit,
-  ]);
+  );
+  const [limit, setLimit] = useFilterScopedState(
+    `${filterKey}|${section}`,
+    pageSize,
+  );
+  const rows = useMemo(
+    () => (matches ? buildSettingsRows(matches, section, limit) : []),
+    [matches, section, limit],
+  );
 
   const scopeCounts = useMemo(
     () =>
@@ -175,29 +187,23 @@ function useThemeSettings(
     }
   }, []);
 
-  const handleToggle = useCallback(
-    (key: string) => {
+  const handleSelect = useCallback(
+    (next: string | null) => {
       if (filtering) {
-        setCollapsedInFilter((set) => toggle(set, key));
+        setFilterSection(() => next);
       } else {
-        setExpanded((set) => toggle(set, key));
+        setBrowseSection(next);
       }
     },
-    [filtering, setCollapsedInFilter],
+    [filtering, setFilterSection],
   );
-
-  const handleCollapseAll = useCallback(() => {
-    setExpanded(emptySet());
-    setCollapsedInFilter(
-      () => new Set(schema?.groups.map((group) => groupKey(group.id))),
-    );
-  }, [schema, setCollapsedInFilter]);
 
   const handleShowMore = useCallback(
     () => setLimit((value) => value + PAGE_SIZE),
     [setLimit],
   );
 
+  const matchCount = matches?.matchCount ?? 0;
   return {
     toolbar: {
       query,
@@ -207,14 +213,19 @@ function useThemeSettings(
       scopeCounts,
       modifiedOnly,
       onModifiedOnlyChange: setModifiedOnly,
-      matchCount: filtering && result ? result.matchCount : null,
-      onCollapseAll: handleCollapseAll,
+      matchCount: filtering ? matchCount : null,
+    },
+    toc: {
+      toc,
+      section,
+      filtering,
+      matchCount,
+      onSelect: handleSelect,
     },
     list: {
-      rows: result?.rows ?? [],
+      rows,
       scope,
       getDefaultValue,
-      onToggle: handleToggle,
       onShowMore: handleShowMore,
       onSwitchScope: setScope,
     },
@@ -298,9 +309,64 @@ export default function ThemeCssEditor({
   );
   const settings = useThemeSettings(schema, model, theme, language);
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const header = headerRef.current;
+    if (!root || !header) {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      root.style.setProperty(
+        '--settings-header-height',
+        `${header.offsetHeight}px`,
+      );
+    });
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
+  const revealListRef = useRef(false);
+  const { onSelect } = settings.toc;
+  const handleSelect = useCallback(
+    (section: string | null) => {
+      revealListRef.current = true;
+      onSelect(section);
+    },
+    [onSelect],
+  );
+  useLayoutEffect(() => {
+    if (!revealListRef.current) {
+      return;
+    }
+    revealListRef.current = false;
+    // The pane keeps its scroll position, which would open the new section
+    // midway once the list top has scrolled under the header.
+    const list = listRef.current;
+    const header = headerRef.current;
+    if (
+      list &&
+      header &&
+      list.getBoundingClientRect().top < header.getBoundingClientRect().bottom
+    ) {
+      list.scrollIntoView({ block: 'start' });
+    }
+  });
+  const toc = { ...settings.toc, onSelect: handleSelect };
+
   return (
-    <Tabs value={mode} onValueChange={(value) => switchMode(value as Mode)}>
-      <div className="sticky top-0 z-10 grid gap-2 bg-background py-2">
+    <Tabs
+      ref={rootRef}
+      className="@container"
+      value={mode}
+      onValueChange={(value) => switchMode(value as Mode)}
+    >
+      <div
+        ref={headerRef}
+        className="sticky top-0 z-10 grid gap-2 bg-background py-2"
+      >
         <TabsList aria-label={m.theme_settings_mode_aria()} className="w-full">
           <TabsTrigger value="gui">
             <SlidersHorizontal aria-hidden />
@@ -312,7 +378,10 @@ export default function ThemeCssEditor({
           </TabsTrigger>
         </TabsList>
         {mode === 'gui' && schemaState === Fulfilled && (
-          <SettingsToolbar {...settings.toolbar} />
+          <>
+            <SettingsToolbar {...settings.toolbar} />
+            {model && <SettingsSectionSelect {...toc} className="@md:hidden" />}
+          </>
         )}
       </div>
       <TabsContent ref={guiPanelRef} value="gui" className="grid gap-2">
@@ -339,11 +408,22 @@ export default function ThemeCssEditor({
           </div>
         )}
         {schemaState === Fulfilled && model ? (
-          <SettingsList
-            {...settings.list}
-            model={model}
-            onCommit={handleCommit}
-          />
+          <div className="grid items-start gap-x-4 @md:grid-cols-[10rem_minmax(0,1fr)] @3xl:grid-cols-[14rem_minmax(0,1fr)]">
+            <SettingsToc
+              {...toc}
+              className="sticky top-(--settings-header-height) hidden max-h-[calc(100svh-var(--settings-header-height))] overflow-y-auto overscroll-contain scrollbar-stable py-2 @md:block"
+            />
+            <div
+              ref={listRef}
+              className="min-w-0 scroll-mt-(--settings-header-height) py-2"
+            >
+              <SettingsList
+                {...settings.list}
+                model={model}
+                onCommit={handleCommit}
+              />
+            </div>
+          </div>
         ) : schemaState === Rejected ? (
           <div className="grid justify-items-start gap-2 py-4 text-sm">
             <p role="alert">{m.theme_settings_load_error()}</p>
