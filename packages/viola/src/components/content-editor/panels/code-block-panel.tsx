@@ -100,7 +100,13 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   }, [activeIndex, refs]);
 
   const updateCaret = () => {
-    setCaret(inputRef.current?.selectionStart ?? 0);
+    const next = inputRef.current?.selectionStart ?? 0;
+    if (next !== caret) {
+      setCaret(next);
+      // The suggestions follow the caret, so the old highlight may now point
+      // to another language or past the end of the list.
+      setActiveIndex(-1);
+    }
   };
 
   const closeList = () => {
