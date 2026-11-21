@@ -1,3 +1,5 @@
+import { groupedPropAlias } from 'postcss-variable-theming/preset';
+
 export interface ThemeVariableDefault {
   value: string;
   /** Selector the default is declared on; `:root` when omitted. */
@@ -15,6 +17,13 @@ export interface ThemeVariable {
   subgroup: string | null;
   /** Name without the `--vs-` prefix of its group. */
   key: string;
+  /**
+   * Leading part of `key` naming what the variable styles, like `h1` of
+   * `h1-font-size`; `null` for a variable of the group as a whole.
+   */
+  target: string | null;
+  /** `key` without its target, like `font-size` of `h1-font-size`. */
+  propertyKey: string;
   /** `@property`-like syntax; an approximation of the consuming properties. */
   syntax: string;
   /** CSS properties the variable ends up in. */
@@ -66,6 +75,20 @@ const LEADING_GROUPS = [META_GROUP, 'page', BASIC_GROUP];
 const MARGIN_BOX =
   /^mbox-(?:top|bottom|left|right)(?:-(?:left|right|top|bottom|center|middle))?(?:-corner)?(?=-)/;
 
+// The aliases theme-base generates variable names with. The `color` entry
+// comes from its own build config rather than the preset.
+const PROPERTY_ALIASES: Readonly<Record<string, string>> = {
+  ...groupedPropAlias,
+  color: 'text-color',
+};
+
+type ThemeVariableBase = Omit<
+  ThemeVariable,
+  'target' | 'propertyKey' | 'subgroup'
+>;
+
+type KeySplit = Pick<ThemeVariable, 'target' | 'propertyKey'>;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -95,7 +118,69 @@ function getSubgroupCandidate(group: string, key: string): string {
   return key.split('-')[0];
 }
 
-function toVariable(path: string[], raw: RawVariable): ThemeVariable {
+/**
+ * Splits a key the way theme-base's `@var` blocks generate it: a target, a
+ * dash, and the aliased name of the property the variable is used in.
+ */
+function splitByProperty(
+  key: string,
+  properties: readonly string[],
+): KeySplit | null {
+  let match: string | undefined;
+  for (const property of properties) {
+    const name = PROPERTY_ALIASES[property] ?? property;
+    if (
+      (key === name || key.endsWith(`-${name}`)) &&
+      name.length > (match?.length ?? 0)
+    ) {
+      match = name;
+    }
+  }
+  if (match === undefined) {
+    return null;
+  }
+  return {
+    target: key === match ? null : key.slice(0, -match.length - 1),
+    propertyKey: match,
+  };
+}
+
+// Names written by hand follow no rule, so they reuse the targets of the
+// generated names in their group.
+function splitByTarget(key: string, targets: Iterable<string>): KeySplit {
+  let target: string | null = null;
+  for (const candidate of targets) {
+    if (
+      key.startsWith(`${candidate}-`) &&
+      candidate.length > (target?.length ?? 0)
+    ) {
+      target = candidate;
+    }
+  }
+  return {
+    target,
+    propertyKey: target === null ? key : key.slice(target.length + 1),
+  };
+}
+
+function splitKeys(variables: readonly ThemeVariableBase[]): KeySplit[] {
+  const generated = variables.map((v) => splitByProperty(v.key, v.properties));
+  const targets = new Map<string, Set<string>>();
+  variables.forEach((variable, index) => {
+    const target = generated[index]?.target;
+    if (target) {
+      const known = targets.get(variable.group) ?? new Set();
+      targets.set(variable.group, known.add(target));
+    }
+  });
+  return variables.map(
+    (variable, index) =>
+      generated[index] ??
+      splitByTarget(variable.key, targets.get(variable.group) ?? []),
+  );
+}
+
+function toVariable(path: string[], raw: RawVariable): ThemeVariableBase {
   const defaults: ThemeVariableDefault[] =
     typeof raw._define === 'string'
       ? [{ value: raw._define }]
@@ -105,7 +190,6 @@ function toVariable(path: string[], raw: RawVariable): ThemeVariable {
     name: getThemeVariableName(path),
     path,
     group: path[0],
-    subgroup: null,
     key: path.slice(1).join('-'),
     syntax: raw._syntax,
     properties: [raw._property ?? []].flat(),
@@ -115,7 +199,7 @@ function toVariable(path: string[], raw: RawVariable): ThemeVariable {
 }
 
 export function flattenThemeVariables(tree: unknown): ThemeVariable[] {
-  const variables: ThemeVariable[] = [];
+  const variables: ThemeVariableBase[] = [];
   const walk = (node: unknown, path: string[]) => {
     if (isRawVariable(node)) {
       variables.push(toVariable(path, node));
@@ -127,15 +211,17 @@ export function flattenThemeVariables(tree: unknown): ThemeVariable[] {
   };
   walk(tree, []);
 
+  const splits = splitKeys(variables);
   const sizes = new Map<string, number>();
-  const candidateOf = (v: ThemeVariable) =>
+  const candidateOf = (v: ThemeVariableBase) =>
     `${v.group}/${getSubgroupCandidate(v.group, v.key)}`;
   for (const variable of variables) {
     const candidate = candidateOf(variable);
     sizes.set(candidate, (sizes.get(candidate) ?? 0) + 1);
   }
-  return variables.map((variable) => ({
+  return variables.map((variable, index) => ({
     ...variable,
+    ...splits[index],
     subgroup:
       (sizes.get(candidateOf(variable)) ?? 0) > 1
         ? getSubgroupCandidate(variable.group, variable.key)

@@ -100,6 +100,8 @@ describe('flattenThemeVariables', () => {
       group: '_meta-properties',
       subgroup: 'color',
       key: 'color-foreground',
+      target: null,
+      propertyKey: 'color-foreground',
       syntax: '*',
       properties: ['color'],
       defaultValue: '#000',
@@ -144,6 +146,130 @@ describe('flattenThemeVariables', () => {
       '--vs-page--border-color': null,
       '--vs-toc--anchor-text-decoration': null,
       '--vs-toc--label': null,
+    });
+  });
+
+  describe('splitting a key into its target and property', () => {
+    const split = (tree: Record<string, Record<string, object>>) =>
+      Object.fromEntries(
+        flattenThemeVariables(tree).map((v) => [
+          v.name,
+          [v.target, v.propertyKey],
+        ]),
+      );
+
+    it('splits before the property the variable is used in', () => {
+      expect(
+        split({
+          '_meta-properties': {
+            'line-height': { _syntax: '*', _property: 'line-height' },
+            'first-page-counter-reset': {
+              _syntax: '*',
+              _property: 'counter-reset',
+            },
+          },
+          _basic: {
+            'h1-font-size': { _syntax: '*', _property: 'font-size' },
+            'blockquote-p-text-align': {
+              _syntax: '*',
+              _property: 'text-align',
+            },
+          },
+        }),
+      ).toEqual({
+        '--vs-line-height': [null, 'line-height'],
+        '--vs-first-page-counter-reset': ['first-page', 'counter-reset'],
+        '--vs--h1-font-size': ['h1', 'font-size'],
+        '--vs--blockquote-p-text-align': ['blockquote-p', 'text-align'],
+      });
+    });
+
+    it('matches the aliased name of the property', () => {
+      expect(
+        split({
+          _basic: {
+            'h1-border-color-block-end': {
+              _syntax: '*',
+              _property: 'border-block-end-color',
+            },
+            'h1-text-color': { _syntax: '*', _property: 'color' },
+            'figure-item-max-size-inline': {
+              _syntax: '*',
+              _property: 'max-inline-size',
+            },
+          },
+        }),
+      ).toEqual({
+        '--vs--h1-border-color-block-end': ['h1', 'border-color-block-end'],
+        '--vs--h1-text-color': ['h1', 'text-color'],
+        '--vs--figure-item-max-size-inline': ['figure-item', 'max-size-inline'],
+      });
+    });
+
+    it('prefers the longest property name', () => {
+      expect(
+        split({
+          page: {
+            'mbox-font-size': {
+              _syntax: '*',
+              _property: ['font-size', 'size'],
+            },
+          },
+        }),
+      ).toEqual({ '--vs-page--mbox-font-size': ['mbox', 'font-size'] });
+    });
+
+    it('gives a hand-named key the longest target known in its group', () => {
+      expect(
+        split({
+          _basic: {
+            'blockquote-font-size': { _syntax: '*', _property: 'font-size' },
+            'blockquote-p-text-indent': {
+              _syntax: '*',
+              _property: 'text-indent',
+            },
+            'blockquote-p-border-color': {
+              _syntax: '*',
+              _property: ['border-block-end-color', 'border-block-start-color'],
+            },
+            'blockquote-border-width': { _syntax: '*' },
+          },
+          figure: {
+            'root-counter-reset': { _syntax: '*', _property: 'counter-reset' },
+            'root-counter-fig': { _syntax: '*' },
+          },
+          toc: { 'blockquote-label': { _syntax: '*' } },
+        }),
+      ).toEqual({
+        '--vs--blockquote-font-size': ['blockquote', 'font-size'],
+        '--vs--blockquote-p-text-indent': ['blockquote-p', 'text-indent'],
+        '--vs--blockquote-p-border-color': ['blockquote-p', 'border-color'],
+        '--vs--blockquote-border-width': ['blockquote', 'border-width'],
+        '--vs-figure--root-counter-reset': ['root', 'counter-reset'],
+        '--vs-figure--root-counter-fig': ['root', 'counter-fig'],
+        '--vs-toc--blockquote-label': [null, 'blockquote-label'],
+      });
+    });
+
+    it('leaves a key without a known target whole', () => {
+      expect(
+        split({
+          '_meta-properties': {
+            'color-foreground': { _syntax: '*', _property: 'color' },
+            'spacing-rlh': { _syntax: '*' },
+          },
+          page: {
+            'margin-inside': {
+              _syntax: '*',
+              _property: ['margin-left', 'margin-right'],
+            },
+          },
+        }),
+      ).toEqual({
+        '--vs-color-foreground': [null, 'color-foreground'],
+        '--vs-spacing-rlh': [null, 'spacing-rlh'],
+        '--vs-page--margin-inside': [null, 'margin-inside'],
+      });
     });
   });
 
@@ -210,6 +336,24 @@ describe('loadThemeVariableSchema', () => {
         group.variables.length,
       );
     }
+  });
+
+  it('splits every key into its target and property', () => {
+    for (const { key, target, propertyKey } of schema.variables) {
+      expect(propertyKey, key).not.toBe('');
+      expect(target === null ? propertyKey : `${target}-${propertyKey}`).toBe(
+        key,
+      );
+    }
+    // A theme-base update shows up here as targets gained, lost or resized.
+    const targets: Record<string, Record<string, number>> = {};
+    for (const { group, target } of schema.variables) {
+      const counts = targets[group] ?? {};
+      const id = target ?? '(none)';
+      counts[id] = (counts[id] ?? 0) + 1;
+      targets[group] = counts;
+    }
+    expect(targets).toMatchSnapshot();
   });
 
   it('names variables as the stylesheets of the theme use them', () => {
