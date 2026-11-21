@@ -212,21 +212,26 @@ export class Project {
       entryContext,
       initialFile,
       sync,
-      // Looked up on every save: the file may have been renamed or removed.
-      onSave: ({ markdown, summary }) => {
-        const file = this.content.files.get(contentId);
-        if (!file) {
-          return;
-        }
-        file.summary = summary;
-        sandbox.files[file.filename] = ref(
-          new SandboxFile('text/markdown', markdown),
-        );
-      },
+      onSave: (content) => this.saveContentFile(contentId, content),
       writeFile: (path, file) => {
         sandbox.files[path] = ref(file);
       },
     });
+  }
+
+  saveContentFile(
+    contentId: ContentId,
+    { markdown, summary }: { markdown: string; summary: string },
+  ) {
+    // Looked up on every save: the file may have been renamed or removed.
+    const file = this.content.files.get(contentId);
+    if (!file || !this.sandbox) {
+      return;
+    }
+    file.summary = summary;
+    this.sandbox.files[file.filename] = ref(
+      new SandboxFile('text/markdown', markdown),
+    );
   }
 
   dispose(): Promise<void> {

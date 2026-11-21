@@ -6,6 +6,7 @@ import { useSnapshot } from 'valtio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
 import { $ui } from '../stores/accessors';
+import { closeModal } from '../stores/actions/ui';
 import type { PaneContent } from '../stores/proxies/ui';
 import { Pane, panes } from './pane';
 import { PaneContext } from './panes/util';
@@ -30,16 +31,16 @@ function DedicatedModal() {
       router.subscribe('onBeforeLoad', ({ fromLocation, toLocation }) => {
         if (fromLocation?.pathname !== toLocation.pathname) {
           setOpen(false);
-          $ui.dedicatedModal = null;
+          closeModal();
         }
       }),
     [router.subscribe],
   );
 
-  const closeModal = useCallback((open: boolean) => {
+  const handleOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setOpen(false);
-      $ui.dedicatedModal = null;
+      closeModal();
     }
   }, []);
 
@@ -62,7 +63,7 @@ function DedicatedModal() {
 
   return (
     <PaneContext.Provider value={{ ...pane, props, hideTitle: true }}>
-      <Dialog open={open} onOpenChange={closeModal}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-4xl p-0" onAnimationEnd={purgeModal}>
           <div className="size-full max-h-svh overflow-auto grid gap-4 p-6">
             <DialogHeader>

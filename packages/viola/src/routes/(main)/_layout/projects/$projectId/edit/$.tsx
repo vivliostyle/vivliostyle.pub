@@ -1,8 +1,8 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { generateId } from '../../../../../../libs/generate-id';
-import { $content, $ui } from '../../../../../../stores/accessors';
+import { $content } from '../../../../../../stores/accessors';
 import { openProject } from '../../../../../../stores/actions/open-project';
+import { showPane } from '../../../../../../stores/actions/ui';
 import type { ProjectId } from '../../../../../../stores/proxies/project';
 
 export const Route = createFileRoute(
@@ -27,17 +27,6 @@ export const Route = createFileRoute(
         params: { projectId: params.projectId },
       });
     }
-    if (
-      $ui.tabs.some((tab) => tab.type === 'edit' && tab.contentId === contentId)
-    ) {
-      return;
-    }
-    $ui.tabs = [
-      {
-        id: generateId(),
-        type: 'edit',
-        contentId,
-      },
-    ];
+    showPane({ type: 'edit', contentId }, { keepIfShown: true });
   },
 });

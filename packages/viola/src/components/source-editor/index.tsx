@@ -1,11 +1,9 @@
 import { invariant } from 'outvariant';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ref } from 'valtio';
 
 import { m } from '../../generated/paraglide/messages';
 import { debounce } from '../../libs/debounce';
-import { SandboxFile } from '../../libs/sandbox/file';
-import { $content, $sandbox } from '../../stores/accessors';
+import { $project } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import CodeEditor from '../code-editor';
 
@@ -41,11 +39,10 @@ function deriveSummaryFromMarkdown(markdown: string): string {
 }
 
 export default function SourceEditor({ contentId }: { contentId: ContentId }) {
-  const content = $content.valueOrThrow();
-  const sandbox = $sandbox.valueOrThrow();
-  const file = content.files.get(contentId);
+  const project = $project.valueOrThrow();
+  const file = project.content.files.get(contentId);
   invariant(file, `Source editor: file not found for contentId: ${contentId}`);
-  const { editor, filename } = file;
+  const { editor } = file;
 
   // The collaborative XmlFragment stays the source of truth; the source view
   // is seeded once from its current markdown and never re-reads it while open.
@@ -56,13 +53,15 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
     () =>
       debounce(
         (code: string) => {
-          file.summary = deriveSummaryFromMarkdown(code);
-          sandbox.files[filename] = ref(new SandboxFile('text/markdown', code));
+          project.saveContentFile(contentId, {
+            markdown: code,
+            summary: deriveSummaryFromMarkdown(code),
+          });
         },
         1000,
         { trailing: true },
       ),
-    [sandbox, filename, file],
+    [project, contentId],
   );
 
   const handleCodeUpdate = useCallback(

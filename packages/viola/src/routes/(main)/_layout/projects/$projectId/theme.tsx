@@ -1,8 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { generateId } from '../../../../../libs/generate-id';
-import { $ui } from '../../../../../stores/accessors';
 import { openProject } from '../../../../../stores/actions/open-project';
+import { showPane } from '../../../../../stores/actions/ui';
 import type { ProjectId } from '../../../../../stores/proxies/project';
 
 export const Route = createFileRoute(
@@ -17,12 +16,6 @@ export const Route = createFileRoute(
     } catch {
       throw redirect({ to: '/' });
     }
-    $ui.tabs = [
-      ...$ui.tabs.filter((t) => t.type === 'edit').slice(0, 1),
-      {
-        id: generateId(),
-        type: 'theme',
-      },
-    ];
+    showPane({ type: 'theme' }, { besideEditor: true });
   },
 });

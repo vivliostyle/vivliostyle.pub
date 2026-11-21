@@ -1,6 +1,6 @@
 import { lazy, useEffect, useId, useState } from 'react';
 import { useDebounce } from 'react-use';
-import { ref, useSnapshot } from 'valtio';
+import { useSnapshot } from 'valtio';
 
 import { Button } from '@v/ui/button';
 import { Check, Loader2 } from '@v/ui/icon';
@@ -9,8 +9,8 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import { usePromiseState } from '../../hooks/use-promise-state';
 import { getOfficialThemeTitle } from '../../libs/official-theme-title';
-import { SandboxFile } from '../../libs/sandbox/file';
-import { $sandbox, $theme } from '../../stores/accessors';
+import { $theme } from '../../stores/accessors';
+import { updateCustomCss } from '../../stores/actions/theme';
 import { officialThemes } from '../../stores/catalog';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -64,10 +64,7 @@ function Content(_: ThemePaneProperty) {
 
   useDebounce(
     () => {
-      $theme.valueOrThrow().customCss = customCss;
-      $sandbox.valueOrThrow().files['style.css'] = ref(
-        new SandboxFile('text/css', customCss),
-      );
+      updateCustomCss(customCss);
     },
     1000,
     [customCss],

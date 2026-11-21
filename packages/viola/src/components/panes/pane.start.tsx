@@ -6,13 +6,13 @@ import { useSnapshot } from 'valtio';
 import { Button } from '@v/ui/button';
 import { Cloud, FilePlus, Loader2, Trash2 } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
-import { generateId } from '../../libs/generate-id';
-import { $extensions, $projects, $session, $ui } from '../../stores/accessors';
+import { $extensions, $projects, $session } from '../../stores/accessors';
 import {
   createCloudProject,
   deleteCloudProject,
 } from '../../stores/actions/cloud-project';
 import { deleteLocalProject } from '../../stores/actions/local-project';
+import { openModal } from '../../stores/actions/ui';
 import { resolvePanePresentation } from '../../stores/proxies/extension';
 import type { ProjectEntry, ProjectId } from '../../stores/proxies/project';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
@@ -254,12 +254,11 @@ function Content(_: StartPaneProperty) {
                 type="button"
                 className="hover:underline"
                 onClick={() => {
-                  $ui.dedicatedModal = {
-                    id: generateId(),
+                  openModal({
                     type: 'extension',
                     extensionId: account.id,
                     panePath: '.',
-                  };
+                  });
                 }}
               >
                 {m.start_sign_in_link()}

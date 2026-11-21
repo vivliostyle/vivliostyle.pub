@@ -2,7 +2,6 @@ import { invariant } from 'outvariant';
 
 import type { ExtensionPermission } from '@v/extension-kit';
 import { installedExtensions } from '../../extensions/installed';
-import { generateId } from '../../libs/generate-id';
 import { $extensions, $ui } from '../accessors';
 import {
   type ExtensionId,
@@ -10,6 +9,7 @@ import {
   registerExtension,
   unregisterExtension,
 } from '../proxies/extension';
+import { closeModal, closePanes, showPane } from './ui';
 
 const cloudPermissions = new Set<ExtensionPermission>([
   'session:read',
@@ -50,14 +50,12 @@ export async function activateExtension(id: ExtensionId): Promise<void> {
 
 export function deactivateExtension(id: ExtensionId): void {
   unregisterExtension(id);
-  $ui.tabs = $ui.tabs.filter(
-    (tab) => !(tab.type === 'extension' && tab.extensionId === id),
-  );
+  closePanes((tab) => tab.type === 'extension' && tab.extensionId === id);
   if (
     $ui.dedicatedModal?.type === 'extension' &&
     $ui.dedicatedModal.extensionId === id
   ) {
-    $ui.dedicatedModal = null;
+    closeModal();
   }
 }
 
@@ -70,25 +68,14 @@ export async function openPermalink(slug: string): Promise<boolean> {
   if (!permalink) {
     return false;
   }
-  if (
-    $ui.tabs.some(
-      (tab) =>
-        tab.type === 'extension' &&
-        tab.extensionId === permalink.extensionId &&
-        tab.panePath === permalink.panePath,
-    )
-  ) {
-    return true;
-  }
-  $ui.tabs = [
-    ...$ui.tabs.filter((tab) => tab.type === 'edit').slice(0, 1),
+  showPane(
     {
-      id: generateId(),
       type: 'extension',
       extensionId: permalink.extensionId,
       panePath: permalink.panePath,
     },
-  ];
+    { besideEditor: true, keepIfShown: true },
+  );
   return true;
 }
 
