@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildThemeVariableSchema,
   loadThemeVariableSchema,
+  type ThemeVariableCategory,
 } from '../../libs/theme-variables';
 import {
   buildSettingsRows,
@@ -14,16 +15,24 @@ import {
   subgroupKey,
 } from './rows';
 
-const v = (syntax = '<length>') => ({ _syntax: syntax });
+const v = (property?: string) => ({ _syntax: '*', _property: property });
 
 const schema = buildThemeVariableSchema({
   '_meta-properties': {
-    'font-family': v('*'),
-    'color-foreground': v('<color>'),
-    'color-background': v('<color>'),
+    'font-family': v('font-family'),
+    'color-foreground': v(),
+    'color-background': v(),
   },
-  page: { 'margin-top': v(), 'margin-bottom': v(), size: v('*') },
-  _basic: { 'h1-font-size': v(), 'h1-margin': v(), 'p-text-indent': v() },
+  page: {
+    'margin-top': v('margin-top'),
+    'margin-bottom': v('margin-bottom'),
+    size: v('size'),
+  },
+  _basic: {
+    'h1-font-size': v('font-size'),
+    'h1-margin-block': v('margin-block'),
+    'p-text-indent': v('text-indent'),
+  },
 });
 
 const labels: Record<string, string> = {
@@ -32,6 +41,17 @@ const labels: Record<string, string> = {
   _basic: 'Elements',
 };
 
+const categoryLabels: Partial<Record<ThemeVariableCategory, string>> = {
+  font: 'Font',
+  color: 'Color and background',
+  'page-setup': 'Page size and marks',
+  margin: 'Margin and padding',
+};
+
+const target = (id: string) => ({ kind: 'target', id }) as const;
+const category = (id: ThemeVariableCategory) =>
+  ({ kind: 'category', id }) as const;
+
 function match(overrides: Partial<SettingsMatchInput> = {}) {
   return matchSettings({
     groups: schema.groups,
@@ -39,6 +59,7 @@ function match(overrides: Partial<SettingsMatchInput> = {}) {
     filter: { query: '', modifiedOnly: false },
     isModified: () => false,
     getGroupLabel: (id) => labels[id],
+    getCategoryLabel: (id) => categoryLabels[id] ?? id,
     ...overrides,
   });
 }
@@ -55,9 +76,9 @@ describe('matchSettings', () => {
     expect(
       toc.map((g) => [g.label, g.count, g.subgroups.map((s) => s.label)]),
     ).toEqual([
-      ['General', 3, ['Color']],
-      ['Page', 3, ['Margin']],
-      ['Elements', 3, ['H1']],
+      ['General', 3, ['Font', 'Color and background']],
+      ['Page', 3, ['Page size and marks', 'Margin and padding']],
+      ['Elements', 3, ['H1', 'P']],
     ]);
     expect(matchCount).toBe(9);
   });
@@ -68,30 +89,50 @@ describe('matchSettings', () => {
     ]);
   });
 
-  it('matches every query token against name, key, group and label', () => {
+  it('matches every query token against name, key and labels', () => {
     const query = (q: string) =>
       keys({ filter: { query: q, modifiedOnly: false } });
     expect(query('COLOR fore')).toEqual([
       'g:_meta-properties',
-      's:_meta-properties/color',
+      's:_meta-properties/category:color',
       '--vs-color-foreground',
     ]);
     expect(query('elements indent')).toEqual([
       'g:_basic',
+      's:_basic/target:p',
       '--vs--p-text-indent',
     ]);
-    expect(query('--vs-page--size')).toEqual(['g:page', '--vs-page--size']);
+    expect(query('--vs-page--size')).toEqual([
+      'g:page',
+      's:page/category:page-setup',
+      '--vs-page--size',
+    ]);
+  });
+
+  it('matches a category label only where it heads a subgroup', () => {
+    expect(keys({ filter: { query: 'padding', modifiedOnly: false } })).toEqual(
+      [
+        'g:page',
+        's:page/category:margin',
+        '--vs-page--margin-top',
+        '--vs-page--margin-bottom',
+      ],
+    );
   });
 
   it('drops the sections left without matches', () => {
     const { toc } = match({ filter: { query: 'h1', modifiedOnly: false } });
     expect(toc).toMatchObject([
-      { key: 'g:_basic', count: 2, subgroups: [{ key: 's:_basic/h1' }] },
+      {
+        key: 'g:_basic',
+        count: 2,
+        subgroups: [{ key: 's:_basic/target:h1' }],
+      },
     ]);
   });
 
   it('filters and counts modified variables', () => {
-    const modified = new Set(['--vs--h1-margin', '--vs-page--size']);
+    const modified = new Set(['--vs--h1-margin-block', '--vs-page--size']);
     const isModified = (name: string) => modified.has(name);
     const { toc, matchCount } = match({
       filter: { query: '', modifiedOnly: true },
@@ -99,32 +140,49 @@ describe('matchSettings', () => {
     });
     expect(matchCount).toBe(2);
     expect(toc).toMatchObject([
-      { key: 'g:page', count: 1, modified: 1, subgroups: [] },
+      {
+        key: 'g:page',
+        count: 1,
+        modified: 1,
+        subgroups: [
+          { key: 's:page/category:page-setup', count: 1, modified: 1 },
+        ],
+      },
       {
         key: 'g:_basic',
         count: 1,
         modified: 1,
-        subgroups: [{ key: 's:_basic/h1', count: 1, modified: 1 }],
+        subgroups: [{ key: 's:_basic/target:h1', count: 1, modified: 1 }],
       },
     ]);
   });
 
   it('reports modified counts without the filter', () => {
-    const { toc } = match({ isModified: (n) => n === '--vs--h1-margin' });
+    const { toc } = match({
+      isModified: (n) => n === '--vs--h1-margin-block',
+    });
     expect(toc.at(-1)).toMatchObject({
       count: 3,
       modified: 1,
-      subgroups: [{ count: 2, modified: 1 }],
+      subgroups: [
+        { count: 2, modified: 1 },
+        { count: 1, modified: 0 },
+      ],
     });
   });
 
   it('finds a group or a subgroup by its key', () => {
     const { toc } = match();
     expect(findSection(toc, groupKey('page'))?.label).toBe('Page');
-    expect(findSection(toc, subgroupKey('page', 'margin'))?.label).toBe(
-      'Margin',
+    expect(findSection(toc, subgroupKey('page', category('margin')))).toEqual(
+      expect.objectContaining({ label: 'Margin and padding', count: 2 }),
     );
-    expect(findSection(toc, subgroupKey('page', 'missing'))).toBeUndefined();
+    expect(findSection(toc, subgroupKey('_basic', target('h1')))?.label).toBe(
+      'H1',
+    );
+    expect(
+      findSection(toc, subgroupKey('page', target('margin'))),
+    ).toBeUndefined();
   });
 });
 
@@ -132,37 +190,75 @@ describe('buildSettingsRows', () => {
   it('lists every match without a section', () => {
     expect(keys({})).toEqual([
       'g:_meta-properties',
+      's:_meta-properties/category:font',
       '--vs-font-family',
-      's:_meta-properties/color',
+      's:_meta-properties/category:color',
       '--vs-color-foreground',
       '--vs-color-background',
       'g:page',
+      's:page/category:page-setup',
       '--vs-page--size',
-      's:page/margin',
+      's:page/category:margin',
       '--vs-page--margin-top',
       '--vs-page--margin-bottom',
       'g:_basic',
-      '--vs--p-text-indent',
-      's:_basic/h1',
+      's:_basic/target:h1',
+      's:_basic/target:h1/font',
       '--vs--h1-font-size',
-      '--vs--h1-margin',
+      's:_basic/target:h1/margin',
+      '--vs--h1-margin-block',
+      's:_basic/target:p',
+      '--vs--p-text-indent',
     ]);
   });
 
-  it('lists a group with its ungrouped variables first', () => {
+  it('heads the categories of a target that spans several', () => {
+    const rows = buildSettingsRows(
+      match(),
+      subgroupKey('_basic', target('h1')),
+      100,
+    );
+    expect(
+      rows.map((row) =>
+        row.kind === 'variable' || row.kind === 'more'
+          ? row.key
+          : `${row.kind}: ${row.label}`,
+      ),
+    ).toEqual([
+      'group: Elements',
+      'subgroup: H1',
+      'category: Font',
+      '--vs--h1-font-size',
+      'category: Margin and padding',
+      '--vs--h1-margin-block',
+    ]);
+    const filtered = buildSettingsRows(
+      match({ filter: { query: 'margin', modifiedOnly: false } }),
+      subgroupKey('_basic', target('h1')),
+      100,
+    );
+    expect(filtered.map((row) => row.kind)).toEqual([
+      'group',
+      'subgroup',
+      'variable',
+    ]);
+  });
+
+  it('lists a whole group', () => {
     expect(keys({}, groupKey('page'))).toEqual([
       'g:page',
+      's:page/category:page-setup',
       '--vs-page--size',
-      's:page/margin',
+      's:page/category:margin',
       '--vs-page--margin-top',
       '--vs-page--margin-bottom',
     ]);
   });
 
   it('lists only the subgroup under its group header', () => {
-    expect(keys({}, subgroupKey('page', 'margin'))).toEqual([
+    expect(keys({}, subgroupKey('page', category('margin')))).toEqual([
       'g:page',
-      's:page/margin',
+      's:page/category:margin',
       '--vs-page--margin-top',
       '--vs-page--margin-bottom',
     ]);
@@ -172,8 +268,9 @@ describe('buildSettingsRows', () => {
     const rows = buildSettingsRows(match(), null, 2);
     expect(rows.map((r) => r.key)).toEqual([
       'g:_meta-properties',
+      's:_meta-properties/category:font',
       '--vs-font-family',
-      's:_meta-properties/color',
+      's:_meta-properties/category:color',
       '--vs-color-foreground',
       'more',
     ]);
@@ -183,7 +280,15 @@ describe('buildSettingsRows', () => {
   it('does not leave a header without its variables at the cap', () => {
     expect(keys({}, groupKey('page'), 1)).toEqual([
       'g:page',
+      's:page/category:page-setup',
       '--vs-page--size',
+      'more',
+    ]);
+    expect(keys({}, subgroupKey('_basic', target('h1')), 1)).toEqual([
+      'g:_basic',
+      's:_basic/target:h1',
+      's:_basic/target:h1/font',
+      '--vs--h1-font-size',
       'more',
     ]);
   });
@@ -197,6 +302,7 @@ describe('buildSettingsRows', () => {
       filter: { query: 'color', modifiedOnly: false },
       isModified: () => false,
       getGroupLabel: (id) => id,
+      getCategoryLabel: (id) => id,
     });
     const rows = buildSettingsRows(matches, null, 150);
     expect(performance.now() - started).toBeLessThan(200);

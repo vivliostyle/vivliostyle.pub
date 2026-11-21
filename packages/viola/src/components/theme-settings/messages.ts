@@ -1,5 +1,9 @@
 import { m } from '../../generated/paraglide/messages';
-import type { ThemeScopeId, ValueType } from '../../libs/theme-variables';
+import type {
+  ThemeScopeId,
+  ThemeVariableCategory,
+  ValueType,
+} from '../../libs/theme-variables';
 import type { CommitError } from './commit';
 import { humanizeKey } from './labels';
 
@@ -26,6 +30,29 @@ const GROUP_LABELS: Record<string, () => string> = {
 export function getGroupLabel(groupId: string): string {
   // A module added by a newer theme-base still gets a readable title.
   return GROUP_LABELS[groupId]?.() ?? humanizeKey(groupId.replace(/^_+/, ''));
+}
+
+const CATEGORY_LABELS: Record<ThemeVariableCategory, () => string> = {
+  'page-setup': m.theme_settings_category_page_setup,
+  font: m.theme_settings_category_font,
+  spacing: m.theme_settings_category_spacing,
+  alignment: m.theme_settings_category_alignment,
+  'line-breaking': m.theme_settings_category_line_breaking,
+  'writing-mode': m.theme_settings_category_writing_mode,
+  decoration: m.theme_settings_category_decoration,
+  color: m.theme_settings_category_color,
+  margin: m.theme_settings_category_margin,
+  border: m.theme_settings_category_border,
+  layout: m.theme_settings_category_layout,
+  visibility: m.theme_settings_category_visibility,
+  fragmentation: m.theme_settings_category_fragmentation,
+  columns: m.theme_settings_category_columns,
+  'generated-content': m.theme_settings_category_generated_content,
+  other: m.theme_settings_category_other,
+};
+
+export function getCategoryLabel(category: ThemeVariableCategory): string {
+  return CATEGORY_LABELS[category]();
 }
 
 const SCOPE_LABELS: Record<ThemeScopeId, () => string> = {
