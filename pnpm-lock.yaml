@@ -327,9 +327,6 @@ catalogs:
     valtio:
       specifier: 2.3.2
       version: 2.3.2
-    valtio-reactive:
-      specifier: 0.2.0
-      version: 0.2.0
     vite:
       specifier: 8.1.6
       version: 8.1.6
@@ -1093,9 +1090,6 @@ importers:
       valtio:
         specifier: 'catalog:'
         version: 2.3.2(@types/react@19.2.14)(react@19.2.6)
-      valtio-reactive:
-        specifier: 'catalog:'
-        version: 0.2.0(valtio@2.3.2(@types/react@19.2.14)(react@19.2.6))
       vite:
         specifier: 'catalog:'
         version: 8.1.6(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0)
@@ -7672,11 +7666,6 @@ packages:
   validate-npm-package-name@7.0.2:
     resolution: {integrity: sha512-hVDIBwsRruT73PbK7uP5ebUt+ezEtCmzZz3F59BSr2F6OVFnJ/6h8liuvdLrQ88Xmnk6/+xGGuq+pG9WwTuy3A==}
     engines: {node: ^20.17.0 || >=22.9.0}
-
-  valtio-reactive@0.2.0:
-    resolution: {integrity: sha512-Zl1vr0w2S33QP9wBRX60p1LczyHrX+AWLB3iRl1doCdUTKaCziSj9GZIyrEIMykfjd0b3t27+X44phKOplcyfg==}
-    peerDependencies:
-      valtio: '>=2.0.0'
 
   valtio@2.3.2:
     resolution: {integrity: sha512-YXhWQei9IN/ZDce9rhL3trCq9+vVq8M1gWmKVdP3YSZ2gxsmmNWVbxXwf9yG6ffu/dAvAD91nevg8xirGr4Dhg==}
@@ -15338,10 +15327,6 @@ snapshots:
   validate-npm-package-name@7.0.0: {}
 
   validate-npm-package-name@7.0.2: {}
-
-  valtio-reactive@0.2.0(valtio@2.3.2(@types/react@19.2.14)(react@19.2.6)):
-    dependencies:
-      valtio: 2.3.2(@types/react@19.2.14)(react@19.2.6)
 
   valtio@2.3.2(@types/react@19.2.14)(react@19.2.6):
     dependencies:
