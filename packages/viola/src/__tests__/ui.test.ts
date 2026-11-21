@@ -57,6 +57,26 @@ describe('ui', () => {
       ]);
     });
 
+    it('keeps the preview when shown beside it', () => {
+      $ui.showPane(preview);
+      $ui.showPane({ type: 'theme' }, { besideEditor: true });
+
+      $ui.showPane({ type: 'media' }, { besideEditor: true });
+
+      expect($ui.tabs).toMatchObject([
+        { type: 'extension', extensionId: 'preview' },
+        { type: 'media' },
+      ]);
+    });
+
+    it('does not stack an extension pane beside the preview', () => {
+      $ui.showPane(preview);
+
+      $ui.showPane({ ...preview, panePath: '/other' }, { besideEditor: true });
+
+      expect($ui.tabs).toMatchObject([{ panePath: '/other' }]);
+    });
+
     it('opens a fresh pane each time unless asked to keep it', () => {
       $ui.showPane({ type: 'bibliography' });
       const firstId = $ui.tabs[0].id;

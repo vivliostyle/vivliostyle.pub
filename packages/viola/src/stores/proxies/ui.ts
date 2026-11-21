@@ -29,6 +29,15 @@ function isSamePane(tab: PaneContent, pane: PaneInit): boolean {
   return tab.type === pane.type;
 }
 
+// A pane shown beside the editor sits next to the preview instead when the
+// preview is what the user is looking at.
+function isMainPane(tab: PaneContent): boolean {
+  return (
+    tab.type === 'edit' ||
+    (tab.type === 'extension' && tab.extensionId === 'preview')
+  );
+}
+
 // Arrow functions that name `ui` rather than `this`: called on a snapshot,
 // `this` is the read-only snapshot and the write would throw.
 export const ui = proxy({
@@ -55,10 +64,12 @@ export const ui = proxy({
     if (ui.tabs.some(isShown)) {
       return;
     }
-    const editor = besideEditor
-      ? ui.tabs.filter((tab) => tab.type === 'edit').slice(0, 1)
+    const main = besideEditor
+      ? ui.tabs
+          .filter((tab) => isMainPane(tab) && tab.type !== pane.type)
+          .slice(0, 1)
       : [];
-    ui.tabs = [...editor, withId(pane)];
+    ui.tabs = [...main, withId(pane)];
   },
 
   closePanes: (predicate: (tab: PaneContent) => boolean): void => {
