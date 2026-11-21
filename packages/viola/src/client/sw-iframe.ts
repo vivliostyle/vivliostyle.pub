@@ -17,7 +17,12 @@ export function setupSwIframe() {
   self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
-    if (location.origin !== url.origin || url.pathname.startsWith('/_cli/')) {
+    // The sandbox origin serves the app's static assets itself. Leaving the
+    // stage navigation to the network keeps its document under this worker.
+    if (
+      location.origin !== url.origin ||
+      ['/_cli/', '/_viewer/'].some((base) => url.pathname.startsWith(base))
+    ) {
       return;
     }
     if (request.mode === 'navigate') {

@@ -1,5 +1,8 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
+  "preview_iframe_title": "Preview",
+  "preview_next_page_aria": "Next page",
   "preview_pane_title": "Preview",
-  "preview_iframe_title": "Preview"
+  "preview_prev_page_aria": "Previous page",
+  "preview_rendering_aria": "Rendering pages"
 }

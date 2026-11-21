@@ -1,0 +1,22 @@
+{
+  "name": "@v/viewer",
+  "private": true,
+  "version": "0.0.0",
+  "license": "AGPL-3.0",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./protocol": "./src/protocol.ts"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@v/config": "workspace:*",
+    "@vivliostyle/core": "catalog:",
+    "comlink": "catalog:",
+    "vite": "catalog:"
+  }
+}

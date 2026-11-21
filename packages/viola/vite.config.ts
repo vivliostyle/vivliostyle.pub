@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import type { ServerResponse } from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,6 +87,17 @@ const serveTemplates = () => {
   } satisfies Plugin;
 };
 
+const setStaticAssetHeaders = (res: ServerResponse) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Origin, Content-Type, Accept, Range',
+  );
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+};
+
 const serveCli = () => {
   let config: ResolvedConfig | undefined;
   return {
@@ -104,16 +116,7 @@ const serveCli = () => {
         sirv(dir, {
           dev: true,
           etag: false,
-          setHeaders: (res) => {
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader(
-              'Access-Control-Allow-Headers',
-              'Origin, Content-Type, Accept, Range',
-            );
-            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-          },
+          setHeaders: setStaticAssetHeaders,
         }),
       );
     },
@@ -142,6 +145,38 @@ const serveCli = () => {
       const dest = path.join(config.build.outDir, '_cli');
       fs.mkdirSync(dest, { recursive: true });
       fs.cpSync(src, dest, { recursive: true });
+    },
+  } satisfies Plugin;
+};
+
+// `@v/viewer` references its assets relatively, so stage URLs must keep the
+// trailing slash of `/_viewer/`.
+const serveViewer = () => {
+  let config: ResolvedConfig | undefined;
+  const dir = path.resolve(
+    require.resolve('@v/viewer/package.json'),
+    '../dist',
+  );
+  return {
+    name: 'serve-viewer',
+    configResolved(resolvedConfig) {
+      config = resolvedConfig;
+    },
+    configureServer(server) {
+      server.middlewares.use(
+        '/_viewer',
+        sirv(dir, {
+          dev: true,
+          etag: false,
+          setHeaders: setStaticAssetHeaders,
+        }),
+      );
+    },
+    closeBundle() {
+      invariant(config, 'Vite config not resolved');
+      fs.cpSync(dir, path.join(config.build.outDir, '_viewer'), {
+        recursive: true,
+      });
     },
   } satisfies Plugin;
 };
@@ -477,6 +512,7 @@ export default defineConfig(({ mode, command }) => {
       serviceWorker(),
       serveTemplates(),
       serveCli(),
+      serveViewer(),
       installedExtensions(),
       ...(apiServerEnabled
         ? [

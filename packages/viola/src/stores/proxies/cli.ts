@@ -37,7 +37,12 @@ export class Cli {
     this.lazyViewerUrlPromise ??= (async () => {
       const remote = await this.createRemotePromise();
       await remote.setupServer();
-      return `${this.sandbox.iframeOrigin}/__vivliostyle-viewer/index.html#src=${this.sandbox.iframeOrigin}/vivliostyle/publication.json&bookMode=true&renderAllPages=true`;
+      const url = new URL('/_viewer/', this.sandbox.iframeOrigin);
+      url.searchParams.set(
+        'src',
+        `${this.sandbox.iframeOrigin}/vivliostyle/publication.json`,
+      );
+      return url.href;
     })();
     return this.lazyViewerUrlPromise;
   }

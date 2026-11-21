@@ -34,6 +34,7 @@
     "dev": {
       "dependsOn": [
         "@v/cli-bundle#build",
+        "@v/viewer#build",
         "@v/api-spec#build",
         "@v/api-client#build"
       ],

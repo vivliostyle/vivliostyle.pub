@@ -75,6 +75,7 @@ catalog:
   '@vitest/coverage-v8': 4.1.9
   '@vitest/ui': 4.1.9
   '@vivliostyle/cli': 11.5.0
+  '@vivliostyle/core': 2.46.0
   '@vivliostyle/theme-base': 3.1.0
   '@vivliostyle/vfm': 2.7.2
   '@vivliostyle/viewer': 2.46.0

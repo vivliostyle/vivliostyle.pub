@@ -198,6 +198,9 @@ catalogs:
     '@vivliostyle/cli':
       specifier: 11.5.0
       version: 11.5.0
+    '@vivliostyle/core':
+      specifier: 2.46.0
+      version: 2.46.0
     '@vivliostyle/theme-base':
       specifier: 3.1.0
       version: 3.1.0
@@ -908,6 +911,21 @@ importers:
         specifier: 'catalog:'
         version: 1.0.7(tailwindcss@4.3.0)
 
+  packages/viewer:
+    devDependencies:
+      '@v/config':
+        specifier: workspace:*
+        version: link:../config
+      '@vivliostyle/core':
+        specifier: 'catalog:'
+        version: 2.46.0
+      comlink:
+        specifier: 'catalog:'
+        version: 4.4.2
+      vite:
+        specifier: 'catalog:'
+        version: 8.1.6(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0)
+
   packages/viola:
     devDependencies:
       '@codemirror/autocomplete':
@@ -1024,6 +1042,9 @@ importers:
       '@v/ui':
         specifier: workspace:*
         version: link:../ui
+      '@v/viewer':
+        specifier: workspace:*
+        version: link:../viewer
       '@vitejs/plugin-react-swc':
         specifier: 'catalog:'
         version: 4.3.1(vite@8.1.6(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.43.1)(tsx@4.22.0)(yaml@2.9.0))
@@ -1165,6 +1186,9 @@ importers:
       '@v/ui':
         specifier: workspace:*
         version: link:../ui
+      '@v/viewer':
+        specifier: workspace:*
+        version: link:../viewer
       comlink:
         specifier: 'catalog:'
         version: 4.4.2

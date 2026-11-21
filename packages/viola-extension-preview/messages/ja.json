@@ -1,5 +1,8 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
+  "preview_iframe_title": "プレビュー",
+  "preview_next_page_aria": "次のページ",
   "preview_pane_title": "プレビュー",
-  "preview_iframe_title": "プレビュー"
+  "preview_prev_page_aria": "前のページ",
+  "preview_rendering_aria": "ページを組版中"
 }

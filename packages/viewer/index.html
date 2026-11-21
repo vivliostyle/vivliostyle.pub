@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- biome-ignore lint/a11y/useHtmlLang: pages without a lang of their own would inherit it, which changes font fallback in the typeset output -->
+<html data-vivliostyle-paginated="true">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vivliostyle Pub Viewer</title>
+    <style>
+      html,
+      body,
+      #vivliostyle-viewer-viewport {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+      }
+    </style>
+    <script type="module" src="./src/main.ts"></script>
+  </head>
+  <body>
+    <div id="vivliostyle-viewer-viewport"></div>
+  </body>
+</html>

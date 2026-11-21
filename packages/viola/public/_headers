@@ -1,16 +1,13 @@
 # https://developers.cloudflare.com/workers/static-assets/headers/
 
+# A header set by several matching rules is joined with a comma, and a joined
+# CORP value is invalid (COEP embedders then treat it as same-origin), so CORP
+# is set by this rule alone.
 /*
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Opener-Policy: same-origin
-
-https://:sandbox.vspub.dev/*
-  Cross-Origin-Resource-Policy: cross-origin
-
-/assets/*
   Cross-Origin-Resource-Policy: cross-origin
 
 /_*
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Headers: Origin, Content-Type, Accept, Range
-  Cross-Origin-Resource-Policy: cross-origin
