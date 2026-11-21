@@ -41,12 +41,21 @@ export async function loadStylesheetRegistry(): Promise<StylesheetRegistry> {
 export interface StylesheetBundleCache {
   inflight: Map<string, Promise<void>>;
   failures: Map<string, { message: string; at: number }>;
+  /** Bundler output by bundler input, valid only while the installed packages stay the same. */
+  inlined: Map<string, Promise<string>>;
 }
 
 export const createStylesheetBundleCache = (): StylesheetBundleCache => ({
   inflight: new Map(),
   failures: new Map(),
+  inlined: new Map(),
 });
+
+/** Call whenever a package is (re)installed, as the bundler resolves against the installed set. */
+export function resetInlinedImports(cache: StylesheetBundleCache) {
+  // Replaced rather than cleared, so that bundles still running land in the old map
+  cache.inlined = new Map();
+}
 
 export interface StylesheetBundleContext {
   isProjectFile: (path: string) => boolean;
@@ -59,6 +68,7 @@ export interface StylesheetBundleContext {
 }
 
 const MAX_PROJECT_FILES = 64;
+const MAX_INLINED_ENTRIES = 32;
 const PROJECT_DIR = 'project';
 // Spares the registry from half-typed names while the user is still typing
 export const INSTALL_IDLE_MS = 800;
@@ -97,15 +107,53 @@ function inlinableImports(
   return imports;
 }
 
+/** Whether any sheet has an `@import` that `bundleUserStylesheets` would inline. */
+export function needsStylesheetBundle(
+  sheets: readonly { path: string; css: string }[],
+  isProjectFile: (path: string) => boolean,
+) {
+  return sheets.some(
+    (it) => inlinableImports(it.path, it.css, isProjectFile).length > 0,
+  );
+}
+
+async function inline(
+  cache: StylesheetBundleCache,
+  registry: StylesheetRegistry,
+  source: string,
+  files: ReadonlyMap<string, string>,
+) {
+  const memo = cache.inlined;
+  const key = JSON.stringify([source, [...files]]);
+  let result = memo.get(key);
+  if (result) {
+    memo.delete(key);
+  } else {
+    result = registry.bundleCss(source, files);
+    // Failures are not kept, as some (e.g. loading the bundler) are transient
+    result.catch(() => {
+      if (memo.get(key) === result) {
+        memo.delete(key);
+      }
+    });
+  }
+  memo.set(key, result);
+  for (const oldest of memo.keys()) {
+    if (memo.size <= MAX_INLINED_ENTRIES) {
+      break;
+    }
+    memo.delete(oldest);
+  }
+  return await result;
+}
+
 async function collectImports(
   sheets: readonly { path: string; css: string }[],
   { isProjectFile, readProjectFile }: StylesheetBundleContext,
 ) {
   const files = new Map(sheets.map((it) => [it.path, it.css]));
   const packages = new Map<string, string>();
-  const needsBundle = sheets.some(
-    (it) => inlinableImports(it.path, it.css, isProjectFile).length > 0,
-  );
+  const needsBundle = needsStylesheetBundle(sheets, isProjectFile);
   const queue = needsBundle ? [...files.keys()] : [];
   for (let path = queue.shift(); path !== undefined; path = queue.shift()) {
     for (const { target } of inlinableImports(
@@ -198,6 +246,7 @@ export async function bundleUserStylesheets(
         promise = registry.installPackage(specifier).then(
           () => {
             cache.failures.delete(specifier);
+            resetInlinedImports(cache);
           },
           (error) => {
             cache.failures.set(specifier, {
@@ -235,7 +284,9 @@ export async function bundleUserStylesheets(
       [...files].map(([filePath, css]) => [`${PROJECT_DIR}/${filePath}`, css]),
     );
     virtualFiles.set(`${PROJECT_DIR}/${path}`, entryCss);
-    return await registry.bundleCss(
+    return await inline(
+      cache,
+      registry,
       `@import ${JSON.stringify(`./${PROJECT_DIR}/${path}`)};`,
       virtualFiles,
     );

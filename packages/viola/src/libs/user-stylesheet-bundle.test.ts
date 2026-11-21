@@ -4,14 +4,16 @@ import {
   bundleUserStylesheets,
   createStylesheetBundleCache,
   INSTALL_FAILURE_TTL_MS,
+  needsStylesheetBundle,
+  resetInlinedImports,
   type StylesheetRegistry,
 } from './user-stylesheet-bundle';
 
 function setup(options: { files?: Record<string, string> } = {}) {
   const installed = new Set<string>();
   const installPackage = vi.fn(async (_specifier: string) => {});
-  const registry: StylesheetRegistry = {
-    bundleCss: async (source, files) => {
+  const bundleCss = vi.fn<StylesheetRegistry['bundleCss']>(
+    async (source, files) => {
       const key = source.match(/"\.\/(.+)"/)?.[1] ?? '';
       const text = files.get(key) ?? '';
       if (text.includes('bad.css')) {
@@ -22,6 +24,9 @@ function setup(options: { files?: Record<string, string> } = {}) {
       }
       return `[${text.replace(/\s+/g, ' ').trim()}]`;
     },
+  );
+  const registry: StylesheetRegistry = {
+    bundleCss,
     installPackage: async (specifier) => {
       await installPackage(specifier);
       installed.add(specifier.replace(/(?!^)@.*/, ''));
@@ -41,6 +46,7 @@ function setup(options: { files?: Record<string, string> } = {}) {
     sleep: async () => {},
   });
   return {
+    bundleCss,
     installPackage,
     installed,
     cache,
@@ -164,5 +170,58 @@ describe('bundleUserStylesheets', () => {
     );
     expect(result).toBeUndefined();
     expect(installPackage).not.toHaveBeenCalled();
+  });
+
+  it('reuses the inlined imports while only the body changes', async () => {
+    const { context, bundleCss } = setup();
+    await bundleUserStylesheets(
+      [{ path: 'style.css', css: '@import "pkg";\n.a { color: red }' }],
+      context(),
+    );
+    const result = await bundleUserStylesheets(
+      [{ path: 'style.css', css: '@import "pkg";\n.a { color: blue }' }],
+      context(),
+    );
+    expect(bundleCss).toHaveBeenCalledTimes(1);
+    expect(result?.css).toBe('[@import "pkg";]\n\n.a { color: blue }');
+  });
+
+  it('inlines again once an imported file or the installed packages change', async () => {
+    const files = { 'part.css': '.p { color: red }' };
+    const { context, bundleCss, cache } = setup({ files });
+    const sheets = [{ path: 'style.css', css: '@import "./part.css";' }];
+    await bundleUserStylesheets(sheets, context());
+    files['part.css'] = '.p { color: blue }';
+    await bundleUserStylesheets(sheets, context());
+    expect(bundleCss).toHaveBeenCalledTimes(2);
+    resetInlinedImports(cache);
+    await bundleUserStylesheets(sheets, context());
+    expect(bundleCss).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not keep a failed bundle', async () => {
+    const { context, bundleCss } = setup();
+    // Once for all the imports together, once for the import alone
+    bundleCss
+      .mockRejectedValueOnce(new Error('Failed to load the bundler'))
+      .mockRejectedValueOnce(new Error('Failed to load the bundler'));
+    const sheets = [{ path: 'style.css', css: '@import "pkg";' }];
+    const first = await bundleUserStylesheets(sheets, context());
+    expect(first?.error).toBeDefined();
+    const second = await bundleUserStylesheets(sheets, context());
+    expect(second?.error).toBeUndefined();
+    expect(second?.css).toContain('[@import "pkg";]');
+  });
+});
+
+describe('needsStylesheetBundle', () => {
+  it('is true only for imports that get inlined', () => {
+    const isProjectFile = (path: string) => path === 'part.css';
+    const needs = (css: string) =>
+      needsStylesheetBundle([{ path: 'style.css', css }], isProjectFile);
+    expect(needs(':root { --a: 1 }')).toBe(false);
+    expect(needs('@import url(https://x.test/a.css);')).toBe(false);
+    expect(needs('@import "pkg";')).toBe(true);
+    expect(needs('@import "./part.css";')).toBe(true);
   });
 });

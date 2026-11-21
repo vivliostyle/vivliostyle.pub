@@ -10,6 +10,12 @@ export {
 } from './css-model';
 export type { CssDiagnostic, CssDiagnosticCode } from './css-scanner';
 export {
+  resolveThemeDefaults,
+  scanThemeDeclarations,
+  type ThemeDeclarations,
+  type ThemeDefaultsOptions,
+} from './defaults';
+export {
   buildThemeVariableSchema,
   flattenThemeVariables,
   getThemeVariableName,

@@ -1,7 +1,7 @@
 import { EditorContent, EditorContext, useCurrentEditor } from '@tiptap/react';
 import { invariant } from 'outvariant';
 import type React from 'react';
-import { use, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { use, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
@@ -30,6 +30,9 @@ if (import.meta.hot) {
   });
 }
 
+const toHostScope = (css: string | undefined) =>
+  css?.replace(/:root/g, ':host') ?? '';
+
 export function EditorStyleContainer({
   children,
   bundledCss,
@@ -37,7 +40,12 @@ export function EditorStyleContainer({
 }: React.PropsWithChildren<{ bundledCss?: string; customCss?: string }>) {
   const node = useRef<HTMLDivElement | null>(null);
   const [root, setRoot] = useState<DocumentFragment | null>(null);
-  const editorConfigurableStyleSheet = useRef(new CSSStyleSheet());
+  // Separate sheets, so that editing the user CSS never reparses the theme package
+  const [sheets] = useState(() => ({
+    theme: new CSSStyleSheet(),
+    override: new CSSStyleSheet(),
+    custom: new CSSStyleSheet(),
+  }));
 
   useLayoutEffect(() => {
     if (!node.current || node.current.shadowRoot) {
@@ -49,22 +57,26 @@ export function EditorStyleContainer({
     });
     shadowRoot.adoptedStyleSheets = [
       editorBaseStyleSheet,
-      editorConfigurableStyleSheet.current,
+      sheets.theme,
+      sheets.override,
+      sheets.custom,
     ];
     setRoot(shadowRoot);
-  }, [node]);
+  }, [sheets]);
 
-  useEffect(() => {
-    const css = `${bundledCss?.replace(/:root/g, ':host') ?? ''}
-${editorOverrideCss}
-${customCss?.replace(/:root/g, ':host') ?? ''}`;
-    editorConfigurableStyleSheet.current.replaceSync(css);
+  useLayoutEffect(() => {
+    sheets.theme.replaceSync(toHostScope(bundledCss));
+  }, [sheets, bundledCss]);
+  useLayoutEffect(() => {
+    sheets.override.replaceSync(editorOverrideCss);
   }, [
-    bundledCss,
-    customCss,
+    sheets,
     // Add imported CSS as dependency to re-apply on HMR
     editorOverrideCss,
   ]);
+  useLayoutEffect(() => {
+    sheets.custom.replaceSync(toHostScope(customCss));
+  }, [sheets, customCss]);
   return (
     <div ref={node} className="h-full">
       {root && <ShadowContent root={root}>{children}</ShadowContent>}

@@ -299,13 +299,21 @@ export class Sandbox {
     await this.persistence.latest;
   }
 
+  // Ordered, so that a later version of a file can never be overwritten by an
+  // earlier one whose bytes took longer to resolve.
+  protected syncQueue: Promise<void> = Promise.resolve();
+
   protected async handleFileUpdate(ops: INTERNAL_Op[]) {
     const pendingUpdates = collectFileUpdates(ops);
     // Queued before the bytes resolve, so `dispose()` waits for this batch.
     const persist = this.persistence.persist(pendingUpdates);
-    const updates = await pendingUpdates;
-    // Rejects once the worker is gone, leaving nothing to mirror the change into.
-    const cli = await this.cli.createRemotePromise().catch(() => undefined);
-    await Promise.all([cli?.fromJSON(updates, '/workdir'), persist]);
+    const sync = this.syncQueue.then(async () => {
+      const updates = await pendingUpdates;
+      // Rejects once the worker is gone, leaving nothing to mirror the change into.
+      const cli = await this.cli.createRemotePromise().catch(() => undefined);
+      await cli?.fromJSON(updates, '/workdir');
+    });
+    this.syncQueue = sync.catch(() => {});
+    await Promise.all([sync, persist]);
   }
 }

@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useCallback,
+  useDeferredValue,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -22,8 +23,11 @@ import {
   DEFAULT_THEME_SCOPE,
   loadThemeVariableSchema,
   parseThemeCss,
+  resolveThemeDefaults,
+  scanThemeDeclarations,
   THEME_SCOPES,
   type ThemeCssModel,
+  type ThemeDeclarations,
   type ThemeScopeId,
   type ThemeVariableSchema,
 } from '../../libs/theme-variables';
@@ -43,6 +47,10 @@ const SEARCH_DEBOUNCE_MS = 200;
 
 export interface ThemeCssEditorProps {
   css: string;
+  /** Bundled CSS of the installed theme package, which sets the defaults. */
+  themeCss?: string;
+  /** Language of the document, for defaults declared under `:lang()`. */
+  language?: string;
   onCssChange: (css: string) => void;
 }
 
@@ -85,9 +93,13 @@ function toggle(set: ReadonlySet<string>, key: string): Set<string> {
   return next;
 }
 
+const noDefaults = () => undefined;
+
 function useThemeSettings(
   schema: ThemeVariableSchema | undefined,
   model: ThemeCssModel | null,
+  theme: ThemeDeclarations | undefined,
+  language: string | undefined,
 ) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -148,6 +160,14 @@ function useThemeSettings(
     [model, schema],
   );
 
+  const getDefaultValue = useMemo(
+    () =>
+      schema
+        ? resolveThemeDefaults({ schema, theme, language, scope })
+        : noDefaults,
+    [schema, theme, language, scope],
+  );
+
   const handleQueryChange = useCallback((next: string, immediate = false) => {
     setQuery(next);
     if (immediate) {
@@ -193,6 +213,7 @@ function useThemeSettings(
     list: {
       rows: result?.rows ?? [],
       scope,
+      getDefaultValue,
       onToggle: handleToggle,
       onShowMore: handleShowMore,
       onSwitchScope: setScope,
@@ -207,6 +228,8 @@ function useThemeSettings(
  */
 export default function ThemeCssEditor({
   css,
+  themeCss,
+  language,
   onCssChange,
 }: ThemeCssEditorProps) {
   const [mode, setMode] = useState<Mode>('gui');
@@ -263,7 +286,17 @@ export default function ThemeCssEditor({
     () => (mode === 'gui' ? parseThemeCss(css) : null),
     [css, mode],
   );
-  const settings = useThemeSettings(schema, model);
+  // A bundle runs to hundreds of KB, so it is scanned in a deferred render;
+  // the documented defaults show until then.
+  const deferredThemeCss = useDeferredValue(themeCss ?? null, null);
+  const theme = useMemo(
+    () =>
+      deferredThemeCss === null
+        ? undefined
+        : scanThemeDeclarations(deferredThemeCss),
+    [deferredThemeCss],
+  );
+  const settings = useThemeSettings(schema, model, theme, language);
 
   return (
     <Tabs value={mode} onValueChange={(value) => switchMode(value as Mode)}>

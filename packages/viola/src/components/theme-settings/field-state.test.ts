@@ -5,269 +5,101 @@ import {
   getDescriptorUnits,
   loadThemeVariableSchema,
   parseSyntax,
-  type ValueDescriptor,
+  validateValue,
 } from '../../libs/theme-variables';
-import {
-  composeDimension,
-  decodeOption,
-  encodeOption,
-  type FieldOption,
-  getDefaultUnit,
-  getSelectedOption,
-  parseFieldValue,
-  planNumberCommit,
-  planUnitChange,
-  resolveFieldView,
-} from './field-state';
+import { completeUnits, getDefaultUnit } from './field-state';
 
-const margin = { keywords: ['auto'], units: ['mm', 'pt', 'em', '%'] };
-const weight = { keywords: ['bold', 'normal'], units: [''] };
-const fill = { keywords: ['auto', 'balance'], units: [] };
-
-describe('parseFieldValue', () => {
-  it.each([
-    ['', margin, { kind: 'empty' }],
-    ['  ', margin, { kind: 'empty' }],
-    ['AUTO', margin, { kind: 'keyword', keyword: 'auto' }],
-    ['12.5mm', margin, { kind: 'dimension', number: '12.5', unit: 'mm' }],
-    ['3PT', margin, { kind: 'dimension', number: '3', unit: 'pt' }],
-    ['1.50em', margin, { kind: 'dimension', number: '1.50', unit: 'em' }],
-    ['.5em', margin, { kind: 'dimension', number: '.5', unit: 'em' }],
-    ['+1e2pt', margin, { kind: 'dimension', number: '+1e2', unit: 'pt' }],
-    ['0', margin, { kind: 'dimension', number: '0', unit: 'mm' }],
-    ['5', margin, { kind: 'custom' }],
-    ['12px', margin, { kind: 'custom' }],
-    ['1em 2em', margin, { kind: 'custom' }],
-    ['var(--x)', margin, { kind: 'custom' }],
-    ['700', weight, { kind: 'dimension', number: '700', unit: '' }],
-    ['bold', weight, { kind: 'keyword', keyword: 'bold' }],
-    ['balance', fill, { kind: 'keyword', keyword: 'balance' }],
-    ['1', fill, { kind: 'custom' }],
-  ])('%j', (value, shape, view) => {
-    expect(parseFieldValue(value, shape)).toEqual(view);
-  });
-});
+const margin = parseSyntax('auto | <length-percentage>+');
+const length = parseSyntax('thin | <length>');
+const stretch = parseSyntax('normal | <percentage>');
+const lineHeight = parseSyntax('normal | <length> | <number> | <percentage>');
+const weight = parseSyntax('bold | <number>');
+const units = getDescriptorUnits(margin);
 
 describe('getDefaultUnit', () => {
-  it('takes the unit of the default value', () => {
-    expect(getDefaultUnit(margin, '2em')).toBe('em');
+  it('takes the unit in use, then the one of the default', () => {
+    expect(getDefaultUnit(units, ['10PT', '2em'])).toBe('pt');
+    expect(getDefaultUnit(units, ['', '2em'])).toBe('em');
+    expect(getDefaultUnit(units, [undefined, '0 5%'])).toBe('%');
   });
 
-  it('falls back to the first unit', () => {
-    expect(getDefaultUnit(margin, 'var(--x)')).toBe('mm');
-    expect(getDefaultUnit(margin, undefined)).toBe('mm');
-    expect(getDefaultUnit(fill, 'auto')).toBe('');
+  it('ignores units the value cannot take and nested ones', () => {
+    expect(getDefaultUnit(units, ['3deg', 'calc(1em + 2pt)'])).toBe('mm');
+    expect(getDefaultUnit(units, ['var(--x, 1em)', undefined])).toBe('mm');
+  });
+
+  it('falls back to the first unit, never to unitless', () => {
+    expect(getDefaultUnit(getDescriptorUnits(lineHeight), [])).toBe('mm');
+    expect(getDefaultUnit(getDescriptorUnits(stretch), ['normal'])).toBe('%');
+    expect(getDefaultUnit(getDescriptorUnits(weight), ['700'])).toBe('');
+    expect(getDefaultUnit([], ['auto'])).toBe('');
   });
 });
 
-describe('resolveFieldView', () => {
-  it('offers the number input for an unset dimension', () => {
-    expect(resolveFieldView('', null, margin, 'pt')).toEqual({
-      kind: 'dimension',
-      number: '',
-      unit: 'pt',
+describe('completeUnits', () => {
+  it.each([
+    ['12', margin, 'mm', '12mm'],
+    [' 12 ', margin, 'mm', ' 12mm '],
+    ['-1.5', margin, 'pt', '-1.5pt'],
+    ['10 20', margin, 'mm', '10mm 20mm'],
+    ['10 20pt', margin, 'mm', '10mm 20pt'],
+    ['1e2', length, 'px', '1e2px'],
+    // Unlike a length, a percentage has no unitless zero.
+    ['0', stretch, '%', '0%'],
+  ])('%j → %j', (text, descriptor, unit, expected) => {
+    expect(completeUnits(text, descriptor, unit)).toBe(expected);
+  });
+
+  it.each([
+    ['0', margin],
+    ['0 auto', margin],
+    ['12px', margin],
+    ['auto', margin],
+    ['1.5', lineHeight],
+    ['700', weight],
+    ['calc(2 * 3em)', margin],
+    ['var(--x, 2)', margin],
+    ['1.', margin],
+    ['1+2', margin],
+    ['12', parseSyntax('<integer>')],
+    ['12', parseSyntax('<custom-ident>')],
+  ])('leaves %j alone', (text, descriptor) => {
+    expect(completeUnits(text, descriptor, 'mm')).toBe(text);
+  });
+
+  it('completes a bare number for a universal descriptor too', () => {
+    const descriptor = describeVariable({
+      syntax: '*',
+      properties: ['margin-block'],
+      key: 'margin-block',
     });
-    expect(resolveFieldView('', null, fill, '')).toEqual({ kind: 'empty' });
+    expect(descriptor.universal).toBe(true);
+    expect(validateValue(descriptor, '12').valid).toBe(true);
+    expect(completeUnits('12', descriptor, 'em')).toBe('12em');
   });
 
-  it('shows a pending unit until a number is entered', () => {
-    expect(
-      resolveFieldView('auto', { kind: 'dimension', unit: 'em' }, margin, 'mm'),
-    ).toEqual({ kind: 'dimension', number: '', unit: 'em' });
-    expect(
-      resolveFieldView(
-        'var(--x)',
-        { kind: 'dimension', unit: 'em' },
-        margin,
-        'mm',
-      ),
-    ).toEqual({ kind: 'dimension', number: '', unit: 'em' });
+  it('does nothing without a unit to give', () => {
+    expect(completeUnits('12', margin, '')).toBe('12');
   });
 
-  it('lets the committed dimension win over a pending unit', () => {
-    expect(
-      resolveFieldView('3pt', { kind: 'dimension', unit: 'em' }, margin, 'mm'),
-    ).toEqual({ kind: 'dimension', number: '3', unit: 'pt' });
-  });
-
-  it('keeps free text once chosen, whatever the value', () => {
-    expect(resolveFieldView('3pt', { kind: 'custom' }, margin, 'mm')).toEqual({
-      kind: 'custom',
-    });
-  });
-});
-
-describe('options', () => {
-  it.each<FieldOption>([
-    { kind: 'default' },
-    { kind: 'custom' },
-    { kind: 'unit', unit: '' },
-    { kind: 'unit', unit: '%' },
-    { kind: 'keyword', keyword: 'auto' },
-  ])('round-trips %j', (option) => {
-    expect(decodeOption(encodeOption(option))).toEqual(option);
-  });
-
-  it('selects the option of a view', () => {
-    expect(
-      getSelectedOption({ kind: 'dimension', number: '1', unit: 'mm' }),
-    ).toEqual({ kind: 'unit', unit: 'mm' });
-    expect(getSelectedOption({ kind: 'empty' })).toEqual({ kind: 'default' });
-  });
-});
-
-describe('composeDimension', () => {
-  it.each([
-    ['12', 'mm', '12mm'],
-    [' .5 ', 'em', '.5em'],
-    ['1.50', 'em', '1.50em'],
-    ['0.0000001', 'mm', '0.0000001mm'],
-    ['1e2', 'px', '1e2px'],
-    ['-1', '', '-1'],
-    ['', 'mm', ''],
-  ])('%j + %j → %j', (number, unit, value) => {
-    expect(composeDimension(number, unit)).toBe(value);
-  });
-
-  it.each([
-    'abc',
-    'auto',
-    '1e',
-    '-',
-    '.',
-    '1.2.3',
-    '12mm',
-  ])('refuses %j', (number) => {
-    expect(composeDimension(number, 'mm')).toBeNull();
-  });
-});
-
-const shapeOf = (descriptor: ValueDescriptor) => ({
-  keywords: descriptor.keywords,
-  units: getDescriptorUnits(descriptor),
-});
-
-/** The number input as it first renders `value`, left as is on blur. */
-function blurUntouched(
-  value: string,
-  descriptor: ValueDescriptor,
-  defaultValue?: string,
-) {
-  const shape = shapeOf(descriptor);
-  const view = resolveFieldView(
-    value,
-    null,
-    shape,
-    getDefaultUnit(shape, defaultValue),
-  );
-  if (view.kind !== 'dimension') {
-    return null;
-  }
-  return planNumberCommit({
-    draft: view.number,
-    displayed: view.number,
-    unit: view.unit,
-    value,
-  });
-}
-
-describe('planNumberCommit', () => {
-  const length = parseSyntax('thin | <length>');
-  const lengthPercentage = parseSyntax('auto | <length-percentage>');
-  const number = parseSyntax('bold | <number>');
-
-  it.each([
-    ['0', length],
-    ['0', lengthPercentage],
-    ['1.50em', lengthPercentage],
-    ['.5em', lengthPercentage],
-    ['10PX', length],
-    ['+1em', length],
-    ['1e2px', length],
-    ['0.0000001mm', length],
-    ['-3pt', length],
-    ['100%', lengthPercentage],
-    ['1.50', number],
-    ['', length],
-  ])('commits nothing for an untouched %j', (value, descriptor) => {
-    expect(blurUntouched(value, descriptor)).toEqual({ kind: 'none' });
-  });
-
-  it('commits nothing for an untouched schema default', async () => {
+  it('leaves every schema default as it is', async () => {
     const schema = await loadThemeVariableSchema();
     let checked = 0;
     for (const variable of schema.variables) {
       const descriptor = describeVariable(variable);
-      if (
-        !variable.defaultValue ||
-        !['select', 'dimension', 'number'].includes(descriptor.input)
-      ) {
+      const { defaultValue } = variable;
+      if (!defaultValue) {
         continue;
       }
-      const plan = blurUntouched(
-        variable.defaultValue,
-        descriptor,
-        variable.defaultValue,
-      );
-      if (plan) {
-        expect([variable.name, plan]).toEqual([
-          variable.name,
-          { kind: 'none' },
-        ]);
-        checked++;
-      }
+      const unit = getDefaultUnit(getDescriptorUnits(descriptor), [
+        defaultValue,
+      ]);
+      expect([
+        variable.name,
+        completeUnits(defaultValue, descriptor, unit),
+      ]).toEqual([variable.name, defaultValue]);
+      checked++;
     }
-    expect(checked).toBeGreaterThan(40);
-  });
-
-  it('commits an edited number with the displayed unit', () => {
-    expect(
-      planNumberCommit({ draft: '12', displayed: '0', unit: 'mm', value: '0' }),
-    ).toEqual({ kind: 'commit', value: '12mm' });
-  });
-
-  it('unsets a cleared number', () => {
-    expect(
-      planNumberCommit({
-        draft: ' ',
-        displayed: '12',
-        unit: 'mm',
-        value: '12mm',
-      }),
-    ).toEqual({ kind: 'commit', value: '' });
-  });
-
-  it('keeps a keyword when the pending number stays empty', () => {
-    expect(
-      planNumberCommit({ draft: '', displayed: '', unit: 'mm', value: 'auto' }),
-    ).toEqual({ kind: 'none' });
-  });
-
-  it.each(['auto', '1e', '-'])('rejects %j instead of unsetting', (draft) => {
-    expect(
-      planNumberCommit({ draft, displayed: '12', unit: 'mm', value: '12mm' }),
-    ).toEqual({ kind: 'error', error: 'not-a-number' });
-  });
-});
-
-describe('planUnitChange', () => {
-  it('keeps the number as written', () => {
-    expect(planUnitChange({ draft: '.5', unit: 'pt', value: '.5em' })).toEqual({
-      kind: 'commit',
-      value: '.5pt',
-    });
-  });
-
-  it('gives a unitless zero the picked unit', () => {
-    expect(planUnitChange({ draft: '0', unit: 'pt', value: '0' })).toEqual({
-      kind: 'commit',
-      value: '0pt',
-    });
-  });
-
-  it('waits for a number', () => {
-    expect(planUnitChange({ draft: '', unit: 'pt', value: 'auto' })).toEqual({
-      kind: 'none',
-    });
+    expect(checked).toBeGreaterThan(100);
   });
 });
