@@ -9,10 +9,10 @@ import {
 import {
   BASIC_GROUP,
   getForeignModule,
-  getSettingsGroupId,
   getSettingsGroupRank,
   getSourceRank,
   META_GROUP,
+  placeSubgroup,
 } from './subjects';
 
 export interface ThemeVariableDefault {
@@ -59,7 +59,10 @@ export type ThemeVariableSubgroupRef =
   | { kind: 'category'; id: ThemeVariableCategory };
 
 export type ThemeVariableSubgroup = ThemeVariableSubgroupRef & {
-  /** Tree group the subgroup belongs to. */
+  /**
+   * Tree group that keys the subgroup. A subgroup of an element can also list
+   * the variables of a module folded into it.
+   */
   group: string;
   /** Module to name in the label of the subgroup, if any. */
   module: string | null;
@@ -339,22 +342,23 @@ export function groupThemeVariables(
 ): ThemeVariableGroup[] {
   const groups = new Map<string, ThemeVariableGroup>();
   for (const variable of variables) {
-    const groupId = getSettingsGroupId(variable.group, variable.subgroup);
+    const place = placeSubgroup(variable.group, variable.subgroup);
+    const groupId = place.settingsGroup;
     let group = groups.get(groupId);
     if (!group) {
       group = { id: groupId, variables: [], subgroups: [] };
       groups.set(groupId, group);
     }
     group.variables.push(variable);
-    const { kind, id } = variable.subgroup;
+    const { kind, id } = place.subgroup;
     let subgroup = group.subgroups.find(
-      (s) => s.group === variable.group && s.kind === kind && s.id === id,
+      (s) => s.group === place.group && s.kind === kind && s.id === id,
     );
     if (!subgroup) {
       subgroup = {
-        ...variable.subgroup,
-        group: variable.group,
-        module: getForeignModule(groupId, variable.group),
+        ...place.subgroup,
+        group: place.group,
+        module: getForeignModule(groupId, place.group),
         variables: [],
       };
       group.subgroups.push(subgroup);

@@ -40,6 +40,7 @@ export {
   type ThemeScope,
   type ThemeScopeId,
 } from './scopes';
+export { isFoldedModule } from './subjects';
 export {
   CSS_DATA_TYPES,
   type CssDataType,

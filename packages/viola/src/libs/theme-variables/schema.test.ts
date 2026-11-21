@@ -438,7 +438,7 @@ describe('flattenThemeVariables', () => {
         'table-width': v('width'),
         'table-height': v('height'),
       },
-      section: { 'call-content': v('content'), 'call-display': v('display') },
+      listing: { 'call-content': v('content'), 'call-display': v('display') },
       table: { 'call-content': v('content'), 'call-display': v('display') },
       widget: { 'foo-content': v('content'), 'foo-display': v('display') },
       heading: { 'foo-content': v('content'), 'foo-display': v('display') },
@@ -451,19 +451,74 @@ describe('flattenThemeVariables', () => {
         ),
       ]),
     ).toEqual([
-      [
-        'heading',
-        [
-          '_basic/heading',
-          '_basic/h1',
-          'section/call (section)',
-          'heading/foo',
-        ],
-      ],
+      ['heading', ['_basic/heading', '_basic/h1', 'heading/foo']],
       ['table', ['_basic/table', 'table/call']],
+      ['code', ['listing/call (listing)']],
       ['inline', ['_basic/bold', '_basic/bold-emphasis']],
       ['_basic', ['_basic/marquee']],
       ['widget', ['widget/foo']],
+    ]);
+  });
+
+  it('folds a module into the elements of its subject', () => {
+    const v = (property?: string) => ({ _syntax: '*', _property: property });
+    const schema = buildThemeVariableSchema({
+      _basic: {
+        'h1-font-size': v('font-size'),
+        'h1-break-after': v('break-after'),
+        'heading-font-size': v('font-size'),
+        'heading-margin-block': v('margin-block'),
+      },
+      section: {
+        'call-content': v('content'),
+        'call-display': v('display'),
+        'counter-style': v(),
+        'h1-break-after': v('break-after'),
+        'h1-break-before': v('break-before'),
+        'h1-marker-content': v('content'),
+        'h1-marker-display': v('display'),
+        label: v(),
+      },
+    });
+    expect(
+      schema.groups.map((group) => [
+        group.id,
+        group.subgroups.map((s) => [
+          `${s.group}/${s.id}`,
+          s.module,
+          s.variables.map((variable) => variable.name),
+        ]),
+      ]),
+    ).toEqual([
+      [
+        'heading',
+        [
+          [
+            '_basic/heading',
+            null,
+            [
+              '--vs--heading-font-size',
+              '--vs--heading-margin-block',
+              '--vs-section--call-display',
+              '--vs-section--call-content',
+              '--vs-section--counter-style',
+              '--vs-section--label',
+            ],
+          ],
+          [
+            '_basic/h1',
+            null,
+            [
+              '--vs--h1-font-size',
+              '--vs-section--h1-marker-display',
+              '--vs--h1-break-after',
+              '--vs-section--h1-break-after',
+              '--vs-section--h1-break-before',
+              '--vs-section--h1-marker-content',
+            ],
+          ],
+        ],
+      ],
     ]);
   });
 

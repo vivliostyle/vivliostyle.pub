@@ -12,6 +12,11 @@ interface ThemeSubject {
   elements: readonly string[];
   /** Module groups it takes, in display order. */
   modules: readonly string[];
+  /**
+   * Module groups whose subgroups join the elements: a target joins the
+   * element that leads its name, and the rest joins the first element.
+   */
+  folds?: readonly string[];
 }
 
 // theme-base splits one subject between the element group and a module, such
@@ -21,7 +26,10 @@ const SUBJECTS: readonly ThemeSubject[] = [
   {
     id: 'heading',
     elements: ['heading', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-    modules: ['section'],
+    modules: [],
+    // The numbering and the breaks of the section around a heading are found
+    // where the heading is, not under the name of the module.
+    folds: ['section'],
   },
   {
     id: 'list',
@@ -79,10 +87,13 @@ interface ElementMatch {
   exact: boolean;
 }
 
-function findElement(target: string): ElementMatch | undefined {
+function findElement(
+  target: string,
+  subjects: readonly ThemeSubject[] = SUBJECTS,
+): ElementMatch | undefined {
   let match: ElementMatch | undefined;
   let matchLength = 0;
-  for (const subject of SUBJECTS) {
+  for (const subject of subjects) {
     for (const [index, element] of subject.elements.entries()) {
       if (
         (target === element || target.startsWith(`${element}-`)) &&
@@ -96,19 +107,45 @@ function findElement(target: string): ElementMatch | undefined {
   return match;
 }
 
-/** Id of the settings group that lists a subgroup of a tree group. */
-export function getSettingsGroupId(
+export interface SubgroupPlace {
+  settingsGroup: string;
+  /** Tree group of the subgroup listed, the element group for a fold. */
+  group: string;
+  subgroup: ThemeVariableSubgroupRef;
+}
+
+/** Where the settings list a subgroup of a tree group. */
+export function placeSubgroup(
   group: string,
   subgroup: ThemeVariableSubgroupRef,
-): string {
+): SubgroupPlace {
   if (group === BASIC_GROUP) {
     const element =
       subgroup.kind === 'target' ? findElement(subgroup.id) : undefined;
-    return element?.subject.id ?? group;
+    return { settingsGroup: element?.subject.id ?? group, group, subgroup };
   }
-  return (
-    SUBJECTS.find((subject) => subject.modules.includes(group))?.id ?? group
-  );
+  const folding = SUBJECTS.find((subject) => subject.folds?.includes(group));
+  if (folding) {
+    const element =
+      subgroup.kind === 'target'
+        ? findElement(subgroup.id, [folding])
+        : undefined;
+    return {
+      settingsGroup: folding.id,
+      group: BASIC_GROUP,
+      subgroup: {
+        kind: 'target',
+        id: folding.elements[element?.index ?? 0],
+      },
+    };
+  }
+  const lending = SUBJECTS.find((subject) => subject.modules.includes(group));
+  return { settingsGroup: lending?.id ?? group, group, subgroup };
+}
+
+/** Whether the settings list a module among the elements of a subject. */
+export function isFoldedModule(group: string): boolean {
+  return SUBJECTS.some((subject) => subject.folds?.includes(group));
 }
 
 /**

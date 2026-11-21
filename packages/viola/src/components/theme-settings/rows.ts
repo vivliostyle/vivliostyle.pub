@@ -6,7 +6,7 @@ import {
   type ThemeVariableGroup,
   type ThemeVariableSubgroupRef,
 } from '../../libs/theme-variables';
-import { getVariableLabel, humanizeKey } from './labels';
+import { getTargetLabel, getVariableLabel } from './labels';
 
 export interface SettingsFilter {
   query: string;
@@ -144,18 +144,16 @@ export function matchSettings({
   for (const group of groups) {
     const label = getGroupLabel(group.id);
     const subgroups = group.subgroups.flatMap((subgroup) => {
-      if (!isVariableGroupInScope(scope, subgroup.group)) {
-        return [];
-      }
       const ownLabel =
         subgroup.kind === 'target'
-          ? humanizeKey(subgroup.id)
+          ? getTargetLabel(subgroup.group, subgroup.id)
           : getCategoryLabel(subgroup.id);
       const subgroupLabel = subgroup.module
         ? qualifyLabel(getGroupLabel(subgroup.module), ownLabel)
         : ownLabel;
       const variables = subgroup.variables.filter(
         (variable) =>
+          isVariableGroupInScope(scope, variable.group) &&
           (!filter.modifiedOnly || isModified(variable.name)) &&
           matchesQuery(variable, tokens, [label, subgroupLabel]),
       );

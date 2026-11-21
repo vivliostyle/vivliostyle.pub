@@ -5,7 +5,15 @@ import type {
   ValueType,
 } from '../../libs/theme-variables';
 import type { CommitError } from './commit';
-import { humanizeKey } from './labels';
+
+/** Stands in for a label that the messages lack. */
+export function humanizeKey(key: string): string {
+  const text = key
+    .split('-')
+    .filter((word) => word !== '')
+    .join(' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 const GROUP_LABELS: Record<string, () => string> = {
   '_meta-properties': m.theme_settings_group_meta,
