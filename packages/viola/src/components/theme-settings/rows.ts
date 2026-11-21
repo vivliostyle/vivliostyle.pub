@@ -51,6 +51,8 @@ export interface SettingsMatchInput {
   scope: ThemeScopeId;
   filter: SettingsFilter;
   isModified: (name: string) => boolean;
+  /** Whether to list the variables marked as advanced. */
+  showAdvanced: boolean;
   getGroupLabel: (groupId: string) => string;
   getCategoryLabel: (category: ThemeVariableCategory) => string;
   /** Labels a subgroup that a module lends to a group of another name. */
@@ -131,6 +133,7 @@ export function matchSettings({
   scope,
   filter,
   isModified,
+  showAdvanced,
   getGroupLabel,
   getCategoryLabel,
   qualifyLabel,
@@ -155,6 +158,11 @@ export function matchSettings({
         (variable) =>
           isVariableGroupInScope(scope, variable.group) &&
           (!filter.modifiedOnly || isModified(variable.name)) &&
+          // A search looks through them all, to find a setting by its name.
+          (showAdvanced ||
+            !variable.advanced ||
+            tokens.length > 0 ||
+            isModified(variable.name)) &&
           matchesQuery(variable, tokens, [label, subgroupLabel]),
       );
       if (variables.length === 0) {

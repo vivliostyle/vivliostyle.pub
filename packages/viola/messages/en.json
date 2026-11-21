@@ -250,6 +250,7 @@
   "theme_settings_search_clear_aria": "Clear search",
   "theme_settings_search_placeholder": "Search settings",
   "theme_settings_section_label": "Section",
+  "theme_settings_show_advanced": "Show advanced",
   "theme_settings_show_more_count": "Show more ({count} remaining)",
   "theme_settings_subgroup_of_module": "{module}: {label}",
   "theme_settings_target_bold_emphasis": "Nested bold and emphasis",

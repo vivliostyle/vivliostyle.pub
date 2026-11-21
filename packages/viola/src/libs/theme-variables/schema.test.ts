@@ -103,6 +103,7 @@ describe('flattenThemeVariables', () => {
       target: null,
       propertyKey: 'color-foreground',
       category: 'color',
+      advanced: false,
       syntax: '*',
       properties: ['color'],
       defaultValue: '#000',
@@ -262,6 +263,30 @@ describe('flattenThemeVariables', () => {
       '--vs-page--mbox-top-inside-content': 'generated-content',
       '--vs-page--cover-page-mbox-visibility': 'visibility',
       '--vs-page--mystery': 'other',
+    });
+  });
+
+  it('marks the counter internals as advanced', () => {
+    expect(
+      Object.fromEntries(
+        flattenThemeVariables({
+          figure: {
+            'counter-style': { _syntax: '*' },
+            label: { _syntax: '*' },
+            'root-counter-reset': { _syntax: '*', _property: 'counter-reset' },
+            'root-counter-fig': { _syntax: '*' },
+          },
+          '_meta-properties': {
+            'crossref-call-counter-prefix': { _syntax: '*' },
+          },
+        }).map((v) => [v.name, v.advanced]),
+      ),
+    ).toEqual({
+      '--vs-figure--counter-style': false,
+      '--vs-figure--label': false,
+      '--vs-figure--root-counter-reset': true,
+      '--vs-figure--root-counter-fig': true,
+      '--vs-crossref-call-counter-prefix': true,
     });
   });
 

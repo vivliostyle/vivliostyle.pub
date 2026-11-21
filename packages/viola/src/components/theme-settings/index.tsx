@@ -125,6 +125,7 @@ function useThemeSettings(
   const [debouncedQuery, setDebouncedQuery] = useState('');
   useDebounce(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS, [query]);
   const [modifiedOnly, setModifiedOnly] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [scope, setScope] = useState<ThemeScopeId>(DEFAULT_THEME_SCOPE);
 
   const filter = useMemo(
@@ -151,11 +152,12 @@ function useThemeSettings(
       scope,
       filter,
       isModified: (name) => Object.hasOwn(variables, name),
+      showAdvanced,
       getGroupLabel,
       getCategoryLabel,
       qualifyLabel,
     });
-  }, [schema, model, scope, filter]);
+  }, [schema, model, scope, filter, showAdvanced]);
   const toc = matches?.toc ?? [];
   const section = resolveSection(
     toc,
@@ -256,6 +258,8 @@ function useThemeSettings(
       scopeCounts,
       modifiedOnly,
       onModifiedOnlyChange: setModifiedOnly,
+      showAdvanced,
+      onShowAdvancedChange: setShowAdvanced,
       matchCount: filtering ? matchCount : null,
     },
     listSection: section,

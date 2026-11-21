@@ -302,3 +302,12 @@ export function getPropertyRank(propertyKey: string): number[] {
   }
   return [PROPERTY_ORDER.length];
 }
+
+/**
+ * Whether a property only tunes the counters behind the numbering, which a
+ * design seldom touches: resets, increments, initial values, prefixes and
+ * the expressions that build a number.
+ */
+export function isAdvancedProperty(propertyKey: string): boolean {
+  return /^(?:counter-(?!style$|delimiter$)|crossref-)/.test(propertyKey);
+}
