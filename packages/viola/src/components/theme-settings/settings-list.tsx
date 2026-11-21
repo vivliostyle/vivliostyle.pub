@@ -8,6 +8,7 @@ import {
   type ThemeCssModel,
   type ThemeScopeId,
 } from '../../libs/theme-variables';
+import { MarginBoxPicker } from './margin-box-picker';
 import type { SettingsRow } from './rows';
 import { SettingInfoCard } from './setting-info';
 import { type CommitHandler, SettingRow } from './setting-row';
@@ -20,6 +21,7 @@ function SettingsList({
   onShowMore,
   onCommit,
   onSwitchScope,
+  onSelectSection,
 }: {
   rows: readonly SettingsRow[];
   model: ThemeCssModel;
@@ -28,6 +30,7 @@ function SettingsList({
   onShowMore: () => void;
   onCommit: CommitHandler;
   onSwitchScope: (scope: ThemeScopeId) => void;
+  onSelectSection: (section: string) => void;
 }) {
   const variables = useMemo(
     () =>
@@ -64,6 +67,15 @@ function SettingsList({
                 <h5 key={row.key} className="mt-4 text-sm font-semibold">
                   {row.label}
                 </h5>
+              );
+            case 'picker':
+              return (
+                <MarginBoxPicker
+                  key={row.key}
+                  boxes={row.boxes}
+                  current={row.current}
+                  onSelect={onSelectSection}
+                />
               );
             case 'category':
               return (

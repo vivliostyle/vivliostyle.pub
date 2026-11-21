@@ -6,7 +6,7 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import type { PrerenderTriggerProps } from '../../hooks/use-prerender';
 import { NativeSelect } from './native-select';
-import type { SettingsSection, SettingsTocGroup } from './rows';
+import { getTocKey, type SettingsSection, type SettingsTocGroup } from './rows';
 
 export interface SettingsTocProps {
   toc: readonly SettingsTocGroup[];
@@ -19,10 +19,14 @@ export interface SettingsTocProps {
   getPrerenderProps: (section: string | null) => PrerenderTriggerProps;
 }
 
-const holdsSection = (group: SettingsTocGroup, section: string | null) =>
-  group.key === section || group.subgroups.some((s) => s.key === section);
+const showsSection = (entry: SettingsSection, section: string | null) =>
+  entry.key === section || !!entry.members?.some((m) => m.key === section);
 
-function ModifiedDot({ count }: { count: number }) {
+const holdsSection = (group: SettingsTocGroup, section: string | null) =>
+  group.key === section ||
+  group.subgroups.some((subgroup) => showsSection(subgroup, section));
+
+export function ModifiedDot({ count }: { count: number }) {
   if (count === 0) {
     return null;
   }
@@ -159,7 +163,7 @@ export const SettingsToc = memo(function SettingsToc({
                         label={subgroup.label}
                         count={subgroup.count}
                         modified={subgroup.modified}
-                        current={subgroup.key === section}
+                        current={showsSection(subgroup, section)}
                         showCount={filtering}
                         onSelect={onSelect}
                         getPrerenderProps={getPrerenderProps}
@@ -226,7 +230,7 @@ export function SettingsSectionSelect({
       <NativeSelect
         id={id}
         className="flex-1"
-        value={section ?? ''}
+        value={section === null ? '' : getTocKey(toc, section)}
         onChange={(event) => onSelect(event.target.value || null)}
       >
         {options}

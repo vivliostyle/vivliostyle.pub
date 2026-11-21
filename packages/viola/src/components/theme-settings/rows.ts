@@ -1,3 +1,4 @@
+import { m } from '../../generated/paraglide/messages';
 import {
   isVariableGroupInScope,
   type ThemeScopeId,
@@ -7,6 +8,7 @@ import {
   type ThemeVariableSubgroupRef,
 } from '../../libs/theme-variables';
 import { getTargetLabel, getVariableLabel } from './labels';
+import { ALL_MARGIN_BOXES, getMarginBox } from './margin-boxes';
 
 export interface SettingsFilter {
   query: string;
@@ -21,6 +23,8 @@ export interface SettingsSection {
   /** Variables passing the filter. */
   count: number;
   modified: number;
+  /** The sections an entry of the table of contents stands for together. */
+  members?: readonly SettingsSection[];
 }
 
 export interface SettingsTocGroup extends SettingsSection {
@@ -34,9 +38,29 @@ interface MatchedPart {
   variables: ThemeVariable[];
 }
 
+interface MatchedSubgroup {
+  section: SettingsSection;
+  parts: MatchedPart[];
+  /** The margin box the subgroup sets, if any. */
+  box: string | null;
+}
+
+type MatchedBox = MatchedSubgroup & { box: string };
+
+const isBox = (subgroup: MatchedSubgroup): subgroup is MatchedBox =>
+  subgroup.box !== null;
+
 interface MatchedGroup {
   section: SettingsTocGroup;
-  subgroups: { section: SettingsSection; parts: MatchedPart[] }[];
+  subgroups: MatchedSubgroup[];
+}
+
+/** A margin box that the diagram of a page can pick. */
+export interface MarginBoxOption {
+  key: string;
+  id: string;
+  count: number;
+  modified: number;
 }
 
 export interface SettingsMatches {
@@ -63,6 +87,12 @@ export type SettingsRow =
   | { kind: 'group'; key: string; label: string }
   | { kind: 'subgroup'; key: string; label: string }
   | { kind: 'category'; key: string; label: string }
+  | {
+      kind: 'picker';
+      key: string;
+      current: string;
+      boxes: readonly MarginBoxOption[];
+    }
   | { kind: 'variable'; key: string; variable: ThemeVariable }
   | { kind: 'more'; key: string; remaining: number };
 
@@ -101,6 +131,31 @@ export function matchesQuery(
     .join('\n')
     .toLowerCase();
   return tokens.every((token) => haystack.includes(token));
+}
+
+// The shared box opens the margin boxes, as every other one falls back to it.
+const leadBox = (boxes: readonly MatchedBox[]) =>
+  boxes.find((s) => s.box === ALL_MARGIN_BOXES) ?? boxes[0];
+
+// A page has some twenty margin boxes, which would bury the rest of the page
+// settings as entries of their own.
+function getTocSections(subgroups: readonly MatchedSubgroup[]) {
+  const boxes = subgroups.filter(isBox);
+  if (boxes.length === 0) {
+    return subgroups.map((s) => s.section);
+  }
+  const members = boxes.map((s) => s.section);
+  const entry: SettingsSection = {
+    key: leadBox(boxes).section.key,
+    groupId: members[0].groupId,
+    label: m.theme_settings_margin_boxes(),
+    count: members.reduce((sum, s) => sum + s.count, 0),
+    modified: members.reduce((sum, s) => sum + s.modified, 0),
+    members,
+  };
+  return subgroups.flatMap((s) =>
+    s.box === null ? [s.section] : s === boxes[0] ? [entry] : [],
+  );
 }
 
 // Category headings only pay off once a target spans several categories.
@@ -146,7 +201,7 @@ export function matchSettings({
 
   for (const group of groups) {
     const label = getGroupLabel(group.id);
-    const subgroups = group.subgroups.flatMap((subgroup) => {
+    const subgroups = group.subgroups.flatMap((subgroup): MatchedSubgroup[] => {
       const ownLabel =
         subgroup.kind === 'target'
           ? getTargetLabel(subgroup.group, subgroup.id)
@@ -182,10 +237,11 @@ export function matchSettings({
             subgroup.kind === 'target'
               ? splitIntoParts(key, variables, getCategoryLabel)
               : [{ key, label: null, variables }],
+          box: getMarginBox(subgroup),
         },
       ];
     });
-    const sections = subgroups.map((subgroup) => subgroup.section);
+    const sections = getTocSections(subgroups);
     const count = sections.reduce((sum, s) => sum + s.count, 0);
     if (count === 0) {
       continue;
@@ -218,12 +274,32 @@ export function findSection(
     if (group.key === key) {
       return group;
     }
-    const subgroup = group.subgroups.find((s) => s.key === key);
-    if (subgroup) {
-      return subgroup;
+    for (const subgroup of group.subgroups) {
+      const section = [subgroup, ...(subgroup.members ?? [])].find(
+        (s) => s.key === key,
+      );
+      if (section) {
+        return section;
+      }
     }
   }
   return undefined;
+}
+
+/** Key of the entry of the table of contents that shows a section. */
+export function getTocKey(
+  toc: readonly SettingsTocGroup[],
+  key: string,
+): string {
+  for (const group of toc) {
+    const entry = group.subgroups.find((s) =>
+      s.members?.some((member) => member.key === key),
+    );
+    if (entry) {
+      return entry.key;
+    }
+  }
+  return key;
 }
 
 /**
@@ -258,27 +334,51 @@ export function buildSettingsRows(
 
   for (const group of groups) {
     const { section } = group;
-    const wholeGroup = sectionKey === null || sectionKey === section.key;
+    const everything = sectionKey === null;
+    const wholeGroup = everything || sectionKey === section.key;
     if (
       !wholeGroup &&
       !group.subgroups.some((s) => s.section.key === sectionKey)
     ) {
       continue;
     }
+    // Outside a search, the margin boxes list one box at a time, picked on
+    // the diagram of a page.
+    const boxes = group.subgroups.filter(isBox);
+    const shownBox = everything
+      ? undefined
+      : (boxes.find((s) => s.section.key === sectionKey) ??
+        (wholeGroup && boxes.length > 0 ? leadBox(boxes) : undefined));
     pushHeader({ kind: 'group', key: section.key, label: section.label });
     for (const subgroup of group.subgroups) {
-      if (wholeGroup || subgroup.section.key === sectionKey) {
-        pushHeader({
-          kind: 'subgroup',
-          key: subgroup.section.key,
-          label: subgroup.section.label,
-        });
-        for (const part of subgroup.parts) {
-          if (part.label !== null) {
-            pushHeader({ kind: 'category', key: part.key, label: part.label });
-          }
-          pushVariables(part.variables);
+      if (subgroup.box !== null && !everything) {
+        if (subgroup !== shownBox) {
+          continue;
         }
+        pushHeader({
+          kind: 'picker',
+          key: `${section.key}/picker`,
+          current: subgroup.section.key,
+          boxes: boxes.map((s) => ({
+            key: s.section.key,
+            id: s.box,
+            count: s.section.count,
+            modified: s.section.modified,
+          })),
+        });
+      } else if (!wholeGroup && subgroup.section.key !== sectionKey) {
+        continue;
+      }
+      pushHeader({
+        kind: 'subgroup',
+        key: subgroup.section.key,
+        label: subgroup.section.label,
+      });
+      for (const part of subgroup.parts) {
+        if (part.label !== null) {
+          pushHeader({ kind: 'category', key: part.key, label: part.label });
+        }
+        pushVariables(part.variables);
       }
     }
   }
