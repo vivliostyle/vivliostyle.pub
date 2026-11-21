@@ -12,8 +12,6 @@ import {
   findSelectedCodeBlock,
   listHighlightLanguages,
 } from '@v/tiptap-extensions';
-import { Button } from '@v/ui/button';
-import { CheckIcon } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
@@ -24,6 +22,7 @@ import {
 } from '../../libs/editor/code-block-language';
 import type { EditorMenuPanelProps } from '../../libs/editor/menu/types';
 import { scrollOptionIntoView } from '../../libs/scroll-option-into-view';
+import { MenuPanelForm } from './menu-panel';
 
 type ListMode = 'closed' | 'typing' | 'browsing';
 
@@ -35,7 +34,9 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   const [value, setValue] = useState<string>(
     () => findSelectedCodeBlock(editor.state)?.node.attrs.language ?? '',
   );
-  const [caret, setCaret] = useState(0);
+  // Selecting just the language lets typing replace it while the meta stays.
+  const [initialSelection] = useState(() => languageRange(value));
+  const [caret, setCaret] = useState(initialSelection.from);
   const [listMode, setListMode] = useState<ListMode>('closed');
   const [activeIndex, setActiveIndex] = useState(-1);
   const pendingCaretRef = useRef<number | null>(null);
@@ -47,16 +48,6 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
           browse: listMode === 'browsing',
         });
   const expanded = suggestions.length > 0;
-
-  // Selecting just the language lets typing replace it while the meta stays.
-  useEffect(() => {
-    const { from, to } = languageRange(inputRef.current?.value ?? '');
-    // The panel can mount before its popover is positioned, when scrolling to
-    // the field would jump the editor pane.
-    inputRef.current?.focus({ preventScroll: true });
-    inputRef.current?.setSelectionRange(from, to);
-    setCaret(from);
-  }, []);
 
   useLayoutEffect(() => {
     const pending = pendingCaretRef.current;
@@ -132,25 +123,23 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
         }
         return;
       case 'Escape':
-        event.preventDefault();
-        event.stopPropagation();
         if (expanded) {
+          event.preventDefault();
+          event.stopPropagation();
           closeList();
-        } else {
-          close();
-          editor.commands.focus();
         }
         return;
     }
   };
 
   return (
-    <form
-      className="flex items-start gap-1"
-      onSubmit={(event) => {
-        event.preventDefault();
-        apply();
-      }}
+    <MenuPanelForm
+      editor={editor}
+      close={close}
+      initialFocusRef={inputRef}
+      initialSelection={initialSelection}
+      submitLabel={m.code_block_panel_apply_aria()}
+      onSubmit={apply}
     >
       <div className="relative">
         <Input
@@ -211,16 +200,6 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
           </div>
         )}
       </div>
-      <Button
-        type="submit"
-        size="icon"
-        variant="ghost"
-        className="h-7 w-7"
-        aria-label={m.code_block_panel_apply_aria()}
-        title={m.code_block_panel_apply_aria()}
-      >
-        <CheckIcon />
-      </Button>
-    </form>
+    </MenuPanelForm>
   );
 }
