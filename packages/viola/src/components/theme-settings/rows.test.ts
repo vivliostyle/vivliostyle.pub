@@ -61,6 +61,7 @@ function match(overrides: Partial<SettingsMatchInput> = {}) {
     scope: 'root',
     filter: { query: '', modifiedOnly: false },
     isModified: () => false,
+    showAdvanced: false,
     getGroupLabel: (id) => labels[id],
     getCategoryLabel: (id) => categoryLabels[id] ?? id,
     qualifyLabel: (module, label) => `${module}: ${label}`,
@@ -246,6 +247,40 @@ describe('matchSettings', () => {
     });
   });
 
+  describe('with advanced variables', () => {
+    const advanced = buildThemeVariableSchema({
+      figure: {
+        'counter-style': v(),
+        label: v(),
+        'root-counter-reset': v('counter-reset'),
+        'root-counter-fig': v(),
+      },
+    });
+    const names = (input: Partial<SettingsMatchInput>) =>
+      buildSettingsRows(match({ groups: advanced.groups, ...input }), null, 100)
+        .filter((row) => row.kind === 'variable')
+        .map((row) => row.key);
+
+    it('leaves them out unless asked for', () => {
+      expect(names({})).toEqual([
+        '--vs-figure--label',
+        '--vs-figure--counter-style',
+      ]);
+      expect(names({ showAdvanced: true })).toHaveLength(4);
+    });
+
+    it('lists those that are modified or searched for', () => {
+      expect(
+        names({
+          isModified: (name) => name === '--vs-figure--root-counter-fig',
+        }),
+      ).toContain('--vs-figure--root-counter-fig');
+      expect(
+        names({ filter: { query: 'reset', modifiedOnly: false } }),
+      ).toEqual(['--vs-figure--root-counter-reset']);
+    });
+  });
+
   it('finds a group or a subgroup by its key', () => {
     const { toc } = match();
     expect(findSection(toc, groupKey('page'))?.label).toBe('Page');
@@ -377,6 +412,7 @@ describe('buildSettingsRows', () => {
       scope: 'root',
       filter: { query: 'color', modifiedOnly: false },
       isModified: () => false,
+      showAdvanced: false,
       getGroupLabel: (id) => id,
       getCategoryLabel: (id) => id,
       qualifyLabel: (module, label) => `${module}: ${label}`,

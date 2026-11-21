@@ -250,6 +250,7 @@
   "theme_settings_search_clear_aria": "検索をクリア",
   "theme_settings_search_placeholder": "設定を検索",
   "theme_settings_section_label": "セクション",
+  "theme_settings_show_advanced": "詳細な設定を表示",
   "theme_settings_show_more_count": "さらに表示（残り{count}件）",
   "theme_settings_subgroup_of_module": "{module}：{label}",
   "theme_settings_target_bold_emphasis": "太字と強調の入れ子",

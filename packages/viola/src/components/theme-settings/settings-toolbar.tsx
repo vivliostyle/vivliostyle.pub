@@ -22,6 +22,8 @@ function SettingsToolbar({
   scopeCounts,
   modifiedOnly,
   onModifiedOnlyChange,
+  showAdvanced,
+  onShowAdvancedChange,
   matchCount,
 }: {
   query: string;
@@ -32,11 +34,14 @@ function SettingsToolbar({
   scopeCounts: Readonly<Record<ThemeScopeId, number>>;
   modifiedOnly: boolean;
   onModifiedOnlyChange: (modifiedOnly: boolean) => void;
+  showAdvanced: boolean;
+  onShowAdvancedChange: (showAdvanced: boolean) => void;
   /** `null` while no filter is active. */
   matchCount: number | null;
 }) {
   const scopeSelectId = useId();
   const modifiedOnlyId = useId();
+  const showAdvancedId = useId();
   const pageOnly = getThemeScope(scope).variableGroups !== null;
 
   return (
@@ -113,6 +118,18 @@ function SettingsToolbar({
           />
           <Label htmlFor={modifiedOnlyId}>
             {m.theme_settings_modified_only()}
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={showAdvancedId}
+            checked={showAdvanced}
+            onCheckedChange={(checked) =>
+              onShowAdvancedChange(checked === true)
+            }
+          />
+          <Label htmlFor={showAdvancedId}>
+            {m.theme_settings_show_advanced()}
           </Label>
         </div>
       </div>

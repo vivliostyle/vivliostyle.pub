@@ -4,6 +4,7 @@ import {
   getLeadingCategory,
   getPropertyRank,
   getTrailingCategory,
+  isAdvancedProperty,
   THEME_VARIABLE_CATEGORIES,
   type ThemeVariableCategory,
 } from './categories';
@@ -41,6 +42,8 @@ export interface ThemeVariable {
   propertyKey: string;
   /** What the variable sets, judged by the property it feeds. */
   category: ThemeVariableCategory;
+  /** Whether the settings list it only on request. */
+  advanced: boolean;
   /** `@property`-like syntax; an approximation of the consuming properties. */
   syntax: string;
   /** CSS properties the variable ends up in. */
@@ -116,7 +119,7 @@ const MIN_TARGET_SIZE = 2;
 
 type ThemeVariableBase = Omit<
   ThemeVariable,
-  'target' | 'propertyKey' | 'category' | 'subgroup'
+  'target' | 'propertyKey' | 'category' | 'advanced' | 'subgroup'
 >;
 
 interface KeySplit extends Pick<ThemeVariable, 'target' | 'propertyKey'> {
@@ -307,6 +310,7 @@ export function flattenThemeVariables(tree: unknown): ThemeVariable[] {
     target: splits[index].target,
     propertyKey: splits[index].propertyKey,
     category: categorize(splits[index], base.properties),
+    advanced: isAdvancedProperty(splits[index].propertyKey),
   }));
   const sections = findTargetSections(variables);
   return variables.map((variable, index): ThemeVariable => {
