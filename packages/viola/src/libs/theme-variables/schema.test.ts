@@ -501,8 +501,8 @@ describe('flattenThemeVariables', () => {
               '--vs--heading-margin-block',
               '--vs-section--call-display',
               '--vs-section--call-content',
-              '--vs-section--counter-style',
               '--vs-section--label',
+              '--vs-section--counter-style',
             ],
           ],
           [
@@ -511,13 +511,46 @@ describe('flattenThemeVariables', () => {
             [
               '--vs--h1-font-size',
               '--vs-section--h1-marker-display',
+              '--vs-section--h1-break-before',
               '--vs--h1-break-after',
               '--vs-section--h1-break-after',
-              '--vs-section--h1-break-before',
               '--vs-section--h1-marker-content',
             ],
           ],
         ],
+      ],
+    ]);
+  });
+
+  it('orders the variables of a subgroup by their properties', () => {
+    const v = (property: string) => ({ _syntax: '*', _property: property });
+    const schema = buildThemeVariableSchema({
+      _basic: {
+        'h1-border-color-block-end': v('border-block-end-color'),
+        'h1-border-color-block-start': v('border-block-start-color'),
+        'h1-border-width': v('border-width'),
+        'h1-font-family': v('font-family'),
+        'h1-font-size': v('font-size'),
+      },
+      page: {
+        'margin-bottom': v('margin-bottom'),
+        'margin-left': v('margin-left'),
+        'margin-right': v('margin-right'),
+        'margin-top': v('margin-top'),
+      },
+    });
+    expect(
+      schema.groups.map((group) =>
+        group.subgroups.flatMap((s) => s.variables.map((x) => x.key)),
+      ),
+    ).toEqual([
+      ['margin-top', 'margin-right', 'margin-bottom', 'margin-left'],
+      [
+        'h1-font-family',
+        'h1-font-size',
+        'h1-border-width',
+        'h1-border-color-block-start',
+        'h1-border-color-block-end',
       ],
     ]);
   });

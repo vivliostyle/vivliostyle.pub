@@ -149,3 +149,156 @@ export function getTrailingCategory(
   }
   return undefined;
 }
+
+// The order a designer reaches for them in, which the source order of the
+// keys, being alphabetical, does not follow.
+const PROPERTY_ORDER = [
+  'size',
+  'marks',
+  'bleed',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'font-style',
+  'font-stretch',
+  'font-variant',
+  'font-variant-numeric',
+  'font-variant-ligatures',
+  'font-feature-settings',
+  'font-variation-settings',
+  'font-kerning',
+  'font-synthesis',
+  'line-height',
+  'letter-spacing',
+  'word-spacing',
+  'text-spacing',
+  'tab-size',
+  'spacing-rlh',
+  'spacing-inline-indent',
+  'text-align',
+  'text-indent',
+  'vertical-align',
+  'ruby-position',
+  'ruby-align',
+  'line-break',
+  'word-break',
+  'overflow-wrap',
+  'hyphens',
+  'hanging-punctuation',
+  'white-space',
+  'writing-mode',
+  'text-orientation',
+  'text-combine-upright',
+  'text-decoration',
+  'text-underline-position',
+  'text-underline-offset',
+  'text-transform',
+  'text-shadow',
+  'text-color',
+  'color-foreground',
+  'color-background',
+  'color-border',
+  'background-color',
+  'background',
+  'background-image',
+  'background-position',
+  'background-size',
+  'margin',
+  'padding',
+  'gap',
+  'border-width',
+  'border-style',
+  'border-color',
+  'border-radius',
+  'border-collapse',
+  'width',
+  'height',
+  'size-inline',
+  'max-size-inline',
+  'min-size-block',
+  'max-size-block',
+  'float',
+  'clear',
+  'position',
+  'inset',
+  'align-items',
+  'flex-direction',
+  'order',
+  'overflow-x',
+  'table-layout',
+  'image-resolution',
+  'ol-indent-size',
+  'display',
+  'visibility',
+  'cover-page-mbox-visibility',
+  'break-before',
+  'break-after',
+  'break-inside',
+  'widows-orphans',
+  'widows',
+  'orphans',
+  'columns',
+  'column-gap',
+  'column-fill',
+  'column-rule-width',
+  'column-rule-style',
+  'column-rule-color',
+  'content',
+  'label',
+  'suffix',
+  'counter-style',
+  'counter-delimiter',
+  'counter-content',
+  'style',
+  'string-set',
+  'list-style-type',
+  'list-style-position',
+  'crossref-call-counter-prefix',
+  'crossref-marker-counter-prefix',
+  'counter-reset',
+  'counter-increment',
+  'counter',
+];
+
+// Sides in logical order, then physical ones clockwise from the top.
+const QUALIFIER_ORDER = [
+  'block',
+  'block-start',
+  'block-end',
+  'inline',
+  'inline-start',
+  'inline-end',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'inside',
+  'outside',
+  'outer',
+  'row',
+  'column',
+  'cell',
+  'thead-inner',
+  'tfoot-inner',
+];
+
+/**
+ * Sort key of a property key within its category: the property, then the
+ * qualifier after it, such as the `block-end` of `border-width-block-end`.
+ */
+export function getPropertyRank(propertyKey: string): number[] {
+  const words = propertyKey.split('-');
+  for (let end = words.length; end > 0; end--) {
+    const index = PROPERTY_ORDER.indexOf(words.slice(0, end).join('-'));
+    if (index === -1) {
+      continue;
+    }
+    const qualifier = words.slice(end).join('-');
+    if (qualifier === '') {
+      return [index, -1];
+    }
+    const rank = QUALIFIER_ORDER.indexOf(qualifier);
+    return [index, rank === -1 ? QUALIFIER_ORDER.length : rank];
+  }
+  return [PROPERTY_ORDER.length];
+}
