@@ -1,5 +1,5 @@
 import { invariant } from 'outvariant';
-import { proxy } from 'valtio';
+import { proxy, subscribe } from 'valtio';
 
 import { type AwaiterOptions, awaiter } from '../libs/awaiter';
 import { extensions } from './proxies/extension';
@@ -31,10 +31,10 @@ function createProxyGetter<S extends unknown[], T>(
       invariant(value, message);
       return value;
     },
-    // Watching `this` reaches the root proxies through `_dependencies`.
+    // Subscribing to `this` reaches the root proxies through `_dependencies`.
     awaiter(options?: AwaiterOptions) {
       return awaiter({
-        watch: this,
+        subscribe: (onChange) => subscribe(this, onChange),
         getter: () => this.value(),
         name: message,
         ...options,

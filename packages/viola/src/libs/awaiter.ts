@@ -1,21 +1,19 @@
-import { subscribe } from 'valtio';
-
 export interface AwaiterOptions {
   timeout?: number;
   signal?: AbortSignal;
 }
 
 // Resolves with the first non-nullish value of `getter`, re-evaluated whenever
-// `watch` (a valtio proxy, observed deeply) changes. Waits indefinitely unless
-// a timeout or signal is given.
+// `subscribe` reports a change. Waits indefinitely unless a timeout or signal
+// is given.
 export function awaiter<T>({
-  watch,
+  subscribe,
   getter,
   name,
   timeout,
   signal,
 }: {
-  watch: object;
+  subscribe: (onChange: () => void) => () => void;
   getter: () => T | null | undefined;
   name: string;
 } & AwaiterOptions): Promise<NonNullable<T>> {
@@ -57,7 +55,13 @@ export function awaiter<T>({
     if (done) {
       return;
     }
-    unsubscribe = subscribe(watch, check);
+    unsubscribe = subscribe(check);
+    // A source that reports while subscribing settles before its unsubscribe
+    // exists, so `finish` could not call it.
+    if (done) {
+      unsubscribe();
+      return;
+    }
     signal?.addEventListener('abort', onAbort);
     if (timeout !== undefined) {
       timer = setTimeout(() => {

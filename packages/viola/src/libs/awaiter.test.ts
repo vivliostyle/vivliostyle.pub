@@ -1,9 +1,12 @@
-import { proxy } from 'valtio';
+import { proxy, subscribe } from 'valtio';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { awaiter } from './awaiter';
 
 const flush = () => new Promise<void>((resolve) => queueMicrotask(resolve));
+
+const changesOf = (state: object) => (onChange: () => void) =>
+  subscribe(state, onChange);
 
 describe('awaiter', () => {
   beforeEach(() => {
@@ -17,7 +20,11 @@ describe('awaiter', () => {
     const state = proxy({ value: 'ready' as string | null });
 
     await expect(
-      awaiter({ watch: state, getter: () => state.value, name: 'value' }),
+      awaiter({
+        subscribe: changesOf(state),
+        getter: () => state.value,
+        name: 'value',
+      }),
     ).resolves.toBe('ready');
   });
 
@@ -25,7 +32,7 @@ describe('awaiter', () => {
   it('resolves when a nested change makes the value appear', async () => {
     const state = proxy({ nested: { value: null as number | null } });
     const promise = awaiter({
-      watch: state,
+      subscribe: changesOf(state),
       getter: () => state.nested.value,
       name: 'nested value',
     });
@@ -35,13 +42,57 @@ describe('awaiter', () => {
     await expect(promise).resolves.toBe(0);
   });
 
+  it('checks again only when the subscription reports a change', async () => {
+    let value: string | null = null;
+    let notify = () => {};
+    const settled = vi.fn();
+    awaiter({
+      subscribe: (onChange) => {
+        notify = onChange;
+        return () => {};
+      },
+      getter: () => value,
+      name: 'value',
+    }).then(settled);
+
+    value = 'ready';
+    await flush();
+    expect(settled).not.toHaveBeenCalled();
+
+    notify();
+    await flush();
+    expect(settled).toHaveBeenCalledWith('ready');
+  });
+
+  it('unsubscribes from a source that reports while subscribing', async () => {
+    let value: string | null = null;
+    const unsubscribe = vi.fn();
+
+    await expect(
+      awaiter({
+        subscribe: (onChange) => {
+          value = 'ready';
+          onChange();
+          return unsubscribe;
+        },
+        getter: () => value,
+        name: 'value',
+        timeout: 1_000,
+      }),
+    ).resolves.toBe('ready');
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('waits without a deadline unless given a timeout', async () => {
     const state = proxy({ value: null as string | null });
     const settled = vi.fn();
-    awaiter({ watch: state, getter: () => state.value, name: 'value' }).then(
-      settled,
-      settled,
-    );
+    awaiter({
+      subscribe: changesOf(state),
+      getter: () => state.value,
+      name: 'value',
+    }).then(settled, settled);
 
     await vi.advanceTimersByTimeAsync(60_000);
 
@@ -51,7 +102,7 @@ describe('awaiter', () => {
   it('rejects once the timeout passes', async () => {
     const state = proxy({ value: null as string | null });
     const promise = awaiter({
-      watch: state,
+      subscribe: changesOf(state),
       getter: () => state.value,
       name: 'value',
       timeout: 1_000,
@@ -69,7 +120,7 @@ describe('awaiter', () => {
     const state = proxy({ value: null as string | null });
     await expect(
       awaiter({
-        watch: state,
+        subscribe: changesOf(state),
         getter: () => state.value,
         name: 'value',
         signal: AbortSignal.abort(),
@@ -78,7 +129,7 @@ describe('awaiter', () => {
 
     const controller = new AbortController();
     const promise = awaiter({
-      watch: state,
+      subscribe: changesOf(state),
       getter: () => state.value,
       name: 'value',
       signal: controller.signal,
@@ -91,7 +142,7 @@ describe('awaiter', () => {
   it('rejects with the error the getter throws', async () => {
     const state = proxy({ broken: false });
     const promise = awaiter({
-      watch: state,
+      subscribe: changesOf(state),
       getter: () => {
         if (state.broken) {
           throw new Error('broken');
@@ -109,7 +160,11 @@ describe('awaiter', () => {
   it('stops watching once settled', async () => {
     const state = proxy({ value: null as string | null });
     const getter = vi.fn(() => state.value);
-    const promise = awaiter({ watch: state, getter, name: 'value' });
+    const promise = awaiter({
+      subscribe: changesOf(state),
+      getter,
+      name: 'value',
+    });
     state.value = 'ready';
     await promise;
     const calls = getter.mock.calls.length;
