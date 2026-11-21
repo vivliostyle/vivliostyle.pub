@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { memo, useId } from 'react';
 
 import { Button } from '@v/ui/button';
 import { Checkbox } from '@v/ui/checkbox';
@@ -14,7 +14,7 @@ import {
 import { getScopeLabel } from './messages';
 import { NativeSelect } from './native-select';
 
-export function SettingsToolbar({
+function SettingsToolbar({
   query,
   onQueryChange,
   scope,
@@ -126,3 +126,7 @@ export function SettingsToolbar({
     </div>
   );
 }
+
+const MemoizedSettingsToolbar = memo(SettingsToolbar);
+
+export { MemoizedSettingsToolbar as SettingsToolbar };

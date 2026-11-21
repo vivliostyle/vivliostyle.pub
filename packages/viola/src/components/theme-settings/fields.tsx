@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { ChevronDown } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
@@ -173,6 +173,11 @@ function KeywordMenu({
   const text = value.trim().toLowerCase();
   const current = keywords.find((k) => k.toLowerCase() === text) ?? '';
   const name = m.theme_settings_keyword_menu_aria({ name: label });
+  // Most menus of a list are never opened, so their options are built only
+  // once the pointer or focus reaches the menu, before it can open.
+  const [armed, setArmed] = useState(false);
+  const arm = () => setArmed(true);
+  const options = armed ? keywords : current ? [current] : [];
   return (
     <div className="relative size-8 shrink-0">
       <select
@@ -181,10 +186,12 @@ function KeywordMenu({
         className="peer absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
         value={current}
         onChange={(event) => onPick(event.target.value)}
+        onPointerEnter={arm}
+        onFocus={arm}
       >
         {/* Selected while the value is no keyword, so that any pick is a change. */}
         <option value="" disabled hidden />
-        {keywords.map((keyword) => (
+        {options.map((keyword) => (
           <option key={keyword} value={keyword}>
             {keyword}
           </option>
