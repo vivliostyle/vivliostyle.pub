@@ -9,6 +9,8 @@ import {
 
 class FakeCore implements CoreCommandEvents {
   readonly issued: string[] = [];
+  /** Whether core is calling its listeners, as it does from its command loop. */
+  dispatching = false;
   readonly #listeners = new Map<string, ((p: CoreCommandPayload) => void)[]>();
 
   addListener(type: string, listener: (payload: CoreCommandPayload) => void) {
@@ -16,8 +18,13 @@ class FakeCore implements CoreCommandEvents {
   }
 
   emit(type: string, payload: CoreCommandPayload) {
-    for (const listener of this.#listeners.get(type) ?? []) {
-      listener(payload);
+    this.dispatching = true;
+    try {
+      for (const listener of this.#listeners.get(type) ?? []) {
+        listener(payload);
+      }
+    } finally {
+      this.dispatching = false;
     }
   }
 
@@ -43,6 +50,49 @@ describe('CommandGate', () => {
     core.done('moveTo');
     expect(await second).toBe(true);
     expect(gate.busy).toBe(false);
+  });
+
+  // Core's command loop takes a command sent while it reports `done` before
+  // the layout task the finished command scheduled has started, so a
+  // configure sent then cannot cancel a load's layout.
+  it('sends the next command only after core has returned from `done`', async () => {
+    const core = new FakeCore();
+    const gate = new CommandGate(core);
+    const sentWhileDispatching: boolean[] = [];
+    void gate.run('loadPublication', () => core.issued.push('load'));
+    void gate.run('configure', () => {
+      sentWhileDispatching.push(core.dispatching);
+      core.issued.push('configure');
+    });
+
+    core.done('loadPublication');
+    expect(core.issued).toEqual(['load']);
+    expect(gate.busy).toBe(true);
+
+    await Promise.resolve();
+    expect(core.issued).toEqual(['load', 'configure']);
+    expect(sentWhileDispatching).toEqual([false]);
+  });
+
+  it('does the same after an action that failed', async () => {
+    const core = new FakeCore();
+    const gate = new CommandGate(core);
+    void gate.run('loadPublication', () => core.issued.push('load'));
+    void gate.run('configure', () => core.issued.push('configure'));
+
+    core.emit('error', {
+      content: { messages: ['Error during action:', 'loadPublication'] },
+    });
+    expect(core.issued).toEqual(['load']);
+    await Promise.resolve();
+    expect(core.issued).toEqual(['load', 'configure']);
+  });
+
+  it('sends a command at once when nothing is with core', () => {
+    const core = new FakeCore();
+    const gate = new CommandGate(core);
+    void gate.run('configure', () => core.issued.push('configure'));
+    expect(core.issued).toEqual(['configure']);
   });
 
   it('is not released by the done event of another action', async () => {
@@ -74,6 +124,7 @@ describe('CommandGate', () => {
     expect(await stale).toBe(false);
 
     core.done('moveTo');
+    await flush();
     core.done('loadPublication');
     expect(await latest).toBe(true);
     expect(core.issued).toEqual(['move', 'load 2']);

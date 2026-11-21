@@ -7,6 +7,7 @@ import {
 } from '@vivliostyle/core';
 
 import { CommandGate } from './command-gate';
+import { dropFontCache, viewFontStyles } from './font-cache';
 import { paperSizeToPx } from './paper-size';
 import { Presentation, type PresentationSnapshot } from './presentation';
 import type {
@@ -16,6 +17,7 @@ import type {
   StageStatus,
   ViewMode,
 } from './protocol';
+import { ReloadController, reloadFailed, reloadStatus } from './reload';
 
 const viewerOptions: CoreViewerOptions = {
   // View modes are ours (see `Presentation`): core re-lays out everything
@@ -43,10 +45,19 @@ export interface StageOptions {
 export class Stage {
   readonly #viewer: CoreViewer;
   readonly #gate: CommandGate;
+  readonly #reload: ReloadController;
   readonly #presentation: Presentation;
   readonly #listeners = new Set<StageStateListener>();
   #publicationUrl: string | undefined;
   #state: StageState;
+  /**
+   * The font rules core used before a hard reload dropped its font cache,
+   * kept while pages laid out before it are shown.
+   */
+  #replacedFontStyles: {
+    styles: HTMLStyleElement[];
+    liveGeneration: number;
+  } | null = null;
 
   constructor(
     viewportElement: HTMLElement,
@@ -61,6 +72,7 @@ export class Stage {
     this.#gate = new CommandGate(this.#viewer);
     this.#state = {
       status: 'loading',
+      failed: false,
       viewMode,
       paperSize,
       pageProgression: 'ltr',
@@ -69,6 +81,15 @@ export class Stage {
       canPrev: false,
       canNext: false,
     };
+    this.#reload = new ReloadController({
+      gate: this.#gate,
+      load: (hard) => this.#load(hard),
+      onChange: (state) =>
+        this.#update({
+          status: reloadStatus(state),
+          failed: reloadFailed(state),
+        }),
+    });
     this.#presentation = new Presentation(viewportElement, {
       viewMode,
       fallbackPageSize: () => paperSizeToPx(this.#state.paperSize),
@@ -80,28 +101,32 @@ export class Stage {
             ? 'rtl'
             : 'ltr';
       },
-      onChange: (snapshot: PresentationSnapshot) => this.#update(snapshot),
+      onChange: (snapshot) => this.#onPresentationChange(snapshot),
+      onProgress: () => this.#reload.dispatch({ type: 'progress' }),
     });
     this.#viewer.addListener('readystatechange', () => {
       const status = stageStatus[this.#viewer.readyState];
       this.#presentation.setComplete(status === 'complete');
-      this.#update({ status });
+      this.#reload.dispatch({ type: 'status', status });
+    });
+    this.#viewer.addListener('error', () => {
+      this.#reload.dispatch({ type: 'error' });
     });
   }
 
   load(publicationUrl: string) {
     this.#publicationUrl = publicationUrl;
-    this.reload();
+    this.#reload.dispatch({ type: 'request', hard: false });
   }
 
-  reload() {
-    const publicationUrl = this.#publicationUrl;
-    if (publicationUrl) {
-      void this.#gate.run(
-        'loadPublication',
-        () => this.#viewer.loadPublication(publicationUrl),
-        { key: 'load' },
-      );
+  /**
+   * Lays the publication out anew from its current files. `hard` also makes
+   * core load its fonts anew, for a change of the configuration or of what
+   * the project depends on.
+   */
+  reload(hard: boolean) {
+    if (this.#publicationUrl) {
+      this.#reload.dispatch({ type: 'request', hard });
     }
   }
 
@@ -146,6 +171,40 @@ export class Stage {
     return () => {
       this.#listeners.delete(listener);
     };
+  }
+
+  #load(hard: boolean) {
+    const publicationUrl = this.#publicationUrl;
+    if (!publicationUrl) {
+      throw new Error('No publication to load');
+    }
+    if (hard) {
+      const styles = viewFontStyles(document);
+      if (dropFontCache(this.#viewer)) {
+        this.#replacedFontStyles = {
+          styles,
+          liveGeneration: this.#presentation.liveGeneration,
+        };
+      }
+    }
+    this.#viewer.loadPublication(publicationUrl);
+  }
+
+  #onPresentationChange(snapshot: PresentationSnapshot) {
+    this.#update(snapshot);
+    // Pages core laid out after it dropped the font cache use fonts of their
+    // own, so the earlier rules are unused once no earlier page can be shown.
+    const replaced = this.#replacedFontStyles;
+    if (
+      replaced &&
+      !this.#presentation.holdsOutdatedPages &&
+      this.#presentation.liveGeneration > replaced.liveGeneration
+    ) {
+      for (const style of replaced.styles) {
+        style.remove();
+      }
+      this.#replacedFontStyles = null;
+    }
   }
 
   #update(patch: Partial<StageState>) {

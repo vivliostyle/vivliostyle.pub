@@ -14,6 +14,7 @@
   "preview_paper_size_letter": "Letter",
   "preview_prev_page_aria": "Previous page",
   "preview_rendering_aria": "Rendering pages",
+  "preview_update_failed": "The preview could not be updated and may show an earlier version",
   "preview_view_mode_aria": "View mode",
   "preview_view_mode_scroll": "Continuous scroll",
   "preview_view_mode_single": "Single page",

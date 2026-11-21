@@ -14,6 +14,7 @@
   "preview_paper_size_letter": "レター",
   "preview_prev_page_aria": "前のページ",
   "preview_rendering_aria": "ページを組版中",
+  "preview_update_failed": "プレビューを更新できませんでした。以前の内容が表示されている可能性があります",
   "preview_view_mode_aria": "表示モード",
   "preview_view_mode_scroll": "連続スクロール",
   "preview_view_mode_single": "単ページ",

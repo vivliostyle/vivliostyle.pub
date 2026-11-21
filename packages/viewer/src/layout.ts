@@ -260,6 +260,98 @@ function compareKeys(a: PageKey, b: PageKey): number {
   return a.spineIndex - b.spineIndex || a.pageIndex - b.pageIndex;
 }
 
+export interface ViewExtent {
+  mode: ViewMode;
+  progression: PageProgression;
+  /** Whether no more pages will be laid out. */
+  complete: boolean;
+  /** Where the view starts in the page at `index` (see `offsetFor`). */
+  offset: number;
+  /** Height of the view in page px. */
+  viewHeight: number;
+}
+
+/**
+ * Whether `pages` already hold everything the view on the page at `index`
+ * shows, so that more pages arriving cannot change it: the partner of a
+ * verso in spread mode, the pages down to the bottom of the view in scroll
+ * mode.
+ */
+export function coversView(
+  pages: readonly PageBox[],
+  index: number,
+  { mode, progression, complete, offset, viewHeight }: ViewExtent,
+): boolean {
+  if (complete || mode === 'single') {
+    return true;
+  }
+  if (mode === 'spread') {
+    return (
+      index < pages.length - 1 || pages[index].side !== versoSide(progression)
+    );
+  }
+  let bottom = 0;
+  for (let i = index; i < pages.length; i++) {
+    bottom += pages[i].height;
+    if (bottom >= offset + viewHeight) {
+      return true;
+    }
+    bottom += scrollGap;
+  }
+  return false;
+}
+
+/** Index of the first of `pages`, in key order, that comes after `key`. */
+export function firstPageAfter(
+  pages: readonly PageKey[],
+  key: PageKey,
+): number {
+  const index = pages.findIndex((page) => compareKeys(page, key) > 0);
+  return index < 0 ? pages.length : index;
+}
+
+export interface PageLocation {
+  /** The page `target` names, or the last page before it, or the first page. */
+  index: number;
+  /**
+   * False while a page `target` names, missing from `pages`, may still be
+   * laid out, e.g. after core took a run of pages away to lay them out again.
+   */
+  settled: boolean;
+}
+
+/**
+ * Where `target` is in `pages`. A page core replaced in place keeps its key,
+ * so only a page that is missing falls back to the one before it.
+ */
+export function locatePage(
+  pages: readonly PageKey[],
+  target: PageKey,
+  complete: boolean,
+): PageLocation | null {
+  if (pages.length === 0) {
+    return null;
+  }
+  let before = -1;
+  let passedTargetSpine = false;
+  for (let i = 0; i < pages.length; i++) {
+    const order = compareKeys(pages[i], target);
+    if (order === 0) {
+      return { index: i, settled: true };
+    }
+    if (order < 0) {
+      before = i;
+    }
+    if (pages[i].spineIndex > target.spineIndex) {
+      passedTargetSpine = true;
+    }
+  }
+  return {
+    index: Math.max(before, 0),
+    settled: complete || passedTargetSpine,
+  };
+}
+
 /**
  * The page `target` names; null while it may still be laid out. Once it cannot
  * appear any more, the last page before it, or the first page.
@@ -269,25 +361,25 @@ export function resolvePage(
   target: PageKey,
   complete: boolean,
 ): number | null {
-  if (pages.length === 0) {
-    return null;
+  const location = locatePage(pages, target, complete);
+  return location?.settled ? location.index : null;
+}
+
+/**
+ * The page a scroll position shows most of (see `dominantSpan`). While the
+ * target page is missing, a view of no page at all names none, so that the
+ * target stays the position to return to.
+ */
+export function viewedPage(
+  spans: readonly Span[],
+  viewTop: number,
+  viewBottom: number,
+  targetShown: boolean,
+): number | null {
+  const index = dominantSpan(spans, viewTop, viewBottom);
+  if (index === null || targetShown) {
+    return index;
   }
-  let before = -1;
-  let passedTargetSpine = false;
-  for (let i = 0; i < pages.length; i++) {
-    const order = compareKeys(pages[i], target);
-    if (order === 0) {
-      return i;
-    }
-    if (order < 0) {
-      before = i;
-    }
-    if (pages[i].spineIndex > target.spineIndex) {
-      passedTargetSpine = true;
-    }
-  }
-  if (!complete && !passedTargetSpine) {
-    return null;
-  }
-  return Math.max(before, 0);
+  const span = spans[index];
+  return span.bottom > viewTop && span.top < viewBottom ? index : null;
 }

@@ -4,12 +4,16 @@ import {
   arrangeScroll,
   arrangeSingle,
   arrangeSpread,
+  coversView,
   dominantSpan,
   endOffset,
+  firstPageAfter,
   fitScale,
+  locatePage,
   moveTarget,
   offsetFor,
   type PageBox,
+  type PageKey,
   type PageSide,
   pairSpreads,
   resolvePage,
@@ -17,7 +21,9 @@ import {
   scrollGap,
   scrollTopFor,
   spreadGap,
+  viewedPage,
 } from './layout';
+import type { ViewMode } from './protocol';
 
 function page(
   spineIndex: number,
@@ -303,5 +309,227 @@ describe('resolvePage', () => {
   it('settles on the first page when nothing comes before the target', () => {
     const later = keys.slice(2);
     expect(resolvePage(later, { spineIndex: 0, pageIndex: 3 }, false)).toBe(0);
+  });
+});
+
+describe('coversView', () => {
+  const extent = {
+    progression: 'ltr',
+    complete: false,
+    offset: 0,
+    viewHeight: 200,
+  } as const;
+  const spreadPages = [
+    page(0, 0, 'right'),
+    page(0, 1, 'left'),
+    page(0, 2, 'right'),
+    page(0, 3, 'left'),
+  ];
+
+  it('is covered by the page itself in single mode', () => {
+    expect(
+      coversView([page(0, 0, 'right')], 0, { ...extent, mode: 'single' }),
+    ).toBe(true);
+  });
+
+  it('waits for the recto that pairs with the last verso in spread mode', () => {
+    const spread = { ...extent, mode: 'spread' } as const;
+    expect(coversView(spreadPages, 1, spread)).toBe(true);
+    expect(coversView(spreadPages, 2, spread)).toBe(true);
+    expect(coversView(spreadPages, 3, spread)).toBe(false);
+    expect(coversView(spreadPages, 3, { ...spread, complete: true })).toBe(
+      true,
+    );
+  });
+
+  it('pairs by the progression of the publication', () => {
+    const rtl = { ...extent, mode: 'spread', progression: 'rtl' } as const;
+    expect(coversView(spreadPages, 3, rtl)).toBe(true);
+    expect(coversView(spreadPages.slice(0, 3), 2, rtl)).toBe(false);
+  });
+
+  it('needs the pages down to the bottom of the view in scroll mode', () => {
+    const scroll = { ...extent, mode: 'scroll' } as const;
+    const pages = [page(0, 0, 'right'), page(0, 1, 'left')];
+    // The view runs from 100 to 300 in the first page, which ends at 150; the
+    // second page starts after the gap.
+    expect(coversView(pages, 0, { ...scroll, offset: 100 })).toBe(true);
+    expect(coversView(pages.slice(0, 1), 0, { ...scroll, offset: 100 })).toBe(
+      false,
+    );
+    expect(
+      coversView(pages, 0, {
+        ...scroll,
+        offset: 2 * 150 + scrollGap - 200 + 1,
+      }),
+    ).toBe(false);
+    expect(coversView(pages, 1, { ...scroll, offset: -50 })).toBe(true);
+  });
+
+  it('is covered once the layout is complete', () => {
+    expect(
+      coversView([page(0, 0, 'right')], 0, {
+        ...extent,
+        mode: 'scroll',
+        complete: true,
+        offset: 1000,
+      }),
+    ).toBe(true);
+  });
+});
+
+// What the presentation does while stale pages are shown: moves act on the
+// stale pages, and the new ones replace them once they cover the target.
+describe('a reload in progress', () => {
+  const sides: PageSide[] = ['right', 'left', 'right', 'left', 'right', 'left'];
+  const stalePages = sides.map((side, i) => page(0, i, side));
+  const live = (count: number) => stalePages.slice(0, count);
+  const covered = (
+    pages: readonly PageBox[],
+    target: PageKey,
+    mode: ViewMode,
+    { complete = false, offset = 0, viewHeight = 200 } = {},
+  ) => {
+    const index = resolvePage(pages, target, complete);
+    return (
+      index !== null &&
+      coversView(pages, index, {
+        mode,
+        progression: 'ltr',
+        complete,
+        offset,
+        viewHeight,
+      })
+    );
+  };
+
+  it('waits for the page a move during the reload landed on', () => {
+    const next = moveTarget('single', 2, stalePages.length, null, 'next');
+    expect(next).toBe(3);
+    const target = { spineIndex: 0, pageIndex: 3 };
+    expect(covered(live(3), target, 'single')).toBe(false);
+    expect(covered(live(4), target, 'single')).toBe(true);
+  });
+
+  it('waits for the whole spread after a switch to spread mode', () => {
+    const target = { spineIndex: 0, pageIndex: 1 };
+    expect(covered(live(2), target, 'single')).toBe(true);
+    expect(covered(live(2), target, 'spread')).toBe(false);
+    expect(covered(live(3), target, 'spread')).toBe(true);
+  });
+
+  it('lands on the last page before a target the edit removed', () => {
+    const target = { spineIndex: 0, pageIndex: 5 };
+    const shorter = [...live(3), page(1, 0, 'right')];
+    expect(covered(live(3), target, 'single')).toBe(false);
+    expect(resolvePage(shorter, target, false)).toBe(2);
+    expect(covered(shorter, target, 'single')).toBe(true);
+    expect(covered(live(3), target, 'single', { complete: true })).toBe(true);
+  });
+
+  it('needs more pages in scroll mode once the pane grows taller', () => {
+    const target = { spineIndex: 0, pageIndex: 1 };
+    expect(covered(live(3), target, 'scroll', { viewHeight: 200 })).toBe(true);
+    expect(covered(live(3), target, 'scroll', { viewHeight: 400 })).toBe(false);
+    expect(covered(live(4), target, 'scroll', { viewHeight: 400 })).toBe(true);
+  });
+});
+
+describe('firstPageAfter', () => {
+  const keys = [
+    { spineIndex: 0, pageIndex: 0 },
+    { spineIndex: 0, pageIndex: 1 },
+    { spineIndex: 1, pageIndex: 0 },
+    { spineIndex: 2, pageIndex: 0 },
+  ];
+
+  it('finds the first page past the key', () => {
+    expect(firstPageAfter(keys, { spineIndex: 0, pageIndex: 1 })).toBe(2);
+    expect(firstPageAfter(keys, { spineIndex: 0, pageIndex: 7 })).toBe(2);
+    expect(firstPageAfter(keys, { spineIndex: 1, pageIndex: 3 })).toBe(3);
+  });
+
+  it('is the end when nothing comes after the key', () => {
+    expect(firstPageAfter(keys, { spineIndex: 2, pageIndex: 0 })).toBe(4);
+    expect(firstPageAfter([], { spineIndex: 0, pageIndex: 0 })).toBe(0);
+  });
+
+  // An edit lands while core is still laying out the previous one: the pages
+  // it has laid out so far are followed by the rest of the rendering before.
+  it('fills a partial layout in from the rendering before it', () => {
+    const before = [0, 1, 2, 3, 4, 5].map((i) =>
+      page(i < 3 ? 0 : 1, i < 3 ? i : i - 3, 'right'),
+    );
+    const partial = [page(0, 0, 'right'), page(0, 1, 'right')];
+    const from = firstPageAfter(before, partial[1]);
+    expect([...partial, ...before.slice(from)]).toHaveLength(before.length);
+
+    // The edit added a page to the first spine item.
+    const longer = [...partial, page(0, 2, 'right'), page(0, 3, 'right')];
+    expect(firstPageAfter(before, longer[3])).toBe(3);
+  });
+});
+
+describe('locatePage', () => {
+  const pages = [
+    page(0, 0, 'right'),
+    page(0, 1, 'left'),
+    page(1, 0, 'right'),
+    page(1, 1, 'left'),
+  ];
+
+  it('finds a page core replaced in place by its key', () => {
+    // A replacement container takes the place of the old one, so the keys
+    // counted from the containers are the same as before.
+    const replaced = pages.map((p) => ({ ...p, height: p.height + 10 }));
+    expect(
+      locatePage(replaced, { spineIndex: 1, pageIndex: 0 }, false),
+    ).toEqual({ index: 2, settled: true });
+  });
+
+  it('stands in the page before a target core took away for the time being', () => {
+    // Core took the following spine items away to lay them out again.
+    const retired = pages.slice(0, 2);
+    expect(locatePage(retired, { spineIndex: 1, pageIndex: 1 }, false)).toEqual(
+      { index: 1, settled: false },
+    );
+    expect(resolvePage(retired, { spineIndex: 1, pageIndex: 1 }, false)).toBe(
+      null,
+    );
+  });
+
+  it('settles on the page before once the target cannot come back', () => {
+    expect(locatePage(pages, { spineIndex: 0, pageIndex: 5 }, false)).toEqual({
+      index: 1,
+      settled: true,
+    });
+    expect(
+      locatePage(pages.slice(0, 2), { spineIndex: 1, pageIndex: 1 }, true),
+    ).toEqual({ index: 1, settled: true });
+  });
+
+  it('stands in the first page when nothing comes before the target', () => {
+    expect(
+      locatePage(pages.slice(2), { spineIndex: 0, pageIndex: 0 }, false),
+    ).toEqual({ index: 0, settled: true });
+    expect(locatePage([], { spineIndex: 0, pageIndex: 0 }, false)).toBeNull();
+  });
+});
+
+describe('viewedPage', () => {
+  const spans = [
+    { top: 0, bottom: 100 },
+    { top: 110, bottom: 210 },
+  ];
+
+  it('is the dominant page while the target is shown', () => {
+    expect(viewedPage(spans, 150, 250, true)).toBe(1);
+    expect(viewedPage(spans, 400, 500, true)).toBe(1);
+  });
+
+  it('names no page for a view of none while the target is missing', () => {
+    expect(viewedPage(spans, 150, 250, false)).toBe(1);
+    expect(viewedPage(spans, 400, 500, false)).toBeNull();
+    expect(viewedPage([], 0, 100, false)).toBeNull();
   });
 });

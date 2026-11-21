@@ -13,6 +13,7 @@ import {
   GalleryVerticalEnd,
   Loader2,
   RectangleVertical,
+  TriangleAlert,
 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import {
@@ -149,13 +150,25 @@ export function Toolbar({
             ))}
           </SelectContent>
         </Select>
-        <span className="grid size-4 place-items-center">
-          {state && state.status !== 'complete' && (
-            <Loader2
+        <span
+          className="grid size-4 place-items-center"
+          title={state?.failed ? t('preview_update_failed') : undefined}
+        >
+          {state?.failed ? (
+            <TriangleAlert
               role="img"
-              aria-label={t('preview_rendering_aria')}
-              className="size-4 animate-spin text-muted-foreground"
+              aria-label={t('preview_update_failed')}
+              className="size-4 text-destructive"
             />
+          ) : (
+            state &&
+            state.status !== 'complete' && (
+              <Loader2
+                role="img"
+                aria-label={t('preview_rendering_aria')}
+                className="size-4 animate-spin text-muted-foreground"
+              />
+            )
           )}
         </span>
       </div>

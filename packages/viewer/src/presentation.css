@@ -33,4 +33,12 @@
     > [data-vivliostyle-page-container][data-pub-visible] {
     content-visibility: auto;
   }
+
+  /* Copies the viewport's attributes, so the rules above and core's style it
+     like the viewport; this puts it over the viewport, which fills the stage. */
+  [data-pub-stale][data-pub-view-mode] {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
 }

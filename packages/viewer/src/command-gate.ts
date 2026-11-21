@@ -111,7 +111,11 @@ export class CommandGate {
   #finish() {
     const entry = this.#inFlight;
     this.#inFlight = null;
+    // Core reports `done` before its command loop moves on, and the loop
+    // takes a command sent from here ahead of the layout task the finished
+    // command scheduled, which the new one then cannot cancel. Once the
+    // callback has returned, the loop waits and a command queues behind it.
+    queueMicrotask(() => this.#pump());
     entry?.settle(true);
-    this.#pump();
   }
 }

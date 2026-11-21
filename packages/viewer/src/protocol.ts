@@ -22,7 +22,13 @@ export const defaultPaperSize: PaperSize = 'a4';
 export type PageProgression = 'ltr' | 'rtl';
 
 export interface StageState {
+  /** Loading from the moment a reload is asked for. */
   status: StageStatus;
+  /**
+   * The latest load reported an error, or nothing moved forward for a long
+   * time. What is shown may be an earlier version of the publication.
+   */
+  failed: boolean;
   viewMode: ViewMode;
   paperSize: PaperSize;
   pageProgression: PageProgression;
@@ -31,7 +37,10 @@ export interface StageState {
    * spread mode it is one of the pages of the displayed spread.
    */
   pageIndex: number;
-  /** Pages laid out so far; final once `status` is `complete`. */
+  /**
+   * Pages laid out so far, but no fewer than the rendering a reload replaced
+   * had until the new one is complete; final once `status` is `complete`.
+   */
   pageCount: number;
   canPrev: boolean;
   canNext: boolean;

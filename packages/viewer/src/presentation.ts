@@ -9,9 +9,11 @@ import {
   arrangeScroll,
   arrangeSingle,
   arrangeSpread,
-  dominantSpan,
+  coversView,
   endOffset,
+  firstPageAfter,
   fitScale,
+  locatePage,
   moveTarget,
   offsetFor,
   type PageBox,
@@ -22,6 +24,7 @@ import {
   type Span,
   type SpreadIndex,
   scrollTopFor,
+  viewedPage,
 } from './layout';
 import { linkFragment } from './links';
 import type { Size } from './paper-size';
@@ -32,11 +35,6 @@ import {
   type ScrollDirection,
   type ScrollStyle,
 } from './scrollable';
-
-/** A page and the offset into it the viewport shows (see `offsetFor`). */
-export interface PagePosition extends PageKey {
-  offset: number;
-}
 
 export interface PresentationSnapshot {
   pageIndex: number;
@@ -52,6 +50,8 @@ export interface PresentationOptions {
   fallbackPageSize: () => Size;
   pageProgression: () => PageProgression | null;
   onChange: (snapshot: PresentationSnapshot) => void;
+  /** Core put pages in place or started to lay the publication out anew. */
+  onProgress: () => void;
 }
 
 interface Layout {
@@ -59,6 +59,26 @@ interface Layout {
   geometry: ScrollGeometry;
   /** Screen spans of the pages, in scroll mode. */
   spans: Span[] | null;
+}
+
+interface Tree {
+  containers: HTMLElement[];
+  pages: PageBox[];
+}
+
+/**
+ * The pages core cleared to lay the publication out anew, shown in a layer
+ * over the viewport until core's new pages cover the same view.
+ */
+interface Stale {
+  layer: HTMLElement;
+  spreadContainer: HTMLElement;
+  progression: PageProgression;
+  /**
+   * Keyed as they were laid out: the rest of an earlier rendering that fills
+   * them in would not count up from them.
+   */
+  tree: Tree;
 }
 
 const padding = 16;
@@ -80,23 +100,78 @@ function isEditable(target: EventTarget | null): boolean {
   );
 }
 
+// Focusing an element of a frame that is not focused would take the focus
+// from the page around it, where the user is likely typing.
+function hasFocus(element: Element): boolean {
+  return document.hasFocus() && document.activeElement === element;
+}
+
+function readTree(spreadContainer: Element | null, fallback: Size): Tree {
+  const containers: HTMLElement[] = [];
+  const pages: PageBox[] = [];
+  const pageCounts = new Map<number, number>();
+  for (const child of spreadContainer?.children ?? []) {
+    if (
+      !(child instanceof HTMLElement) ||
+      !child.hasAttribute(pageContainerAttribute)
+    ) {
+      continue;
+    }
+    const spineIndex =
+      Number(child.getAttribute('data-vivliostyle-spine-index')) || 0;
+    // Core numbers pages only once their layout settles, after it has put
+    // them in place; the order of the containers is final before that.
+    const pageIndex = pageCounts.get(spineIndex) ?? 0;
+    pageCounts.set(spineIndex, pageIndex + 1);
+    containers.push(child);
+    pages.push({
+      spineIndex,
+      pageIndex,
+      side:
+        child.getAttribute('data-vivliostyle-page-side') === 'left'
+          ? 'left'
+          : 'right',
+      // Core sizes each container to its page sheet in px.
+      width: Number.parseFloat(child.style.width) || fallback.width,
+      height: Number.parseFloat(child.style.height) || fallback.height,
+    });
+  }
+  return { containers, pages };
+}
+
 /**
  * Shows core's laid-out pages in our own view modes without ever making core
  * lay out again. The position is kept as a page key plus an offset, so it
  * survives core replacing containers or laying everything out anew.
+ *
+ * When core clears the viewport to lay out anew, the pages it removed stay
+ * on screen, in a layer of their own, and are what paging, scrolling and view
+ * mode changes act on, until its new pages cover the same view.
  */
 export class Presentation {
   readonly #viewport: HTMLElement;
   readonly #options: PresentationOptions;
   readonly #rootObserver = new MutationObserver(() => this.#attach());
-  readonly #pageObserver = new MutationObserver(() => this.#update());
+  readonly #pageObserver = new MutationObserver(() => {
+    this.#options.onProgress();
+    this.#update();
+  });
   #mode: ViewMode;
   #complete = false;
   #target: PageKey = { spineIndex: 0, pageIndex: 0 };
   #targetOffset: number | 'end' = 0;
   /** Id of a link target that is not laid out yet. */
   #pendingFragment: string | null = null;
-  #spreadContainer: HTMLElement | null = null;
+  /** Core's spread container, where it puts the pages it lays out. */
+  #liveSpreadContainer: HTMLElement | null = null;
+  #liveGeneration = 0;
+  #stale: Stale | null = null;
+  /**
+   * The stale pages last replaced before core completed, which fill in for
+   * the pages it has not laid out yet when the new ones go stale in turn.
+   */
+  #fallback: Tree | null = null;
+  // The rest describes the displayed pages: the stale ones while there are.
   #containers: HTMLElement[] = [];
   #pages: PageBox[] = [];
   #progression: PageProgression = 'ltr';
@@ -109,6 +184,11 @@ export class Presentation {
   #appliedScrollTop = 0;
   #desiredScrollTop = 0;
   #wheel = initialWheelState;
+  // The most pages, and the tallest scroll arrangement, shown since core last
+  // completed, so that pages still to come, or taken away to be laid out
+  // again, do not seem to have been removed.
+  #provisionalPageCount: number | null = null;
+  #reservedHeight: number | null = null;
 
   constructor(viewport: HTMLElement, options: PresentationOptions) {
     this.#viewport = viewport;
@@ -127,8 +207,14 @@ export class Presentation {
     this.#attach();
   }
 
-  get spreadContainer(): HTMLElement | null {
-    return this.#spreadContainer;
+  /** Incremented whenever core starts to lay the publication out anew. */
+  get liveGeneration(): number {
+    return this.#liveGeneration;
+  }
+
+  /** Whether pages laid out before the current layout began may be shown. */
+  get holdsOutdatedPages(): boolean {
+    return this.#stale !== null || this.#fallback !== null;
   }
 
   setViewMode(mode: ViewMode) {
@@ -138,6 +224,7 @@ export class Presentation {
     this.#update(() => {
       this.#mode = mode;
       this.#viewport.setAttribute('data-pub-view-mode', mode);
+      this.#stale?.layer.setAttribute('data-pub-view-mode', mode);
       this.#listenToWheel();
     });
   }
@@ -147,6 +234,11 @@ export class Presentation {
     if (complete !== this.#complete) {
       this.#update(() => {
         this.#complete = complete;
+        if (complete) {
+          this.#fallback = null;
+          this.#provisionalPageCount = null;
+          this.#reservedHeight = null;
+        }
       });
     }
   }
@@ -180,23 +272,16 @@ export class Presentation {
     }
   }
 
-  capturePosition(): PagePosition {
-    this.#syncScroll();
-    return {
-      ...this.#target,
-      offset: this.#targetOffset === 'end' ? 0 : this.#targetOffset,
-    };
+  get #scroller(): HTMLElement {
+    return this.#stale?.layer ?? this.#viewport;
   }
 
-  restorePosition(position: PagePosition) {
-    this.#update(() => {
-      this.#pendingFragment = null;
-      this.#target = {
-        spineIndex: position.spineIndex,
-        pageIndex: position.pageIndex,
-      };
-      this.#targetOffset = position.offset;
-    });
+  get #spreadContainer(): HTMLElement | null {
+    return this.#stale?.spreadContainer ?? this.#liveSpreadContainer;
+  }
+
+  get #displayedComplete(): boolean {
+    return this.#stale === null && this.#complete;
   }
 
   #show(index: number, offset: number | 'end') {
@@ -215,15 +300,162 @@ export class Presentation {
       outerZoomBox?.querySelector<HTMLElement>(
         ':scope > [data-vivliostyle-spread-container]',
       ) ?? null;
-    if (spreadContainer !== this.#spreadContainer) {
+    if (spreadContainer !== this.#liveSpreadContainer) {
+      const previous = this.#liveSpreadContainer;
       this.#pageObserver.disconnect();
-      this.#placed.clear();
-      this.#spreadContainer = spreadContainer;
+      // While stale pages are shown, a cleared tree never was and is dropped.
+      if (!this.#stale && previous && !previous.isConnected && this.#layout) {
+        // Our size rule also holds for the box core put in place of the old
+        // one, so the position survives the clear and a scroll not reported
+        // yet counts.
+        this.#syncScroll();
+        this.#freeze(
+          this.#withFallback(this.#containers, this.#pages),
+          previous,
+        );
+      } else if (!this.#stale) {
+        this.#unplaceAll();
+      }
+      this.#liveSpreadContainer = spreadContainer;
+      this.#liveGeneration += 1;
       if (spreadContainer) {
         this.#pageObserver.observe(spreadContainer, { childList: true });
       }
+      this.#options.onProgress();
     }
     this.#update();
+  }
+
+  /** `pages` followed by those of the fallback that come after them. */
+  #withFallback(containers: HTMLElement[], pages: PageBox[]): Tree {
+    const fallback = this.#fallback;
+    if (!fallback) {
+      return { containers, pages };
+    }
+    const from =
+      pages.length > 0
+        ? firstPageAfter(fallback.pages, pages[pages.length - 1])
+        : 0;
+    return {
+      containers: [...containers, ...fallback.containers.slice(from)],
+      pages: [...pages, ...fallback.pages.slice(from)],
+    };
+  }
+
+  /**
+   * Shows `tree` in a layer that replicates the viewport, in boxes made after
+   * those around `spreadContainer`. Runs from the mutation observer, before
+   * the browser renders the cleared viewport.
+   */
+  #freeze(tree: Tree, spreadContainer: HTMLElement) {
+    const outerZoomBox = spreadContainer.parentElement;
+    if (!outerZoomBox) {
+      return;
+    }
+    const viewport = this.#viewport;
+    this.#unplaceAll();
+    this.#fallback = null;
+    const layer = document.createElement('div');
+    // Core's viewport rules and ours select by these attributes, and the
+    // pages need the custom properties core set on the viewport's style.
+    for (const { name, value } of viewport.attributes) {
+      if (name !== 'id' && name !== 'tabindex') {
+        layer.setAttribute(name, value);
+      }
+    }
+    layer.setAttribute('data-pub-stale', '');
+    layer.setAttribute('aria-busy', 'true');
+    layer.tabIndex = viewport.tabIndex;
+    // Boxes of our own: core's old viewport object keeps pointing at its
+    // boxes, so a layout task that outlived its cancellation inserts there, or
+    // fails, instead of changing the pages shown.
+    const staleOuterZoomBox = outerZoomBox.cloneNode(false) as HTMLElement;
+    const staleSpreadContainer = spreadContainer.cloneNode(
+      false,
+    ) as HTMLElement;
+    for (const container of tree.containers) {
+      container.removeAttribute(visibleAttribute);
+    }
+    staleSpreadContainer.append(...tree.containers);
+    staleOuterZoomBox.append(staleSpreadContainer);
+    // Outdated content: focus, selection, links and assistive technology stay
+    // out of it, while the layer around it still scrolls.
+    staleOuterZoomBox.inert = true;
+    layer.append(staleOuterZoomBox);
+    layer.addEventListener('scroll', this.#onScroll, { passive: true });
+    const focused = hasFocus(viewport);
+    // Ids repeat in both trees; scripts of the document must find the new
+    // ones first.
+    viewport.after(layer);
+    // The stale pages start out arranged as they were, and a view whose
+    // target is missing is not scrolled to it, so it has to start here.
+    layer.scrollTop = viewport.scrollTop;
+    // Keyboard focus and assistive technology go to the layer meanwhile.
+    viewport.inert = true;
+    if (focused) {
+      layer.focus({ preventScroll: true });
+    }
+    this.#stale = {
+      layer,
+      spreadContainer: staleSpreadContainer,
+      progression: this.#progression,
+      tree,
+    };
+    this.#appliedScrollTop = layer.scrollTop;
+    this.#listenToWheel();
+  }
+
+  #dropStale() {
+    const stale = this.#stale;
+    if (!stale) {
+      return;
+    }
+    if (!this.#complete) {
+      this.#fallback = stale.tree;
+    }
+    const focused = hasFocus(stale.layer);
+    this.#stale = null;
+    this.#viewport.inert = false;
+    stale.layer.remove();
+    if (focused) {
+      this.#viewport.focus({ preventScroll: true });
+    }
+    this.#unplaceAll();
+    this.#appliedScrollTop = this.#viewport.scrollTop;
+    this.#listenToWheel();
+  }
+
+  #unplaceAll() {
+    for (const container of this.#placed.keys()) {
+      container.removeAttribute(visibleAttribute);
+    }
+    this.#placed.clear();
+  }
+
+  /** Whether the pages core has laid out so far show what the stale ones do. */
+  #liveCoversView(): boolean {
+    const { pages } = readTree(
+      this.#liveSpreadContainer,
+      this.#options.fallbackPageSize(),
+    );
+    const index = resolvePage(pages, this.#target, this.#complete);
+    if (index === null) {
+      return false;
+    }
+    const scale =
+      this.#mode === 'scroll'
+        ? fitScale(
+            arrangeScroll(pages).width,
+            this.#viewport.clientWidth - padding * 2,
+          )
+        : 1;
+    return coversView(pages, index, {
+      mode: this.#mode,
+      progression: this.#options.pageProgression() ?? 'ltr',
+      complete: this.#complete,
+      offset: typeof this.#targetOffset === 'number' ? this.#targetOffset : 0,
+      viewHeight: this.#viewport.clientHeight / scale,
+    });
   }
 
   /**
@@ -233,21 +465,59 @@ export class Presentation {
   #update(change?: () => void) {
     this.#syncScroll();
     change?.();
-    this.#readPages();
+    this.#present();
+    // Both happen before the browser renders again, so the new pages replace
+    // the stale ones without a frame in between.
+    if (this.#stale && this.#liveCoversView()) {
+      this.#dropStale();
+      this.#present();
+    }
+    this.#publish();
+  }
+
+  #present() {
+    const { containers, pages } =
+      this.#stale?.tree ??
+      readTree(this.#liveSpreadContainer, this.#options.fallbackPageSize());
+    this.#containers = containers;
+    this.#pages = pages;
+    if (!this.#complete) {
+      this.#provisionalPageCount = Math.max(
+        this.#provisionalPageCount ?? 0,
+        pages.length,
+      );
+      this.#reservedHeight = Math.max(
+        this.#reservedHeight ?? 0,
+        arrangeScroll(pages).height,
+      );
+    }
     const linked = this.#takeLinkTarget();
-    this.#progression = this.#options.pageProgression() ?? 'ltr';
+    this.#progression =
+      this.#stale?.progression ?? this.#options.pageProgression() ?? 'ltr';
     this.#spreadIndex =
       this.#mode === 'spread'
         ? pairSpreads(
-            this.#pages.map((page) => page.side),
+            pages.map((page) => page.side),
             this.#progression,
           )
         : null;
-    this.#current = resolvePage(this.#pages, this.#target, this.#complete);
+    const location = locatePage(pages, this.#target, this.#displayedComplete);
+    if (location?.settled) {
+      // A target that is gone for good settles on the page shown instead,
+      // which a later layout then keeps.
+      const page = pages[location.index];
+      this.#target = { spineIndex: page.spineIndex, pageIndex: page.pageIndex };
+    }
+    // While the target may still come back, a paged view shows the page
+    // before it, and a scrolled one stays where it is.
+    this.#current =
+      location && (location.settled || this.#mode !== 'scroll')
+        ? location.index
+        : null;
     const arrangement = this.#arrange();
     const scale = fitScale(
       arrangement?.width ?? 0,
-      this.#viewport.clientWidth - padding * 2,
+      this.#scroller.clientWidth - padding * 2,
     );
     this.#place(arrangement, scale);
     if (linked && this.#current === linked.index) {
@@ -257,7 +527,6 @@ export class Presentation {
         scale;
     }
     this.#scroll(arrangement, scale);
-    this.#publish();
   }
 
   // Laid-out pages are all in the DOM, so the ids core writes into them find a
@@ -277,7 +546,7 @@ export class Presentation {
       ? this.#containers.indexOf(container as HTMLElement)
       : -1;
     if (!element || index < 0) {
-      if (this.#complete) {
+      if (this.#displayedComplete) {
         this.#pendingFragment = null;
       }
       return null;
@@ -287,41 +556,6 @@ export class Presentation {
     this.#target = { spineIndex: page.spineIndex, pageIndex: page.pageIndex };
     this.#targetOffset = 0;
     return { index, element };
-  }
-
-  #readPages() {
-    const containers: HTMLElement[] = [];
-    const pages: PageBox[] = [];
-    const pageCounts = new Map<number, number>();
-    const fallback = this.#options.fallbackPageSize();
-    for (const child of this.#spreadContainer?.children ?? []) {
-      if (
-        !(child instanceof HTMLElement) ||
-        !child.hasAttribute(pageContainerAttribute)
-      ) {
-        continue;
-      }
-      const spineIndex =
-        Number(child.getAttribute('data-vivliostyle-spine-index')) || 0;
-      // Core numbers pages only once their layout settles, after it has put
-      // them in place; the order of the containers is final before that.
-      const pageIndex = pageCounts.get(spineIndex) ?? 0;
-      pageCounts.set(spineIndex, pageIndex + 1);
-      containers.push(child);
-      pages.push({
-        spineIndex,
-        pageIndex,
-        side:
-          child.getAttribute('data-vivliostyle-page-side') === 'left'
-            ? 'left'
-            : 'right',
-        // Core sizes each container to its page sheet in px.
-        width: Number.parseFloat(child.style.width) || fallback.width,
-        height: Number.parseFloat(child.style.height) || fallback.height,
-      });
-    }
-    this.#containers = containers;
-    this.#pages = pages;
   }
 
   #arrange(): Arrangement | null {
@@ -339,6 +573,10 @@ export class Presentation {
   }
 
   #place(arrangement: Arrangement | null, scale: number) {
+    const height = Math.max(
+      arrangement?.height ?? 0,
+      this.#mode === 'scroll' ? (this.#reservedHeight ?? 0) : 0,
+    );
     // Transforms take no layout space, so the outer zoom box, which clips the
     // transformed spread container, is what scrolls. A rule, not inherited
     // custom properties, so a change does not restyle every page below.
@@ -348,7 +586,7 @@ export class Presentation {
   }
   [data-pub-view-mode] > [data-vivliostyle-outer-zoom-box] {
     width: ${(arrangement?.width ?? 0) * scale}px !important;
-    height: ${(arrangement?.height ?? 0) * scale}px !important;
+    height: ${height * scale}px !important;
   }
   [data-pub-view-mode] > [data-vivliostyle-outer-zoom-box] > [data-vivliostyle-spread-container] {
     --viv-outputScale: ${scale};
@@ -358,11 +596,11 @@ export class Presentation {
       this.#style.textContent = css;
     }
 
-    const stale = new Set(this.#placed.keys());
+    const unplaced = new Set(this.#placed.keys());
     for (const { index, x, y } of arrangement?.placements ?? []) {
       const container = this.#containers[index];
       const placement = `${x},${y}`;
-      stale.delete(container);
+      unplaced.delete(container);
       if (this.#placed.get(container) !== placement) {
         // Core clears these before it puts a container in place and leaves
         // them alone afterwards.
@@ -372,7 +610,7 @@ export class Presentation {
         this.#placed.set(container, placement);
       }
     }
-    for (const container of stale) {
+    for (const container of unplaced) {
       container.removeAttribute(visibleAttribute);
       this.#placed.delete(container);
     }
@@ -384,12 +622,12 @@ export class Presentation {
       this.#layout = null;
       return;
     }
-    const viewport = this.#viewport;
+    const scroller = this.#scroller;
     const originTop =
       outerZoomBox.getBoundingClientRect().top -
-      viewport.getBoundingClientRect().top -
-      viewport.clientTop +
-      viewport.scrollTop;
+      scroller.getBoundingClientRect().top -
+      scroller.clientTop +
+      scroller.scrollTop;
     const geometry: ScrollGeometry = { originTop, padding, scale };
     this.#layout = {
       arrangement,
@@ -409,7 +647,7 @@ export class Presentation {
       this.#targetOffset = endOffset(
         geometry,
         arrangement.height,
-        viewport.clientHeight,
+        scroller.clientHeight,
       );
     }
     this.#desiredScrollTop = scrollTopFor(
@@ -419,10 +657,10 @@ export class Presentation {
     );
     // Setting the position, even to about the same value, stops a momentum
     // scroll in progress.
-    if (Math.abs(viewport.scrollTop - this.#desiredScrollTop) >= 0.5) {
-      viewport.scrollTop = this.#desiredScrollTop;
+    if (Math.abs(scroller.scrollTop - this.#desiredScrollTop) >= 0.5) {
+      scroller.scrollTop = this.#desiredScrollTop;
     }
-    this.#appliedScrollTop = viewport.scrollTop;
+    this.#appliedScrollTop = scroller.scrollTop;
   }
 
   #pageY(index: number): number {
@@ -435,32 +673,32 @@ export class Presentation {
 
   /** Takes a scroll position the user produced since our last one into the target. */
   #syncScroll() {
-    const viewport = this.#viewport;
-    const scrollTop = viewport.scrollTop;
+    const scroller = this.#scroller;
+    const scrollTop = scroller.scrollTop;
     if (scrollTop === this.#appliedScrollTop) {
       return;
     }
     this.#appliedScrollTop = scrollTop;
     const layout = this.#layout;
-    if (!layout || this.#current === null) {
+    if (!layout) {
       return;
     }
     // The browser clamps the position when the content shrinks below the one
     // we asked for, e.g. while core lays the publication out anew. That is
     // not the user moving away from the target.
-    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight;
+    const maxScrollTop = scroller.scrollHeight - scroller.clientHeight;
     if (
       this.#desiredScrollTop > maxScrollTop + 1 &&
       Math.abs(scrollTop - maxScrollTop) <= 1
     ) {
       return;
     }
-    this.#pendingFragment = null;
     if (layout.spans) {
-      const index = dominantSpan(
+      const index = viewedPage(
         layout.spans,
         scrollTop,
-        scrollTop + viewport.clientHeight,
+        scrollTop + scroller.clientHeight,
+        this.#current !== null,
       );
       if (index !== null) {
         const page = this.#pages[index];
@@ -471,6 +709,10 @@ export class Presentation {
         };
       }
     }
+    if (this.#current === null) {
+      return;
+    }
+    this.#pendingFragment = null;
     this.#targetOffset = offsetFor(
       layout.geometry,
       this.#pageY(this.#current),
@@ -491,7 +733,7 @@ export class Presentation {
         null;
     this.#options.onChange({
       pageIndex: current ?? this.#lastPageIndex,
-      pageCount,
+      pageCount: Math.max(pageCount, this.#provisionalPageCount ?? 0),
       canPrev: canMove('prev'),
       canNext: canMove('next'),
       pageProgression: this.#progression,
@@ -499,12 +741,12 @@ export class Presentation {
   }
 
   #listenToWheel() {
+    this.#viewport.removeEventListener('wheel', this.#onWheel);
+    this.#stale?.layer.removeEventListener('wheel', this.#onWheel);
     // A non-passive wheel listener makes every scroll wait for the main
     // thread, which core keeps busy while it lays pages out.
-    if (this.#mode === 'scroll') {
-      this.#viewport.removeEventListener('wheel', this.#onWheel);
-    } else {
-      this.#viewport.addEventListener('wheel', this.#onWheel, {
+    if (this.#mode !== 'scroll') {
+      this.#scroller.addEventListener('wheel', this.#onWheel, {
         passive: false,
       });
     }
@@ -513,14 +755,17 @@ export class Presentation {
   #canScroll(target: EventTarget | null, direction: ScrollDirection): boolean {
     return canScrollToward(
       target instanceof Element ? target : null,
-      this.#viewport,
+      this.#scroller,
       direction,
       scrollStyle,
     );
   }
 
-  readonly #onScroll = () => {
-    if (this.#viewport.scrollTop !== this.#appliedScrollTop) {
+  readonly #onScroll = (event: Event) => {
+    if (
+      event.currentTarget === this.#scroller &&
+      this.#scroller.scrollTop !== this.#appliedScrollTop
+    ) {
       this.#syncScroll();
       this.#publish();
     }
@@ -538,7 +783,7 @@ export class Presentation {
       event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? 16
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-          ? this.#viewport.clientHeight
+          ? this.#scroller.clientHeight
           : 1;
     const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
     const physical = horizontal ? event.deltaX : event.deltaY;

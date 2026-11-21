@@ -69,4 +69,4 @@ if (src) {
   }
 }
 
-subscribeFullReload(() => stage.reload());
+subscribeFullReload((path) => stage.reload(path === '*'));
