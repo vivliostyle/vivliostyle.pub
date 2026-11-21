@@ -8,6 +8,7 @@ import {
 import {
   buildSettingsRows,
   findSection,
+  getTocKey,
   groupKey,
   isFiltering,
   matchSettings,
@@ -281,6 +282,88 @@ describe('matchSettings', () => {
     });
   });
 
+  describe('with margin boxes', () => {
+    const page = buildThemeVariableSchema({
+      page: {
+        size: v('size'),
+        'mbox-font-size': v('font-size'),
+        'mbox-text-color': v('color'),
+        'mbox-top-left-font-size': v('font-size'),
+        'mbox-top-left-text-color': v('color'),
+        'mbox-top-font-size': v('font-size'),
+        'mbox-top-text-color': v('color'),
+      },
+    });
+    const matches = (input: Partial<SettingsMatchInput> = {}) =>
+      match({ groups: page.groups, ...input });
+    const rowKeys = (section: string | null, input = {}) =>
+      buildSettingsRows(matches(input), section, 100).map((row) => row.key);
+    const box = (id: string) => subgroupKey('page', target(id));
+
+    it('lists them as one entry of the table of contents', () => {
+      const { subgroups } = matches().toc[0];
+      expect(subgroups.map((s) => [s.key, s.label, s.count])).toEqual([
+        [subgroupKey('page', category('page-setup')), 'Page size and marks', 1],
+        [box('mbox'), 'Margin boxes', 6],
+      ]);
+      expect(subgroups[1].members?.map((s) => s.key)).toEqual([
+        box('mbox'),
+        box('mbox-top-left'),
+        box('mbox-top'),
+      ]);
+    });
+
+    it('shows one box at a time under the diagram', () => {
+      const rows = buildSettingsRows(matches(), box('mbox-top-left'), 100);
+      expect(rows.map((row) => row.key)).toEqual([
+        'g:page',
+        'g:page/picker',
+        box('mbox-top-left'),
+        `${box('mbox-top-left')}/font`,
+        '--vs-page--mbox-top-left-font-size',
+        `${box('mbox-top-left')}/color`,
+        '--vs-page--mbox-top-left-text-color',
+      ]);
+      expect(rows[1]).toMatchObject({
+        current: box('mbox-top-left'),
+        boxes: [
+          { id: 'mbox', count: 2 },
+          { id: 'mbox-top-left', count: 2 },
+          { id: 'mbox-top', count: 2 },
+        ],
+      });
+      expect(rowKeys(groupKey('page')).slice(0, 5)).toEqual([
+        'g:page',
+        subgroupKey('page', category('page-setup')),
+        '--vs-page--size',
+        'g:page/picker',
+        box('mbox'),
+      ]);
+      expect(rowKeys(groupKey('page'))).not.toContain(box('mbox-top'));
+    });
+
+    it('lists every match of a search', () => {
+      expect(
+        rowKeys(null, { filter: { query: 'font', modifiedOnly: false } }),
+      ).toEqual([
+        'g:page',
+        box('mbox'),
+        '--vs-page--mbox-font-size',
+        box('mbox-top-left'),
+        '--vs-page--mbox-top-left-font-size',
+        box('mbox-top'),
+        '--vs-page--mbox-top-font-size',
+      ]);
+    });
+
+    it('finds a box by its key', () => {
+      const { toc } = matches();
+      expect(findSection(toc, box('mbox-top'))?.label).toBe('Top edge');
+      expect(getTocKey(toc, box('mbox-top'))).toBe(box('mbox'));
+      expect(getTocKey(toc, groupKey('page'))).toBe(groupKey('page'));
+    });
+  });
+
   it('finds a group or a subgroup by its key', () => {
     const { toc } = match();
     expect(findSection(toc, groupKey('page'))?.label).toBe('Page');
@@ -331,9 +414,7 @@ describe('buildSettingsRows', () => {
     );
     expect(
       rows.map((row) =>
-        row.kind === 'variable' || row.kind === 'more'
-          ? row.key
-          : `${row.kind}: ${row.label}`,
+        'label' in row ? `${row.kind}: ${row.label}` : row.key,
       ),
     ).toEqual([
       'group: Headings',

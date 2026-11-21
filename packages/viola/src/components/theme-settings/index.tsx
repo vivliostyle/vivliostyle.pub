@@ -491,6 +491,7 @@ export default function ThemeCssEditor({
                     rows={settings.lists.getRows(key)}
                     model={model}
                     onCommit={handleCommit}
+                    onSelectSection={handleSelect}
                   />
                 )}
               </PrerenderedViews>
