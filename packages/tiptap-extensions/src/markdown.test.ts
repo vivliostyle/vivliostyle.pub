@@ -137,6 +137,17 @@ describe('code block info string', () => {
     expect(roundTrip('~~~~a`b\n ~~~\n~~~~')).toBe('~~~~a`b\n ~~~\n~~~~');
   });
 
+  it('measures fences in code too long to spread into a call', () => {
+    const code = Array.from({ length: 200_000 }, () => '```').join('\n');
+    expect(
+      serializeBlock({
+        type: 'codeBlock',
+        attrs: { language: null },
+        content: [{ type: 'text', text: code }],
+      }),
+    ).toBe(`\`\`\`\`\n${code}\n\`\`\`\``);
+  });
+
   it('switches to tildes for an info string with backticks', () => {
     expect(
       serializeBlock({

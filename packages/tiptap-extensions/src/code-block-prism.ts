@@ -51,7 +51,12 @@ function toInfoString(value: string | null | undefined): string | null {
 function codeFence(infoString: string, code: string): string {
   const char = infoString.includes('`') ? '~' : '`';
   const runs = code.match(char === '`' ? /^ {0,3}`+/gm : /^ {0,3}~+/gm);
-  const longest = Math.max(0, ...(runs ?? []).map((run) => run.trim().length));
+  // Not Math.max(...runs): a long enough code block exceeds the engine's
+  // argument limit.
+  let longest = 0;
+  for (const run of runs ?? []) {
+    longest = Math.max(longest, run.trim().length);
+  }
   return char.repeat(Math.max(3, longest + 1));
 }
 
