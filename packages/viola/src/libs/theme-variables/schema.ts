@@ -2,6 +2,7 @@ import { groupedPropAlias } from 'postcss-variable-theming/preset';
 
 import {
   getLeadingCategory,
+  getPropertyRank,
   getTrailingCategory,
   THEME_VARIABLE_CATEGORIES,
   type ThemeVariableCategory,
@@ -66,7 +67,7 @@ export type ThemeVariableSubgroup = ThemeVariableSubgroupRef & {
   group: string;
   /** Module to name in the label of the subgroup, if any. */
   module: string | null;
-  /** In source order, or by category within a target. */
+  /** By category, then in the order of their properties. */
   variables: ThemeVariable[];
 };
 
@@ -372,11 +373,13 @@ export function groupThemeVariables(
     ];
     group.subgroups.sort((a, b) => compareRanks(rankOf(a), rankOf(b)));
     for (const subgroup of group.subgroups) {
-      if (subgroup.kind === 'target') {
-        subgroup.variables.sort(
-          (a, b) => categoryRank(a.category) - categoryRank(b.category),
-        );
-      }
+      const variableRank = (variable: ThemeVariable) => [
+        categoryRank(variable.category),
+        ...getPropertyRank(variable.propertyKey),
+      ];
+      subgroup.variables.sort((a, b) =>
+        compareRanks(variableRank(a), variableRank(b)),
+      );
     }
   }
   return [...groups.values()].sort(
