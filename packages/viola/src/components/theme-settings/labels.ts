@@ -1,34 +1,44 @@
-import type { ThemeVariable } from '../../libs/theme-variables';
+import { m } from '../../generated/paraglide/messages';
+import { isFoldedModule, type ThemeVariable } from '../../libs/theme-variables';
+import { getGroupLabel, humanizeKey } from './messages';
+import { TARGET_LABELS } from './vocabulary';
 
-// Element names and abbreviations read better in capitals than as words.
-const UPPERCASE_WORDS = new Set([
-  ...['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'rt'],
-  ...['ol', 'ul', 'li', 'dl', 'dt', 'dd', 'td', 'th'],
-  ...['toc', 'rlh'],
-]);
+export function findTargetLabel(
+  group: string,
+  target: string,
+): string | undefined {
+  return (
+    TARGET_LABELS.get(`${group}/${target}`) ?? TARGET_LABELS.get(target)
+  )?.();
+}
 
-const WORDS: Record<string, string> = {
-  mbox: 'margin box',
-};
-
-export function humanizeKey(key: string): string {
-  const words = key
-    .split('-')
-    .filter((word) => word !== '')
-    .map((word) =>
-      UPPERCASE_WORDS.has(word) ? word.toUpperCase() : (WORDS[word] ?? word),
-    );
-  const text = words.join(' ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
+export function getTargetLabel(group: string, target: string): string {
+  return findTargetLabel(group, target) ?? humanizeKey(target);
 }
 
 export function getVariableLabel(
-  variable: Pick<ThemeVariable, 'key' | 'subgroup'>,
+  variable: Pick<
+    ThemeVariable,
+    'group' | 'target' | 'propertyKey' | 'subgroup'
+  >,
 ): string {
-  const { key, subgroup } = variable;
-  const rest =
-    subgroup.kind === 'target' && key.startsWith(`${subgroup.id}-`)
-      ? key.slice(subgroup.id.length + 1)
-      : key;
-  return humanizeKey(rest);
+  const { group, target, propertyKey, subgroup } = variable;
+  const detail = (text: string) =>
+    m.theme_settings_label_with_detail({ label: propertyKey, detail: text });
+  // A folded module shares the subgroup of an element, whose heading names
+  // neither the module nor its target.
+  if (isFoldedModule(group)) {
+    return detail(
+      target === null ? getGroupLabel(group) : getTargetLabel(group, target),
+    );
+  }
+  // The heading of the subgroup names the target, unless the variable joined
+  // the subgroup from a target of its own.
+  if (
+    target === null ||
+    (subgroup.kind === 'target' && subgroup.id === target)
+  ) {
+    return propertyKey;
+  }
+  return detail(getTargetLabel(group, target));
 }

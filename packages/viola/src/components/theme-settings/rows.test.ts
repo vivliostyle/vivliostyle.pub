@@ -40,7 +40,8 @@ const labels: Record<string, string> = {
   page: 'Page',
   body: 'Body text',
   heading: 'Headings',
-  section: 'Sections',
+  code: 'Code',
+  listing: 'Code listings',
 };
 
 const categoryLabels: Partial<Record<ThemeVariableCategory, string>> = {
@@ -81,8 +82,8 @@ describe('matchSettings', () => {
     ).toEqual([
       ['General', 3, ['Font', 'Color and background']],
       ['Page', 3, ['Page size and marks', 'Margin and padding']],
-      ['Body text', 1, ['P']],
-      ['Headings', 2, ['H1']],
+      ['Body text', 1, ['<p>']],
+      ['Headings', 2, ['<h1>']],
     ]);
     expect(matchCount).toBe(9);
   });
@@ -175,16 +176,15 @@ describe('matchSettings', () => {
   describe('with a group gathered from several tree groups', () => {
     const merged = buildThemeVariableSchema({
       _basic: {
-        'h1-font-size': v('font-size'),
-        'h1-margin-block': v('margin-block'),
+        'pre-font-size': v('font-size'),
+        'pre-margin-block': v('margin-block'),
       },
-      section: {
-        'h1-break-before': v('break-before'),
-        'h1-break-after': v('break-after'),
+      listing: {
+        'call-content': v('content'),
+        'call-display': v('display'),
       },
     });
-    const isModified = (name: string) =>
-      name === '--vs-section--h1-break-after';
+    const isModified = (name: string) => name === '--vs-listing--call-display';
 
     it('names the module of a subgroup lent to a group of another name', () => {
       expect(
@@ -194,10 +194,10 @@ describe('matchSettings', () => {
         ]),
       ).toEqual([
         [
-          'g:heading',
+          'g:code',
           [
-            ['s:_basic/target:h1', 'H1'],
-            ['s:section/target:h1', 'Sections: H1'],
+            ['s:_basic/target:pre', '<pre>'],
+            ['s:listing/target:call', 'Code listings: References'],
           ],
         ],
       ]);
@@ -207,14 +207,16 @@ describe('matchSettings', () => {
       expect(
         buildSettingsRows(
           match({ groups: merged.groups }),
-          subgroupKey('section', target('h1')),
+          subgroupKey('listing', target('call')),
           100,
         ).map((row) => row.key),
       ).toEqual([
-        'g:heading',
-        's:section/target:h1',
-        '--vs-section--h1-break-before',
-        '--vs-section--h1-break-after',
+        'g:code',
+        's:listing/target:call',
+        's:listing/target:call/visibility',
+        '--vs-listing--call-display',
+        's:listing/target:call/generated-content',
+        '--vs-listing--call-content',
       ]);
     });
 
@@ -224,8 +226,8 @@ describe('matchSettings', () => {
           count: 4,
           modified: 1,
           subgroups: [
-            { key: 's:_basic/target:h1', count: 2, modified: 0 },
-            { key: 's:section/target:h1', count: 2, modified: 1 },
+            { key: 's:_basic/target:pre', count: 2, modified: 0 },
+            { key: 's:listing/target:call', count: 2, modified: 1 },
           ],
         },
       ]);
@@ -238,7 +240,7 @@ describe('matchSettings', () => {
       ).toMatchObject([
         {
           count: 1,
-          subgroups: [{ key: 's:section/target:h1', count: 1, modified: 1 }],
+          subgroups: [{ key: 's:listing/target:call', count: 1, modified: 1 }],
         },
       ]);
     });
@@ -251,7 +253,7 @@ describe('matchSettings', () => {
       expect.objectContaining({ label: 'Margin and padding', count: 2 }),
     );
     expect(findSection(toc, subgroupKey('_basic', target('h1')))?.label).toBe(
-      'H1',
+      '<h1>',
     );
     expect(
       findSection(toc, subgroupKey('page', target('margin'))),
@@ -300,7 +302,7 @@ describe('buildSettingsRows', () => {
       ),
     ).toEqual([
       'group: Headings',
-      'subgroup: H1',
+      'subgroup: <h1>',
       'category: Font',
       '--vs--h1-font-size',
       'category: Margin and padding',
