@@ -34,7 +34,6 @@ interface SettingRowProps {
   important: boolean;
   /** Other scopes that set the variable. */
   otherScopes: readonly ThemeScopeId[];
-  nested: boolean;
   onCommit: CommitHandler;
   onSwitchScope: (scope: ThemeScopeId) => void;
 }
@@ -46,7 +45,6 @@ function SettingRow({
   defaultValue,
   important,
   otherScopes,
-  nested,
   onCommit,
   onSwitchScope,
 }: SettingRowProps) {
@@ -76,7 +74,6 @@ function SettingRow({
       aria-labelledby={labelId}
       className={cn(
         'grid gap-1.5 border-l-2 py-2 pr-1 pl-3',
-        nested && 'ml-3',
         modified ? 'border-primary' : 'border-transparent',
       )}
     >
@@ -130,17 +127,19 @@ function SettingRow({
           ))}
         </div>
       )}
-      <ValueField
-        value={value ?? ''}
-        descriptor={descriptor}
-        defaultValue={defaultValue}
-        label={label}
-        labelId={labelId}
-        describedBy={describedBy}
-        invalid={error !== null}
-        onCommit={commit}
-        onRevert={revert}
-      />
+      <div className="max-w-lg">
+        <ValueField
+          value={value ?? ''}
+          descriptor={descriptor}
+          defaultValue={defaultValue}
+          label={label}
+          labelId={labelId}
+          describedBy={describedBy}
+          invalid={error !== null}
+          onCommit={commit}
+          onRevert={revert}
+        />
+      </div>
       {defaultValue && (
         <p
           id={hintId}
