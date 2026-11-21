@@ -30,16 +30,16 @@ function DedicatedModal() {
       router.subscribe('onBeforeLoad', ({ fromLocation, toLocation }) => {
         if (fromLocation?.pathname !== toLocation.pathname) {
           setOpen(false);
-          $ui.dedicatedModal = null;
+          $ui.closeModal();
         }
       }),
     [router.subscribe],
   );
 
-  const closeModal = useCallback((open: boolean) => {
+  const handleOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setOpen(false);
-      $ui.dedicatedModal = null;
+      $ui.closeModal();
     }
   }, []);
 
@@ -62,7 +62,7 @@ function DedicatedModal() {
 
   return (
     <PaneContext.Provider value={{ ...pane, props, hideTitle: true }}>
-      <Dialog open={open} onOpenChange={closeModal}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-4xl p-0" onAnimationEnd={purgeModal}>
           <div className="size-full max-h-svh overflow-auto grid gap-4 p-6">
             <DialogHeader>

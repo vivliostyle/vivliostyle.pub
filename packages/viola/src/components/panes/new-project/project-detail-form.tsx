@@ -29,7 +29,7 @@ import { usePromiseState } from '../../../hooks/use-promise-state';
 import { getOfficialThemeTitle } from '../../../libs/official-theme-title';
 import { $draftProject, $project } from '../../../stores/accessors';
 import { setupProjectFromDraft } from '../../../stores/actions/setup-project-from-draft';
-import { Theme } from '../../../stores/proxies/theme';
+import { officialThemes } from '../../../stores/catalog';
 import { TemplateStoreMolecule } from './store';
 
 function BookTitleInput({ children }: React.PropsWithChildren) {
@@ -153,7 +153,7 @@ function ThemeSelect({ children }: React.PropsWithChildren) {
         value={currentPackageName}
         onValueChange={handleSelect}
       >
-        {Object.entries(Theme.officialThemes).map(([value, { title }]) => (
+        {Object.entries(officialThemes).map(([value, { title }]) => (
           <StackedRadioGroupItem key={value} value={value} required>
             {getOfficialThemeTitle(value, title)}
           </StackedRadioGroupItem>

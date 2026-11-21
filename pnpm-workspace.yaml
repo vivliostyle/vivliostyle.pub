@@ -118,7 +118,6 @@ catalog:
   unenv: 2.0.0-rc.24
   valibot: 1.4.0
   valtio: 2.3.2
-  valtio-reactive: 0.2.0
   vite: 8.1.6
   vite-plugin-pwa: 1.3.0
   vitest: 4.1.9

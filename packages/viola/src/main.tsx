@@ -6,7 +6,10 @@ import { ThemeProvider } from '@v/ui/theme-provider';
 import './libs/polyfills';
 import { router } from './router';
 import { restoreSession } from './stores/actions/session';
+import { initStores } from './stores/init';
 import './main.css';
+
+initStores();
 
 // Kick off auth restoration as soon as the app boots so the sidebar's
 // signed-in state is populated by the time the first route renders.

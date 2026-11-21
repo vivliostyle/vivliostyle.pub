@@ -30,10 +30,10 @@ export async function deleteCloudProject(projectId: ProjectId): Promise<void> {
   if ($projects.currentProjectId === projectId) {
     await router.navigate({ to: '/' });
   }
+  // A project still being created has its sandbox but no Project yet.
+  await ($projects.value[projectId] ?? $sandboxes.value[projectId])?.dispose();
   await $session.api.deleteProject(projectId);
   delete $projects.entries[projectId];
-  delete $projects.value[projectId];
-  delete $sandboxes.value[projectId];
   if ($projects.currentProjectId === projectId) {
     $projects.currentProjectId = null;
   }

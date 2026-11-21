@@ -48,13 +48,6 @@ function Title({ contentId }: EditPaneProperty) {
     : m.edit_pane_title();
 }
 
-function setMode(id: PaneId, mode: EditorMode) {
-  const tab = $ui.tabs.find((t) => t.id === id);
-  if (tab?.type === 'edit') {
-    tab.mode = mode;
-  }
-}
-
 function ModeToggle({
   id,
   mode = 'visual',
@@ -65,7 +58,9 @@ function ModeToggle({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => id && setMode(id, isSource ? 'visual' : 'source')}
+        onClick={() =>
+          id && $ui.setEditMode(id, isSource ? 'visual' : 'source')
+        }
       >
         {isSource ? <Type /> : <Code />}
         {isSource ? m.edit_mode_visual() : m.edit_mode_source()}

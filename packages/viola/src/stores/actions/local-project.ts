@@ -8,6 +8,8 @@ export async function deleteLocalProject(projectId: ProjectId): Promise<void> {
   if ($projects.currentProjectId === projectId) {
     await router.navigate({ to: '/' });
   }
+  // A project still being created has its sandbox but no Project yet.
+  await ($projects.value[projectId] ?? $sandboxes.value[projectId])?.dispose();
   const root = await OPFSStorageProvider.open();
   try {
     await root.remove(projectId, { recursive: true });
@@ -15,8 +17,6 @@ export async function deleteLocalProject(projectId: ProjectId): Promise<void> {
     // already gone
   }
   delete $projects.entries[projectId];
-  delete $projects.value[projectId];
-  delete $sandboxes.value[projectId];
   if ($projects.currentProjectId === projectId) {
     $projects.currentProjectId = null;
   }

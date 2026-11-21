@@ -1,12 +1,10 @@
 import { invariant } from 'outvariant';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ref } from 'valtio';
 
 import { m } from '../../generated/paraglide/messages';
 import { debounce } from '../../libs/debounce';
-import { $content, $sandbox } from '../../stores/accessors';
+import { $project } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
-import { SandboxFile } from '../../stores/proxies/sandbox';
 import CodeEditor from '../code-editor';
 
 // Side-menu summary derived directly from raw markdown, for the source editor
@@ -41,11 +39,10 @@ function deriveSummaryFromMarkdown(markdown: string): string {
 }
 
 export default function SourceEditor({ contentId }: { contentId: ContentId }) {
-  const content = $content.valueOrThrow();
-  const sandbox = $sandbox.valueOrThrow();
-  const file = content.files.get(contentId);
+  const project = $project.valueOrThrow();
+  const file = project.content.files.get(contentId);
   invariant(file, `Source editor: file not found for contentId: ${contentId}`);
-  const { editor, filename } = file;
+  const { editor } = file;
 
   // The collaborative XmlFragment stays the source of truth; the source view
   // is seeded once from its current markdown and never re-reads it while open.
@@ -56,13 +53,15 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
     () =>
       debounce(
         (code: string) => {
-          file.summary = deriveSummaryFromMarkdown(code);
-          sandbox.files[filename] = ref(new SandboxFile('text/markdown', code));
+          project.saveContentFile(contentId, {
+            markdown: code,
+            summary: deriveSummaryFromMarkdown(code),
+          });
         },
         1000,
         { trailing: true },
       ),
-    [sandbox, filename, file],
+    [project, contentId],
   );
 
   const handleCodeUpdate = useCallback(
@@ -79,11 +78,12 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
   // XmlFragment — emitUpdate runs the editor's own save path so the sandbox
   // file and server sync reconverge deterministically. Skip the write entirely
   // when the source never diverged from the seed, to avoid emitting a redundant
-  // collaborative update for an untouched document.
+  // collaborative update for an untouched document, or when deleting the file
+  // has already destroyed the editor ahead of this unmount.
   useEffect(() => {
     return () => {
       saveToSandbox.cancel();
-      if (latestCode.current !== initialCode) {
+      if (!editor.isDestroyed && latestCode.current !== initialCode) {
         editor.commands.setContent(latestCode.current, {
           contentType: 'markdown',
           emitUpdate: true,

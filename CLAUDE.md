@@ -101,9 +101,18 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
 
 ### Package layout
 
-- **`packages/viola/`** (`@v/viola`) — the React + Vite 8 app. Stack: React 19, TanStack Router (file-based, `routeTree.gen.ts` is generated), Tailwind v4, TipTap (markdown editing) + `@v/tiptap-extensions`, CodeMirror (raw source editing), valtio (`stores/proxies/*` are valtio proxies; `stores/actions/*` are command functions; `stores/accessors.ts` exposes them).
+- **`packages/viola/`** (`@v/viola`) — the React + Vite 8 app. Stack: React 19, TanStack Router (file-based, `routeTree.gen.ts` is generated), Tailwind v4, TipTap (markdown editing) + `@v/tiptap-extensions`, CodeMirror (raw source editing), valtio (`stores/proxies/*` are valtio proxies; `stores/actions/*` are commands that span stores; `stores/accessors.ts` exposes them).
+  - `libs/` never imports `stores/` at runtime (type-only imports are fine). A helper in `libs/` that needs store state takes it from its caller as arguments or callbacks. I/O and pure logic that the proxies rely on belong in `libs/`. Static catalogs, such as the fixed lists of templates and themes, sit in their own module under `stores/`, not in a proxy class.
+  - Store modules have no import-time side effects. Global wiring, such as enabling valtio op delivery or starting a channel relay, happens in a single init function that the app entry calls once. Tests that need the wiring call it themselves.
+  - Components and routes may assign a single store field directly. A change that must keep one store's invariant is a method on that store's proxy, and callers use the method instead of writing those fields. Such changes include several fields that move together, or a check before the write. A store includes the objects it owns, so a method on an owning object may also write the objects under it.
+  - A change that spans separate stores, or that needs the router or another action, is a function in `stores/actions/`. Proxies cannot import actions or the router, so anything that needs them is an action.
+  - Call a method that writes on the proxy, never on a snapshot (`useSnapshot`/`snapshot()`). A snapshot keeps the methods and its type allows the call, but its fields are read-only, so a write through `this` throws. A method that only reads may be called on a snapshot. A plain-object proxy's method that writes is therefore an arrow function that writes through the variable holding the proxy, not through `this`. A class proxy's methods that write use `this` and must be called on the proxy. Work started in a class constructor runs on the unwrapped object, so its writes to the object's own fields notify no one; start it on the proxy after wrapping.
+  - Where a valtio proxy lives:
+    - State that several features or routes share, or that is persisted, goes in `stores/proxies/` (reached through `stores/accessors.ts`).
+    - State that one feature owns for the page's lifetime stays in that feature's own module. A proxy under `libs/` still must not import `stores/`.
+    - State tied to one mounted pane that must start fresh on every mount is a bunshi molecule scoped to the pane.
   - `templates/basic/`, `templates/minimal/` — project starter templates packed into `.tar.gz` on the fly by the `serveTemplates` Vite plugin and extracted into memfs via `setupTemplate`.
-  - `src/client/` — service worker entry (`sw.ts` branches on hostname to call `setupSwHost` or `setupSwIframe`) and the CLI worker entry (`cli-worker.ts`).
+  - `src/client/` — service worker entry (`sw.ts` branches on hostname to call `setupSwHost` or `setupSwIframe`), the CLI worker entry (`cli-worker.ts`), and the host page's end of the `host:project` relay that the host SW forwards to.
 
 - **`packages/cli-bundle/`** (`@v/cli-bundle`) — the browserified Vivliostyle CLI worker. Build is **Rolldown directly** (not Vite), config in `rolldown.config.ts`. Emits four outputs:
   1. `dist/index.js` — the worker bundle (ESM, ~5 MB).
@@ -144,6 +153,7 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 - **Patches**: `patches/buffer@6.0.3.patch` is applied via `patchedDependencies` in `pnpm-workspace.yaml` (moved there from `package.json#pnpm.patchedDependencies` in pnpm 11). The `allowBuilds` key in the same file controls which packages may run install scripts.
 - **Husky pre-commit** runs `lint-staged` (Biome format) and `pnpm check`.
 - **Agent guidance lives only in this file.** No `.cursor/rules`, `.cursorrules`, or `.github/copilot-instructions.md` exist — `AGENTS.md` is a symlink to `CLAUDE.md` so every agent reads the same source. If you need to extend the guide, edit `CLAUDE.md`.
+- **Write agent guidance that survives code changes.** In this file and in `.claude/rules/`, state a rule by the role and structure it governs, not by the code that follows it today. Don't cite specific variables, functions, classes or files as examples. After a rename or a refactor, such an example points at code that no longer exists, and nothing flags it. Directory names are fine when the rule is about that layout, and so are third-party library APIs. When a rule needs an example, describe the situation in words (e.g. "several fields that change together") instead of naming the symbol.
 
 ## Internationalization (i18n)
 

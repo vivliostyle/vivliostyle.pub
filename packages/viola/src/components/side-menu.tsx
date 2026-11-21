@@ -65,7 +65,6 @@ import {
 import VivliostyleLogo from '../assets/vivliostyle-logo.svg';
 import { m } from '../generated/paraglide/messages';
 import { getLocale, locales, setLocale } from '../generated/paraglide/runtime';
-import { generateId } from '../libs/generate-id';
 import {
   $content,
   $extensions,
@@ -87,6 +86,7 @@ import {
 } from '../stores/actions/export-project';
 import { deleteLocalProject } from '../stores/actions/local-project';
 import { printPdf } from '../stores/actions/print-pdf';
+import { openProjectsModal } from '../stores/actions/ui';
 import type {
   ContentId,
   HierarchicalReadingOrder,
@@ -111,11 +111,7 @@ function ApplicationDropdownMenu({ children }: React.PropsWithChildren) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start">
-        <DropdownMenuItem
-          onClick={() => {
-            $ui.dedicatedModal = { id: generateId(), type: 'start' };
-          }}
-        >
+        <DropdownMenuItem onClick={openProjectsModal}>
           <FolderOpen />
           <span>{m.side_menu_open_project()}</span>
         </DropdownMenuItem>
@@ -341,12 +337,11 @@ function AccountMenuSection() {
           <SidebarMenuButton
             tooltip={tooltip}
             onClick={() => {
-              $ui.dedicatedModal = {
-                id: generateId(),
+              $ui.openModal({
                 type: 'extension',
                 extensionId: account.id,
                 panePath: '.',
-              };
+              });
             }}
           >
             {inner}

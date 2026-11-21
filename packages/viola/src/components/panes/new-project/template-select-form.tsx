@@ -7,11 +7,14 @@ import {
   StackedRadioGroupItem,
 } from '@v/ui/custom/stacked-radio';
 import { m } from '../../../generated/paraglide/messages';
-import { Sandbox } from '../../../stores/proxies/sandbox';
+import {
+  type OfficialTemplateId,
+  officialTemplates,
+} from '../../../stores/catalog';
 import { TemplateStoreMolecule } from './store';
 
 const officialTemplateMessages: Record<
-  keyof typeof Sandbox.officialTemplates,
+  OfficialTemplateId,
   { title: () => string; description: () => string }
 > = {
   blank: {
@@ -42,12 +45,10 @@ export function TemplateSelectForm() {
             startTransition(() => templateStoreProxy.selectTemplate(value));
           }}
         >
-          {Object.entries(Sandbox.officialTemplates).map(
+          {Object.entries(officialTemplates).map(
             ([value, { title, description }]) => {
               const messages =
-                officialTemplateMessages[
-                  value as keyof typeof Sandbox.officialTemplates
-                ];
+                officialTemplateMessages[value as OfficialTemplateId];
               return (
                 <StackedRadioGroupItem
                   key={value}

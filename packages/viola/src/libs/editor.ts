@@ -2,23 +2,20 @@ import { Editor, type Extensions } from '@tiptap/core';
 import { Collaboration } from '@tiptap/extension-collaboration';
 import { Placeholder } from '@tiptap/extensions';
 import { dirname, relative } from 'pathe';
-import { ref } from 'valtio';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 
 import type { SyncProvider } from '@v/sync-client';
 import { PubExtensions } from '@v/tiptap-extensions';
-import { debounce } from '../libs/debounce';
-import { $projects } from '../stores/accessors';
-import type { ContentId } from '../stores/proxies/content';
 import type { ProjectId } from '../stores/proxies/project';
-import { SandboxFile } from '../stores/proxies/sandbox';
+import { debounce } from './debounce';
 import { createSandboxImageSaver } from './editor/image-saver';
 import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
 import { createEditorMenuExtensions } from './editor/menu/extensions';
 import { YUndoCursorFix } from './editor/y-undo-cursor-fix';
 import { type EditorSyncContext, startEditorSync } from './editor-sync';
+import type { SandboxFile } from './sandbox/file';
 
 export type { EditorSyncContext } from './editor-sync';
 
@@ -26,20 +23,32 @@ function editorPersistenceKey(projectId: ProjectId, filename: string): string {
   return `viola:editor:${projectId}:${filename}`;
 }
 
+export function getEditorSummary(editor: Editor): string {
+  return (
+    editor
+      .getText({ blockSeparator: '\n' })
+      .split('\n')
+      .find((s) => s.trim())
+      ?.trim() || ''
+  );
+}
+
 export async function setupEditor({
   projectId,
-  contentId,
   filename,
   entryContext,
   initialFile,
   sync,
+  onSave,
+  writeFile,
 }: {
   projectId: ProjectId;
-  contentId: ContentId;
   filename?: string;
   entryContext?: string;
   initialFile?: SandboxFile;
   sync?: EditorSyncContext;
+  onSave: (content: { markdown: string; summary: string }) => void;
+  writeFile: (path: string, file: SandboxFile) => void;
 }) {
   const fileDir = filename ? dirname(filename) : '';
   let basePath = filename && relative(entryContext || '', dirname(filename));
@@ -55,30 +64,12 @@ export async function setupEditor({
     ? new IndexeddbPersistence(editorPersistenceKey(projectId, filename), doc)
     : undefined;
 
-  // Resolve the owning project via projectId rather than the current-project
-  // accessors so persisted-state hydration writes back to the right sandbox
-  // even when this project has not yet been made current.
   const saveContent = debounce(
     (editor: Editor) => {
-      const project = $projects.value[projectId];
-      const sandbox = project?.sandbox;
-      if (!project || !sandbox) {
-        return;
-      }
-      const file = project.content.files.get(contentId);
-      if (!file) {
-        return;
-      }
-      file.summary =
-        editor
-          .getText({ blockSeparator: '\n' })
-          .split('\n')
-          .find((s) => s.trim())
-          ?.trim() || '';
-      const markdown = editor.getMarkdown();
-      sandbox.files[file.filename] = ref(
-        new SandboxFile('text/markdown', markdown),
-      );
+      onSave({
+        markdown: editor.getMarkdown(),
+        summary: getEditorSummary(editor),
+      });
     },
     1000,
     { trailing: true },
@@ -88,7 +79,7 @@ export async function setupEditor({
     PubExtensions.configure({
       basePath,
       fileDir,
-      imageSaver: createSandboxImageSaver({ fileDir }),
+      imageSaver: createSandboxImageSaver({ fileDir, writeFile }),
       onFileDrop: (editor, files, pos) => {
         insertImageFiles({ editor, files, pos });
       },
@@ -126,6 +117,7 @@ export async function setupEditor({
 
   let syncProvider: SyncProvider | undefined;
   editor.on('destroy', () => {
+    saveContent.cancel();
     syncProvider?.disconnect();
     persistence?.destroy();
     doc.destroy();

@@ -7,14 +7,14 @@ import type { Sandbox } from './sandbox';
 export type RemoteCli = Comlink.Remote<typeof import('@v/cli-bundle')>;
 
 export class Cli {
-  protected static remoteMap = new Map<string, RemoteCli>();
-
   static create(sandbox: Sandbox) {
     return proxy(new Cli(sandbox));
   }
 
   protected sandbox: Sandbox;
+  protected remote: RemoteCli | undefined;
   protected remoteDeferred: PromiseWithResolvers<RemoteCli> | undefined;
+  protected disposed = false;
   protected lazyViewerUrlPromise: Promise<string> | undefined;
   protected lazyPrintViewerUrlPromise: Promise<string> | undefined;
 
@@ -23,9 +23,11 @@ export class Cli {
   }
 
   createRemotePromise(): Promise<RemoteCli> {
-    const existing = Cli.remoteMap.get(this.sandbox.iframeOrigin);
-    if (existing) {
-      return Promise.resolve(existing);
+    if (this.disposed) {
+      return Promise.reject(new Error('CLI remote disposed'));
+    }
+    if (this.remote) {
+      return Promise.resolve(this.remote);
     }
     this.remoteDeferred ??= ref(Promise.withResolvers<RemoteCli>());
     return this.remoteDeferred.promise;
@@ -58,22 +60,24 @@ export class Cli {
   createRemoteResolver() {
     return {
       resolve: (value: RemoteCli) => {
-        Cli.remoteMap.set(this.sandbox.iframeOrigin, value);
+        this.remote = ref(value);
         this.remoteDeferred?.resolve(value);
         this.remoteDeferred = undefined;
       },
       reset: () => {
-        this.disposeRemote();
+        this.releaseRemote();
       },
     };
   }
 
-  protected disposeRemote() {
-    const remote = Cli.remoteMap.get(this.sandbox.iframeOrigin);
-    if (remote) {
-      remote[Comlink.releaseProxy]();
-      Cli.remoteMap.delete(this.sandbox.iframeOrigin);
-    }
+  dispose() {
+    this.disposed = true;
+    this.releaseRemote();
+  }
+
+  protected releaseRemote() {
+    this.remote?.[Comlink.releaseProxy]();
+    this.remote = undefined;
     this.remoteDeferred?.reject(new Error('CLI remote disposed'));
     this.remoteDeferred = undefined;
     this.lazyViewerUrlPromise = undefined;

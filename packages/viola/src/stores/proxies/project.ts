@@ -1,12 +1,18 @@
 import { LANGUAGES } from '@vivliostyle/cli/constants';
-import { join, relative } from 'pathe';
+import { join } from 'pathe';
 import { proxy, ref, subscribe } from 'valtio';
 import { deepClone } from 'valtio/utils';
 
-import { type EditorSyncContext, setupEditor } from '../../libs/editor';
+import {
+  type EditorSyncContext,
+  getEditorSummary,
+  setupEditor,
+} from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
+import { SandboxFile } from '../../libs/sandbox/file';
+import { officialThemes } from '../catalog';
 import { Content, type ContentId } from './content';
-import { Sandbox, SandboxFile } from './sandbox';
+import { Sandbox } from './sandbox';
 import { session } from './session';
 import { Theme } from './theme';
 
@@ -59,33 +65,38 @@ export class Project {
     projectId: ProjectId;
     sandboxPromise: Promise<Sandbox>;
   }) {
-    const project = proxy(
-      new Project({
-        projectId,
-        sandboxPromise,
-      }),
-    );
-    subscribe(project.bibliography, () => project.handleBibliographyUpdate());
-    subscribe(project.toc, () => project.handleTocUpdate());
-    subscribe(project.theme, () => project.handleThemeUpdate());
-
-    projects.value[projectId] = project;
-    return project;
+    return Project.register(new Project({ projectId, sandboxPromise }));
   }
 
-  protected static createNewProject({ projectId }: { projectId: ProjectId }) {
-    const sandboxPromise = Sandbox.createNewSandbox({ projectId });
-    const project = proxy(new Project({ projectId, sandboxPromise }));
-    subscribe(project.bibliography, () => project.handleBibliographyUpdate());
-    subscribe(project.toc, () => project.handleTocUpdate());
-    subscribe(project.theme, () => project.handleThemeUpdate());
-
-    projects.value[projectId] = project;
-    return project;
-  }
+  // Outlives the draft's removal from `projects.value`, so the next draft can
+  // wait until this one has finished tearing down.
+  protected static draft: Project | undefined;
 
   static createDraftProject() {
-    return Project.createNewProject({ projectId: draftProjectId });
+    const previousDisposal = Project.disposeDraftProject();
+    // Both drafts share one OPFS directory, so the old draft's pending writes
+    // must land before the new sandbox wipes it.
+    const sandboxPromise = (async () => {
+      await previousDisposal;
+      return Sandbox.createNewSandbox({ projectId: draftProjectId });
+    })();
+    Project.draft = Project.register(
+      new Project({ projectId: draftProjectId, sandboxPromise }),
+    );
+    return Project.draft;
+  }
+
+  static disposeDraftProject() {
+    return Project.draft?.dispose();
+  }
+
+  protected static register(instance: Project) {
+    const project = proxy(instance);
+    project.unsubscribe = project.subscribeConfigSync();
+    // Started on the proxy so that setup's writes, such as `sandbox`, notify.
+    project.setupPromise = project.setup();
+    projects.value[project.projectId] = project;
+    return project;
   }
 
   projectId: ProjectId;
@@ -93,9 +104,12 @@ export class Project {
   theme = Theme.create(this);
   sandbox: Sandbox | undefined;
   sandboxPromise: Promise<Sandbox>;
-  setupPromise: Promise<void>;
+  setupPromise!: Promise<void>;
   bibliography = deepClone(initialBibliographyState);
   toc = deepClone(initialTocState);
+
+  protected unsubscribe = () => {};
+  protected disposePromise: Promise<void> | undefined;
 
   protected constructor({
     projectId,
@@ -103,20 +117,21 @@ export class Project {
   }: { projectId: ProjectId; sandboxPromise: Promise<Sandbox> }) {
     this.projectId = projectId;
     this.sandboxPromise = sandboxPromise;
-    this.setupPromise = (async () => {
-      const sandbox = await sandboxPromise;
-      this.sandbox = sandbox;
-      await this.restoreProjectFromFileSystem();
-      this.bibliography.title = sandbox.vivliostyleConfig.title || '';
-      this.bibliography.author = sandbox.vivliostyleConfig.author || '';
-      this.bibliography.language =
-        sandbox.vivliostyleConfig.language ?? detectBrowserLanguage();
-      this.toc.enabled = Boolean(sandbox.vivliostyleConfig.toc);
-      if (typeof sandbox.vivliostyleConfig.toc === 'object') {
-        this.toc.title = sandbox.vivliostyleConfig.toc.title || '';
-        this.toc.sectionDepth = sandbox.vivliostyleConfig.toc.sectionDepth || 0;
-      }
-    })();
+  }
+
+  protected async setup() {
+    const sandbox = await this.sandboxPromise;
+    this.sandbox = sandbox;
+    await this.restoreProjectFromFileSystem();
+    this.bibliography.title = sandbox.vivliostyleConfig.title || '';
+    this.bibliography.author = sandbox.vivliostyleConfig.author || '';
+    this.bibliography.language =
+      sandbox.vivliostyleConfig.language ?? detectBrowserLanguage();
+    this.toc.enabled = Boolean(sandbox.vivliostyleConfig.toc);
+    if (typeof sandbox.vivliostyleConfig.toc === 'object') {
+      this.toc.title = sandbox.vivliostyleConfig.toc.title || '';
+      this.toc.sectionDepth = sandbox.vivliostyleConfig.toc.sectionDepth || 0;
+    }
   }
 
   protected async restoreProjectFromFileSystem() {
@@ -148,26 +163,24 @@ export class Project {
         continue;
       }
       const contentId = generateId<ContentId>();
-      const editor = await setupEditor({
-        projectId: this.projectId,
+      const editor = await this.setupContentEditor({
         contentId,
         filename,
         entryContext,
         initialFile: content,
         sync,
       });
-      const summary =
-        editor
-          .getText({ blockSeparator: '\n' })
-          .split('\n')
-          .find((s) => s.trim())
-          ?.trim() || '';
+      // Teardown does not wait for setup, so it never sees this editor.
+      if (this.disposePromise) {
+        editor.destroy();
+        throw new Error(`Project disposed during setup: ${this.projectId}`);
+      }
 
       readingOrder.push(contentId);
       this.content.files.set(contentId, {
         format,
         filename,
-        summary,
+        summary: getEditorSummary(editor),
         editor: ref(editor),
       });
     }
@@ -181,10 +194,90 @@ export class Project {
     }
     if (
       Array.isArray(sandbox.vivliostyleConfig.theme) &&
-      sandbox.vivliostyleConfig.theme[0] in Theme.officialThemes
+      sandbox.vivliostyleConfig.theme[0] in officialThemes
     ) {
       this.theme.install(sandbox.vivliostyleConfig.theme[0]);
     }
+  }
+
+  async setupContentEditor({
+    contentId,
+    filename,
+    entryContext,
+    initialFile,
+    sync,
+  }: {
+    contentId: ContentId;
+    filename: string;
+    entryContext: string;
+    initialFile?: SandboxFile;
+    sync?: EditorSyncContext;
+  }) {
+    const sandbox = await this.sandboxPromise;
+    return setupEditor({
+      projectId: this.projectId,
+      filename,
+      entryContext,
+      initialFile,
+      sync,
+      onSave: (content) => this.saveContentFile(contentId, content),
+      writeFile: (path, file) => {
+        sandbox.files[path] = ref(file);
+      },
+    });
+  }
+
+  saveContentFile(
+    contentId: ContentId,
+    { markdown, summary }: { markdown: string; summary: string },
+  ) {
+    // Looked up on every save: the file may have been renamed or removed.
+    const file = this.content.files.get(contentId);
+    if (!file || !this.sandbox) {
+      return;
+    }
+    file.summary = summary;
+    this.sandbox.files[file.filename] = ref(
+      new SandboxFile('text/markdown', markdown),
+    );
+  }
+
+  updateCustomCss(css: string) {
+    if (!this.sandbox) {
+      return;
+    }
+    this.theme.customCss = css;
+    this.sandbox.files['style.css'] = ref(new SandboxFile('text/css', css));
+  }
+
+  dispose(): Promise<void> {
+    this.disposePromise ??= this.teardown();
+    return this.disposePromise;
+  }
+
+  protected async teardown() {
+    if (projects.value[this.projectId] === this) {
+      delete projects.value[this.projectId];
+    }
+    this.unsubscribe();
+    for (const file of this.content.files.values()) {
+      file.editor.destroy();
+    }
+    const sandbox = await this.sandboxPromise.catch(() => undefined);
+    await sandbox?.dispose();
+  }
+
+  protected subscribeConfigSync() {
+    const unsubscribes = [
+      subscribe(this.bibliography, () => this.handleBibliographyUpdate()),
+      subscribe(this.toc, () => this.handleTocUpdate()),
+      subscribe(this.theme, () => this.handleThemeUpdate()),
+    ];
+    return () => {
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
+    };
   }
 
   protected resolveEditorSyncContext(): EditorSyncContext | undefined {
@@ -229,98 +322,3 @@ export class Project {
     });
   }
 }
-
-export interface ProjectServeRequest {
-  type: 'vs:project-serve';
-  id: string;
-  url: string;
-  init: RequestInit;
-}
-
-export interface ProjectServeResponse {
-  type: 'vs:project-serve-result';
-  id: string;
-  result: ConstructorParameters<typeof Response>;
-}
-
-// Requests may address a specific project as `/vivliostyle/p/<projectId>/...`
-// (the print tab does); the owning tab strips the prefix before serving.
-const projectPathRe = /^\/vivliostyle\/p\/([a-z0-9]+)(\/.*)$/;
-
-// Returns null when this tab is not responsible for the request, so another
-// tab's relay can answer instead.
-async function serveProjectResource(
-  url: string,
-  init: RequestInit,
-): Promise<ConstructorParameters<typeof Response> | null> {
-  const target = new URL(url);
-  const project =
-    projects.currentProjectId && projects.value[projects.currentProjectId];
-  if (!project) {
-    return null;
-  }
-  const prefixed = target.pathname.match(projectPathRe);
-  if (prefixed) {
-    if (prefixed[1] !== projects.currentProjectId) {
-      return null;
-    }
-    target.pathname = `/vivliostyle${prefixed[2]}`;
-  }
-  const sandbox = await project.sandboxPromise;
-  if (target.pathname.startsWith('/vivliostyle/')) {
-    const entryContext = sandbox.vivliostyleConfig.entryContext || '';
-    const filename = join(
-      entryContext,
-      relative('/vivliostyle', target.pathname),
-    );
-    const content = sandbox.files[filename];
-    if (content) {
-      const contentType = content.type || 'application/octet-stream';
-      return [
-        await content.buffer(),
-        {
-          status: 200,
-          headers: {
-            'Content-Type': contentType,
-            'Cache-Control': 'no-store',
-          },
-        },
-      ];
-    }
-  }
-  // Vite-generated resources (publication.json, entry HTML, the viewer
-  // client module) exist only in the CLI worker. The host-origin print tab
-  // reaches them through this relay because its own sandbox-origin SW sits
-  // in another storage partition and cannot see the worker.
-  try {
-    const cli = await sandbox.cli.createRemotePromise();
-    return await cli.serve(target.href, init);
-  } catch {
-    return ['', { status: 404 }];
-  }
-}
-
-// Hand-rolled RPC instead of Comlink: every tab shares this BroadcastChannel,
-// and Comlink.expose would make all of them answer every request — a tab
-// without the project instantly wins the race with a 404. Here tabs stay
-// silent unless they own the requested project.
-const channel = new BroadcastChannel('host:project');
-channel.addEventListener('message', async (event: MessageEvent) => {
-  const data = event.data as Partial<ProjectServeRequest> | undefined;
-  if (data?.type !== 'vs:project-serve' || !data.id || !data.url) {
-    return;
-  }
-  try {
-    const result = await serveProjectResource(data.url, data.init ?? {});
-    if (!result) {
-      return;
-    }
-    channel.postMessage({
-      type: 'vs:project-serve-result',
-      id: data.id,
-      result,
-    } satisfies ProjectServeResponse);
-  } catch {
-    // No reply; the service worker times the request out.
-  }
-});

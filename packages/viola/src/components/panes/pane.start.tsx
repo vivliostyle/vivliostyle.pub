@@ -6,7 +6,6 @@ import { useSnapshot } from 'valtio';
 import { Button } from '@v/ui/button';
 import { Cloud, FilePlus, Loader2, Trash2 } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
-import { generateId } from '../../libs/generate-id';
 import { $extensions, $projects, $session, $ui } from '../../stores/accessors';
 import {
   createCloudProject,
@@ -254,12 +253,11 @@ function Content(_: StartPaneProperty) {
                 type="button"
                 className="hover:underline"
                 onClick={() => {
-                  $ui.dedicatedModal = {
-                    id: generateId(),
+                  $ui.openModal({
                     type: 'extension',
                     extensionId: account.id,
                     panePath: '.',
-                  };
+                  });
                 }}
               >
                 {m.start_sign_in_link()}
