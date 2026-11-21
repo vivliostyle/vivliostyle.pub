@@ -10,9 +10,9 @@ import {
 import { Button } from '@v/ui/button';
 import { Upload } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
+import { getMediaAccept, type MediaAsset } from '../../libs/media';
 import { openFilePicker } from '../../libs/open-file-picker';
 import { $project, $sandbox } from '../../stores/accessors';
-import { type MediaAsset, Sandbox } from '../../stores/proxies/sandbox';
 import { ImageDropZone } from './media/image-drop-zone';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -50,7 +50,7 @@ function Content(_: MediaPaneProperty) {
   const handleUpload = async () => {
     const $$sandbox = $sandbox.valueOrThrow();
     const files = await openFilePicker({
-      accept: Sandbox.getMediaAccept('image'),
+      accept: getMediaAccept('image'),
     });
     for (const file of files) {
       await $$sandbox.saveMediaAsset(file);

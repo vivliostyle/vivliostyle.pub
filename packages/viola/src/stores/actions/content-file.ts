@@ -3,11 +3,10 @@ import { invariant } from 'outvariant';
 import { dirname, join, relative, sep } from 'pathe';
 import { ref } from 'valtio';
 
-import { setupEditor } from '../../libs/editor';
 import { generateId, generateRandomName } from '../../libs/generate-id';
+import { SandboxFile } from '../../libs/sandbox/file';
 import { $content, $project, $sandbox, $ui } from '../accessors';
 import type { ContentId } from '../proxies/content';
-import { SandboxFile } from '../proxies/sandbox';
 
 export async function createContentFile({
   format,
@@ -18,7 +17,7 @@ export async function createContentFile({
 }): Promise<ContentId> {
   const $$content = $content.valueOrThrow();
   const $$sandbox = $sandbox.valueOrThrow();
-  const projectId = $project.valueOrThrow().projectId;
+  const $$project = $project.valueOrThrow();
   const prevFile = insertAfter && $$content.files.get(insertAfter);
   const entryContext = $$sandbox.vivliostyleConfig.entryContext || '';
   const prevFileDir =
@@ -46,7 +45,7 @@ export async function createContentFile({
     filename,
     summary: '',
     editor: ref(
-      await setupEditor({ projectId, contentId, filename, entryContext }),
+      await $$project.setupContentEditor({ contentId, filename, entryContext }),
     ),
   });
   $$content.readingOrder.splice(index, 0, contentId);

@@ -1,5 +1,13 @@
 import { ref } from 'valtio';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 vi.mock('../router', () => ({
   router: { navigate: vi.fn() },
@@ -56,16 +64,17 @@ vi.mock('@v/storage-providers', async (importOriginal) => {
   };
 });
 
+import { SandboxFile } from '../libs/sandbox/file';
 import { $projects, $sandboxes } from '../stores/accessors';
 import { createCloudProject } from '../stores/actions/cloud-project';
 import { openProject } from '../stores/actions/open-project';
 import { register } from '../stores/actions/session';
+import { initStores } from '../stores/init';
 import {
   draftProjectId,
   Project,
   type ProjectId,
 } from '../stores/proxies/project';
-import { SandboxFile } from '../stores/proxies/sandbox';
 import { buildTestServer } from './harness/server';
 import { setupTestSession } from './harness/session';
 import { bindApp } from './setup';
@@ -73,6 +82,14 @@ import { bindApp } from './setup';
 const settle = () => new Promise((resolve) => setTimeout(resolve));
 
 describe('project disposal', () => {
+  let teardownStores: () => void;
+  beforeAll(() => {
+    teardownStores = initStores();
+  });
+  afterAll(() => {
+    teardownStores();
+  });
+
   beforeEach(async () => {
     bindApp(buildTestServer().root);
     setupTestSession();

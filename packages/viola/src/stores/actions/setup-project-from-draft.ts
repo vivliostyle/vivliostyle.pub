@@ -7,6 +7,7 @@ import { deepClone } from 'valtio/utils';
 
 import { generateProjectId } from '../../libs/generate-id';
 import { $draftProject, $projects, $session } from '../accessors';
+import { type OfficialTemplateId, officialTemplates } from '../catalog';
 import { Project, type ProjectEntry, type ProjectId } from '../proxies/project';
 import { Sandbox } from '../proxies/sandbox';
 import { discoverProjects } from './discover-projects';
@@ -22,10 +23,7 @@ export async function setupProjectFromDraft({
   templateValue: string;
 }): Promise<SetupProjectFromDraftResult> {
   const $$draftProject = $draftProject.valueOrThrow();
-  const template =
-    Sandbox.officialTemplates[
-      templateValue as keyof typeof Sandbox.officialTemplates
-    ];
+  const template = officialTemplates[templateValue as OfficialTemplateId];
 
   $projects.currentProjectId = null;
 

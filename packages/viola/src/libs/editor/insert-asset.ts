@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core';
 import { relative } from 'pathe';
 
-import { Sandbox } from '../../stores/proxies/sandbox';
+import { categorizeAsset } from '../media';
 
 export interface InsertExistingAssetOptions {
   editor: Editor;
@@ -14,7 +14,7 @@ export function insertExistingAsset({
   assetPath,
   pos,
 }: InsertExistingAssetOptions): void {
-  const category = Sandbox.categorizeAsset(assetPath);
+  const category = categorizeAsset(assetPath);
   if (category !== 'image') {
     return;
   }

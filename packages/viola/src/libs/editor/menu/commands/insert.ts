@@ -1,7 +1,7 @@
 import { ImageIcon, LinkIcon, MinusIcon } from '@v/ui/icon';
 import { LinkPanel } from '../../../../components/content-editor/panels/link-panel';
 import { m } from '../../../../generated/paraglide/messages';
-import { Sandbox } from '../../../../stores/proxies/sandbox';
+import { getMediaAccept } from '../../../media';
 import { openFilePicker } from '../../../open-file-picker';
 import { insertImageFiles } from '../../insert-image';
 import { registerEditorMenuCommand } from '../registry';
@@ -33,7 +33,7 @@ registerEditorMenuCommand({
   icon: ImageIcon,
   run: async ({ editor }) => {
     const files = await openFilePicker({
-      accept: Sandbox.getMediaAccept('image'),
+      accept: getMediaAccept('image'),
     });
     if (files.length === 0) {
       return;

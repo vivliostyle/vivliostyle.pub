@@ -9,9 +9,9 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import { usePromiseState } from '../../hooks/use-promise-state';
 import { getOfficialThemeTitle } from '../../libs/official-theme-title';
+import { SandboxFile } from '../../libs/sandbox/file';
 import { $sandbox, $theme } from '../../stores/accessors';
-import { SandboxFile } from '../../stores/proxies/sandbox';
-import { Theme } from '../../stores/proxies/theme';
+import { officialThemes } from '../../stores/catalog';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
 type ThemePaneProperty = object;
@@ -57,10 +57,7 @@ function Content(_: ThemePaneProperty) {
 
   const [packageNameInput, setPackageNameInput] = useState('');
   useEffect(() => {
-    if (
-      installedTheme &&
-      !(installedTheme.packageName in Theme.officialThemes)
-    ) {
+    if (installedTheme && !(installedTheme.packageName in officialThemes)) {
       setPackageNameInput(installedTheme.packageName);
     }
   });
@@ -81,36 +78,34 @@ function Content(_: ThemePaneProperty) {
       <section className="grid gap-2">
         <h3 className="text-l font-bold">{m.theme_official_section_title()}</h3>
         <ul className="grid grid-cols-2 gap-2">
-          {Object.entries(Theme.officialThemes).map(
-            ([packageName, { title }]) => {
-              return (
-                <li key={packageName}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      'size-full text-left',
-                      packageName === currentPackageName && 'border-primary',
-                    )}
-                    onClick={() => $theme.valueOrThrow().install(packageName)}
-                  >
-                    <span className="flex-1">
-                      {getOfficialThemeTitle(packageName, title)}
-                    </span>
-                    {packageName === themeSnap.installingPackageName ? (
-                      <LoadingIcon />
-                    ) : (
-                      <InstalledIcon
-                        className={cn(
-                          packageName !== currentPackageName && 'invisible',
-                        )}
-                      />
-                    )}
-                  </Button>
-                </li>
-              );
-            },
-          )}
+          {Object.entries(officialThemes).map(([packageName, { title }]) => {
+            return (
+              <li key={packageName}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    'size-full text-left',
+                    packageName === currentPackageName && 'border-primary',
+                  )}
+                  onClick={() => $theme.valueOrThrow().install(packageName)}
+                >
+                  <span className="flex-1">
+                    {getOfficialThemeTitle(packageName, title)}
+                  </span>
+                  {packageName === themeSnap.installingPackageName ? (
+                    <LoadingIcon />
+                  ) : (
+                    <InstalledIcon
+                      className={cn(
+                        packageName !== currentPackageName && 'invisible',
+                      )}
+                    />
+                  )}
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       </section>
 

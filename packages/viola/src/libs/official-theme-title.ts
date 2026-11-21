@@ -1,8 +1,8 @@
 import { m } from '../generated/paraglide/messages';
-import type { Theme } from '../stores/proxies/theme';
+import type { OfficialThemePackageName } from '../stores/catalog';
 
 const officialThemeTitleMessages: Record<
-  keyof typeof Theme.officialThemes,
+  OfficialThemePackageName,
   () => string
 > = {
   '@vivliostyle/theme-base': m.theme_official_base,
@@ -18,8 +18,6 @@ export function getOfficialThemeTitle(
   fallback: string,
 ): string {
   const getMessage =
-    officialThemeTitleMessages[
-      packageName as keyof typeof Theme.officialThemes
-    ];
+    officialThemeTitleMessages[packageName as OfficialThemePackageName];
   return getMessage ? getMessage() : fallback;
 }

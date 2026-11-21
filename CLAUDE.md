@@ -102,8 +102,10 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
 ### Package layout
 
 - **`packages/viola/`** (`@v/viola`) — the React + Vite 8 app. Stack: React 19, TanStack Router (file-based, `routeTree.gen.ts` is generated), Tailwind v4, TipTap (markdown editing) + `@v/tiptap-extensions`, CodeMirror (raw source editing), valtio (`stores/proxies/*` are valtio proxies; `stores/actions/*` are command functions; `stores/accessors.ts` exposes them).
+  - `libs/` never imports `stores/` at runtime (type-only imports are fine): pass store state in as arguments or callbacks, as `setupEditor` does with `onSave`/`writeFile`. I/O and pure logic behind the proxies live in `libs/` (`libs/sandbox/*`, `libs/media.ts`), static catalogs in `stores/catalog.ts`.
+  - Store modules have no import-time side effects. Global wiring (valtio op delivery, the `host:project` relay in `client/project-relay.ts`, store-driven subscriptions) starts in `initStores()` (`stores/init.ts`), called once from `main.tsx`; tests that need it call it themselves.
   - `templates/basic/`, `templates/minimal/` — project starter templates packed into `.tar.gz` on the fly by the `serveTemplates` Vite plugin and extracted into memfs via `setupTemplate`.
-  - `src/client/` — service worker entry (`sw.ts` branches on hostname to call `setupSwHost` or `setupSwIframe`) and the CLI worker entry (`cli-worker.ts`).
+  - `src/client/` — service worker entry (`sw.ts` branches on hostname to call `setupSwHost` or `setupSwIframe`), the CLI worker entry (`cli-worker.ts`), and the host page's end of the `host:project` relay that the host SW forwards to (`project-relay.ts`).
 
 - **`packages/cli-bundle/`** (`@v/cli-bundle`) — the browserified Vivliostyle CLI worker. Build is **Rolldown directly** (not Vite), config in `rolldown.config.ts`. Emits four outputs:
   1. `dist/index.js` — the worker bundle (ESM, ~5 MB).

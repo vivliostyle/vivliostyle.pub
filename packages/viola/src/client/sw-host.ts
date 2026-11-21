@@ -3,7 +3,7 @@
 import type {
   ProjectServeRequest,
   ProjectServeResponse,
-} from '../stores/proxies/project';
+} from './project-relay';
 import {
   buildRequestInit,
   createHeadResponse,

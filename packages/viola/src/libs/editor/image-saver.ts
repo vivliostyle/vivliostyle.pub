@@ -1,15 +1,16 @@
 import { extname, join, relative } from 'pathe';
-import { ref } from 'valtio';
 
 import type { ImageSaver } from '@v/tiptap-extensions';
-import { $sandbox } from '../../stores/accessors';
-import { Sandbox, SandboxFile } from '../../stores/proxies/sandbox';
 import { generateId } from '../generate-id';
+import { getMimeTypeByExtension } from '../media';
+import { SandboxFile } from '../sandbox/file';
 
 export function createSandboxImageSaver({
   fileDir,
+  writeFile,
 }: {
   fileDir: string;
+  writeFile: (path: string, file: SandboxFile) => void;
 }): ImageSaver {
   return {
     async saveImage(file) {
@@ -19,12 +20,8 @@ export function createSandboxImageSaver({
       const relSrc = relative(fileDir, savePath);
       const bytes = new Uint8Array(await file.arrayBuffer());
       const mimeType =
-        file.type ||
-        Sandbox.getMimeTypeByExtension(ext) ||
-        'application/octet-stream';
-      $sandbox.valueOrThrow().files[savePath] = ref(
-        new SandboxFile(mimeType, bytes),
-      );
+        file.type || getMimeTypeByExtension(ext) || 'application/octet-stream';
+      writeFile(savePath, new SandboxFile(mimeType, bytes));
       return { src: relSrc };
     },
   };

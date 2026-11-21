@@ -4,9 +4,9 @@ import { ref } from 'valtio';
 
 import { m } from '../../generated/paraglide/messages';
 import { debounce } from '../../libs/debounce';
+import { SandboxFile } from '../../libs/sandbox/file';
 import { $content, $sandbox } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
-import { SandboxFile } from '../../stores/proxies/sandbox';
 import CodeEditor from '../code-editor';
 
 // Side-menu summary derived directly from raw markdown, for the source editor
