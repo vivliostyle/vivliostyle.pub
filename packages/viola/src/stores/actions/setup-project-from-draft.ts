@@ -79,6 +79,7 @@ export async function setupProjectFromDraft({
     $projects.entries[projectId] = entry;
   }
 
+  let project: Project | undefined;
   try {
     const cli = await sandbox.cli.createRemotePromise();
     const themePackageName =
@@ -99,7 +100,7 @@ export async function setupProjectFromDraft({
       themePackageName,
       entry: deepClone(sandbox.vivliostyleConfig.entry) as BuildTask['entry'],
     });
-    const project = Project.createProjectFromSandbox({
+    project = Project.createProjectFromSandbox({
       projectId,
       sandboxPromise: Promise.resolve(sandbox),
     });
@@ -108,6 +109,7 @@ export async function setupProjectFromDraft({
       project.theme.install(themePackageName),
     ]);
   } catch (err) {
+    await (project ?? sandbox).dispose();
     if (useCloud) {
       await $session.api.deleteProject(projectId).catch(() => {});
       delete $projects.entries[projectId];

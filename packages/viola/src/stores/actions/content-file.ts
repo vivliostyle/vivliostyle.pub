@@ -74,6 +74,7 @@ export async function deleteContentFile({
   // update content
   $$content.readingOrder.splice(index, 1);
   $$content.files.delete(contentId);
+  file.editor.destroy();
 
   // update sandbox
   $$sandbox.updateVivliostyleConfig((config) => {

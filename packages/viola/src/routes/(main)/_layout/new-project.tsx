@@ -20,4 +20,7 @@ export const Route = createFileRoute('/(main)/_layout/new-project')({
       },
     ];
   },
+  onLeave: () => {
+    void Project.disposeDraftProject();
+  },
 });

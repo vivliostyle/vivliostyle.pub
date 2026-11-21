@@ -80,8 +80,11 @@ export function SandboxPortal() {
   const sandboxes = useSnapshot($sandboxes);
 
   return createPortal(
-    Object.keys(sandboxes.value).map((projectId) => (
-      <IframeSandbox key={projectId} projectId={projectId as ProjectId} />
+    (Object.keys(sandboxes.value) as ProjectId[]).map((projectId) => (
+      <IframeSandbox
+        key={sandboxes.value[projectId].instanceId}
+        projectId={projectId}
+      />
     )),
     document.body,
   );

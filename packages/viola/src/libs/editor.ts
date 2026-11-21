@@ -126,6 +126,7 @@ export async function setupEditor({
 
   let syncProvider: SyncProvider | undefined;
   editor.on('destroy', () => {
+    saveContent.cancel();
     syncProvider?.disconnect();
     persistence?.destroy();
     doc.destroy();

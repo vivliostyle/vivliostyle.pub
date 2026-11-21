@@ -21,7 +21,12 @@ export async function openProject(projectId: ProjectId): Promise<Project> {
         : Sandbox.createSandboxFromFilesystem({ projectId });
     project = Project.createProjectFromSandbox({ projectId, sandboxPromise });
   }
-  await project.setupPromise;
+  try {
+    await project.setupPromise;
+  } catch (error) {
+    await project.dispose();
+    throw error;
+  }
   $projects.currentProjectId = projectId;
   return project;
 }

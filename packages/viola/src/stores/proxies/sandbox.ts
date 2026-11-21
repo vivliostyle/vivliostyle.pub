@@ -150,20 +150,38 @@ export class Sandbox {
     },
   } as const;
 
-  protected static create({
+  protected static async create({
     projectId,
     provider,
+    initialize,
   }: {
     projectId: ProjectId;
     provider: StorageProvider;
+    initialize: (sandbox: Sandbox) => Promise<void>;
   }) {
     const sandbox = proxy(new Sandbox({ projectId, provider }));
-    subscribe(sandbox.files, (ops) => sandbox.handleFileUpdate(ops));
-    subscribeKey(sandbox.files, 'vivliostyle.config.json', async (blob) => {
-      sandbox.writableVivliostyleConfig = JSON.parse(await blob.text());
-    });
+    const unsubscribeFiles = subscribe(sandbox.files, (ops) =>
+      sandbox.handleFileUpdate(ops),
+    );
+    const unsubscribeConfig = subscribeKey(
+      sandbox.files,
+      'vivliostyle.config.json',
+      async (blob) => {
+        sandbox.writableVivliostyleConfig = JSON.parse(await blob.text());
+      },
+    );
+    sandbox.unsubscribe = () => {
+      unsubscribeFiles();
+      unsubscribeConfig();
+    };
 
     sandboxes.value[projectId] = sandbox;
+    try {
+      await initialize(sandbox);
+    } catch (error) {
+      await sandbox.dispose();
+      throw error;
+    }
     return sandbox;
   }
 
@@ -184,12 +202,15 @@ export class Sandbox {
       // ignore
     }
     const provider = await OPFSStorageProvider.open({ subPath: projectId });
-    const sandbox = Sandbox.create({ projectId, provider });
-    await sandbox.initializeProjectFiles({
-      themePackageName: '@vivliostyle/theme-base',
-      entry: [],
+    return Sandbox.create({
+      projectId,
+      provider,
+      initialize: (sandbox) =>
+        sandbox.initializeProjectFiles({
+          themePackageName: '@vivliostyle/theme-base',
+          entry: [],
+        }),
     });
-    return sandbox;
   }
 
   static async createSandboxFromFilesystem({
@@ -198,9 +219,11 @@ export class Sandbox {
     projectId: ProjectId;
   }) {
     const provider = await OPFSStorageProvider.open({ subPath: projectId });
-    const sandbox = Sandbox.create({ projectId, provider });
-    await sandbox.loadFromFileSystem();
-    return sandbox;
+    return Sandbox.create({
+      projectId,
+      provider,
+      initialize: (sandbox) => sandbox.loadFromFileSystem(),
+    });
   }
 
   static async createNewRemoteSandbox({
@@ -211,12 +234,15 @@ export class Sandbox {
     api: ApiClient;
   }) {
     const provider = new RemoteHttpStorageProvider(api, projectId);
-    const sandbox = Sandbox.create({ projectId, provider });
-    await sandbox.initializeProjectFiles({
-      themePackageName: '@vivliostyle/theme-base',
-      entry: [],
+    return Sandbox.create({
+      projectId,
+      provider,
+      initialize: (sandbox) =>
+        sandbox.initializeProjectFiles({
+          themePackageName: '@vivliostyle/theme-base',
+          entry: [],
+        }),
     });
-    return sandbox;
   }
 
   static async createRemoteSandboxFromApi({
@@ -227,20 +253,24 @@ export class Sandbox {
     api: ApiClient;
   }) {
     const provider = new RemoteHttpStorageProvider(api, projectId);
-    const sandbox = Sandbox.create({ projectId, provider });
-    // An "empty" remote project (e.g. one created via the "Create an empty
-    // cloud project" button) has no vivliostyle.config.json yet, so
-    // `loadFromFileSystem` would throw. Seed it instead so the editor mounts.
-    const entries = await provider.list('', { recursive: true });
-    if (entries.length === 0) {
-      await sandbox.initializeProjectFiles({
-        themePackageName: '@vivliostyle/theme-base',
-        entry: [],
-      });
-    } else {
-      await sandbox.loadFromFileSystem();
-    }
-    return sandbox;
+    return Sandbox.create({
+      projectId,
+      provider,
+      initialize: async (sandbox) => {
+        // An "empty" remote project (e.g. one created via the "Create an empty
+        // cloud project" button) has no vivliostyle.config.json yet, so
+        // `loadFromFileSystem` would throw. Seed it instead so the editor mounts.
+        const entries = await provider.list('', { recursive: true });
+        if (entries.length === 0) {
+          await sandbox.initializeProjectFiles({
+            themePackageName: '@vivliostyle/theme-base',
+            entry: [],
+          });
+        } else {
+          await sandbox.loadFromFileSystem();
+        }
+      },
+    });
   }
 
   static categorizeAsset(path: string): MediaCategory | null {
@@ -264,11 +294,15 @@ export class Sandbox {
   }
 
   projectId: ProjectId;
+  // Distinguishes successive sandboxes of one project (the draft is recreated
+  // under a fixed id) so each gets a fresh iframe and CLI worker.
+  instanceId = generateId();
   iframeOrigin: string;
   provider: StorageProvider;
   files: Record<string, ReturnType<typeof ref<SandboxFile>>> = proxy({});
   cli = Cli.create(this);
 
+  protected unsubscribe = () => {};
   protected writableVivliostyleConfig = deepClone(initialVivliostyleConfig);
 
   get vivliostyleConfig() {
@@ -287,6 +321,15 @@ export class Sandbox {
     this.projectId = projectId;
     this.iframeOrigin = sandboxOrigin(`sandbox-${projectId}`);
     this.provider = ref(provider);
+  }
+
+  async dispose() {
+    this.unsubscribe();
+    this.cli.dispose();
+    if (sandboxes.value[this.projectId] === this) {
+      delete sandboxes.value[this.projectId];
+    }
+    await this.persistQueue;
   }
 
   updateVivliostyleConfig(
@@ -516,7 +559,8 @@ export class Sandbox {
     }
     const persist = this.persistChanges(writes, deletes);
     this.lastPersist = persist;
-    const cli = await this.cli.createRemotePromise();
-    await Promise.all([cli.fromJSON(updates, '/workdir'), persist]);
+    // Rejects once the worker is gone, leaving nothing to mirror the change into.
+    const cli = await this.cli.createRemotePromise().catch(() => undefined);
+    await Promise.all([cli?.fromJSON(updates, '/workdir'), persist]);
   }
 }
