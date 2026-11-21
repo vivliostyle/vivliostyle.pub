@@ -3,14 +3,14 @@ import { type ReactNode, type RefObject, useEffect, useState } from 'react';
 
 import { Button, type ButtonProps } from '@v/ui/button';
 import { CheckIcon } from '@v/ui/icon';
-import type { EditorMenuPanelProps } from '../../libs/editor/menu/types';
+import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
 
-export function dismissMenuPanel({ editor, close }: EditorMenuPanelProps) {
+export function dismissPanel({ editor, close }: EditorMenuPanelProps) {
   close();
   editor.commands.focus();
 }
 
-export function MenuPanelButton({
+export function PanelButton({
   label,
   type = 'button',
   ...props
@@ -31,7 +31,7 @@ export function MenuPanelButton({
   );
 }
 
-export interface MenuPanelFormProps extends EditorMenuPanelProps {
+export interface PanelFormProps extends EditorMenuPanelProps {
   /** Focused on mount. */
   initialFocusRef: RefObject<HTMLInputElement | null>;
   /** Selected in that field on mount, instead of its whole value. */
@@ -44,7 +44,7 @@ export interface MenuPanelFormProps extends EditorMenuPanelProps {
   children: ReactNode;
 }
 
-export function MenuPanelForm({
+export function PanelForm({
   editor,
   close,
   initialFocusRef,
@@ -54,7 +54,7 @@ export function MenuPanelForm({
   actions,
   error,
   children,
-}: MenuPanelFormProps) {
+}: PanelFormProps) {
   const [selection] = useState(initialSelection);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export function MenuPanelForm({
     }
     event.preventDefault();
     event.stopPropagation();
-    dismissMenuPanel({ editor, close });
+    dismissPanel({ editor, close });
   };
 
   return (
@@ -91,9 +91,9 @@ export function MenuPanelForm({
         onKeyDown={handleKeyDown}
       >
         {children}
-        <MenuPanelButton type="submit" label={submitLabel}>
+        <PanelButton type="submit" label={submitLabel}>
           <CheckIcon />
-        </MenuPanelButton>
+        </PanelButton>
         {actions}
       </form>
       {error && (

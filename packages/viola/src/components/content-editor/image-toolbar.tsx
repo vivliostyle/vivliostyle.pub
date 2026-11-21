@@ -10,7 +10,7 @@ import { Input } from '@v/ui/input';
 import { m } from '../../generated/paraglide/messages';
 import { useContainerRelativeRect } from '../../hooks/use-container-relative-rect';
 
-const IMAGE_MENU_OFFSET_VAR = '--image-menu-offset';
+const IMAGE_TOOLBAR_OFFSET_VAR = '--image-toolbar-offset';
 
 interface ImageState {
   from: number;
@@ -18,7 +18,7 @@ interface ImageState {
   alt: string;
 }
 
-interface ImageMenuProps {
+interface ImageToolbarProps {
   containerRef: RefObject<HTMLDivElement | null>;
 }
 
@@ -38,7 +38,7 @@ function getSelectedImage(editor: Editor): ImageState | null {
   };
 }
 
-export function ImageMenu({ containerRef }: ImageMenuProps) {
+export function ImageToolbar({ containerRef }: ImageToolbarProps) {
   const { editor } = useCurrentEditor();
   const [state, setState] = useState<ImageState | null>(null);
   const altInputRef = useRef<HTMLInputElement>(null);
@@ -124,22 +124,22 @@ export function ImageMenu({ containerRef }: ImageMenuProps) {
           pointerEvents: 'none',
           zIndex: 50,
           textAlign: 'center',
-          [IMAGE_MENU_OFFSET_VAR]: '4px',
+          [IMAGE_TOOLBAR_OFFSET_VAR]: '4px',
         } as React.CSSProperties
       }
     >
-      {/* Spacer matching the image height so the sticky menu naturally
+      {/* Spacer matching the image height so the sticky toolbar naturally
           settles at the image's bottom edge. */}
       <div style={{ height: rect.height, pointerEvents: 'none' }} aria-hidden />
-      {/* Sticky menu sticks to the viewport bottom while the image is
+      {/* Sticky toolbar sticks to the viewport bottom while the image is
           partially scrolled past, then settles back below the image. */}
       <div
         role="toolbar"
-        aria-label={m.image_menu_toolbar_aria()}
+        aria-label={m.image_toolbar_aria()}
         style={{
           position: 'sticky',
-          bottom: `var(${IMAGE_MENU_OFFSET_VAR})`,
-          marginTop: `var(${IMAGE_MENU_OFFSET_VAR})`,
+          bottom: `var(${IMAGE_TOOLBAR_OFFSET_VAR})`,
+          marginTop: `var(${IMAGE_TOOLBAR_OFFSET_VAR})`,
           pointerEvents: 'auto',
         }}
         className="inline-flex items-center gap-1 rounded-md border bg-popover p-1 shadow-md"
@@ -149,9 +149,9 @@ export function ImageMenu({ containerRef }: ImageMenuProps) {
           ref={altInputRef}
           defaultValue={state.alt}
           onBlur={handleAltBlur}
-          placeholder={m.image_menu_alt_placeholder()}
+          placeholder={m.image_toolbar_alt_placeholder()}
           className="h-7 w-48"
-          aria-label={m.image_menu_alt_aria()}
+          aria-label={m.image_toolbar_alt_aria()}
         />
         <Button
           type="button"
@@ -160,7 +160,7 @@ export function ImageMenu({ containerRef }: ImageMenuProps) {
           className="h-7 w-7"
           onMouseDown={(e) => e.preventDefault()}
           onClick={handleDelete}
-          aria-label={m.image_menu_delete_aria()}
+          aria-label={m.image_toolbar_delete_aria()}
         >
           <Trash2 />
         </Button>

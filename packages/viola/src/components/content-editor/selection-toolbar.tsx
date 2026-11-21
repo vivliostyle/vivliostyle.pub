@@ -365,7 +365,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
       <div
         ref={toolbarRef}
         role="toolbar"
-        aria-label={m.selection_menu_toolbar_aria()}
+        aria-label={m.selection_toolbar_aria()}
         aria-orientation="horizontal"
         className="flex items-center gap-0.5 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
         onKeyDown={handleToolbarKeyDown}
@@ -470,7 +470,9 @@ function ToolbarDropdown({
           {...itemProps}
         >
           {CurrentIcon && <CurrentIcon />}
-          <span>{current?.label() ?? m.selection_menu_block_type_mixed()}</span>
+          <span>
+            {current?.label() ?? m.selection_toolbar_block_type_mixed()}
+          </span>
           <ChevronDownIcon className="opacity-60" />
         </Button>
       </DropdownMenuTrigger>

@@ -27,7 +27,7 @@ import {
   EditArea,
   EditorStyleContainer,
 } from '../../../../components/content-editor';
-import { ImageMenu } from '../../../../components/content-editor/image-menu';
+import { ImageToolbar } from '../../../../components/content-editor/image-toolbar';
 import { SelectionToolbar } from '../../../../components/content-editor/selection-toolbar';
 import { TriggerMenu } from '../../../../components/content-editor/trigger-menu';
 import { createObjectUrlImageSaver } from '../../../../libs/editor/image-saver';
@@ -130,7 +130,7 @@ export function RichEditorPane() {
         </EditorStyleContainer>
         <TriggerMenu />
         <SelectionToolbar containerRef={wrapperRef} />
-        <ImageMenu containerRef={wrapperRef} />
+        <ImageToolbar containerRef={wrapperRef} />
       </div>
     </EditorContext.Provider>
   );

@@ -9,7 +9,7 @@ import {
   StrikethroughIcon,
   UnderlineIcon,
 } from '@v/ui/icon';
-import { LinkPanel } from '../../../../components/content-editor/link-panel';
+import { LinkPanel } from '../../../../components/content-editor/panels/link-panel';
 import { m } from '../../../../generated/paraglide/messages';
 import { registerEditorMenuCommand } from '../registry';
 import { isInCodeBlock } from './utils';

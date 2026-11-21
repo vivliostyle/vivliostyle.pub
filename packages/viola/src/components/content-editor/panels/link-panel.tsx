@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 
 import { UnlinkIcon } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
-import { m } from '../../generated/paraglide/messages';
+import { m } from '../../../generated/paraglide/messages';
 import {
   getEditableSelectionText,
   getSelectedLinkHref,
@@ -10,9 +10,9 @@ import {
   removeLinkFromSelection,
   selectionHasLink,
   setLinkOnSelection,
-} from '../../libs/editor/link';
-import type { EditorMenuPanelProps } from '../../libs/editor/menu/types';
-import { dismissMenuPanel, MenuPanelButton, MenuPanelForm } from './menu-panel';
+} from '../../../libs/editor/link';
+import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
+import { dismissPanel, PanelButton, PanelForm } from './panel-form';
 
 export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
   const urlRef = useRef<HTMLInputElement>(null);
@@ -39,7 +39,7 @@ export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
       if (hasLink) {
         removeLink();
       } else {
-        dismissMenuPanel({ editor, close });
+        dismissPanel({ editor, close });
       }
       return;
     }
@@ -55,7 +55,7 @@ export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
   };
 
   return (
-    <MenuPanelForm
+    <PanelForm
       editor={editor}
       close={close}
       initialFocusRef={urlRef}
@@ -63,12 +63,9 @@ export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
       onSubmit={apply}
       actions={
         hasLink && (
-          <MenuPanelButton
-            label={m.link_panel_remove_aria()}
-            onClick={removeLink}
-          >
+          <PanelButton label={m.link_panel_remove_aria()} onClick={removeLink}>
             <UnlinkIcon />
-          </MenuPanelButton>
+          </PanelButton>
         )
       }
       error={invalid && m.link_panel_invalid_url()}
@@ -93,6 +90,6 @@ export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
           />
         )}
       </div>
-    </MenuPanelForm>
+    </PanelForm>
   );
 }

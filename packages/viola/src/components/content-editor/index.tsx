@@ -9,7 +9,7 @@ import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
-import { ImageMenu } from './image-menu';
+import { ImageToolbar } from './image-toolbar';
 import { SelectionToolbar } from './selection-toolbar';
 import { TriggerMenu } from './trigger-menu';
 
@@ -98,7 +98,7 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
         </EditorStyleContainer>
         <TriggerMenu />
         <SelectionToolbar containerRef={wrapperRef} />
-        <ImageMenu containerRef={wrapperRef} />
+        <ImageToolbar containerRef={wrapperRef} />
       </div>
     </EditorContext.Provider>
   );

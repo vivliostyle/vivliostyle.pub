@@ -14,15 +14,15 @@ import {
 } from '@v/tiptap-extensions';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
-import { m } from '../../generated/paraglide/messages';
+import { m } from '../../../generated/paraglide/messages';
 import {
   languageRange,
   replaceLanguage,
   suggestLanguages,
-} from '../../libs/editor/code-block-language';
-import type { EditorMenuPanelProps } from '../../libs/editor/menu/types';
-import { scrollOptionIntoView } from '../../libs/scroll-option-into-view';
-import { MenuPanelForm } from './menu-panel';
+} from '../../../libs/editor/code-block-language';
+import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
+import { scrollOptionIntoView } from '../../../libs/scroll-option-into-view';
+import { PanelForm } from './panel-form';
 
 type ListMode = 'closed' | 'typing' | 'browsing';
 
@@ -133,7 +133,7 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   };
 
   return (
-    <MenuPanelForm
+    <PanelForm
       editor={editor}
       close={close}
       initialFocusRef={inputRef}
@@ -200,6 +200,6 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
           </div>
         )}
       </div>
-    </MenuPanelForm>
+    </PanelForm>
   );
 }

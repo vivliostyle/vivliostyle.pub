@@ -1,5 +1,5 @@
 import { ImageIcon, LinkIcon, MinusIcon } from '@v/ui/icon';
-import { LinkPanel } from '../../../../components/content-editor/link-panel';
+import { LinkPanel } from '../../../../components/content-editor/panels/link-panel';
 import { m } from '../../../../generated/paraglide/messages';
 import { Sandbox } from '../../../../stores/proxies/sandbox';
 import { openFilePicker } from '../../../open-file-picker';

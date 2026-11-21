@@ -3,7 +3,7 @@ import {
   resolveVfmLanguage,
 } from '@v/tiptap-extensions';
 import { BracesIcon } from '@v/ui/icon';
-import { CodeBlockPanel } from '../../../../components/content-editor/code-block-panel';
+import { CodeBlockPanel } from '../../../../components/content-editor/panels/code-block-panel';
 import { m } from '../../../../generated/paraglide/messages';
 import { registerEditorMenuCommand } from '../registry';
 import { isInCodeBlock } from './utils';
