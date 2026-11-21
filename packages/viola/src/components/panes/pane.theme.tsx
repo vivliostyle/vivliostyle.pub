@@ -24,7 +24,7 @@ export const Pane = createPane<ThemePaneProperty>({
   title: () => m.theme_pane_title(),
   content: (props) => (
     <ScrollOverflow>
-      <PaneContainer>
+      <PaneContainer fullWidth>
         <Content {...props} />
       </PaneContainer>
     </ScrollOverflow>
@@ -98,7 +98,7 @@ function Content(_: ThemePaneProperty) {
     <div className="grid gap-4">
       <section className="grid gap-2">
         <h3 className="text-l font-bold">{m.theme_official_section_title()}</h3>
-        <ul className="grid grid-cols-2 gap-2">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2">
           {Object.entries(officialThemes).map(([packageName, { title }]) => {
             return (
               <li key={packageName}>

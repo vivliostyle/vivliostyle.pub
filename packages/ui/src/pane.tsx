@@ -13,17 +13,21 @@ export function ScrollOverflow({ children }: { children?: ReactNode }) {
 export function PaneContainer({
   title,
   hideTitle,
+  fullWidth,
   children,
 }: {
   title?: ReactNode;
   hideTitle?: boolean;
+  /** Spans the whole pane instead of a centered column of reading width. */
+  fullWidth?: boolean;
   children?: ReactNode;
 }) {
   const showsTitle = title !== undefined && !hideTitle;
   return (
     <div
       className={cn(
-        'pb-8 px-8 max-w-xl mx-auto grid gap-4',
+        'pb-8 px-8 mx-auto grid gap-4',
+        !fullWidth && 'max-w-xl',
         showsTitle ? 'pt-16' : 'pt-8',
       )}
     >
