@@ -92,13 +92,13 @@ export class FilePersistence {
 
   constructor(protected readonly provider: StorageProvider) {}
 
-  persist(updates: FileUpdates): Promise<void> {
-    const { writes, deletes } = splitFileUpdates(updates);
-    if (writes.length === 0 && deletes.length === 0) {
-      this.latest = Promise.resolve();
-      return this.latest;
-    }
-    const run = this.queue.then(() => this.apply(writes, deletes));
+  persist(updates: FileUpdates | Promise<FileUpdates>): Promise<void> {
+    const run = this.queue.then(async () => {
+      const { writes, deletes } = splitFileUpdates(await updates);
+      if (writes.length > 0 || deletes.length > 0) {
+        await this.apply(writes, deletes);
+      }
+    });
     this.queue = run.catch(() => {});
     this.latest = run;
     return run;

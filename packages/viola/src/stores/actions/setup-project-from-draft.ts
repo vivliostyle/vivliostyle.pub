@@ -6,7 +6,7 @@ import type { BuildTask } from '@vivliostyle/cli/schema';
 import { deepClone } from 'valtio/utils';
 
 import { generateProjectId } from '../../libs/generate-id';
-import { $draftProject, $projects, $session } from '../accessors';
+import { $draftProject, $projects, $sandboxes, $session } from '../accessors';
 import { type OfficialTemplateId, officialTemplates } from '../catalog';
 import { Project, type ProjectEntry, type ProjectId } from '../proxies/project';
 import { Sandbox } from '../proxies/sandbox';
@@ -98,6 +98,10 @@ export async function setupProjectFromDraft({
       themePackageName,
       entry: deepClone(sandbox.vivliostyleConfig.entry) as BuildTask['entry'],
     });
+    // The entry is listed before setup ends, so the user can delete it meanwhile.
+    if ($sandboxes.value[projectId] !== sandbox) {
+      throw new Error(`Project deleted during setup: ${projectId}`);
+    }
     project = Project.createProjectFromSandbox({
       projectId,
       sandboxPromise: Promise.resolve(sandbox),
@@ -106,6 +110,9 @@ export async function setupProjectFromDraft({
       project.setupPromise,
       project.theme.install(themePackageName),
     ]);
+    if ($projects.value[projectId] !== project) {
+      throw new Error(`Project deleted during setup: ${projectId}`);
+    }
   } catch (err) {
     await (project ?? sandbox).dispose();
     if (useCloud) {

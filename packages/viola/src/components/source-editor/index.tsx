@@ -78,11 +78,12 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
   // XmlFragment — emitUpdate runs the editor's own save path so the sandbox
   // file and server sync reconverge deterministically. Skip the write entirely
   // when the source never diverged from the seed, to avoid emitting a redundant
-  // collaborative update for an untouched document.
+  // collaborative update for an untouched document, or when deleting the file
+  // has already destroyed the editor ahead of this unmount.
   useEffect(() => {
     return () => {
       saveToSandbox.cancel();
-      if (latestCode.current !== initialCode) {
+      if (!editor.isDestroyed && latestCode.current !== initialCode) {
         editor.commands.setContent(latestCode.current, {
           contentType: 'markdown',
           emitUpdate: true,

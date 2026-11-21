@@ -6,6 +6,7 @@ import { SandboxFile } from './file';
 import {
   collectFileUpdates,
   FilePersistence,
+  type FileUpdates,
   readProjectFiles,
   splitFileUpdates,
 } from './persistence';
@@ -126,6 +127,23 @@ describe('FilePersistence', () => {
       'fail first.md',
       'start second.md',
       'end second.md',
+    ]);
+  });
+
+  it('queues a batch on arrival, before its updates resolve', async () => {
+    const provider = createProvider();
+    const persistence = new FilePersistence(provider);
+    const first = Promise.withResolvers<FileUpdates>();
+
+    persistence.persist(first.promise);
+    persistence.persist({ 'a.md': bytes('second') });
+    const idle = persistence.idle();
+    first.resolve({ 'a.md': bytes('first') });
+    await idle;
+
+    expect(vi.mocked(provider.write).mock.calls).toEqual([
+      ['a.md', bytes('first')],
+      ['a.md', bytes('second')],
     ]);
   });
 

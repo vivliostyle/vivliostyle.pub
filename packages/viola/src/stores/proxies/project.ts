@@ -167,6 +167,11 @@ export class Project {
         initialFile: content,
         sync,
       });
+      // Teardown does not wait for setup, so it never sees this editor.
+      if (this.disposePromise) {
+        editor.destroy();
+        throw new Error(`Project disposed during setup: ${this.projectId}`);
+      }
 
       readingOrder.push(contentId);
       this.content.files.set(contentId, {
@@ -252,8 +257,6 @@ export class Project {
       delete projects.value[this.projectId];
     }
     this.unsubscribe();
-    // Setup may still be creating editors; let it settle so none escape.
-    await this.setupPromise.catch(() => {});
     for (const file of this.content.files.values()) {
       file.editor.destroy();
     }

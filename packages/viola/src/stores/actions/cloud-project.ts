@@ -1,5 +1,5 @@
 import { router } from '../../router';
-import { $projects, $session } from '../accessors';
+import { $projects, $sandboxes, $session } from '../accessors';
 import type { ProjectEntry, ProjectId } from '../proxies/project';
 import { discoverProjects } from './discover-projects';
 
@@ -30,7 +30,8 @@ export async function deleteCloudProject(projectId: ProjectId): Promise<void> {
   if ($projects.currentProjectId === projectId) {
     await router.navigate({ to: '/' });
   }
-  await $projects.value[projectId]?.dispose();
+  // A project still being created has its sandbox but no Project yet.
+  await ($projects.value[projectId] ?? $sandboxes.value[projectId])?.dispose();
   await $session.api.deleteProject(projectId);
   delete $projects.entries[projectId];
   if ($projects.currentProjectId === projectId) {

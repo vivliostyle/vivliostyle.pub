@@ -67,6 +67,7 @@ vi.mock('@v/storage-providers', async (importOriginal) => {
 import { SandboxFile } from '../libs/sandbox/file';
 import { $projects, $sandboxes } from '../stores/accessors';
 import { createCloudProject } from '../stores/actions/cloud-project';
+import { deleteLocalProject } from '../stores/actions/local-project';
 import { openProject } from '../stores/actions/open-project';
 import { register } from '../stores/actions/session';
 import { initStores } from '../stores/init';
@@ -75,6 +76,7 @@ import {
   Project,
   type ProjectId,
 } from '../stores/proxies/project';
+import { Sandbox } from '../stores/proxies/sandbox';
 import { buildTestServer } from './harness/server';
 import { setupTestSession } from './harness/session';
 import { bindApp } from './setup';
@@ -165,6 +167,72 @@ describe('project disposal', () => {
     expect($projects.value[draftProjectId]).toBe(second);
     expect($sandboxes.value[draftProjectId]).toBe(second.sandbox);
     expect(second.bibliography.title).toBe('');
+  });
+
+  it('finishes a write whose bytes are still resolving before the sandbox is disposed', async () => {
+    const projectId = 'pendingwrite' as ProjectId;
+    const sandbox = await Sandbox.createNewSandbox({ projectId });
+    const file = new SandboxFile('text/markdown', '');
+    const bytes = Promise.withResolvers<Uint8Array>();
+    file.bytes = bytes.promise;
+    sandbox.files['late.md'] = ref(file);
+    await settle();
+
+    let disposed = false;
+    const disposal = sandbox.dispose().then(() => {
+      disposed = true;
+    });
+    await settle();
+    expect(disposed).toBe(false);
+
+    bytes.resolve(new TextEncoder().encode('late'));
+    await disposal;
+    expect(opfs.has(`${projectId}/late.md`)).toBe(true);
+  });
+
+  it('disposes a project without waiting for its editors to be set up', async () => {
+    type ContentEditor = Awaited<ReturnType<Project['setupContentEditor']>>;
+    const projectId = 'slowsetup' as ProjectId;
+    const sandbox = await Sandbox.createNewSandbox({ projectId });
+    sandbox.updateVivliostyleConfig((config) => {
+      config.entry = ['a.md'];
+    });
+    sandbox.files['a.md'] = ref(new SandboxFile('text/markdown', '# A'));
+    const editorSetup = Promise.withResolvers<ContentEditor>();
+    const setupContentEditor = vi
+      .spyOn(Project.prototype, 'setupContentEditor')
+      .mockReturnValue(editorSetup.promise);
+    try {
+      const project = Project.createProjectFromSandbox({
+        projectId,
+        sandboxPromise: Promise.resolve(sandbox),
+      });
+      await vi.waitFor(() => expect(setupContentEditor).toHaveBeenCalled());
+
+      await project.dispose();
+      expect($sandboxes.value[projectId]).toBeUndefined();
+
+      const destroy = vi.fn();
+      editorSetup.resolve({ destroy } as unknown as ContentEditor);
+      await expect(project.setupPromise).rejects.toThrowError(/disposed/);
+      expect(destroy).toHaveBeenCalledOnce();
+    } finally {
+      setupContentEditor.mockRestore();
+    }
+  });
+
+  it('disposes the sandbox of a project deleted before its Project is registered', async () => {
+    const projectId = 'halfcreated' as ProjectId;
+    const sandbox = await Sandbox.createNewSandbox({ projectId });
+    $projects.entries[projectId] = { projectId, source: 'local' };
+
+    await deleteLocalProject(projectId);
+
+    expect($sandboxes.value[projectId]).toBeUndefined();
+    await expect(sandbox.cli.createRemotePromise()).rejects.toThrowError(
+      /disposed/,
+    );
+    expect($projects.entries[projectId]).toBeUndefined();
   });
 
   it('drops a project whose setup failed so that a retry starts over', async () => {

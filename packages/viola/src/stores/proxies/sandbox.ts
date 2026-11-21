@@ -292,8 +292,10 @@ export class Sandbox {
   }
 
   protected async handleFileUpdate(ops: INTERNAL_Op[]) {
-    const updates = await collectFileUpdates(ops);
-    const persist = this.persistence.persist(updates);
+    const pendingUpdates = collectFileUpdates(ops);
+    // Queued before the bytes resolve, so `dispose()` waits for this batch.
+    const persist = this.persistence.persist(pendingUpdates);
+    const updates = await pendingUpdates;
     // Rejects once the worker is gone, leaving nothing to mirror the change into.
     const cli = await this.cli.createRemotePromise().catch(() => undefined);
     await Promise.all([cli?.fromJSON(updates, '/workdir'), persist]);
