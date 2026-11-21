@@ -57,6 +57,7 @@ export class Theme {
     inputTimer: undefined as ReturnType<typeof setTimeout> | undefined,
     written: new Map<string, { css: string; file: SandboxFile | undefined }>(),
     requestWrite: undefined as Coalesced | undefined,
+    disposed: false,
   });
 
   protected constructor(project: Project) {
@@ -174,6 +175,10 @@ export class Theme {
   protected applyStylesheetInput() {
     const state = this.stylesheetEditState;
     clearTimeout(state.inputTimer);
+    if (state.disposed) {
+      state.input.clear();
+      return;
+    }
     let changed = false;
     for (const [path, css] of state.input) {
       const stylesheet = this.stylesheets.find((it) => it.path === path);
@@ -194,9 +199,17 @@ export class Theme {
     state.requestWrite();
   }
 
+  /** Drops the edits still waiting, which would otherwise land in a torn-down sandbox. */
+  dispose() {
+    const state = this.stylesheetEditState;
+    state.disposed = true;
+    clearTimeout(state.inputTimer);
+    state.input.clear();
+  }
+
   protected writeStylesheets() {
     const { sandbox } = this.project;
-    if (!sandbox) {
+    if (!sandbox || this.stylesheetEditState.disposed) {
       return;
     }
     const { written } = this.stylesheetEditState;

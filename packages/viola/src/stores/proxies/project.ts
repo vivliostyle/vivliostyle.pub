@@ -247,6 +247,7 @@ export class Project {
       delete projects.value[this.projectId];
     }
     this.unsubscribe();
+    this.theme.dispose();
     for (const file of this.content.files.values()) {
       file.editor.destroy();
     }
