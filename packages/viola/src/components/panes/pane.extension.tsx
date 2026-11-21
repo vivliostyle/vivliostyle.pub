@@ -127,7 +127,7 @@ const hostApiRegistry: HostApiRegistry = {
   getViewerUrl: {
     permission: 'viewer:read',
     impl: async () => {
-      const cli = await $cli.awaiter();
+      const cli = await $cli.awaiter({ timeout: 10_000 });
       return await cli.createViewerUrlPromise();
     },
   },

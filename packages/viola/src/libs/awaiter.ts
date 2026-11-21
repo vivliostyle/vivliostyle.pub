@@ -1,38 +1,68 @@
-export const awaiter = async <T>({
+import { subscribe } from 'valtio';
+
+export interface AwaiterOptions {
+  timeout?: number;
+  signal?: AbortSignal;
+}
+
+// Resolves with the first non-nullish value of `getter`, re-evaluated whenever
+// `watch` (a valtio proxy, observed deeply) changes. Waits indefinitely unless
+// a timeout or signal is given.
+export function awaiter<T>({
+  watch,
   getter,
   name,
-  abortSignal,
+  timeout,
+  signal,
 }: {
-  getter: () => T | Promise<NonNullable<T>>;
+  watch: object;
+  getter: () => T | null | undefined;
   name: string;
-  abortSignal?: AbortSignal;
-}): Promise<NonNullable<T>> => {
-  const now = performance.now();
+} & AwaiterOptions): Promise<NonNullable<T>> {
   return new Promise((resolve, reject) => {
-    const loop = () => {
-      if (abortSignal?.aborted) {
-        return reject(new Error(`Awaiter aborted: ${name}`));
-      }
-      try {
-        const value = getter();
-        if (value instanceof Promise) {
-          value.then((v) => resolve(v)).catch(reject);
-          return;
-        } else if (value != null) {
-          return resolve(value);
-        }
-      } catch (error) {
-        return reject(error);
-      }
-      if (performance.now() - now > 10_000) {
-        // timeout
-        return reject(new Error(`Awaiter timeout: ${name}`));
-      }
-      // Poll via setTimeout, not requestAnimationFrame: rAF is paused while the
-      // document is hidden, which would stall this loop — and its timeout — until
-      // the tab is shown again.
-      setTimeout(loop, 50);
+    if (signal?.aborted) {
+      reject(new Error(`Awaiter aborted: ${name}`));
+      return;
+    }
+    let done = false;
+    let unsubscribe = () => {};
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onAbort = () => {
+      finish(() => reject(new Error(`Awaiter aborted: ${name}`)));
     };
-    loop();
+    const finish = (settle: () => void) => {
+      done = true;
+      unsubscribe();
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      settle();
+    };
+    const check = () => {
+      if (done) {
+        return;
+      }
+      let value: T | null | undefined;
+      try {
+        value = getter();
+      } catch (error) {
+        finish(() => reject(error));
+        return;
+      }
+      if (value != null) {
+        finish(() => resolve(value));
+      }
+    };
+
+    check();
+    if (done) {
+      return;
+    }
+    unsubscribe = subscribe(watch, check);
+    signal?.addEventListener('abort', onAbort);
+    if (timeout !== undefined) {
+      timer = setTimeout(() => {
+        finish(() => reject(new Error(`Awaiter timeout: ${name}`)));
+      }, timeout);
+    }
   });
-};
+}
