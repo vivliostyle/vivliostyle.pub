@@ -1,6 +1,6 @@
 import * as Comlink from 'comlink';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { subscribe, ref as valtioRef } from 'valtio';
+import { useEffect, useRef, useState } from 'react';
+import { subscribe } from 'valtio';
 
 import type {
   ExtensionAuthErrorCode,
@@ -27,8 +27,6 @@ import {
 } from '../../stores/actions/session';
 import {
   type ExtensionId,
-  extensionFrameKey,
-  extensionFrames,
   getExtensionPermissions,
   resolvePaneSizing,
   resolvePaneTitle,
@@ -221,22 +219,9 @@ function Content({ extensionId, panePath }: ExtensionPaneProperty) {
     };
   }, [origin, extensionId, sizing]);
 
-  const registerFrame = useCallback(
-    (el: HTMLIFrameElement | null) => {
-      iframeRef.current = el;
-      const key = extensionFrameKey(extensionId, panePath);
-      if (el) {
-        extensionFrames[key] = valtioRef(el);
-      } else {
-        delete extensionFrames[key];
-      }
-    },
-    [extensionId, panePath],
-  );
-
   const iframe = (
     <iframe
-      ref={registerFrame}
+      ref={iframeRef}
       title={resolvePaneTitle(extensionId, panePath, getLocale())}
       src={`${origin}${extensionFramePath(extensionId, panePath)}`}
       onLoad={() => setLoaded(true)}
