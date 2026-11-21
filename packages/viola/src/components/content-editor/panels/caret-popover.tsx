@@ -17,7 +17,7 @@ export function CaretPopover({
   onDismiss: () => void;
   children: ReactNode;
 }) {
-  const { refs, floatingStyles } = useFloating({
+  const { refs, floatingStyles, update } = useFloating({
     placement: 'bottom-start',
     strategy: 'absolute',
     middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
@@ -36,6 +36,15 @@ export function CaretPopover({
       contextElement: editor.view.dom,
     });
   }, [editor, refs]);
+
+  // autoUpdate misses a remote edit that moves the caret along its line, as no
+  // element moves or resizes.
+  useEffect(() => {
+    editor.on('transaction', update);
+    return () => {
+      editor.off('transaction', update);
+    };
+  }, [editor, update]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {

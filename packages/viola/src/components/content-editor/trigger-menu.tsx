@@ -70,24 +70,25 @@ export function TriggerMenu() {
     setActiveIndex(0);
   }, [openId, query]);
 
-  const { refs, floatingStyles, middlewareData, isPositioned } = useFloating({
-    open: visible,
-    placement: 'bottom-start',
-    strategy: 'absolute',
-    middleware: [
-      offset(4),
-      flip({ padding: 8 }),
-      shift({ padding: 8 }),
-      size({
-        padding: 8,
-        apply({ availableHeight, elements }) {
-          elements.floating.style.maxHeight = `${Math.max(availableHeight, 96)}px`;
-        },
-      }),
-      hide(),
-    ],
-    whileElementsMounted: autoUpdate,
-  });
+  const { refs, floatingStyles, middlewareData, isPositioned, update } =
+    useFloating({
+      open: visible,
+      placement: 'bottom-start',
+      strategy: 'absolute',
+      middleware: [
+        offset(4),
+        flip({ padding: 8 }),
+        shift({ padding: 8 }),
+        size({
+          padding: 8,
+          apply({ availableHeight, elements }) {
+            elements.floating.style.maxHeight = `${Math.max(availableHeight, 96)}px`;
+          },
+        }),
+        hide(),
+      ],
+      whileElementsMounted: autoUpdate,
+    });
 
   useLayoutEffect(() => {
     if (!editor || !clientRect) {
@@ -100,6 +101,18 @@ export function TriggerMenu() {
       contextElement: editor.view.dom,
     });
   }, [editor, clientRect, refs]);
+
+  // autoUpdate misses a remote edit that moves the trigger along its line, as
+  // no element moves or resizes.
+  useEffect(() => {
+    if (!editor || !visible) {
+      return;
+    }
+    editor.on('transaction', update);
+    return () => {
+      editor.off('transaction', update);
+    };
+  }, [editor, visible, update]);
 
   // middlewareData outlives a close, so only trust it once this open has been
   // positioned.
