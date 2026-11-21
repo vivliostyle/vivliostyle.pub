@@ -6,7 +6,6 @@ import { useSnapshot } from 'valtio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@v/ui/dialog';
 import { SidebarProvider, SidebarTrigger } from '@v/ui/sidebar';
 import { $ui } from '../stores/accessors';
-import { closeModal } from '../stores/actions/ui';
 import type { PaneContent } from '../stores/proxies/ui';
 import { Pane, panes } from './pane';
 import { PaneContext } from './panes/util';
@@ -31,7 +30,7 @@ function DedicatedModal() {
       router.subscribe('onBeforeLoad', ({ fromLocation, toLocation }) => {
         if (fromLocation?.pathname !== toLocation.pathname) {
           setOpen(false);
-          closeModal();
+          $ui.closeModal();
         }
       }),
     [router.subscribe],
@@ -40,7 +39,7 @@ function DedicatedModal() {
   const handleOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setOpen(false);
-      closeModal();
+      $ui.closeModal();
     }
   }, []);
 

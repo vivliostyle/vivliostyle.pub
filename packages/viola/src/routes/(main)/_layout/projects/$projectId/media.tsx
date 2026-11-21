@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
+import { $ui } from '../../../../../stores/accessors';
 import { openProject } from '../../../../../stores/actions/open-project';
-import { showPane } from '../../../../../stores/actions/ui';
 import type { ProjectId } from '../../../../../stores/proxies/project';
 
 export const Route = createFileRoute(
@@ -17,6 +17,6 @@ export const Route = createFileRoute(
     } catch {
       throw redirect({ to: '/' });
     }
-    showPane({ type: 'media' }, { besideEditor: true });
+    $ui.showPane({ type: 'media' }, { besideEditor: true });
   },
 });

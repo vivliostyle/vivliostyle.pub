@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { $projects } from '../../../stores/accessors';
+import { $projects, $ui } from '../../../stores/accessors';
 import { discoverProjects } from '../../../stores/actions/discover-projects';
-import { showPane } from '../../../stores/actions/ui';
 
 export const Route = createFileRoute('/(main)/_layout/')({
   beforeLoad: async ({ preload }) => {
@@ -11,6 +10,6 @@ export const Route = createFileRoute('/(main)/_layout/')({
     }
     await discoverProjects();
     $projects.currentProjectId = null;
-    showPane({ type: 'start' });
+    $ui.showPane({ type: 'start' });
   },
 });

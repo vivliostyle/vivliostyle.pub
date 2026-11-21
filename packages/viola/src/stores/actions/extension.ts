@@ -9,7 +9,6 @@ import {
   registerExtension,
   unregisterExtension,
 } from '../proxies/extension';
-import { closeModal, closePanes, showPane } from './ui';
 
 const cloudPermissions = new Set<ExtensionPermission>([
   'session:read',
@@ -50,12 +49,12 @@ export async function activateExtension(id: ExtensionId): Promise<void> {
 
 export function deactivateExtension(id: ExtensionId): void {
   unregisterExtension(id);
-  closePanes((tab) => tab.type === 'extension' && tab.extensionId === id);
+  $ui.closePanes((tab) => tab.type === 'extension' && tab.extensionId === id);
   if (
     $ui.dedicatedModal?.type === 'extension' &&
     $ui.dedicatedModal.extensionId === id
   ) {
-    closeModal();
+    $ui.closeModal();
   }
 }
 
@@ -68,7 +67,7 @@ export async function openPermalink(slug: string): Promise<boolean> {
   if (!permalink) {
     return false;
   }
-  showPane(
+  $ui.showPane(
     {
       type: 'extension',
       extensionId: permalink.extensionId,

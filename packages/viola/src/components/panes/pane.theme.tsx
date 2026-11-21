@@ -9,8 +9,7 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import { usePromiseState } from '../../hooks/use-promise-state';
 import { getOfficialThemeTitle } from '../../libs/official-theme-title';
-import { $theme } from '../../stores/accessors';
-import { updateCustomCss } from '../../stores/actions/theme';
+import { $project, $theme } from '../../stores/accessors';
 import { officialThemes } from '../../stores/catalog';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -64,7 +63,7 @@ function Content(_: ThemePaneProperty) {
 
   useDebounce(
     () => {
-      updateCustomCss(customCss);
+      $project.valueOrThrow().updateCustomCss(customCss);
     },
     1000,
     [customCss],

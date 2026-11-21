@@ -4,8 +4,7 @@ import { useSnapshot } from 'valtio';
 import { Button } from '@v/ui/button';
 import { Code, Loader2, Type } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
-import { $content } from '../../stores/accessors';
-import { setEditMode } from '../../stores/actions/ui';
+import { $content, $ui } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import type { PaneId } from '../../stores/proxies/ui';
 import { createPane, ScrollOverflow } from './util';
@@ -59,7 +58,9 @@ function ModeToggle({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => id && setEditMode(id, isSource ? 'visual' : 'source')}
+        onClick={() =>
+          id && $ui.setEditMode(id, isSource ? 'visual' : 'source')
+        }
       >
         {isSource ? <Type /> : <Code />}
         {isSource ? m.edit_mode_visual() : m.edit_mode_source()}

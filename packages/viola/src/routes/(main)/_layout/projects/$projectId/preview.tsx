@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
+import { $ui } from '../../../../../stores/accessors';
 import { openProject } from '../../../../../stores/actions/open-project';
-import { showPane } from '../../../../../stores/actions/ui';
 import type { ExtensionId } from '../../../../../stores/proxies/extension';
 import type { ProjectId } from '../../../../../stores/proxies/project';
 
@@ -18,7 +18,7 @@ export const Route = createFileRoute(
     } catch {
       throw redirect({ to: '/' });
     }
-    showPane(
+    $ui.showPane(
       {
         type: 'extension',
         extensionId: 'preview' as ExtensionId,

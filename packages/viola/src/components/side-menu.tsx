@@ -71,6 +71,7 @@ import {
   $project,
   $projects,
   $session,
+  $ui,
 } from '../stores/accessors';
 import { deleteCloudProject } from '../stores/actions/cloud-project';
 import {
@@ -85,7 +86,7 @@ import {
 } from '../stores/actions/export-project';
 import { deleteLocalProject } from '../stores/actions/local-project';
 import { printPdf } from '../stores/actions/print-pdf';
-import { openModal, openProjectsModal } from '../stores/actions/ui';
+import { openProjectsModal } from '../stores/actions/ui';
 import type {
   ContentId,
   HierarchicalReadingOrder,
@@ -336,7 +337,7 @@ function AccountMenuSection() {
           <SidebarMenuButton
             tooltip={tooltip}
             onClick={() => {
-              openModal({
+              $ui.openModal({
                 type: 'extension',
                 extensionId: account.id,
                 panePath: '.',

@@ -234,6 +234,14 @@ export class Project {
     );
   }
 
+  updateCustomCss(css: string) {
+    if (!this.sandbox) {
+      return;
+    }
+    this.theme.customCss = css;
+    this.sandbox.files['style.css'] = ref(new SandboxFile('text/css', css));
+  }
+
   dispose(): Promise<void> {
     this.disposePromise ??= this.teardown();
     return this.disposePromise;
