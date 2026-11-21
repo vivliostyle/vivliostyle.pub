@@ -1,19 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@v/ui/button';
-import {
-  HoverPopover,
-  HoverPopoverArea,
-  HoverPopoverContent,
-  HoverPopoverTrigger,
-} from '@v/ui/hover-popover';
-import { Check, Copy, ExternalLink, Info } from '@v/ui/icon';
+import { HoverPopoverContent } from '@v/ui/hover-popover';
+import { Check, Copy, ExternalLink } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
-import type {
-  ThemeVariable,
-  ValueDescriptor,
-  ValueType,
+import {
+  describeVariable,
+  type ThemeVariable,
+  type ValueDescriptor,
+  type ValueType,
 } from '../../libs/theme-variables';
+import { getVariableLabel } from './labels';
 import { getValueTypeLabel } from './messages';
 import {
   type CssReference,
@@ -22,61 +19,53 @@ import {
   getValueUnits,
 } from './value-info';
 
-interface SettingInfoProps {
-  variable: ThemeVariable;
-  descriptor: ValueDescriptor;
-  label: string;
-  important: boolean;
-  /** The label; hovering it opens the card as well. */
-  children: React.ReactNode;
-}
-
-export function SettingInfo({
-  variable,
-  descriptor,
-  label,
-  important,
-  children,
-}: SettingInfoProps) {
+/** The one card of a list, for the info button last used in it. */
+export function SettingInfoCard({
+  getVariable,
+  isImportant,
+}: {
+  getVariable: (name: string) => ThemeVariable | undefined;
+  isImportant: (name: string) => boolean;
+}) {
+  const titleId = useId();
   return (
-    <HoverPopover>
-      <HoverPopoverArea className="flex min-w-0 items-start gap-0.5">
-        {children}
-        <HoverPopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-5 shrink-0 text-muted-foreground [&_svg]:size-3.5"
-            aria-label={m.theme_settings_info_aria({ name: label })}
-          >
-            <Info />
-          </Button>
-        </HoverPopoverTrigger>
-      </HoverPopoverArea>
-      <HoverPopoverContent
-        align="start"
-        hideWhenDetached
-        aria-label={label}
-        className="grid w-80 gap-3 p-3 text-xs"
-      >
-        <InfoCard
-          variable={variable}
-          descriptor={descriptor}
-          label={label}
-          important={important}
-        />
-      </HoverPopoverContent>
-    </HoverPopover>
+    <HoverPopoverContent
+      align="start"
+      hideWhenDetached
+      aria-labelledby={titleId}
+      className="grid w-80 gap-3 p-3 text-xs"
+    >
+      {(name) => {
+        const variable = getVariable(name);
+        return (
+          variable && (
+            <InfoCard
+              titleId={titleId}
+              variable={variable}
+              descriptor={describeVariable(variable)}
+              label={getVariableLabel(variable)}
+              important={isImportant(name)}
+            />
+          )
+        );
+      }}
+    </HoverPopoverContent>
   );
 }
 
 function InfoCard({
+  titleId,
   variable,
   descriptor,
   label,
   important,
-}: Omit<SettingInfoProps, 'children'>) {
+}: {
+  titleId: string;
+  variable: ThemeVariable;
+  descriptor: ValueDescriptor;
+  label: string;
+  important: boolean;
+}) {
   const { universal, keywords, types, multiplier } = descriptor;
   const units = universal ? [] : getValueUnits(descriptor);
   const hasHint = keywords.length > 0 || types.length > 0;
@@ -84,7 +73,9 @@ function InfoCard({
   return (
     <>
       <div className="grid gap-1">
-        <p className="text-sm font-medium">{label}</p>
+        <p id={titleId} className="text-sm font-medium">
+          {label}
+        </p>
         <VariableName name={variable.name} important={important} />
       </div>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">

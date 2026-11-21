@@ -5,8 +5,10 @@ import {
   useDeferredValue,
   useLayoutEffect,
   useMemo,
+  useOptimistic,
   useRef,
   useState,
+  useTransition,
 } from 'react';
 import { useDebounce } from 'react-use';
 
@@ -14,6 +16,7 @@ import { Button } from '@v/ui/button';
 import { Code, Loader2, SlidersHorizontal, TriangleAlert } from '@v/ui/icon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@v/ui/tabs';
 import { m } from '../../generated/paraglide/messages';
+import { PrerenderedViews, usePrerender } from '../../hooks/use-prerender';
 import {
   Fulfilled,
   Rejected,
@@ -38,6 +41,7 @@ import {
   findSection,
   isFiltering,
   matchSettings,
+  type SettingsRow,
   type SettingsTocGroup,
 } from './rows';
 import type { CommitHandler } from './setting-row';
@@ -89,7 +93,13 @@ function useFilterScopedState<T>(filterKey: string, initial: () => T) {
   return [state.value, set] as const;
 }
 
-const pageSize = () => PAGE_SIZE;
+/** Rows shown per section, raised by "show more". */
+type Limits = Readonly<Record<string, number>>;
+
+const noLimits = (): Limits => ({});
+// Views are keyed by strings, and `null` stands for every match.
+const toListKey = (section: string | null) => section ?? '';
+const fromListKey = (key: string) => (key === '' ? null : key);
 const noSection = () => null;
 const noDefaults = () => undefined;
 
@@ -150,14 +160,31 @@ function useThemeSettings(
     filtering ? filterSection : browseSection,
     filtering,
   );
-  const [limit, setLimit] = useFilterScopedState(
-    `${filterKey}|${section}`,
-    pageSize,
-  );
-  const rows = useMemo(
-    () => (matches ? buildSettingsRows(matches, section, limit) : []),
-    [matches, section, limit],
-  );
+  // The list of a section takes a while to mount, so it renders in a
+  // transition while the table of contents shows the pick right away.
+  const [, startTransition] = useTransition();
+  const [pickedSection, setPickedSection] = useOptimistic(section);
+
+  const listKey = toListKey(section);
+  const prerender = usePrerender(listKey, { resetKey: filterKey });
+  const [limits, setLimits] = useFilterScopedState(filterKey, noLimits);
+  // Rebuilt per section only when its matches or limit change, so that the
+  // hidden lists keep their rows and skip re-rendering.
+  const rowsCache = useMemo(() => new Map<string, SettingsRow[]>(), [matches]);
+  const getRows = (key: string) => {
+    if (!matches) {
+      return [];
+    }
+    const limit = limits[key] ?? PAGE_SIZE;
+    const cacheKey = `${key}\n${limit}`;
+    let rows = rowsCache.get(cacheKey);
+    if (!rows) {
+      rows = buildSettingsRows(matches, fromListKey(key), limit);
+      rowsCache.set(cacheKey, rows);
+    }
+    return rows;
+  };
+  const rows = getRows(listKey);
 
   const scopeCounts = useMemo(
     () =>
@@ -188,19 +215,33 @@ function useThemeSettings(
   }, []);
 
   const handleSelect = useCallback(
-    (next: string | null) => {
-      if (filtering) {
-        setFilterSection(() => next);
-      } else {
-        setBrowseSection(next);
-      }
-    },
-    [filtering, setFilterSection],
+    (next: string | null) =>
+      startTransition(() => {
+        setPickedSection(next);
+        if (filtering) {
+          setFilterSection(() => next);
+        } else {
+          setBrowseSection(next);
+        }
+      }),
+    [filtering, setFilterSection, setPickedSection],
   );
 
   const handleShowMore = useCallback(
-    () => setLimit((value) => value + PAGE_SIZE),
-    [setLimit],
+    () =>
+      startTransition(() =>
+        setLimits((prev) => ({
+          ...prev,
+          [listKey]: (prev[listKey] ?? PAGE_SIZE) + PAGE_SIZE,
+        })),
+      ),
+    [listKey, setLimits],
+  );
+
+  const { triggerProps } = prerender;
+  const getPrerenderProps = useCallback(
+    (next: string | null) => triggerProps(toListKey(next)),
+    [triggerProps],
   );
 
   const matchCount = matches?.matchCount ?? 0;
@@ -215,13 +256,16 @@ function useThemeSettings(
       onModifiedOnlyChange: setModifiedOnly,
       matchCount: filtering ? matchCount : null,
     },
+    listSection: section,
     toc: {
       toc,
-      section,
+      section: pickedSection,
       filtering,
       matchCount,
       onSelect: handleSelect,
+      getPrerenderProps,
     },
+    lists: { current: listKey, keys: prerender.keys, getRows },
     list: {
       rows,
       scope,
@@ -328,22 +372,9 @@ export default function ThemeCssEditor({
     return () => observer.disconnect();
   }, []);
 
-  const revealListRef = useRef(false);
-  const { onSelect } = settings.toc;
-  const handleSelect = useCallback(
-    (section: string | null) => {
-      revealListRef.current = true;
-      onSelect(section);
-    },
-    [onSelect],
-  );
-  useLayoutEffect(() => {
-    if (!revealListRef.current) {
-      return;
-    }
-    revealListRef.current = false;
-    // The pane keeps its scroll position, which would open the new section
-    // midway once the list top has scrolled under the header.
+  // The pane keeps its scroll position, which would open the new section
+  // midway once the list top has scrolled under the header.
+  const revealList = useCallback(() => {
     const list = listRef.current;
     const header = headerRef.current;
     if (
@@ -353,7 +384,34 @@ export default function ThemeCssEditor({
     ) {
       list.scrollIntoView({ block: 'start' });
     }
+  }, []);
+  const revealPendingRef = useRef(false);
+  const listSectionRef = useRef(settings.listSection);
+  const onSelectRef = useRef(settings.toc.onSelect);
+  useLayoutEffect(() => {
+    listSectionRef.current = settings.listSection;
+    onSelectRef.current = settings.toc.onSelect;
   });
+  // Stable, so that a pick does not re-render the whole table of contents.
+  const handleSelect = useCallback(
+    (section: string | null) => {
+      if (section === listSectionRef.current) {
+        revealList();
+        return;
+      }
+      revealPendingRef.current = true;
+      onSelectRef.current(section);
+    },
+    [revealList],
+  );
+  const { rows } = settings.list;
+  // Waits for the rows of the picked section, which come in a transition.
+  useLayoutEffect(() => {
+    if (revealPendingRef.current) {
+      revealPendingRef.current = false;
+      revealList();
+    }
+  }, [rows, revealList]);
   const toc = { ...settings.toc, onSelect: handleSelect };
 
   return (
@@ -417,11 +475,19 @@ export default function ThemeCssEditor({
               ref={listRef}
               className="min-w-0 scroll-mt-(--settings-header-height) py-2"
             >
-              <SettingsList
-                {...settings.list}
-                model={model}
-                onCommit={handleCommit}
-              />
+              <PrerenderedViews
+                current={settings.lists.current}
+                keys={settings.lists.keys}
+              >
+                {(key) => (
+                  <SettingsList
+                    {...settings.list}
+                    rows={settings.lists.getRows(key)}
+                    model={model}
+                    onCommit={handleCommit}
+                  />
+                )}
+              </PrerenderedViews>
             </div>
           </div>
         ) : schemaState === Rejected ? (

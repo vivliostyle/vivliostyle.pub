@@ -1,7 +1,8 @@
 import { memo, useCallback, useId, useMemo, useState } from 'react';
 
-import { Button } from '@v/ui/button';
-import { RotateCcw } from '@v/ui/icon';
+import { Button, buttonVariants } from '@v/ui/button';
+import { HoverPopoverArea, HoverPopoverTrigger } from '@v/ui/hover-popover';
+import { Info, RotateCcw } from '@v/ui/icon';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
@@ -15,7 +16,6 @@ import type { CommitError } from './commit';
 import { ValueField } from './fields';
 import { getVariableLabel } from './labels';
 import { getCommitErrorMessage, getScopeLabel } from './messages';
-import { SettingInfo } from './setting-info';
 
 export type CommitHandler = (
   scope: ThemeScopeId,
@@ -24,6 +24,16 @@ export type CommitHandler = (
   value: string,
 ) => CommitError | null;
 
+// A plain button with the classes of `Button`, which would add a component
+// per row; resolved once, as merging them is not free either.
+const infoButtonClassName = cn(
+  buttonVariants({
+    variant: 'ghost',
+    size: 'icon',
+    className: 'size-5 shrink-0 text-muted-foreground [&_svg]:size-3.5',
+  }),
+);
+
 interface SettingRowProps {
   variable: ThemeVariable;
   scope: ThemeScopeId;
@@ -31,7 +41,6 @@ interface SettingRowProps {
   value: string | undefined;
   /** Value in effect when no scope sets the variable. */
   defaultValue: string | undefined;
-  important: boolean;
   /** Other scopes that set the variable. */
   otherScopes: readonly ThemeScopeId[];
   onCommit: CommitHandler;
@@ -43,7 +52,6 @@ function SettingRow({
   scope,
   value,
   defaultValue,
-  important,
   otherScopes,
   onCommit,
   onSwitchScope,
@@ -73,16 +81,17 @@ function SettingRow({
       role="group"
       aria-labelledby={labelId}
       className={cn(
-        'grid gap-1.5 border-l-2 py-2 pr-1 pl-3',
+        // Rows off screen skip layout and paint until scrolled to.
+        'grid gap-1.5 border-l-2 py-2 pr-1 pl-3 [contain-intrinsic-size:auto_5rem] [content-visibility:auto]',
         modified ? 'border-primary' : 'border-transparent',
       )}
     >
       <div className="flex items-start gap-2">
-        <SettingInfo
-          variable={variable}
-          descriptor={descriptor}
-          label={label}
-          important={important}
+        {/* Hovering the label opens the card as well. The card is shared by
+            the list and picked by the variable name. */}
+        <HoverPopoverArea
+          value={variable.name}
+          className="flex min-w-0 items-start gap-0.5"
         >
           <div id={labelId} className="min-w-0 text-sm font-medium">
             {label}
@@ -93,7 +102,14 @@ function SettingRow({
               </span>
             )}
           </div>
-        </SettingInfo>
+          <HoverPopoverTrigger
+            value={variable.name}
+            className={infoButtonClassName}
+            aria-label={m.theme_settings_info_aria({ name: label })}
+          >
+            <Info />
+          </HoverPopoverTrigger>
+        </HoverPopoverArea>
         {modified && (
           <Button
             type="button"
