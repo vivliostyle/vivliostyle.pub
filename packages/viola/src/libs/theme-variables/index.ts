@@ -1,4 +1,8 @@
 export {
+  THEME_VARIABLE_CATEGORIES,
+  type ThemeVariableCategory,
+} from './categories';
+export {
   parseThemeCss,
   removeVariable,
   setVariable,
@@ -26,6 +30,7 @@ export {
   type ThemeVariableGroup,
   type ThemeVariableSchema,
   type ThemeVariableSubgroup,
+  type ThemeVariableSubgroupRef,
 } from './schema';
 export {
   DEFAULT_THEME_SCOPE,

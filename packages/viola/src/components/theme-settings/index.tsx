@@ -35,7 +35,7 @@ import {
   type ThemeVariableSchema,
 } from '../../libs/theme-variables';
 import { commitValue } from './commit';
-import { getGroupLabel } from './messages';
+import { getCategoryLabel, getGroupLabel } from './messages';
 import {
   buildSettingsRows,
   findSection,
@@ -152,6 +152,7 @@ function useThemeSettings(
       filter,
       isModified: (name) => Object.hasOwn(variables, name),
       getGroupLabel,
+      getCategoryLabel,
     });
   }, [schema, model, scope, filter]);
   const toc = matches?.toc ?? [];

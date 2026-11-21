@@ -98,10 +98,11 @@ describe('flattenThemeVariables', () => {
       name: '--vs-color-foreground',
       path: ['_meta-properties', 'color-foreground'],
       group: '_meta-properties',
-      subgroup: 'color',
+      subgroup: { kind: 'category', id: 'color' },
       key: 'color-foreground',
       target: null,
       propertyKey: 'color-foreground',
+      category: 'color',
       syntax: '*',
       properties: ['color'],
       defaultValue: '#000',
@@ -130,22 +131,137 @@ describe('flattenThemeVariables', () => {
     });
   });
 
-  it('clusters variables sharing a prefix and leaves the rest alone', () => {
+  describe('sorting a variable into a subgroup', () => {
+    const subgroups = (tree: Record<string, Record<string, object>>) =>
+      Object.fromEntries(
+        flattenThemeVariables(tree).map((v) => [
+          v.name,
+          `${v.subgroup.kind}:${v.subgroup.id}`,
+        ]),
+      );
+
+    it('gives a target of two or more variables its own subgroup', () => {
+      expect(
+        subgroups({
+          _basic: {
+            'table-border-color': { _syntax: '*', _property: 'border-color' },
+            'table-width': { _syntax: '*', _property: 'width' },
+            'table-cell-padding': { _syntax: '*', _property: 'padding' },
+            'table-cell-text-align': { _syntax: '*', _property: 'text-align' },
+          },
+        }),
+      ).toEqual({
+        '--vs--table-border-color': 'target:table',
+        '--vs--table-width': 'target:table',
+        '--vs--table-cell-padding': 'target:table-cell',
+        '--vs--table-cell-text-align': 'target:table-cell',
+      });
+    });
+
+    it('moves a lone target into the nearest subgroup it is part of', () => {
+      expect(
+        subgroups({
+          _basic: {
+            'table-border-color': { _syntax: '*', _property: 'border-color' },
+            'table-width': { _syntax: '*', _property: 'width' },
+            'table-row-height': { _syntax: '*', _property: 'height' },
+            'table-row-even-background-color': {
+              _syntax: '*',
+              _property: 'background-color',
+            },
+          },
+        }),
+      ).toEqual({
+        '--vs--table-border-color': 'target:table',
+        '--vs--table-width': 'target:table',
+        '--vs--table-row-height': 'target:table',
+        '--vs--table-row-even-background-color': 'target:table',
+      });
+    });
+
+    it('moves another lone target into its category of the group', () => {
+      expect(
+        subgroups({
+          prism: {
+            'text-color': { _syntax: '*', _property: 'color' },
+            'keyword-text-color': { _syntax: '*', _property: 'color' },
+            'comment-text-color': { _syntax: '*', _property: 'color' },
+          },
+        }),
+      ).toEqual({
+        '--vs-prism--text-color': 'category:color',
+        '--vs-prism--keyword-text-color': 'category:color',
+        '--vs-prism--comment-text-color': 'category:color',
+      });
+    });
+
+    it('keeps a lone target with nowhere to go in a subgroup', () => {
+      expect(
+        subgroups({
+          _basic: {
+            'del-text-decoration': {
+              _syntax: '*',
+              _property: 'text-decoration',
+            },
+            'p-font-size': { _syntax: '*', _property: 'font-size' },
+            'p-text-indent': { _syntax: '*', _property: 'text-indent' },
+          },
+        }),
+      ).toEqual({
+        '--vs--del-text-decoration': 'target:del',
+        '--vs--p-font-size': 'target:p',
+        '--vs--p-text-indent': 'target:p',
+      });
+    });
+
+    it('sorts a variable without a target by its category', () => {
+      expect(
+        subgroups({
+          '_meta-properties': {
+            'line-height': { _syntax: '*', _property: 'line-height' },
+            'line-break': { _syntax: '*', _property: 'line-break' },
+          },
+        }),
+      ).toEqual({
+        '--vs-line-height': 'category:spacing',
+        '--vs-line-break': 'category:line-breaking',
+      });
+    });
+  });
+
+  it('categorizes a variable by the property it feeds', () => {
     expect(
-      Object.fromEntries(variables.map((v) => [v.name, v.subgroup])),
+      Object.fromEntries(
+        flattenThemeVariables({
+          '_meta-properties': {
+            'color-border': { _syntax: '*', _property: 'border-color' },
+            'font-family-alt': { _syntax: '*' },
+            'widows-orphans': { _syntax: '*' },
+            'spacing-rlh': { _syntax: '*' },
+          },
+          _basic: {
+            'h1-size-inline': { _syntax: '*', _property: 'inline-size' },
+            'h1-text-color': { _syntax: '*', _property: 'color' },
+          },
+          page: {
+            'mbox-top-font-size': { _syntax: '*', _property: 'font-size' },
+            'mbox-top-inside-content': { _syntax: '*' },
+            'cover-page-mbox-visibility': { _syntax: '*' },
+            mystery: { _syntax: '*' },
+          },
+        }).map((v) => [v.name, v.category]),
+      ),
     ).toEqual({
-      '--vs-color-foreground': 'color',
-      '--vs-color-background': 'color',
-      '--vs-tab-size': null,
-      '--vs-page--mbox-top-left-content': 'mbox-top-left',
-      '--vs-page--mbox-top-left-font-size': 'mbox-top-left',
-      '--vs-page--mbox-top-content': 'mbox-top',
-      '--vs-page--mbox-top-font-size': 'mbox-top',
-      '--vs-page--mbox-font-size': 'mbox',
-      '--vs-page--mbox-inside-top-content': 'mbox',
-      '--vs-page--border-color': null,
-      '--vs-toc--anchor-text-decoration': null,
-      '--vs-toc--label': null,
+      '--vs-color-border': 'color',
+      '--vs-font-family-alt': 'font',
+      '--vs-widows-orphans': 'fragmentation',
+      '--vs-spacing-rlh': 'margin',
+      '--vs--h1-size-inline': 'layout',
+      '--vs--h1-text-color': 'color',
+      '--vs-page--mbox-top-font-size': 'font',
+      '--vs-page--mbox-top-inside-content': 'generated-content',
+      '--vs-page--cover-page-mbox-visibility': 'visibility',
+      '--vs-page--mystery': 'other',
     });
   });
 
@@ -290,11 +406,17 @@ describe('flattenThemeVariables', () => {
     ]);
     const page = schema.groups[1];
     expect(page.variables).toHaveLength(7);
-    expect(page.ungrouped.map((v) => v.key)).toEqual(['border-color']);
-    expect(page.subgroups.map((s) => [s.id, s.variables.length])).toEqual([
-      ['mbox-top-left', 2],
-      ['mbox-top', 2],
-      ['mbox', 2],
+    expect(
+      page.subgroups.map((s) => [s.kind, s.id, s.variables.length]),
+    ).toEqual([
+      ['category', 'font', 2],
+      ['category', 'border', 1],
+      ['category', 'generated-content', 2],
+      ['target', 'mbox-top-left', 2],
+    ]);
+    expect(page.subgroups.at(-1)?.variables.map((v) => v.key)).toEqual([
+      'mbox-top-left-font-size',
+      'mbox-top-left-content',
     ]);
     expect(schema.byName.get('--vs--p-font-size')?.group).toBe('_basic');
   });
@@ -331,11 +453,23 @@ describe('loadThemeVariableSchema', () => {
       expect(variable.syntax).not.toBe('');
     }
     for (const group of schema.groups) {
-      const grouped = group.subgroups.flatMap((s) => s.variables);
-      expect(grouped.length + group.ungrouped.length).toBe(
+      expect(group.subgroups.flatMap((s) => s.variables)).toHaveLength(
         group.variables.length,
       );
     }
+  });
+
+  it('sorts the variables into subgroups of known categories', () => {
+    const sections = Object.fromEntries(
+      schema.groups.map((group) => [
+        group.id,
+        group.subgroups.map((s) => `${s.kind}:${s.id} (${s.variables.length})`),
+      ]),
+    );
+    expect(sections).toMatchSnapshot();
+    expect(
+      schema.variables.filter((v) => v.category === 'other').map((v) => v.name),
+    ).toEqual([]);
   });
 
   it('splits every key into its target and property', () => {

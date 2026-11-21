@@ -1,5 +1,12 @@
 import { groupedPropAlias } from 'postcss-variable-theming/preset';
 
+import {
+  getLeadingCategory,
+  getTrailingCategory,
+  THEME_VARIABLE_CATEGORIES,
+  type ThemeVariableCategory,
+} from './categories';
+
 export interface ThemeVariableDefault {
   value: string;
   /** Selector the default is declared on; `:root` when omitted. */
@@ -13,8 +20,7 @@ export interface ThemeVariable {
   path: readonly string[];
   /** Top-level key of the tree: `_meta-properties`, `_basic` or a module. */
   group: string;
-  /** Cluster inside the group, or `null` for a variable that stands alone. */
-  subgroup: string | null;
+  subgroup: ThemeVariableSubgroupRef;
   /** Name without the `--vs-` prefix of its group. */
   key: string;
   /**
@@ -24,6 +30,8 @@ export interface ThemeVariable {
   target: string | null;
   /** `key` without its target, like `font-size` of `h1-font-size`. */
   propertyKey: string;
+  /** What the variable sets, judged by the property it feeds. */
+  category: ThemeVariableCategory;
   /** `@property`-like syntax; an approximation of the consuming properties. */
   syntax: string;
   /** CSS properties the variable ends up in. */
@@ -34,16 +42,24 @@ export interface ThemeVariable {
   conditionalDefaults: readonly ThemeVariableDefault[];
 }
 
-export interface ThemeVariableSubgroup {
-  id: string;
+/**
+ * A section of a group: the variables styling one target, or those of the
+ * group as a whole that set one category.
+ */
+export type ThemeVariableSubgroupRef =
+  | { kind: 'target'; id: string }
+  | { kind: 'category'; id: ThemeVariableCategory };
+
+export type ThemeVariableSubgroup = ThemeVariableSubgroupRef & {
+  /** In source order, or by category within a target. */
   variables: ThemeVariable[];
-}
+};
 
 export interface ThemeVariableGroup {
   id: string;
   /** Every variable of the group, in source order. */
   variables: ThemeVariable[];
-  ungrouped: ThemeVariable[];
+  /** Categories in their order, then targets in source order. */
   subgroups: ThemeVariableSubgroup[];
 }
 
@@ -72,9 +88,6 @@ const BASIC_GROUP = '_basic';
 // from instead.
 const LEADING_GROUPS = [META_GROUP, 'page', BASIC_GROUP];
 
-const MARGIN_BOX =
-  /^mbox-(?:top|bottom|left|right)(?:-(?:left|right|top|bottom|center|middle))?(?:-corner)?(?=-)/;
-
 // The aliases theme-base generates variable names with. The `color` entry
 // comes from its own build config rather than the preset.
 const PROPERTY_ALIASES: Readonly<Record<string, string>> = {
@@ -82,12 +95,18 @@ const PROPERTY_ALIASES: Readonly<Record<string, string>> = {
   color: 'text-color',
 };
 
+// A target with fewer variables would make a section of a single row.
+const MIN_TARGET_SIZE = 2;
+
 type ThemeVariableBase = Omit<
   ThemeVariable,
-  'target' | 'propertyKey' | 'subgroup'
+  'target' | 'propertyKey' | 'category' | 'subgroup'
 >;
 
-type KeySplit = Pick<ThemeVariable, 'target' | 'propertyKey'>;
+interface KeySplit extends Pick<ThemeVariable, 'target' | 'propertyKey'> {
+  /** Property the name was generated from, if it was. */
+  source?: string;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -111,13 +130,6 @@ export function getThemeVariableName(path: readonly string[]): string {
   return group === BASIC_GROUP ? `--vs--${key}` : `--vs-${group}--${key}`;
 }
 
-function getSubgroupCandidate(group: string, key: string): string {
-  if (group === 'page' && key.startsWith('mbox-')) {
-    return key.match(MARGIN_BOX)?.[0] ?? 'mbox';
-  }
-  return key.split('-')[0];
-}
-
 /**
  * Splits a key the way theme-base's `@var` blocks generate it: a target, a
  * dash, and the aliased name of the property the variable is used in.
@@ -126,22 +138,23 @@ function splitByProperty(
   key: string,
   properties: readonly string[],
 ): KeySplit | null {
-  let match: string | undefined;
+  let match: { name: string; property: string } | undefined;
   for (const property of properties) {
     const name = PROPERTY_ALIASES[property] ?? property;
     if (
       (key === name || key.endsWith(`-${name}`)) &&
-      name.length > (match?.length ?? 0)
+      name.length > (match?.name.length ?? 0)
     ) {
-      match = name;
+      match = { name, property };
     }
   }
   if (match === undefined) {
     return null;
   }
   return {
-    target: key === match ? null : key.slice(0, -match.length - 1),
-    propertyKey: match,
+    target: key === match.name ? null : key.slice(0, -match.name.length - 1),
+    propertyKey: match.name,
+    source: match.property,
   };
 }
 
@@ -180,6 +193,67 @@ function splitKeys(variables: readonly ThemeVariableBase[]): KeySplit[] {
   );
 }
 
+function categorize(
+  { source, propertyKey }: KeySplit,
+  properties: readonly string[],
+): ThemeVariableCategory {
+  // The source goes first, since an alias can read as another property
+  // (`size-inline` of `inline-size` as `size`).
+  return (
+    (source === undefined ? undefined : getLeadingCategory(source)) ??
+    getLeadingCategory(propertyKey) ??
+    properties.map(getLeadingCategory).find(Boolean) ??
+    getTrailingCategory(propertyKey) ??
+    'other'
+  );
+}
+
+/**
+ * Picks the target section of each variable, or `null` to list it under its
+ * category. A target too small for a section joins the nearest target whose
+ * name leads its own, or else the group's own variables of its category. With
+ * neither, it keeps a section of its own, since a category section holding it
+ * alone would read as a setting of the whole group.
+ */
+function findTargetSections(
+  variables: readonly Pick<ThemeVariable, 'group' | 'target' | 'category'>[],
+): (string | null)[] {
+  const sizes = new Map<string, Map<string, number>>();
+  const groupCategories = new Set<string>();
+  for (const { group, target, category } of variables) {
+    if (target === null) {
+      groupCategories.add(`${group}\n${category}`);
+    } else {
+      const counts = sizes.get(group) ?? new Map<string, number>();
+      sizes.set(group, counts.set(target, (counts.get(target) ?? 0) + 1));
+    }
+  }
+  return variables.map(({ group, target, category }) => {
+    if (target === null) {
+      return null;
+    }
+    let section: string | null = null;
+    for (const [candidate, size] of sizes.get(group) ?? []) {
+      if (size < MIN_TARGET_SIZE) {
+        continue;
+      }
+      if (candidate === target) {
+        return target;
+      }
+      if (
+        target.startsWith(`${candidate}-`) &&
+        candidate.length > (section?.length ?? 0)
+      ) {
+        section = candidate;
+      }
+    }
+    if (section !== null || groupCategories.has(`${group}\n${category}`)) {
+      return section;
+    }
+    return target;
+  });
+}
+
 function toVariable(path: string[], raw: RawVariable): ThemeVariableBase {
   const defaults: ThemeVariableDefault[] =
     typeof raw._define === 'string'
@@ -199,10 +273,10 @@ function toVariable(path: string[], raw: RawVariable): ThemeVariableBase {
 }
 
 export function flattenThemeVariables(tree: unknown): ThemeVariable[] {
-  const variables: ThemeVariableBase[] = [];
+  const bases: ThemeVariableBase[] = [];
   const walk = (node: unknown, path: string[]) => {
     if (isRawVariable(node)) {
-      variables.push(toVariable(path, node));
+      bases.push(toVariable(path, node));
     } else if (isRecord(node)) {
       for (const [key, child] of Object.entries(node)) {
         walk(child, [...path, key]);
@@ -211,23 +285,33 @@ export function flattenThemeVariables(tree: unknown): ThemeVariable[] {
   };
   walk(tree, []);
 
-  const splits = splitKeys(variables);
-  const sizes = new Map<string, number>();
-  const candidateOf = (v: ThemeVariableBase) =>
-    `${v.group}/${getSubgroupCandidate(v.group, v.key)}`;
-  for (const variable of variables) {
-    const candidate = candidateOf(variable);
-    sizes.set(candidate, (sizes.get(candidate) ?? 0) + 1);
-  }
-  return variables.map((variable, index) => ({
-    ...variable,
-    ...splits[index],
-    subgroup:
-      (sizes.get(candidateOf(variable)) ?? 0) > 1
-        ? getSubgroupCandidate(variable.group, variable.key)
-        : null,
+  const splits = splitKeys(bases);
+  const variables = bases.map((base, index) => ({
+    ...base,
+    target: splits[index].target,
+    propertyKey: splits[index].propertyKey,
+    category: categorize(splits[index], base.properties),
   }));
+  const sections = findTargetSections(variables);
+  return variables.map((variable, index): ThemeVariable => {
+    const section = sections[index];
+    return {
+      ...variable,
+      subgroup:
+        section === null
+          ? { kind: 'category', id: variable.category }
+          : { kind: 'target', id: section },
+    };
+  });
 }
+
+const categoryRank = (category: ThemeVariableCategory) =>
+  THEME_VARIABLE_CATEGORIES.indexOf(category);
+
+const subgroupRank = (subgroup: ThemeVariableSubgroupRef) =>
+  subgroup.kind === 'category'
+    ? categoryRank(subgroup.id)
+    : THEME_VARIABLE_CATEGORIES.length;
 
 export function groupThemeVariables(
   variables: readonly ThemeVariable[],
@@ -236,25 +320,27 @@ export function groupThemeVariables(
   for (const variable of variables) {
     let group = groups.get(variable.group);
     if (!group) {
-      group = {
-        id: variable.group,
-        variables: [],
-        ungrouped: [],
-        subgroups: [],
-      };
+      group = { id: variable.group, variables: [], subgroups: [] };
       groups.set(variable.group, group);
     }
     group.variables.push(variable);
-    if (variable.subgroup === null) {
-      group.ungrouped.push(variable);
-      continue;
-    }
-    let subgroup = group.subgroups.find((s) => s.id === variable.subgroup);
+    const { kind, id } = variable.subgroup;
+    let subgroup = group.subgroups.find((s) => s.kind === kind && s.id === id);
     if (!subgroup) {
-      subgroup = { id: variable.subgroup, variables: [] };
+      subgroup = { ...variable.subgroup, variables: [] };
       group.subgroups.push(subgroup);
     }
     subgroup.variables.push(variable);
+  }
+  for (const group of groups.values()) {
+    group.subgroups.sort((a, b) => subgroupRank(a) - subgroupRank(b));
+    for (const subgroup of group.subgroups) {
+      if (subgroup.kind === 'target') {
+        subgroup.variables.sort(
+          (a, b) => categoryRank(a.category) - categoryRank(b.category),
+        );
+      }
+    }
   }
   const rank = (id: string) => {
     const index = LEADING_GROUPS.indexOf(id);

@@ -27,8 +27,8 @@ export function getVariableLabel(
 ): string {
   const { key, subgroup } = variable;
   const rest =
-    subgroup !== null && key.startsWith(`${subgroup}-`)
-      ? key.slice(subgroup.length + 1)
+    subgroup.kind === 'target' && key.startsWith(`${subgroup.id}-`)
+      ? key.slice(subgroup.id.length + 1)
       : key;
-  return humanizeKey(rest || key);
+  return humanizeKey(rest);
 }

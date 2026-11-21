@@ -65,6 +65,15 @@ function SettingsList({
                   {row.label}
                 </h5>
               );
+            case 'category':
+              return (
+                <h6
+                  key={row.key}
+                  className="mt-3 text-xs font-medium text-muted-foreground"
+                >
+                  {row.label}
+                </h6>
+              );
             case 'variable': {
               const { name } = row.variable;
               const entry = model.scopes[scope].variables[name];

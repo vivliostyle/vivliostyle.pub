@@ -16,22 +16,33 @@ describe('humanizeKey', () => {
 });
 
 describe('getVariableLabel', () => {
-  it('drops the subgroup prefix', () => {
-    expect(
-      getVariableLabel({ key: 'color-foreground', subgroup: 'color' }),
-    ).toBe('Foreground');
+  it('drops the target of its section', () => {
     expect(
       getVariableLabel({
         key: 'mbox-top-left-content',
-        subgroup: 'mbox-top-left',
+        subgroup: { kind: 'target', id: 'mbox-top-left' },
       }),
     ).toBe('Content');
+    expect(
+      getVariableLabel({
+        key: 'table-row-even-background-color',
+        subgroup: { kind: 'target', id: 'table' },
+      }),
+    ).toBe('Row even background color');
   });
 
-  it('keeps the whole key without a subgroup or a matching prefix', () => {
-    expect(getVariableLabel({ key: 'font-size', subgroup: null })).toBe(
-      'Font size',
-    );
-    expect(getVariableLabel({ key: 'call', subgroup: 'call' })).toBe('Call');
+  it('keeps the whole key in a category or without a matching prefix', () => {
+    expect(
+      getVariableLabel({
+        key: 'color-foreground',
+        subgroup: { kind: 'category', id: 'color' },
+      }),
+    ).toBe('Color foreground');
+    expect(
+      getVariableLabel({
+        key: 'call',
+        subgroup: { kind: 'target', id: 'call' },
+      }),
+    ).toBe('Call');
   });
 });
