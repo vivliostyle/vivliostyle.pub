@@ -1,3 +1,11 @@
+import {
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  size,
+  useFloating,
+} from '@floating-ui/react-dom';
 import type React from 'react';
 import {
   useEffect,
@@ -28,7 +36,6 @@ type ListMode = 'closed' | 'typing' | 'browsing';
 
 export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const listboxRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
   const languages = useMemo(listHighlightLanguages, []);
   const [value, setValue] = useState<string>(
@@ -49,6 +56,30 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
         });
   const expanded = suggestions.length > 0;
 
+  const { refs, floatingStyles } = useFloating({
+    open: expanded,
+    placement: 'bottom-start',
+    strategy: 'absolute',
+    middleware: [
+      offset(4),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      size({
+        padding: 8,
+        apply({ availableHeight, elements }) {
+          // Overrides max-h-48, which still caps the list when flip() first
+          // measures it.
+          elements.floating.style.maxHeight = `min(12rem, ${Math.max(availableHeight, 0)}px)`;
+        },
+      }),
+    ],
+    whileElementsMounted: autoUpdate,
+  });
+
+  useLayoutEffect(() => {
+    refs.setReference(inputRef.current);
+  }, [refs]);
+
   useLayoutEffect(() => {
     const pending = pendingCaretRef.current;
     if (pending !== null) {
@@ -59,14 +90,14 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   });
 
   useEffect(() => {
-    const listbox = listboxRef.current;
+    const listbox = refs.floating.current;
     const option = listbox?.querySelector<HTMLElement>(
       '[aria-selected="true"]',
     );
     if (activeIndex >= 0 && listbox && option) {
       scrollOptionIntoView(listbox, option);
     }
-  }, [activeIndex]);
+  }, [activeIndex, refs]);
 
   const updateCaret = () => {
     setCaret(inputRef.current?.selectionStart ?? 0);
@@ -141,7 +172,7 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
       submitLabel={m.code_block_panel_apply_aria()}
       onSubmit={apply}
     >
-      <div className="relative">
+      <div>
         <Input
           ref={inputRef}
           value={value}
@@ -171,11 +202,12 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
         />
         {expanded && (
           <div
-            ref={listboxRef}
+            ref={refs.setFloating}
+            style={floatingStyles}
             id={listboxId}
             role="listbox"
             aria-label={m.code_block_panel_suggestions_aria()}
-            className="absolute top-full left-0 z-10 mt-1 max-h-48 min-w-40 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            className="z-10 max-h-48 min-w-40 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
             // Keeps focus, and so the caret, in the field while picking.
             onMouseDown={(event) => event.preventDefault()}
           >
