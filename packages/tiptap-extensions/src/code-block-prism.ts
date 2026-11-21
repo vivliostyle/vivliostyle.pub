@@ -9,6 +9,7 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import type { EditorState, Transaction } from '@tiptap/pm/state';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { decodeString } from 'micromark-util-decode-string';
 import type { RefractorNode } from 'refractor';
 import refractor from 'refractor';
 
@@ -62,8 +63,10 @@ function codeFence(infoString: string, code: string): string {
 
 /**
  * Derives the highlight language the same way VFM does: remark splits the
- * info string at the first whitespace, then VFM strips the `:title` part
- * (`js:example.js` → `js`). See @vivliostyle/vfm lib/plugins/code.js.
+ * info string at the first whitespace and decodes escapes and character
+ * references in that word, then VFM strips the `:title` part
+ * (`js:example.js`, `js\:example.js` → `js`). See @vivliostyle/vfm
+ * lib/plugins/code.js.
  */
 export function resolveVfmLanguage(
   infoString: string | null | undefined,
@@ -72,8 +75,9 @@ export function resolveVfmLanguage(
   if (!word) {
     return null;
   }
-  const match = word.match(/^(.+?):(.+)$/);
-  return match ? match[1] : word;
+  const language = decodeString(word);
+  const match = language.match(/^(.+?):(.+)$/);
+  return match ? match[1] : language;
 }
 
 /**

@@ -36,6 +36,13 @@ describe('resolveVfmLanguage', () => {
   it('keeps a trailing colon without title, matching VFM', () => {
     expect(resolveVfmLanguage('js:')).toBe('js:');
   });
+
+  it('decodes escapes and character references, as remark does', () => {
+    expect(resolveVfmLanguage('js\\:example.js')).toBe('js');
+    expect(resolveVfmLanguage('&#106;s')).toBe('js');
+    expect(resolveVfmLanguage('c&plus;&plus;')).toBe('c++');
+    expect(resolveVfmLanguage('js\\')).toBe('js\\');
+  });
 });
 
 describe('flattenRefractorNodes', () => {
