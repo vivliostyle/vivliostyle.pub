@@ -38,7 +38,9 @@ const schema = buildThemeVariableSchema({
 const labels: Record<string, string> = {
   '_meta-properties': 'General',
   page: 'Page',
-  _basic: 'Elements',
+  body: 'Body text',
+  heading: 'Headings',
+  section: 'Sections',
 };
 
 const categoryLabels: Partial<Record<ThemeVariableCategory, string>> = {
@@ -60,6 +62,7 @@ function match(overrides: Partial<SettingsMatchInput> = {}) {
     isModified: () => false,
     getGroupLabel: (id) => labels[id],
     getCategoryLabel: (id) => categoryLabels[id] ?? id,
+    qualifyLabel: (module, label) => `${module}: ${label}`,
     ...overrides,
   });
 }
@@ -78,7 +81,8 @@ describe('matchSettings', () => {
     ).toEqual([
       ['General', 3, ['Font', 'Color and background']],
       ['Page', 3, ['Page size and marks', 'Margin and padding']],
-      ['Elements', 3, ['H1', 'P']],
+      ['Body text', 1, ['P']],
+      ['Headings', 2, ['H1']],
     ]);
     expect(matchCount).toBe(9);
   });
@@ -97,8 +101,8 @@ describe('matchSettings', () => {
       's:_meta-properties/category:color',
       '--vs-color-foreground',
     ]);
-    expect(query('elements indent')).toEqual([
-      'g:_basic',
+    expect(query('body indent')).toEqual([
+      'g:body',
       's:_basic/target:p',
       '--vs--p-text-indent',
     ]);
@@ -124,7 +128,7 @@ describe('matchSettings', () => {
     const { toc } = match({ filter: { query: 'h1', modifiedOnly: false } });
     expect(toc).toMatchObject([
       {
-        key: 'g:_basic',
+        key: 'g:heading',
         count: 2,
         subgroups: [{ key: 's:_basic/target:h1' }],
       },
@@ -149,7 +153,7 @@ describe('matchSettings', () => {
         ],
       },
       {
-        key: 'g:_basic',
+        key: 'g:heading',
         count: 1,
         modified: 1,
         subgroups: [{ key: 's:_basic/target:h1', count: 1, modified: 1 }],
@@ -162,12 +166,81 @@ describe('matchSettings', () => {
       isModified: (n) => n === '--vs--h1-margin-block',
     });
     expect(toc.at(-1)).toMatchObject({
-      count: 3,
+      count: 2,
       modified: 1,
-      subgroups: [
-        { count: 2, modified: 1 },
-        { count: 1, modified: 0 },
-      ],
+      subgroups: [{ count: 2, modified: 1 }],
+    });
+  });
+
+  describe('with a group gathered from several tree groups', () => {
+    const merged = buildThemeVariableSchema({
+      _basic: {
+        'h1-font-size': v('font-size'),
+        'h1-margin-block': v('margin-block'),
+      },
+      section: {
+        'h1-break-before': v('break-before'),
+        'h1-break-after': v('break-after'),
+      },
+    });
+    const isModified = (name: string) =>
+      name === '--vs-section--h1-break-after';
+
+    it('names the module of a subgroup lent to a group of another name', () => {
+      expect(
+        match({ groups: merged.groups }).toc.map((g) => [
+          g.key,
+          g.subgroups.map((s) => [s.key, s.label]),
+        ]),
+      ).toEqual([
+        [
+          'g:heading',
+          [
+            ['s:_basic/target:h1', 'H1'],
+            ['s:section/target:h1', 'Sections: H1'],
+          ],
+        ],
+      ]);
+    });
+
+    it('lists only the rows of the tree group picked', () => {
+      expect(
+        buildSettingsRows(
+          match({ groups: merged.groups }),
+          subgroupKey('section', target('h1')),
+          100,
+        ).map((row) => row.key),
+      ).toEqual([
+        'g:heading',
+        's:section/target:h1',
+        '--vs-section--h1-break-before',
+        '--vs-section--h1-break-after',
+      ]);
+    });
+
+    it('counts the modified variables across its tree groups', () => {
+      expect(match({ groups: merged.groups, isModified }).toc).toMatchObject([
+        {
+          count: 4,
+          modified: 1,
+          subgroups: [
+            { key: 's:_basic/target:h1', count: 2, modified: 0 },
+            { key: 's:section/target:h1', count: 2, modified: 1 },
+          ],
+        },
+      ]);
+      expect(
+        match({
+          groups: merged.groups,
+          isModified,
+          filter: { query: '', modifiedOnly: true },
+        }).toc,
+      ).toMatchObject([
+        {
+          count: 1,
+          subgroups: [{ key: 's:section/target:h1', count: 1, modified: 1 }],
+        },
+      ]);
     });
   });
 
@@ -201,14 +274,15 @@ describe('buildSettingsRows', () => {
       's:page/category:margin',
       '--vs-page--margin-top',
       '--vs-page--margin-bottom',
-      'g:_basic',
+      'g:body',
+      's:_basic/target:p',
+      '--vs--p-text-indent',
+      'g:heading',
       's:_basic/target:h1',
       's:_basic/target:h1/font',
       '--vs--h1-font-size',
       's:_basic/target:h1/margin',
       '--vs--h1-margin-block',
-      's:_basic/target:p',
-      '--vs--p-text-indent',
     ]);
   });
 
@@ -225,7 +299,7 @@ describe('buildSettingsRows', () => {
           : `${row.kind}: ${row.label}`,
       ),
     ).toEqual([
-      'group: Elements',
+      'group: Headings',
       'subgroup: H1',
       'category: Font',
       '--vs--h1-font-size',
@@ -285,7 +359,7 @@ describe('buildSettingsRows', () => {
       'more',
     ]);
     expect(keys({}, subgroupKey('_basic', target('h1')), 1)).toEqual([
-      'g:_basic',
+      'g:heading',
       's:_basic/target:h1',
       's:_basic/target:h1/font',
       '--vs--h1-font-size',
@@ -303,6 +377,7 @@ describe('buildSettingsRows', () => {
       isModified: () => false,
       getGroupLabel: (id) => id,
       getCategoryLabel: (id) => id,
+      qualifyLabel: (module, label) => `${module}: ${label}`,
     });
     const rows = buildSettingsRows(matches, null, 150);
     expect(performance.now() - started).toBeLessThan(200);
