@@ -46,7 +46,12 @@ export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
     const text = textRef.current?.value;
     const applied = isInsert
       ? insertLink(editor, { href, text })
-      : setLinkOnSelection(editor, { href, text });
+      : setLinkOnSelection(editor, {
+          href,
+          // Left alone, the field holds the text from when the panel opened,
+          // which a collaborator may have edited since.
+          text: text === initialText ? undefined : text,
+        });
     if (!applied) {
       setInvalid(true);
       return;
