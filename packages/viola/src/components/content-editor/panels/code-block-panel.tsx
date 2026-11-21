@@ -30,7 +30,7 @@ import {
 } from '../../../libs/editor/code-block-language';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
 import { scrollOptionIntoView } from '../../../libs/scroll-option-into-view';
-import { PanelForm } from './panel-form';
+import { dismissPanel, PanelForm } from './panel-form';
 
 type ListMode = 'closed' | 'typing' | 'browsing';
 
@@ -38,9 +38,10 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
   const languages = useMemo(listHighlightLanguages, []);
-  const [value, setValue] = useState<string>(
+  const [initialValue] = useState<string>(
     () => findSelectedCodeBlock(editor.state)?.node.attrs.language ?? '',
   );
+  const [value, setValue] = useState(initialValue);
   // Selecting just the language lets typing replace it while the meta stays.
   const [initialSelection] = useState(() => languageRange(value));
   const [caret, setCaret] = useState(initialSelection.from);
@@ -122,6 +123,12 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   };
 
   const apply = () => {
+    // Left alone, the field holds the info string from when the panel opened,
+    // which a collaborator may have edited since.
+    if (value === initialValue) {
+      dismissPanel({ editor, close });
+      return;
+    }
     editor.chain().focus().setCodeBlockInfo(value).run();
     close();
   };
