@@ -11,6 +11,7 @@ import { type OfficialTemplateId, officialTemplates } from '../catalog';
 import { Project, type ProjectEntry, type ProjectId } from '../proxies/project';
 import { Sandbox } from '../proxies/sandbox';
 import { discoverProjects } from './discover-projects';
+import { deleteLocalProject } from './local-project';
 
 export interface SetupProjectFromDraftResult {
   projectId: ProjectId;
@@ -118,6 +119,8 @@ export async function setupProjectFromDraft({
     if (useCloud) {
       await $session.api.deleteProject(projectId).catch(() => {});
       delete $projects.entries[projectId];
+    } else {
+      await deleteLocalProject(projectId).catch(() => {});
     }
     throw err;
   }

@@ -3,9 +3,6 @@ export interface AwaiterOptions {
   signal?: AbortSignal;
 }
 
-// Resolves with the first non-nullish value of `getter`, re-evaluated whenever
-// `subscribe` reports a change. Waits indefinitely unless a timeout or signal
-// is given.
 export function awaiter<T>({
   subscribe,
   getter,

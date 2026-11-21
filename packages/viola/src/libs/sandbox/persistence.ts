@@ -82,7 +82,7 @@ export async function readProjectFiles(provider: StorageProvider): Promise<{
 
 export class FilePersistence {
   // The most recent batch, so a bulk operation can await the writes its
-  // mutations kicked off (see `Sandbox.saveMemoryToFileSystem`).
+  // mutations kicked off.
   latest: Promise<void> = Promise.resolve();
 
   // Serializes overlapping batches: OPFS write streams take an exclusive

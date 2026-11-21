@@ -93,6 +93,18 @@ describe('ui', () => {
       $ui.showPane({ ...preview, panePath: '/other' }, { keepIfShown: true });
       expect($ui.tabs).toMatchObject([{ panePath: '/other' }]);
     });
+
+    it('keeps any pane that the predicate accepts', () => {
+      $ui.showPane({ ...preview, panePath: '/other' });
+      const before = $ui.tabs;
+
+      $ui.showPane(preview, {
+        keepIfShown: (tab) =>
+          tab.type === 'extension' && tab.extensionId === preview.extensionId,
+      });
+
+      expect($ui.tabs).toBe(before);
+    });
   });
 
   // A method written with `this` would throw here: the snapshot is read-only.

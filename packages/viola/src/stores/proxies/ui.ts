@@ -41,14 +41,18 @@ export const ui = proxy({
       besideEditor = false,
       keepIfShown = false,
     }: {
-      // Keep the first open editor and show the pane next to it.
       besideEditor?: boolean;
       // Leave the panes untouched while one already shows this content, so its
       // state (an editor's mode, an extension frame) survives the navigation.
-      keepIfShown?: boolean;
+      // A predicate decides instead which open pane counts as showing it.
+      keepIfShown?: boolean | ((tab: PaneContent) => boolean);
     } = {},
   ): void => {
-    if (keepIfShown && ui.tabs.some((tab) => isSamePane(tab, pane))) {
+    const isShown =
+      typeof keepIfShown === 'function'
+        ? keepIfShown
+        : (tab: PaneContent) => keepIfShown && isSamePane(tab, pane);
+    if (ui.tabs.some(isShown)) {
       return;
     }
     const editor = besideEditor

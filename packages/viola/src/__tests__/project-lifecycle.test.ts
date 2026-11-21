@@ -1,3 +1,4 @@
+import { releaseProxy } from 'comlink';
 import { ref } from 'valtio';
 import {
   afterAll,
@@ -65,12 +66,14 @@ vi.mock('@v/storage-providers', async (importOriginal) => {
 });
 
 import { SandboxFile } from '../libs/sandbox/file';
-import { $projects, $sandboxes } from '../stores/accessors';
+import { $projects, $sandbox, $sandboxes } from '../stores/accessors';
 import { createCloudProject } from '../stores/actions/cloud-project';
 import { deleteLocalProject } from '../stores/actions/local-project';
 import { openProject } from '../stores/actions/open-project';
 import { register } from '../stores/actions/session';
+import { setupProjectFromDraft } from '../stores/actions/setup-project-from-draft';
 import { initStores } from '../stores/init';
+import type { RemoteCli } from '../stores/proxies/cli';
 import {
   draftProjectId,
   Project,
@@ -219,6 +222,68 @@ describe('project disposal', () => {
     } finally {
       setupContentEditor.mockRestore();
     }
+  });
+
+  it('wakes a sandbox awaiter as soon as the project gets its sandbox', async () => {
+    type ContentEditor = Awaited<ReturnType<Project['setupContentEditor']>>;
+    const projectId = 'awaitedsandbox' as ProjectId;
+    const sandbox = await Sandbox.createNewSandbox({ projectId });
+    sandbox.updateVivliostyleConfig((config) => {
+      config.entry = ['a.md'];
+    });
+    sandbox.files['a.md'] = ref(new SandboxFile('text/markdown', '# A'));
+    const sandboxSetup = Promise.withResolvers<Sandbox>();
+    // Holds setup right after the sandbox is assigned, so no later write
+    // wakes the awaiter in its place.
+    const editorSetup = Promise.withResolvers<ContentEditor>();
+    const setupContentEditor = vi
+      .spyOn(Project.prototype, 'setupContentEditor')
+      .mockReturnValue(editorSetup.promise);
+    try {
+      const project = Project.createProjectFromSandbox({
+        projectId,
+        sandboxPromise: sandboxSetup.promise,
+      });
+      $projects.currentProjectId = projectId;
+      const awaited = $sandbox.awaiter({ timeout: 1000 });
+
+      sandboxSetup.resolve(sandbox);
+
+      await expect(awaited).resolves.toBe(sandbox);
+      await project.dispose();
+      editorSetup.resolve({ destroy: vi.fn() } as unknown as ContentEditor);
+      await expect(project.setupPromise).rejects.toThrowError(/disposed/);
+    } finally {
+      setupContentEditor.mockRestore();
+    }
+  });
+
+  it('removes a local project whose creation failed', async () => {
+    const draft = Project.createDraftProject();
+    await draft.setupPromise;
+    const existing = new Set(Object.keys($sandboxes.value));
+
+    const creation = setupProjectFromDraft({ templateValue: 'blank' });
+    const sandbox = await vi.waitFor(() => {
+      const created = Object.values($sandboxes.value).find(
+        ({ projectId }) => !existing.has(projectId),
+      );
+      if (!created) {
+        throw new Error('sandbox is not created yet');
+      }
+      return created;
+    });
+    sandbox.cli.createRemoteResolver().resolve({
+      setupTemplate: vi.fn().mockRejectedValue(new Error('template failed')),
+      fromJSON: vi.fn().mockResolvedValue(undefined),
+      [releaseProxy]: vi.fn(),
+    } as unknown as RemoteCli);
+
+    await expect(creation).rejects.toThrow();
+    expect($projects.entries[sandbox.projectId]).toBeUndefined();
+    expect(
+      [...opfs.keys()].some((key) => key.startsWith(`${sandbox.projectId}/`)),
+    ).toBe(false);
   });
 
   it('disposes the sandbox of a project deleted before its Project is registered', async () => {

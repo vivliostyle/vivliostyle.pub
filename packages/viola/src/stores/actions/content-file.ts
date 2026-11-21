@@ -64,11 +64,7 @@ export async function deleteContentFile({
   const index = $$content.readingOrder.indexOf(contentId);
 
   // update ui
-  if (
-    $ui.tabs.some((tab) => tab.type === 'edit' && tab.contentId === contentId)
-  ) {
-    $ui.tabs = [];
-  }
+  $ui.closePanes((tab) => tab.type === 'edit' && tab.contentId === contentId);
 
   // update content
   $$content.readingOrder.splice(index, 1);

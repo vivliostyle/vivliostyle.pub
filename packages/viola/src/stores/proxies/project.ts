@@ -93,6 +93,8 @@ export class Project {
   protected static register(instance: Project) {
     const project = proxy(instance);
     project.unsubscribe = project.subscribeConfigSync();
+    // Started on the proxy so that setup's writes, such as `sandbox`, notify.
+    project.setupPromise = project.setup();
     projects.value[project.projectId] = project;
     return project;
   }
@@ -102,7 +104,7 @@ export class Project {
   theme = Theme.create(this);
   sandbox: Sandbox | undefined;
   sandboxPromise: Promise<Sandbox>;
-  setupPromise: Promise<void>;
+  setupPromise!: Promise<void>;
   bibliography = deepClone(initialBibliographyState);
   toc = deepClone(initialTocState);
 
@@ -115,20 +117,21 @@ export class Project {
   }: { projectId: ProjectId; sandboxPromise: Promise<Sandbox> }) {
     this.projectId = projectId;
     this.sandboxPromise = sandboxPromise;
-    this.setupPromise = (async () => {
-      const sandbox = await sandboxPromise;
-      this.sandbox = sandbox;
-      await this.restoreProjectFromFileSystem();
-      this.bibliography.title = sandbox.vivliostyleConfig.title || '';
-      this.bibliography.author = sandbox.vivliostyleConfig.author || '';
-      this.bibliography.language =
-        sandbox.vivliostyleConfig.language ?? detectBrowserLanguage();
-      this.toc.enabled = Boolean(sandbox.vivliostyleConfig.toc);
-      if (typeof sandbox.vivliostyleConfig.toc === 'object') {
-        this.toc.title = sandbox.vivliostyleConfig.toc.title || '';
-        this.toc.sectionDepth = sandbox.vivliostyleConfig.toc.sectionDepth || 0;
-      }
-    })();
+  }
+
+  protected async setup() {
+    const sandbox = await this.sandboxPromise;
+    this.sandbox = sandbox;
+    await this.restoreProjectFromFileSystem();
+    this.bibliography.title = sandbox.vivliostyleConfig.title || '';
+    this.bibliography.author = sandbox.vivliostyleConfig.author || '';
+    this.bibliography.language =
+      sandbox.vivliostyleConfig.language ?? detectBrowserLanguage();
+    this.toc.enabled = Boolean(sandbox.vivliostyleConfig.toc);
+    if (typeof sandbox.vivliostyleConfig.toc === 'object') {
+      this.toc.title = sandbox.vivliostyleConfig.toc.title || '';
+      this.toc.sectionDepth = sandbox.vivliostyleConfig.toc.sectionDepth || 0;
+    }
   }
 
   protected async restoreProjectFromFileSystem() {

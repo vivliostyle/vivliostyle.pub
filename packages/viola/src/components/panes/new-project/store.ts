@@ -32,7 +32,12 @@ export const TemplateStoreMolecule = molecule(() => {
           template: template.source,
           theme: false,
         });
-      })();
+      })().catch((error: unknown) => {
+        // Leaving the pane discards the draft, which rejects the pending setup.
+        if ($draftProject.value() === project) {
+          throw error;
+        }
+      });
       return this.installTemplatePromise;
     },
   });
