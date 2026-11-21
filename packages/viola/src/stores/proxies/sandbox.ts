@@ -23,6 +23,10 @@ import {
   readProjectFiles,
 } from '../../libs/sandbox/persistence';
 import { listSnapshotFiles } from '../../libs/sandbox/snapshot';
+import {
+  DEFAULT_USER_STYLESHEET_PATH,
+  toConfigThemeEntries,
+} from '../../libs/user-stylesheets';
 import type { DeepReadonly } from '../../type-utils';
 import { Cli } from './cli';
 import type { ProjectId } from './project';
@@ -268,9 +272,13 @@ export class Sandbox {
   }) {
     this.updateVivliostyleConfig((config) => {
       config.entry = entry;
-      config.theme = [themePackageName, './style.css'];
+      config.theme = toConfigThemeEntries(themePackageName, [
+        DEFAULT_USER_STYLESHEET_PATH,
+      ]);
     });
-    this.files['style.css'] = ref(new SandboxFile('text/css', defaultCss));
+    this.files[DEFAULT_USER_STYLESHEET_PATH] = ref(
+      new SandboxFile('text/css', defaultCss),
+    );
   }
 
   async saveMemoryToFileSystem() {
@@ -291,13 +299,21 @@ export class Sandbox {
     await this.persistence.latest;
   }
 
+  // Ordered, so that a later version of a file can never be overwritten by an
+  // earlier one whose bytes took longer to resolve.
+  protected syncQueue: Promise<void> = Promise.resolve();
+
   protected async handleFileUpdate(ops: INTERNAL_Op[]) {
     const pendingUpdates = collectFileUpdates(ops);
     // Queued before the bytes resolve, so `dispose()` waits for this batch.
     const persist = this.persistence.persist(pendingUpdates);
-    const updates = await pendingUpdates;
-    // Rejects once the worker is gone, leaving nothing to mirror the change into.
-    const cli = await this.cli.createRemotePromise().catch(() => undefined);
-    await Promise.all([cli?.fromJSON(updates, '/workdir'), persist]);
+    const sync = this.syncQueue.then(async () => {
+      const updates = await pendingUpdates;
+      // Rejects once the worker is gone, leaving nothing to mirror the change into.
+      const cli = await this.cli.createRemotePromise().catch(() => undefined);
+      await cli?.fromJSON(updates, '/workdir');
+    });
+    this.syncQueue = sync.catch(() => {});
+    await Promise.all([sync, persist]);
   }
 }

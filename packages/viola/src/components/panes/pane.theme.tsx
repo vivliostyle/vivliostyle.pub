@@ -1,5 +1,4 @@
-import { lazy, useEffect, useId, useState } from 'react';
-import { useDebounce } from 'react-use';
+import { lazy, Suspense, useCallback, useEffect, useId, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Button } from '@v/ui/button';
@@ -25,14 +24,19 @@ export const Pane = createPane<ThemePaneProperty>({
   title: () => m.theme_pane_title(),
   content: (props) => (
     <ScrollOverflow>
-      <PaneContainer>
+      <PaneContainer fullWidth>
         <Content {...props} />
       </PaneContainer>
     </ScrollOverflow>
   ),
 });
 
-const CodeEditor = lazy(() => import('../code-editor'));
+const ThemeCssEditor = lazy(() => import('../theme-settings'));
+
+// The CSS code editor reports every keystroke; settings fields only finished values
+const isTypingText = () =>
+  document.activeElement instanceof HTMLElement &&
+  document.activeElement.isContentEditable;
 
 function InstalledIcon({ className, ...props }: React.ComponentProps<'svg'>) {
   return <Check {...props} strokeWidth={4} className={cn(className)} />;
@@ -47,10 +51,21 @@ function LoadingIcon({ className, ...props }: React.ComponentProps<'span'>) {
 }
 
 function Content(_: ThemePaneProperty) {
+  const { projectId } = useSnapshot($project).valueOrThrow();
+  // The pane survives navigating to another project's theme route, and the
+  // editor state it seeded from the previous project must not carry over.
+  return <ProjectThemeContent key={projectId} />;
+}
+
+function ProjectThemeContent() {
   const themeSnap = useSnapshot($theme).valueOrThrow();
   const packageNameInputDescriptionId = useId();
-  const [customCss, setCustomCss] = useState(() => themeSnap.customCss);
+  const [stylesheetPath] = useState(() => themeSnap.stylesheets[0]?.path);
+  const [css, setCssState] = useState(
+    () => themeSnap.stylesheets[0]?.css ?? '',
+  );
   const { value: installedTheme } = usePromiseState(themeSnap.installPromise);
+  const { language } = useSnapshot($project).valueOrThrow().bibliography;
   const currentPackageName =
     themeSnap.installingPackageName || installedTheme?.packageName;
 
@@ -61,19 +76,36 @@ function Content(_: ThemePaneProperty) {
     }
   });
 
-  useDebounce(
-    () => {
-      $project.valueOrThrow().updateCustomCss(customCss);
+  const setCss = useCallback(
+    (next: string) => {
+      setCssState(next);
+      if (stylesheetPath) {
+        $theme
+          .valueOrThrow()
+          .updateStylesheet(stylesheetPath, next, { debounce: isTypingText() });
+      }
     },
-    1000,
-    [customCss],
+    [stylesheetPath],
   );
+  useEffect(() => {
+    const theme = $theme.valueOrThrow();
+    const flushWhenHidden = () => {
+      if (document.visibilityState === 'hidden') {
+        theme.flushStylesheetEdits();
+      }
+    };
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    return () => {
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+      theme.flushStylesheetEdits();
+    };
+  }, []);
 
   return (
     <div className="grid gap-4">
       <section className="grid gap-2">
         <h3 className="text-l font-bold">{m.theme_official_section_title()}</h3>
-        <ul className="grid grid-cols-2 gap-2">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2">
           {Object.entries(officialThemes).map(([packageName, { title }]) => {
             return (
               <li key={packageName}>
@@ -172,11 +204,32 @@ function Content(_: ThemePaneProperty) {
         <h3 className="text-l font-bold">
           {m.theme_custom_css_section_title()}
         </h3>
-        <CodeEditor
-          aria-label={m.theme_custom_css_editor_aria()}
-          code={customCss}
-          onCodeUpdate={setCustomCss}
-        />
+        <Suspense
+          fallback={
+            <div className="grid place-items-center py-8">
+              <Loader2 className="size-8 animate-spin text-gray-300" />
+            </div>
+          }
+        >
+          <ThemeCssEditor
+            css={css}
+            themeCss={installedTheme?.bundledCss}
+            language={language}
+            onCssChange={setCss}
+          />
+        </Suspense>
+        {themeSnap.stylesheetBundleError?.kind === 'import' && (
+          <p className="text-sm text-destructive" aria-live="polite">
+            {themeSnap.stylesheetBundleError.target
+              ? m.theme_import_error({
+                  target: themeSnap.stylesheetBundleError.target,
+                  message: themeSnap.stylesheetBundleError.message,
+                })
+              : m.theme_import_error_no_target({
+                  message: themeSnap.stylesheetBundleError.message,
+                })}
+          </p>
+        )}
       </section>
     </div>
   );
