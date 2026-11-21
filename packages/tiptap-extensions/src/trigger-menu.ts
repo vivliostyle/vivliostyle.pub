@@ -326,7 +326,14 @@ export const TriggerMenu = Extension.create<TriggerMenuOptions>({
         key: triggerMenuPluginKey,
         state: {
           init: () => null,
-          apply: (tr, value) => applyTriggerMenuTransaction(value, tr),
+          apply: (tr, value, _oldState, newState) => {
+            const next = applyTriggerMenuTransaction(value, tr);
+            // A command such as toggling a code block can move the trigger
+            // into a context where it could not have been opened.
+            return next && options.isAllowed(newState, newState.selection.from)
+              ? next
+              : null;
+          },
         },
         props: {
           handleTextInput(view, from, to, text) {

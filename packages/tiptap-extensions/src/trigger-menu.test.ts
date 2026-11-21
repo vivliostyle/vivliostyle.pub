@@ -1,4 +1,4 @@
-import { getSchema } from '@tiptap/core';
+import { Editor, getSchema } from '@tiptap/core';
 import { Code } from '@tiptap/extension-code';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import { Document } from '@tiptap/extension-document';
@@ -17,6 +17,7 @@ import {
   getTriggerMenuRange,
   isOutsideCode,
   resolveActiveTrigger,
+  TriggerMenu,
   triggerMenuPluginKey,
 } from './trigger-menu';
 
@@ -223,5 +224,36 @@ describe('applyTriggerMenuTransaction', () => {
   it('does not open without the open meta', () => {
     const state = type(createState(), '/');
     expect(getActiveTrigger(state)).toBeNull();
+  });
+});
+
+describe('TriggerMenu', () => {
+  it('closes when a command turns the textblock into code', () => {
+    const editor = new Editor({
+      element: null,
+      extensions: [
+        Document,
+        Paragraph,
+        Text,
+        CodeBlock,
+        TriggerMenu.configure({ getTriggers: () => triggers }),
+      ],
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    // A headless editor's state has no plugins.
+    editor.view.updateState(
+      editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
+    );
+    editor.commands.setTextSelection(1);
+    editor.view.dispatch(
+      editor.state.tr.insertText('/h1').setMeta(triggerMenuPluginKey, {
+        type: 'open',
+        active: { menuId: 'slash', trigger: '/', from: 1 },
+      }),
+    );
+    expect(getTriggerMenuRange(editor.state)).toEqual({ from: 1, to: 4 });
+    editor.commands.toggleCodeBlock();
+    expect(getActiveTrigger(editor.state)).toBeNull();
+    editor.destroy();
   });
 });
