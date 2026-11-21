@@ -17,6 +17,9 @@ export const Route = createFileRoute(
     } catch {
       throw redirect({ to: '/' });
     }
-    $ui.showPane({ type: 'bibliography' }, { besideEditor: true });
+    $ui.showPane(
+      { type: 'bibliography' },
+      { besideEditor: true, keepIfShown: true },
+    );
   },
 });
