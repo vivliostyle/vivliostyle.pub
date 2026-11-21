@@ -51,6 +51,7 @@ export function SettingsList({
   rows,
   model,
   scope,
+  getDefaultValue,
   onToggle,
   onShowMore,
   onCommit,
@@ -59,6 +60,7 @@ export function SettingsList({
   rows: readonly SettingsRow[];
   model: ThemeCssModel;
   scope: ThemeScopeId;
+  getDefaultValue: (name: string) => string | undefined;
   onToggle: (key: string) => void;
   onShowMore: () => void;
   onCommit: CommitHandler;
@@ -98,6 +100,7 @@ export function SettingsList({
                 variable={row.variable}
                 scope={scope}
                 value={entry?.value}
+                defaultValue={getDefaultValue(name)}
                 important={entry?.important ?? false}
                 otherScopes={THEME_SCOPES.filter(
                   (s) => s.id !== scope && model.scopes[s.id].variables[name],

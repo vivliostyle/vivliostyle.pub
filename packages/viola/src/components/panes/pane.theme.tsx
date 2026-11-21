@@ -1,5 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useState } from 'react';
-import { useDebounce } from 'react-use';
+import { lazy, Suspense, useCallback, useEffect, useId, useState } from 'react';
 import { useSnapshot } from 'valtio';
 
 import { Button } from '@v/ui/button';
@@ -9,7 +8,7 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import { usePromiseState } from '../../hooks/use-promise-state';
 import { getOfficialThemeTitle } from '../../libs/official-theme-title';
-import { $theme } from '../../stores/accessors';
+import { $project, $theme } from '../../stores/accessors';
 import { officialThemes } from '../../stores/catalog';
 import { createPane, PaneContainer, ScrollOverflow } from './util';
 
@@ -34,6 +33,11 @@ export const Pane = createPane<ThemePaneProperty>({
 
 const ThemeCssEditor = lazy(() => import('../theme-settings'));
 
+// The CSS code editor reports every keystroke; settings fields only finished values
+const isTypingText = () =>
+  document.activeElement instanceof HTMLElement &&
+  document.activeElement.isContentEditable;
+
 function InstalledIcon({ className, ...props }: React.ComponentProps<'svg'>) {
   return <Check {...props} strokeWidth={4} className={cn(className)} />;
 }
@@ -50,8 +54,11 @@ function Content(_: ThemePaneProperty) {
   const themeSnap = useSnapshot($theme).valueOrThrow();
   const packageNameInputDescriptionId = useId();
   const [stylesheetPath] = useState(() => themeSnap.stylesheets[0]?.path);
-  const [css, setCss] = useState(() => themeSnap.stylesheets[0]?.css ?? '');
+  const [css, setCssState] = useState(
+    () => themeSnap.stylesheets[0]?.css ?? '',
+  );
   const { value: installedTheme } = usePromiseState(themeSnap.installPromise);
+  const { language } = useSnapshot($project).valueOrThrow().bibliography;
   const currentPackageName =
     themeSnap.installingPackageName || installedTheme?.packageName;
 
@@ -62,15 +69,30 @@ function Content(_: ThemePaneProperty) {
     }
   });
 
-  useDebounce(
-    () => {
+  const setCss = useCallback(
+    (next: string) => {
+      setCssState(next);
       if (stylesheetPath) {
-        $theme.valueOrThrow().updateStylesheet(stylesheetPath, css);
+        $theme
+          .valueOrThrow()
+          .updateStylesheet(stylesheetPath, next, { debounce: isTypingText() });
       }
     },
-    1000,
-    [css],
+    [stylesheetPath],
   );
+  useEffect(() => {
+    const theme = $theme.valueOrThrow();
+    const flushWhenHidden = () => {
+      if (document.visibilityState === 'hidden') {
+        theme.flushStylesheetEdits();
+      }
+    };
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    return () => {
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+      theme.flushStylesheetEdits();
+    };
+  }, []);
 
   return (
     <div className="grid gap-4">
@@ -182,7 +204,12 @@ function Content(_: ThemePaneProperty) {
             </div>
           }
         >
-          <ThemeCssEditor css={css} onCssChange={setCss} />
+          <ThemeCssEditor
+            css={css}
+            themeCss={installedTheme?.bundledCss}
+            language={language}
+            onCssChange={setCss}
+          />
         </Suspense>
         {themeSnap.stylesheetBundleError?.kind === 'import' && (
           <p className="text-sm text-destructive" aria-live="polite">

@@ -15,6 +15,7 @@ import type { CommitError } from './commit';
 import { ValueField } from './fields';
 import { getVariableLabel } from './labels';
 import { getCommitErrorMessage, getScopeLabel } from './messages';
+import { SettingInfo } from './setting-info';
 
 export type CommitHandler = (
   scope: ThemeScopeId,
@@ -28,6 +29,8 @@ interface SettingRowProps {
   scope: ThemeScopeId;
   /** `undefined` when the scope does not set the variable. */
   value: string | undefined;
+  /** Value in effect when no scope sets the variable. */
+  defaultValue: string | undefined;
   important: boolean;
   /** Other scopes that set the variable. */
   otherScopes: readonly ThemeScopeId[];
@@ -40,6 +43,7 @@ function SettingRow({
   variable,
   scope,
   value,
+  defaultValue,
   important,
   otherScopes,
   nested,
@@ -62,9 +66,8 @@ function SettingRow({
   const revert = useCallback(() => setError(null), []);
 
   const describedBy =
-    [variable.defaultValue && hintId, error && errorId]
-      .filter(Boolean)
-      .join(' ') || undefined;
+    [defaultValue && hintId, error && errorId].filter(Boolean).join(' ') ||
+    undefined;
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a fieldset would restyle the row and its legend.
@@ -72,14 +75,19 @@ function SettingRow({
       role="group"
       aria-labelledby={labelId}
       className={cn(
-        'grid gap-1.5 border-l-2 py-3 pr-1 pl-3',
+        'grid gap-1.5 border-l-2 py-2 pr-1 pl-3',
         nested && 'ml-3',
         modified ? 'border-primary' : 'border-transparent',
       )}
     >
       <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div id={labelId} className="text-sm font-medium">
+        <SettingInfo
+          variable={variable}
+          descriptor={descriptor}
+          label={label}
+          important={important}
+        >
+          <div id={labelId} className="min-w-0 text-sm font-medium">
             {label}
             {modified && (
               <span className="sr-only">
@@ -88,20 +96,13 @@ function SettingRow({
               </span>
             )}
           </div>
-          <code
-            className="block truncate text-xs text-muted-foreground select-all"
-            title={variable.name}
-          >
-            {variable.name}
-            {important && ' !important'}
-          </code>
-        </div>
+        </SettingInfo>
         {modified && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="size-7 shrink-0"
+            className="-my-0.5 ml-auto size-6 shrink-0"
             aria-label={m.theme_settings_reset_aria({ name: label })}
             title={m.theme_settings_reset_aria({ name: label })}
             onClick={() => commit('')}
@@ -132,21 +133,20 @@ function SettingRow({
       <ValueField
         value={value ?? ''}
         descriptor={descriptor}
-        defaultValue={variable.defaultValue}
+        defaultValue={defaultValue}
         label={label}
         labelId={labelId}
         describedBy={describedBy}
         invalid={error !== null}
         onCommit={commit}
         onRevert={revert}
-        onError={setError}
       />
-      {variable.defaultValue && (
+      {defaultValue && (
         <p
           id={hintId}
           className="break-all font-mono text-xs text-muted-foreground"
         >
-          {m.theme_settings_default_hint({ value: variable.defaultValue })}
+          {m.theme_settings_default_hint({ value: defaultValue })}
         </p>
       )}
       {error && (

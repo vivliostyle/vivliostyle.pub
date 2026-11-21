@@ -1,5 +1,6 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef } from 'react';
 
+import { ChevronDown } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
@@ -8,22 +9,9 @@ import {
   type ValueDescriptor,
 } from '../../libs/theme-variables';
 import { toPickerColor } from './color';
-import type { CommitError } from './commit';
-import {
-  decodeOption,
-  encodeOption,
-  type FieldOverride,
-  type FieldShape,
-  getDefaultUnit,
-  getSelectedOption,
-  type NumberCommit,
-  parseFieldValue,
-  planNumberCommit,
-  planUnitChange,
-  resolveFieldView,
-} from './field-state';
-import { NativeSelect } from './native-select';
+import { completeUnits, getDefaultUnit } from './field-state';
 import { useDraft } from './use-draft';
+import { useNumberStepper } from './use-number-stepper';
 
 export interface FieldProps {
   /** Value in the current scope; empty when unset. */
@@ -38,8 +26,6 @@ export interface FieldProps {
   onCommit: (value: string) => void;
   /** Drops the error of a failed commit. */
   onRevert: () => void;
-  /** Reports input that is rejected before reaching `onCommit`. */
-  onError: (error: CommitError) => void;
 }
 
 const GENERIC_FONT_FAMILIES = [
@@ -61,11 +47,14 @@ const COLOR_KEYWORDS = ['currentColor', 'transparent'];
 const isComposing = (event: React.KeyboardEvent) =>
   event.nativeEvent.isComposing || event.keyCode === 229;
 
+const asTyped = (text: string) => text;
+
 function TextValueInput({
   value,
   onCommit,
   onRevert,
   suggestions = [],
+  complete = asTyped,
   placeholder,
   className,
   ...aria
@@ -78,16 +67,29 @@ function TextValueInput({
     | 'aria-labelledby'
     | 'aria-describedby'
     | 'aria-invalid'
-  > & { suggestions?: readonly string[] }) {
+  > & {
+    suggestions?: readonly string[];
+    /** Rewrites the text before it is committed and shown. */
+    complete?: (text: string) => string;
+  }) {
   const [draft, setDraft] = useDraft(value);
   const listId = useId();
+  const stepper = useNumberStepper();
   const commit = (text: string) =>
     text.trim() === value.trim() ? onRevert() : onCommit(text);
+  const commitDraft = (text: string) => {
+    const completed = complete(text);
+    if (completed !== text) {
+      setDraft(completed);
+    }
+    commit(completed);
+  };
 
   return (
     <>
       <Input
         {...aria}
+        ref={stepper.ref}
         type="text"
         className={cn('h-8 font-mono text-xs md:text-xs', className)}
         value={draft}
@@ -96,6 +98,7 @@ function TextValueInput({
         autoComplete="off"
         spellCheck={false}
         onChange={(event) => {
+          stepper.reset();
           setDraft(event.target.value);
           // Picking a datalist suggestion is a choice, not typing.
           const { inputType } = event.nativeEvent as Partial<InputEvent>;
@@ -103,20 +106,33 @@ function TextValueInput({
             suggestions.length > 0 &&
             (inputType === undefined || inputType === 'insertReplacementText')
           ) {
-            commit(event.target.value);
+            commitDraft(event.target.value);
           }
         }}
-        onBlur={() => commit(draft)}
+        onBlur={() => {
+          stepper.reset();
+          commitDraft(draft);
+        }}
         onKeyDown={(event) => {
           if (isComposing(event)) {
             return;
           }
           if (event.key === 'Enter') {
             event.preventDefault();
-            commit(draft);
+            commitDraft(draft);
           } else if (event.key === 'Escape') {
+            stepper.reset();
             setDraft(value);
             onRevert();
+          } else {
+            const stepped = stepper.step(event, {
+              fallback: placeholder,
+              complete,
+            });
+            if (stepped !== null) {
+              setDraft(stepped);
+              onCommit(stepped);
+            }
           }
         }}
       />
@@ -140,153 +156,77 @@ function fieldAria({ labelId, describedBy, invalid }: FieldProps) {
 }
 
 /**
- * Number + unit for dimensions and numbers, a select for keywords, and free
- * text behind "Custom value…" for anything the two cannot express.
+ * Lists the keywords one click away whatever the input holds, which a
+ * datalist does not: it only offers what matches the text.
  */
-function KeywordUnitField(props: FieldProps) {
-  const {
-    value,
-    descriptor,
-    defaultValue,
-    label,
-    onCommit,
-    onRevert,
-    onError,
-  } = props;
-  const shape = useMemo<FieldShape>(
-    () => ({
-      keywords: descriptor.keywords,
-      units: getDescriptorUnits(descriptor),
-    }),
-    [descriptor],
+function KeywordMenu({
+  keywords,
+  value,
+  label,
+  onPick,
+}: {
+  keywords: readonly string[];
+  value: string;
+  label: string;
+  onPick: (keyword: string) => void;
+}) {
+  const text = value.trim().toLowerCase();
+  const current = keywords.find((k) => k.toLowerCase() === text) ?? '';
+  const name = m.theme_settings_keyword_menu_aria({ name: label });
+  return (
+    <div className="relative size-8 shrink-0">
+      <select
+        aria-label={name}
+        title={name}
+        className="peer absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
+        value={current}
+        onChange={(event) => onPick(event.target.value)}
+      >
+        {/* Selected while the value is no keyword, so that any pick is a change. */}
+        <option value="" disabled hidden />
+        {keywords.map((keyword) => (
+          <option key={keyword} value={keyword}>
+            {keyword}
+          </option>
+        ))}
+      </select>
+      <span
+        aria-hidden
+        className="pointer-events-none grid size-full place-items-center rounded-md border border-input text-muted-foreground peer-hover:bg-accent peer-hover:text-accent-foreground peer-focus-visible:ring-1 peer-focus-visible:ring-ring"
+      >
+        <ChevronDown className="size-4" />
+      </span>
+    </div>
   );
-  const defaultUnit = getDefaultUnit(shape, defaultValue);
-  const [override, setOverride] = useState<FieldOverride>(null);
-  const view = resolveFieldView(value, override, shape, defaultUnit);
-  const displayed = view.kind === 'dimension' ? view.number : '';
-  const [number, setNumber] = useDraft(displayed);
-  const defaultView = defaultValue
-    ? parseFieldValue(defaultValue, shape)
-    : null;
+}
 
-  const apply = (plan: NumberCommit) => {
-    if (plan.kind === 'commit') {
-      onCommit(plan.value);
-    } else if (plan.kind === 'error') {
-      onError(plan.error);
-    } else {
-      onRevert();
-    }
-  };
-  const commitNumber = (unit: string) =>
-    apply(planNumberCommit({ draft: number, displayed, unit, value }));
-
-  const handleSelect = (encoded: string) => {
-    const option = decodeOption(encoded);
-    switch (option.kind) {
-      case 'default':
-        setOverride(null);
-        onCommit('');
-        break;
-      case 'keyword':
-        setOverride(null);
-        onCommit(option.keyword);
-        break;
-      case 'custom':
-        setOverride({ kind: 'custom' });
-        break;
-      case 'unit':
-        setOverride({ kind: 'dimension', unit: option.unit });
-        apply(planUnitChange({ draft: number, unit: option.unit, value }));
-        break;
-    }
-  };
+function KeywordTextField(props: FieldProps) {
+  const { value, descriptor, defaultValue, label, onCommit, onRevert } = props;
+  const units = useMemo(() => getDescriptorUnits(descriptor), [descriptor]);
+  const complete = (text: string) =>
+    completeUnits(
+      text,
+      descriptor,
+      getDefaultUnit(units, [text, value, defaultValue]),
+    );
 
   return (
     <div className="flex gap-2">
-      {view.kind === 'dimension' && (
-        <Input
-          {...fieldAria(props)}
-          // Text rather than `type="number"`, which reports unparsable input
-          // as an empty value and changes it on wheel scroll.
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          spellCheck={false}
-          className="h-8 w-28 font-mono text-xs md:text-xs"
-          value={number}
-          placeholder={
-            defaultView?.kind === 'dimension' && defaultView.unit === view.unit
-              ? defaultView.number
-              : undefined
-          }
-          onChange={(event) => setNumber(event.target.value)}
-          onBlur={() => commitNumber(view.unit)}
-          onKeyDown={(event) => {
-            if (isComposing(event)) {
-              return;
-            }
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              commitNumber(view.unit);
-            } else if (event.key === 'Escape') {
-              setNumber(displayed);
-              onRevert();
-            }
-          }}
-        />
-      )}
-      <NativeSelect
-        {...(view.kind === 'dimension' || view.kind === 'custom'
-          ? { 'aria-label': m.theme_settings_unit_aria({ name: label }) }
-          : fieldAria(props))}
-        className={cn(view.kind === 'custom' ? 'shrink-0' : 'flex-1')}
-        value={encodeOption(getSelectedOption(view))}
-        onChange={(event) => handleSelect(event.target.value)}
-      >
-        {shape.units.length === 0 && (
-          <option value={encodeOption({ kind: 'default' })}>
-            {defaultValue
-              ? m.theme_settings_option_default_with_value({
-                  value: defaultValue,
-                })
-              : m.theme_settings_option_default()}
-          </option>
-        )}
-        {shape.units.length > 0 && (
-          <optgroup label={m.theme_settings_option_group_units()}>
-            {shape.units.map((unit) => (
-              <option key={unit} value={encodeOption({ kind: 'unit', unit })}>
-                {unit || m.theme_settings_unit_none()}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        {shape.keywords.length > 0 && (
-          <optgroup label={m.theme_settings_option_group_keywords()}>
-            {shape.keywords.map((keyword) => (
-              <option
-                key={keyword}
-                value={encodeOption({ kind: 'keyword', keyword })}
-              >
-                {keyword}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        <option value={encodeOption({ kind: 'custom' })}>
-          {m.theme_settings_option_custom()}
-        </option>
-      </NativeSelect>
-      {view.kind === 'custom' && (
-        <TextValueInput
-          {...fieldAria(props)}
-          className="flex-1"
+      <TextValueInput
+        {...fieldAria(props)}
+        className="flex-1"
+        value={value}
+        placeholder={defaultValue}
+        complete={complete}
+        onCommit={onCommit}
+        onRevert={onRevert}
+      />
+      {descriptor.keywords.length > 0 && (
+        <KeywordMenu
+          keywords={descriptor.keywords}
           value={value}
-          placeholder={defaultValue}
-          suggestions={shape.keywords}
-          onCommit={onCommit}
-          onRevert={onRevert}
+          label={label}
+          onPick={onCommit}
         />
       )}
     </div>
@@ -357,7 +297,7 @@ export function ValueField(props: FieldProps) {
     case 'select':
     case 'dimension':
     case 'number':
-      return <KeywordUnitField {...props} />;
+      return <KeywordTextField {...props} />;
     default:
       return (
         <TextValueInput

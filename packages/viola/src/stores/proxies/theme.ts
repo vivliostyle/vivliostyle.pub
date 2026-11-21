@@ -1,15 +1,24 @@
 import { invariant } from 'outvariant';
 import { proxy, ref } from 'valtio';
 
+import { type Coalesced, coalesce } from '../../libs/coalesce';
 import { SandboxFile } from '../../libs/sandbox/file';
 import {
   bundleUserStylesheets,
   createStylesheetBundleCache,
+  needsStylesheetBundle,
+  resetInlinedImports,
   type StylesheetBundleError,
 } from '../../libs/user-stylesheet-bundle';
 import { resolveUserStylesheetPaths } from '../../libs/user-stylesheets';
 import type { Project } from './project';
 import type { Sandbox } from './sandbox';
+
+// Spares the editor from flashing half-typed values
+const STYLESHEET_INPUT_DEBOUNCE_MS = 300;
+// Every write reloads the whole preview, so a burst of edits is written as one
+const STYLESHEET_WRITE_WAIT_MS = 200;
+const STYLESHEET_WRITE_MAX_WAIT_MS = 1000;
 
 export interface ThemeInstallationResult {
   packageName: string;
@@ -40,9 +49,14 @@ export class Theme {
   // Behind `ref` so bookkeeping never notifies subscribers
   protected stylesheetBundleState = ref({
     seq: 0,
-    timer: undefined as ReturnType<typeof setTimeout> | undefined,
     sandbox: undefined as Sandbox | undefined,
     cache: createStylesheetBundleCache(),
+  });
+  protected stylesheetEditState = ref({
+    input: new Map<string, string>(),
+    inputTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+    written: new Map<string, { css: string; file: SandboxFile | undefined }>(),
+    requestWrite: undefined as Coalesced | undefined,
   });
 
   protected constructor(project: Project) {
@@ -64,28 +78,34 @@ export class Theme {
         return { path, css: '' };
       }),
     );
+    const { written } = this.stylesheetEditState;
+    for (const { path, css } of this.stylesheets) {
+      written.set(path, { css, file: sandbox.files[path] });
+    }
     this.stylesheetBundleState.sandbox = sandbox;
-    this.refreshStylesheetBundle(0);
+    this.refreshStylesheetBundle();
   }
 
-  refreshStylesheetBundle(delay = 300) {
+  refreshStylesheetBundle() {
     const state = this.stylesheetBundleState;
     const seq = ++state.seq;
-    clearTimeout(state.timer);
-    state.timer = setTimeout(async () => {
+    const files = state.sandbox?.files ?? {};
+    const isProjectFile = (path: string) => path in files;
+    const sheets = this.stylesheets.map(({ path, css }) => ({ path, css }));
+    if (!needsStylesheetBundle(sheets, isProjectFile)) {
+      this.applyStylesheetBundle(undefined, undefined);
+      return;
+    }
+    (async () => {
       try {
         // The theme package itself may be imported by a stylesheet and is still being fetched
         await this.installPromise;
-        const files = state.sandbox?.files ?? {};
-        const result = await bundleUserStylesheets(
-          this.stylesheets.map(({ path, css }) => ({ path, css })),
-          {
-            isProjectFile: (path) => path in files,
-            readProjectFile: (path) => files[path]?.text(),
-            cache: state.cache,
-            isStale: () => seq !== state.seq,
-          },
-        );
+        const result = await bundleUserStylesheets(sheets, {
+          isProjectFile,
+          readProjectFile: (path) => files[path]?.text(),
+          cache: state.cache,
+          isStale: () => seq !== state.seq,
+        });
         if (result && seq === state.seq) {
           this.applyStylesheetBundle(result.css, result.error);
         }
@@ -97,10 +117,10 @@ export class Theme {
           });
         }
       }
-    }, delay);
+    })();
   }
 
-  // Unchanged values are not assigned because every theme mutation triggers a config write
+  // Unchanged values are not assigned, since every assignment notifies all theme subscribers
   protected applyStylesheetBundle(
     css: string | undefined,
     error: StylesheetBundleError | undefined,
@@ -118,14 +138,77 @@ export class Theme {
     }
   }
 
-  updateStylesheet(path: string, css: string) {
-    const stylesheet = this.stylesheets.find((it) => it.path === path);
-    invariant(stylesheet, `Unknown stylesheet: ${path}`);
-    const { sandbox } = this.project;
-    invariant(sandbox, 'Sandbox is not ready');
-    stylesheet.css = css;
-    sandbox.files[path] = ref(new SandboxFile('text/css', css));
+  /**
+   * Applies the edit to the editor styles at once, or after a pause in typing
+   * with `debounce`, and writes it to the project file soon after.
+   */
+  updateStylesheet(
+    path: string,
+    css: string,
+    { debounce = false }: { debounce?: boolean } = {},
+  ) {
+    invariant(
+      this.stylesheets.some((it) => it.path === path),
+      `Unknown stylesheet: ${path}`,
+    );
+    invariant(this.project.sandbox, 'Sandbox is not ready');
+    const state = this.stylesheetEditState;
+    state.input.set(path, css);
+    if (debounce) {
+      clearTimeout(state.inputTimer);
+      state.inputTimer = setTimeout(
+        () => this.applyStylesheetInput(),
+        STYLESHEET_INPUT_DEBOUNCE_MS,
+      );
+    } else {
+      this.applyStylesheetInput();
+    }
+  }
+
+  /** Applies and writes out every edit that is still waiting. */
+  flushStylesheetEdits() {
+    this.applyStylesheetInput();
+    this.stylesheetEditState.requestWrite?.flush();
+  }
+
+  protected applyStylesheetInput() {
+    const state = this.stylesheetEditState;
+    clearTimeout(state.inputTimer);
+    let changed = false;
+    for (const [path, css] of state.input) {
+      const stylesheet = this.stylesheets.find((it) => it.path === path);
+      if (stylesheet && stylesheet.css !== css) {
+        stylesheet.css = css;
+        changed = true;
+      }
+    }
+    state.input.clear();
+    if (!changed) {
+      return;
+    }
     this.refreshStylesheetBundle();
+    state.requestWrite ??= coalesce(() => this.writeStylesheets(), {
+      wait: STYLESHEET_WRITE_WAIT_MS,
+      maxWait: STYLESHEET_WRITE_MAX_WAIT_MS,
+    });
+    state.requestWrite();
+  }
+
+  protected writeStylesheets() {
+    const { sandbox } = this.project;
+    if (!sandbox) {
+      return;
+    }
+    const { written } = this.stylesheetEditState;
+    for (const { path, css } of this.stylesheets) {
+      const last = written.get(path);
+      if (last?.css === css && last.file === sandbox.files[path]) {
+        continue;
+      }
+      const file = new SandboxFile('text/css', css);
+      sandbox.files[path] = ref(file);
+      written.set(path, { css, file });
+    }
   }
 
   install(specifier: string) {
@@ -150,6 +233,9 @@ export class Theme {
         this.installingPackageName = undefined;
       }
     })();
-    this.installPromise.then(() => this.refreshStylesheetBundle(0));
+    this.installPromise.then(() => {
+      resetInlinedImports(this.stylesheetBundleState.cache);
+      this.refreshStylesheetBundle();
+    });
   }
 }
