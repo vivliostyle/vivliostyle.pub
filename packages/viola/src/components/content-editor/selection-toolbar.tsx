@@ -36,6 +36,15 @@ const selectionToolbarPluginKey = new PluginKey('selectionToolbar');
 
 type ShouldShow = NonNullable<BubbleMenuProps['shouldShow']>;
 
+function sendToolbarMeta(
+  editor: Editor,
+  meta: 'show' | 'hide' | 'updatePosition',
+): void {
+  editor.view.dispatch(
+    editor.state.tr.setMeta(selectionToolbarPluginKey, meta),
+  );
+}
+
 function hasTextSelection(state: EditorState): boolean {
   const { selection } = state;
   if (
@@ -113,6 +122,11 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
     [canShow],
   );
 
+  const dismiss = useCallback((target: Editor) => {
+    dismissedRef.current = target.state.selection;
+    sendToolbarMeta(target, 'hide');
+  }, []);
+
   const appendTo = useCallback(
     () => containerRef.current ?? document.body,
     [containerRef],
@@ -142,9 +156,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
   // Opening or closing a panel changes the toolbar's size.
   useEffect(() => {
     if (editor && !editor.isDestroyed && visibleRef.current) {
-      editor.view.dispatch(
-        editor.state.tr.setMeta(selectionToolbarPluginKey, 'updatePosition'),
-      );
+      sendToolbarMeta(editor, 'updatePosition');
     }
   }, [editor, panel]);
 
@@ -154,17 +166,19 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
     }
     const dom = editor.view.dom;
     const show = () => {
-      editor.view.dispatch(
-        editor.state.tr.setMeta(selectionToolbarPluginKey, 'show'),
-      );
+      sendToolbarMeta(editor, 'show');
       // BubbleMenu skips positioning while it is still hidden.
-      editor.view.dispatch(
-        editor.state.tr.setMeta(selectionToolbarPluginKey, 'updatePosition'),
-      );
+      sendToolbarMeta(editor, 'updatePosition');
     };
     const handleMouseDown = (event: MouseEvent) => {
-      if (event.button === 0) {
-        pointerDownRef.current = true;
+      if (event.button !== 0) {
+        return;
+      }
+      pointerDownRef.current = true;
+      // A Shift-drag extends the selection without collapsing it, and
+      // BubbleMenu defers such updates until the pointer rests.
+      if (visibleRef.current) {
+        sendToolbarMeta(editor, 'hide');
       }
     };
     // While dragging, shouldShow keeps the toolbar hidden; once the button is
@@ -189,10 +203,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         return;
       }
       if (event.key === 'Escape' && visibleRef.current) {
-        dismissedRef.current = editor.state.selection;
-        editor.view.dispatch(
-          editor.state.tr.setMeta(selectionToolbarPluginKey, 'hide'),
-        );
+        dismiss(editor);
       } else if (event.altKey && event.key === 'F10') {
         if (!visibleRef.current) {
           dismissedRef.current = null;
@@ -227,22 +238,45 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         ) {
           return;
         }
-        editor.view.dispatch(
-          editor.state.tr.setMeta(selectionToolbarPluginKey, 'hide'),
-        );
+        sendToolbarMeta(editor, 'hide');
       });
+    };
+    // BubbleMenu only follows window scrolling, but the editor scrolls inside
+    // a pane, where flip() and shift() need rerunning. Debounced like
+    // BubbleMenu's own handler, as each transaction re-diffs the Yjs document.
+    let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+    const handleScroll = (event: Event) => {
+      if (
+        !visibleRef.current ||
+        !(event.target instanceof Node) ||
+        toolbarRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        if (!editor.isDestroyed && visibleRef.current) {
+          sendToolbarMeta(editor, 'updatePosition');
+        }
+      }, 60);
     };
     dom.addEventListener('mousedown', handleMouseDown);
     dom.addEventListener('keydown', handleKeyDown);
     window.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('scroll', handleScroll, {
+      capture: true,
+      passive: true,
+    });
     editor.on('blur', handleBlur);
     return () => {
       dom.removeEventListener('mousedown', handleMouseDown);
       dom.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('scroll', handleScroll, { capture: true });
+      clearTimeout(scrollTimer);
       editor.off('blur', handleBlur);
     };
-  }, [editor, canShow]);
+  }, [editor, canShow, dismiss]);
 
   const closePanel = useCallback(() => setPanel(null), []);
 
@@ -276,7 +310,10 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         break;
       case 'Escape':
         event.preventDefault();
-        editor?.commands.focus();
+        if (editor) {
+          dismiss(editor);
+          editor.commands.focus();
+        }
         return;
       default:
         return;
