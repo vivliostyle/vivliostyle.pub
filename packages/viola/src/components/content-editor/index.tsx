@@ -9,8 +9,9 @@ import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
 import editorOverrideCss from './editor-theme-override.css?inline';
-import { ImageMenu } from './image-menu';
-import { InlineMenu } from './inline-menu';
+import { ImageToolbar } from './image-toolbar';
+import { SelectionToolbar } from './selection-toolbar';
+import { TriggerMenu } from './trigger-menu';
 
 function ShadowContent({
   children,
@@ -95,8 +96,9 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
         >
           <EditArea />
         </EditorStyleContainer>
-        <InlineMenu containerRef={wrapperRef} />
-        <ImageMenu containerRef={wrapperRef} />
+        <TriggerMenu />
+        <SelectionToolbar containerRef={wrapperRef} />
+        <ImageToolbar containerRef={wrapperRef} />
       </div>
     </EditorContext.Provider>
   );

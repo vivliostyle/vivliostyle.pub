@@ -710,6 +710,9 @@ importers:
       '@handlewithcare/remark-prosemirror':
         specifier: 0.1.5
         version: 0.1.5(prosemirror-model@1.25.5)
+      micromark-util-decode-string:
+        specifier: 2.0.1
+        version: 2.0.1
       prosemirror-model:
         specifier: 1.25.5
         version: 1.25.5

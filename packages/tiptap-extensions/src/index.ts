@@ -10,15 +10,15 @@ import { HorizontalRule } from '@tiptap/extension-horizontal-rule';
 import { Image } from '@tiptap/extension-image';
 import { Italic } from '@tiptap/extension-italic';
 import { Link } from '@tiptap/extension-link';
-import { ListItem, ListKeymap, OrderedList } from '@tiptap/extension-list';
 import { Paragraph } from '@tiptap/extension-paragraph';
 import { Strike } from '@tiptap/extension-strike';
 import { Text } from '@tiptap/extension-text';
 import { Underline } from '@tiptap/extension-underline';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
-import { Markdown } from '@tiptap/markdown';
 import { join } from 'pathe';
 
+import { BlockFormatting } from './block-format';
+import { ChainSafeClearNodes } from './clear-nodes';
 import { CodeBlockPrism } from './code-block-prism';
 import {
   CustomDragHandler,
@@ -26,7 +26,15 @@ import {
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
 import { Frontmatter } from './frontmatter';
+import { PubListItem, PubListKeymap, PubOrderedList } from './list';
+import { PubMarkdown } from './markdown';
 
+export { type BlockFormat, getBlockFormat } from './block-format';
+export {
+  findSelectedCodeBlock,
+  listHighlightLanguages,
+  resolveVfmLanguage,
+} from './code-block-prism';
 export {
   type AssetDragPayload,
   CUSTOM_DRAG_MIME_NAME,
@@ -101,15 +109,18 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       // UndoRedo.configure({}),
       HorizontalRule.configure({}),
       Italic.configure({}),
-      ListItem.configure({}),
-      ListKeymap.configure({}),
+      PubListItem.configure({}),
+      PubListKeymap.configure({}),
       Link.configure({}),
-      OrderedList.configure({}),
+      PubOrderedList.configure({}),
       Paragraph.configure({}),
       Strike.configure({}),
       Text.configure({}),
       Underline.configure({}),
       // TrailingNode.configure({}),
+
+      ChainSafeClearNodes,
+      BlockFormatting,
 
       FileMediaHandler.configure({
         allowedMimeTypes: IMAGE_MIME_TYPES,
@@ -140,7 +151,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           ];
         },
       }).configure({}),
-      Markdown.configure({}),
+      PubMarkdown.configure({}),
       Frontmatter,
     ];
   },

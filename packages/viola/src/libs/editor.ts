@@ -8,20 +8,17 @@ import * as Y from 'yjs';
 
 import type { SyncProvider } from '@v/sync-client';
 import { PubExtensions } from '@v/tiptap-extensions';
-import { InlineTrigger } from '@v/tiptap-extensions/inline-trigger';
 import { debounce } from '../libs/debounce';
 import { $projects } from '../stores/accessors';
 import type { ContentId } from '../stores/proxies/content';
 import type { ProjectId } from '../stores/proxies/project';
 import { SandboxFile } from '../stores/proxies/sandbox';
 import { createSandboxImageSaver } from './editor/image-saver';
-import { getAllTriggers, inlineMenuState } from './editor/inline-menu';
 import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
+import { createEditorMenuExtensions } from './editor/menu/extensions';
 import { YUndoCursorFix } from './editor/y-undo-cursor-fix';
 import { type EditorSyncContext, startEditorSync } from './editor-sync';
-
-import './editor/inline-menu.media';
 
 export type { EditorSyncContext } from './editor-sync';
 
@@ -113,17 +110,7 @@ export async function setupEditor({
     Placeholder.configure({
       placeholder: 'Start typing...',
     }),
-    InlineTrigger.configure({
-      triggers: getAllTriggers(),
-      isMenuOpen: () => inlineMenuState.trigger !== null,
-      onDismiss: () => inlineMenuState.closeInlineMenu(),
-      onTrigger: (editor, trigger, from, coords) => {
-        inlineMenuState.trigger = trigger;
-        inlineMenuState.editor = ref(editor);
-        inlineMenuState.from = from;
-        inlineMenuState.coords = coords;
-      },
-    }),
+    ...createEditorMenuExtensions(),
     Collaboration.configure({
       document: doc,
     }),
