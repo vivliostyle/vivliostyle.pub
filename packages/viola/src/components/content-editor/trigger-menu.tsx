@@ -39,6 +39,7 @@ import type {
   EditorMenuCommand,
   EditorMenuPanelProps,
 } from '../../libs/editor/menu/types';
+import { scrollOptionIntoView } from '../../libs/scroll-option-into-view';
 
 export function TriggerMenu() {
   const { editor } = useCurrentEditor();
@@ -187,8 +188,12 @@ export function TriggerMenu() {
 
   const optionRefs = useRef<(HTMLElement | null)[]>([]);
   useEffect(() => {
-    optionRefs.current[currentIndex]?.scrollIntoView({ block: 'nearest' });
-  }, [currentIndex]);
+    const listbox = refs.floating.current;
+    const option = optionRefs.current[currentIndex];
+    if (listbox && option) {
+      scrollOptionIntoView(listbox, option);
+    }
+  }, [currentIndex, refs]);
 
   let optionIndex = 0;
   const renderOption = (command: EditorMenuCommand) => {

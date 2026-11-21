@@ -30,7 +30,9 @@ export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
   const [invalid, setInvalid] = useState(false);
 
   useEffect(() => {
-    urlRef.current?.focus();
+    // The panel can mount before its popover is positioned, when scrolling to
+    // the field would jump the editor pane.
+    urlRef.current?.focus({ preventScroll: true });
     urlRef.current?.select();
   }, []);
 

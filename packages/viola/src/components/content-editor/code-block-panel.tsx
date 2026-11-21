@@ -23,6 +23,7 @@ import {
   suggestLanguages,
 } from '../../libs/editor/code-block-language';
 import type { EditorMenuPanelProps } from '../../libs/editor/menu/types';
+import { scrollOptionIntoView } from '../../libs/scroll-option-into-view';
 
 type ListMode = 'closed' | 'typing' | 'browsing';
 
@@ -50,7 +51,9 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   // Selecting just the language lets typing replace it while the meta stays.
   useEffect(() => {
     const { from, to } = languageRange(inputRef.current?.value ?? '');
-    inputRef.current?.focus();
+    // The panel can mount before its popover is positioned, when scrolling to
+    // the field would jump the editor pane.
+    inputRef.current?.focus({ preventScroll: true });
     inputRef.current?.setSelectionRange(from, to);
     setCaret(from);
   }, []);
@@ -65,10 +68,12 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
   });
 
   useEffect(() => {
-    if (activeIndex >= 0) {
-      listboxRef.current
-        ?.querySelector('[aria-selected="true"]')
-        ?.scrollIntoView({ block: 'nearest' });
+    const listbox = listboxRef.current;
+    const option = listbox?.querySelector<HTMLElement>(
+      '[aria-selected="true"]',
+    );
+    if (activeIndex >= 0 && listbox && option) {
+      scrollOptionIntoView(listbox, option);
     }
   }, [activeIndex]);
 

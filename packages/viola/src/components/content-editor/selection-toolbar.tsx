@@ -203,6 +203,8 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         }
         event.preventDefault();
         const toolbar = toolbarRef.current;
+        // show() positions the toolbar asynchronously, so it may not be in
+        // place yet for focus to scroll to.
         (
           toolbar?.querySelector<HTMLElement>(
             '[data-toolbar-item][tabindex="0"]:not(:disabled)',
@@ -210,7 +212,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
           toolbar?.querySelector<HTMLElement>(
             '[data-toolbar-item]:not(:disabled)',
           )
-        )?.focus();
+        )?.focus({ preventScroll: true });
       }
     };
     // BubbleMenu ignores the first blur after a mousedown inside it, and the
