@@ -1,0 +1,11 @@
+name = "vivliostyle-pub-preview-sandbox-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+# Without it, a Worker fetching a workers.dev URL is refused with error 1042.
+compatibility_flags = ["global_fetch_strictly_public"]
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "*-pr-preview-vspub.vspub.dev/*"
+zone_name = "vspub.dev"

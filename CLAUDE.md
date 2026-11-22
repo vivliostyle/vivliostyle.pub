@@ -97,7 +97,7 @@ Communication is layered:
   - Host SW (`sw-host.ts`) forwards `/vivliostyle/...` to `cli.serve()` via the project channel.
   - Iframe SW (`sw-iframe.ts`) forwards `/vivliostyle/...` to the CLI worker's `serve()`, and proxies `/__vivliostyle-viewer/...` to the bundled Vivliostyle viewer assets served from `/_cli/viewer/`.
 
-All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`. Don't drop these headers — they're load-bearing for `SharedArrayBuffer` access. Because `require-corp` (unlike `credentialless`) requires every cross-origin subresource to carry an explicit CORP header, the cross-origin assets the iframe pulls from the host origin must be served with CORP — see the `_headers` rules (prod) and the `serveCli` plugin headers (dev). The headers are mirrored in several places that must stay in sync: `packages/viola/public/_headers` (Cloudflare prod), `vite.config.ts` `server.headers` + the `serveCli` plugin (dev), the two service workers (`sw-utils.ts`, `sw-iframe.ts`), and `@v/cli-bundle`'s `commonHeaders` in `src/index.ts`.
+All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`. Don't drop these headers — they're load-bearing for `SharedArrayBuffer` access. Because `require-corp` (unlike `credentialless`) requires every cross-origin subresource to carry an explicit CORP header, the cross-origin assets the iframe pulls from the host origin must be served with CORP — see the `_headers` rules (prod) and the `serveCli` plugin headers (dev). The headers are mirrored in several places that must stay in sync: `packages/viola/public/_headers` (Cloudflare prod), `vite.config.ts` `server.headers` + the `serveCli` plugin (dev), the two service workers (`sw-utils.ts`, `sw-iframe.ts`), `@v/cli-bundle`'s `commonHeaders` in `src/index.ts`, and the CORP header that `@v/preview-sandbox-proxy` adds for PR-preview sandbox hosts.
 
 ### Package layout
 
@@ -131,6 +131,8 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
 - **`packages/ui/`** (`@v/ui`) — Radix UI primitives wrapped in a shadcn-style component layer. Tailwind v4.
 
 - **`packages/config/`** (`@v/config`) — shared `tsconfig` bases and `get-project-root.js` (used to locate `secrets/`).
+
+- **`packages/preview-sandbox-proxy/`** (`@v/preview-sandbox-proxy`) — a standalone Cloudflare Worker, not part of the app bundle. It serves PR-preview sandbox subdomains on `vspub.dev` by proxying them to the PR's workers.dev preview (see *Deployment*).
 
 ### The cli-bundle build, in more detail
 
@@ -190,3 +192,5 @@ Three equivalent paths, all land as normal PRs that maintainers review:
 ## Deployment
 
 Cloudflare Workers via Wrangler. `wrangler.toml` serves `packages/viola/dist/` as a SPA. The GitHub Actions workflow `build-deploy.yml` deploys `main` to `alpha.vivliostyle.pub` and PR previews to `pr-preview-<n>-vivliostyle-pub-app.vivliostyle.workers.dev`.
+
+A PR preview is a Worker version with a preview alias. Version URLs exist only on workers.dev, and a zone route always reaches the active deployment, so no route can send the `vspub.dev` sandbox subdomains to a PR build directly. Instead, a PR build's sandbox subdomains end in `-pr-preview-vspub`, and `packages/preview-sandbox-proxy` (deployed from `main`) proxies that route to the matching preview alias. The PR identifier must keep the sandbox label within the 63-character DNS limit.
