@@ -77,6 +77,12 @@ async function doSetupServer() {
     server: {
       middlewareMode: true,
       allowedHosts: true,
+      watch: {
+        // The CLI writes its outputs (manuscript HTML, the manifest) into its
+        // workspace as it serves them. Seen by the watcher, each write makes
+        // Vite or the CLI ask the preview to reload once more.
+        ignored: ['**/.vivliostyle/**'],
+      },
     },
     plugins: [
       createVitePlugin({

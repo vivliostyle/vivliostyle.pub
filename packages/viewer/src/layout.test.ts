@@ -376,6 +376,50 @@ describe('coversView', () => {
       }),
     ).toBe(true);
   });
+
+  it('waits while a page in view is unsettled', () => {
+    const unsettled = (index: number) => index === 1;
+    expect(
+      coversView(spreadPages, 0, { ...extent, mode: 'single', unsettled }),
+    ).toBe(true);
+    expect(
+      coversView(spreadPages, 1, { ...extent, mode: 'single', unsettled }),
+    ).toBe(false);
+    // Page 2 is the recto of the spread that page 1 opens.
+    expect(
+      coversView(spreadPages, 2, { ...extent, mode: 'spread', unsettled }),
+    ).toBe(false);
+    expect(
+      coversView(spreadPages, 3, {
+        ...extent,
+        mode: 'spread',
+        unsettled,
+        complete: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('checks every page the scrolled view shows', () => {
+    const scroll = { ...extent, mode: 'scroll' } as const;
+    const pages = [
+      page(0, 0, 'right'),
+      page(0, 1, 'left'),
+      page(0, 2, 'right'),
+    ];
+    const unsettled = (index: number) => index === 0;
+    expect(coversView(pages, 1, { ...scroll, unsettled })).toBe(true);
+    // Starting below the top of the view, page 1 leaves page 0 in view.
+    expect(coversView(pages, 1, { ...scroll, offset: -50, unsettled })).toBe(
+      false,
+    );
+    expect(
+      coversView(pages, 1, {
+        ...scroll,
+        offset: 100,
+        unsettled: (index) => index === 2,
+      }),
+    ).toBe(false);
+  });
 });
 
 // What the presentation does while stale pages are shown: moves act on the

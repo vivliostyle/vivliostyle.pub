@@ -30,6 +30,7 @@ import {
 import { linkFragment } from './links';
 import type { Size } from './paper-size';
 import type { PageProgression, ViewMode } from './protocol';
+import { pageKeyId } from './references';
 import {
   canScrollToward,
   type ScrollBox,
@@ -53,6 +54,15 @@ export interface PresentationOptions {
   onChange: (snapshot: PresentationSnapshot) => void;
   /** Core put pages in place or started to lay the publication out anew. */
   onProgress: () => void;
+  /** Core started to lay the publication out anew. */
+  onLayoutStart: () => void;
+  /**
+   * The pages of the layout core started last cover the view, settled; once
+   * per layout.
+   */
+  onShown: () => void;
+  /** Ids (see `pageKeyId`) of the pages that show placeholders for now. */
+  pagesAwaitingTargets: () => ReadonlySet<string>;
 }
 
 interface Layout {
@@ -84,6 +94,7 @@ interface Stale {
 
 const padding = 16;
 const pageContainerAttribute = 'data-vivliostyle-page-container';
+const pagesCounterAttribute = 'data-vivliostyle-pages-counter';
 const visibleAttribute = 'data-pub-visible';
 const xlinkNamespace = 'http://www.w3.org/1999/xlink';
 
@@ -159,6 +170,7 @@ export class Presentation {
   });
   #mode: ViewMode;
   #complete = false;
+  #layoutFailed = false;
   #target: PageKey = { spineIndex: 0, pageIndex: 0 };
   #targetOffset: number | 'end' = 0;
   /** Id of a link target that is not laid out yet. */
@@ -166,6 +178,8 @@ export class Presentation {
   /** Core's spread container, where it puts the pages it lays out. */
   #liveSpreadContainer: HTMLElement | null = null;
   #liveGeneration = 0;
+  /** The live generation last reported as shown (see `onShown`). */
+  #shownGeneration = 0;
   #stale: Stale | null = null;
   /**
    * The stale pages last replaced before core completed, which fill in for
@@ -228,6 +242,18 @@ export class Presentation {
       this.#stale?.layer.setAttribute('data-pub-view-mode', mode);
       this.#listenToWheel();
     });
+  }
+
+  /**
+   * Whether the latest layout failed or stalled. Core then never completes,
+   * so pages with placeholders are shown as they are rather than waited for.
+   */
+  setLayoutFailed(failed: boolean) {
+    if (failed !== this.#layoutFailed) {
+      this.#update(() => {
+        this.#layoutFailed = failed;
+      });
+    }
   }
 
   /** Whether core has laid out every page, after which a missing page is gone. */
@@ -321,6 +347,7 @@ export class Presentation {
       this.#liveGeneration += 1;
       if (spreadContainer) {
         this.#pageObserver.observe(spreadContainer, { childList: true });
+        this.#options.onLayoutStart();
       }
       this.#options.onProgress();
     }
@@ -435,7 +462,7 @@ export class Presentation {
 
   /** Whether the pages core has laid out so far show what the stale ones do. */
   #liveCoversView(): boolean {
-    const { pages } = readTree(
+    const { containers, pages } = readTree(
       this.#liveSpreadContainer,
       this.#options.fallbackPageSize(),
     );
@@ -443,6 +470,7 @@ export class Presentation {
     if (index === null) {
       return false;
     }
+    let awaitingTargets: ReadonlySet<string> | undefined;
     const scale =
       this.#mode === 'scroll'
         ? fitScale(
@@ -456,6 +484,18 @@ export class Presentation {
       complete: this.#complete,
       offset: typeof this.#targetOffset === 'number' ? this.#targetOffset : 0,
       viewHeight: this.#viewport.clientHeight / scale,
+      // Core writes the total page count into counter(pages) only once it
+      // has laid out every page; until then it shows 0.
+      unsettled: (i) => {
+        if (this.#layoutFailed) {
+          return false;
+        }
+        awaitingTargets ??= this.#options.pagesAwaitingTargets();
+        return (
+          awaitingTargets.has(pageKeyId(pages[i])) ||
+          containers[i].querySelector(`[${pagesCounterAttribute}]`) !== null
+        );
+      },
     });
   }
 
@@ -474,6 +514,15 @@ export class Presentation {
       this.#present();
     }
     this.#publish();
+    if (
+      this.#shownGeneration !== this.#liveGeneration &&
+      !this.#stale &&
+      this.#liveCoversView()
+    ) {
+      this.#shownGeneration = this.#liveGeneration;
+      // Last: the next load may be issued from here.
+      this.#options.onShown();
+    }
   }
 
   #present() {

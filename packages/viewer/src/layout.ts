@@ -269,36 +269,82 @@ export interface ViewExtent {
   offset: number;
   /** Height of the view in page px. */
   viewHeight: number;
+  /**
+   * Whether core is still to change the page at an index, e.g. to fill in a
+   * reference to a page it has not laid out yet.
+   */
+  unsettled?: (index: number) => boolean;
 }
 
 /**
  * Whether `pages` already hold everything the view on the page at `index`
  * shows, so that more pages arriving cannot change it: the partner of a
  * verso in spread mode, the pages down to the bottom of the view in scroll
- * mode.
+ * mode, none of them unsettled.
  */
 export function coversView(
   pages: readonly PageBox[],
   index: number,
-  { mode, progression, complete, offset, viewHeight }: ViewExtent,
+  {
+    mode,
+    progression,
+    complete,
+    offset,
+    viewHeight,
+    unsettled = () => false,
+  }: ViewExtent,
 ): boolean {
-  if (complete || mode === 'single') {
+  if (complete) {
     return true;
   }
-  if (mode === 'spread') {
-    return (
-      index < pages.length - 1 || pages[index].side !== versoSide(progression)
-    );
+  const shown = pagesInView(
+    pages,
+    index,
+    mode,
+    progression,
+    offset,
+    viewHeight,
+  );
+  return shown !== null && !shown.some(unsettled);
+}
+
+/** Null while pages the view shows may still be laid out. */
+function pagesInView(
+  pages: readonly PageBox[],
+  index: number,
+  mode: ViewMode,
+  progression: PageProgression,
+  offset: number,
+  viewHeight: number,
+): number[] | null {
+  if (mode === 'single') {
+    return [index];
   }
+  if (mode === 'spread') {
+    const verso = versoSide(progression);
+    if (pages[index].side === verso) {
+      if (index === pages.length - 1) {
+        return null;
+      }
+      return pages[index + 1].side === verso ? [index] : [index, index + 1];
+    }
+    return index > 0 && pages[index - 1].side === verso
+      ? [index - 1, index]
+      : [index];
+  }
+  // A page that starts below the top of the view leaves the end of the one
+  // before it in view.
+  const shown = offset < 0 && index > 0 ? [index - 1] : [];
   let bottom = 0;
   for (let i = index; i < pages.length; i++) {
+    shown.push(i);
     bottom += pages[i].height;
     if (bottom >= offset + viewHeight) {
-      return true;
+      return shown;
     }
     bottom += scrollGap;
   }
-  return false;
+  return null;
 }
 
 /** Index of the first of `pages`, in key order, that comes after `key`. */

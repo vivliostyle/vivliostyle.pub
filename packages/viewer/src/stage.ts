@@ -11,6 +11,7 @@ import type {
   StageStateListener,
   ViewMode,
 } from './protocol';
+import { pagesAwaitingTargets } from './references';
 import { ReloadController, reloadFailed, reloadStatus } from './reload';
 
 export interface StageOptions {
@@ -55,11 +56,15 @@ export class Stage {
     this.#reload = new ReloadController({
       gate: this.#gate,
       load: (hard) => this.#load(hard),
-      onChange: (state) =>
-        this.#update({
-          status: reloadStatus(state),
-          failed: reloadFailed(state),
-        }),
+      onChange: (state) => {
+        const failed = reloadFailed(state);
+        const failedChanged = failed !== this.#state.failed;
+        this.#update({ status: reloadStatus(state), failed });
+        // Last: the presentation may report back to the controller.
+        if (failedChanged) {
+          this.#presentation.setLayoutFailed(failed);
+        }
+      },
     });
     this.#presentation = new Presentation(viewportElement, {
       viewMode,
@@ -74,6 +79,9 @@ export class Stage {
       },
       onChange: (snapshot) => this.#onPresentationChange(snapshot),
       onProgress: () => this.#reload.dispatch({ type: 'progress' }),
+      onLayoutStart: () => this.#reload.dispatch({ type: 'layoutStart' }),
+      onShown: () => this.#reload.dispatch({ type: 'shown' }),
+      pagesAwaitingTargets: () => pagesAwaitingTargets(this.#viewer),
     });
     this.#viewer.addListener('readystatechange', () => {
       const status = stageStatus[this.#viewer.readyState];
@@ -128,7 +136,14 @@ export class Stage {
         defaultPaperSize: paperSizeToPx(this.#state.paperSize),
       });
     if (this.#publicationUrl) {
-      void this.#gate.run('configure', configure, { key: 'paperSize' });
+      void this.#gate.run(
+        'configure',
+        () => {
+          configure();
+          this.#reload.dispatch({ type: 'configure' });
+        },
+        { key: 'paperSize' },
+      );
     } else {
       // Core has no command loop before its first load, so no `done` would
       // release the gate; it records the option for that load instead.
