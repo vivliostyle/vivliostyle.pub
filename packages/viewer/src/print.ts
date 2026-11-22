@@ -73,9 +73,8 @@ export function printPublication(
     document.title = viewer.getMetadata()[titleProperty]?.[0]?.v || stageTitle;
     status.remove();
     window.print();
-    // `print()` returns once the dialog is closed. The tab stays
-    // script-closable despite the COOP swap, because the navigation replaced
-    // its single about:blank history entry.
+    // `print()` returns once the dialog is closed. Script may close the tab
+    // because the host opened it with `window.open`.
     window.close();
   };
 

@@ -11,8 +11,8 @@ let printSession = 0;
 // Printing happens in a top-level tab because Firefox crashes generating its
 // print preview for the nested cross-origin isolated viewer iframe (#64).
 export async function printPdf() {
-  // A COOP-severed handle (after navigation) also reports `closed`, so each
-  // click after a successful navigation starts a fresh tab.
+  // The tab closes itself after printing, so one still open is a print in
+  // progress.
   if (printWindow && !printWindow.closed) {
     printWindow.focus();
     return;
