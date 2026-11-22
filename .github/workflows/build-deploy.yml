@@ -44,7 +44,9 @@ jobs:
             echo "hostname=pr-preview-${{ github.event.number }}-vivliostyle-pub-app.vivliostyle.workers.dev" >> $GITHUB_OUTPUT
             # `sandbox-<25-char projectId>--<identifier>` must fit the 63-char
             # DNS label limit, so keep the identifier within 28 characters.
-            echo "sandbox-identifier=pr-${{ github.event.number }}-vivliostyle-pub" >> $GITHUB_OUTPUT
+            # The `-pr-preview-vspub` suffix is what routes sandbox hosts to
+            # `packages/preview-sandbox-proxy`, which parses the PR number back.
+            echo "sandbox-identifier=${{ github.event.number }}-pr-preview-vspub" >> $GITHUB_OUTPUT
           fi
       - run: pnpm build
         env:
@@ -69,6 +71,12 @@ jobs:
       - name: Deploy production
         if: ${{ github.ref_name == github.event.repository.default_branch }}
         run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy preview sandbox proxy
+        if: ${{ github.ref_name == github.event.repository.default_branch }}
+        run: npx wrangler deploy --config packages/preview-sandbox-proxy/wrangler.toml
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

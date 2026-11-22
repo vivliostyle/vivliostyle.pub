@@ -132,6 +132,8 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
 
 - **`packages/config/`** (`@v/config`) — shared `tsconfig` bases and `get-project-root.js` (used to locate `secrets/`).
 
+- **`packages/preview-sandbox-proxy/`** (`@v/preview-sandbox-proxy`) — a standalone Cloudflare Worker, not part of the app bundle. It serves PR-preview sandbox subdomains on `vspub.dev` by proxying them to the PR's workers.dev preview (see *Deployment*).
+
 ### The cli-bundle build, in more detail
 
 `rolldown.config.ts` is dense and load-bearing — the comments in it explain *why* each plugin / alias exists. Quick map for navigation:
@@ -190,3 +192,5 @@ Three equivalent paths, all land as normal PRs that maintainers review:
 ## Deployment
 
 Cloudflare Workers via Wrangler. `wrangler.toml` serves `packages/viola/dist/` as a SPA. The GitHub Actions workflow `build-deploy.yml` deploys `main` to `alpha.vivliostyle.pub` and PR previews to `pr-preview-<n>-vivliostyle-pub-app.vivliostyle.workers.dev`.
+
+A PR preview is a Worker version with a preview alias. Version URLs exist only on workers.dev, and a zone route always reaches the active deployment, so no route can send the `vspub.dev` sandbox subdomains to a PR build directly. Instead, a PR build's sandbox subdomains end in `-pr-preview-vspub`, and `packages/preview-sandbox-proxy` (deployed from `main`) proxies that route to the matching preview alias. The PR identifier must keep the sandbox label within the 63-character DNS limit.
