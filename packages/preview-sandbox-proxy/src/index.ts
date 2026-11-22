@@ -1,11 +1,25 @@
-// PR builds are Worker versions whose preview URLs exist only on workers.dev,
-// and a zone route always reaches the active deployment, so each PR's sandbox
-// hosts are proxied to its preview alias. The sandbox identifier and alias
-// naming here must match `.github/workflows/build-deploy.yml`.
-const sandboxLabelPattern = /--(\d+)-pr-preview-vspub$/;
+// The sandbox identifier and preview alias naming must match
+// `.github/workflows/build-deploy.yml`.
+const sandboxLabelPattern = /^sandbox-.+--([1-9]\d*)-pr-preview-vspub$/;
 
 function previewOrigin(prNumber: string): string {
   return `https://pr-preview-${prNumber}-vivliostyle-pub-app.vivliostyle.workers.dev`;
+}
+
+function rewriteLocation(
+  location: string,
+  upstreamOrigin: string,
+  sandboxOrigin: string,
+): string {
+  let target: URL;
+  try {
+    target = new URL(location, upstreamOrigin);
+  } catch {
+    return location;
+  }
+  return target.origin === upstreamOrigin
+    ? `${sandboxOrigin}${target.pathname}${target.search}${target.hash}`
+    : location;
 }
 
 export default {
@@ -35,13 +49,10 @@ export default {
     headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
     const location = headers.get('Location');
     if (location) {
-      const target = new URL(location, upstreamOrigin);
-      if (target.origin === upstreamOrigin) {
-        headers.set(
-          'Location',
-          `${url.origin}${target.pathname}${target.search}${target.hash}`,
-        );
-      }
+      headers.set(
+        'Location',
+        rewriteLocation(location, upstreamOrigin, url.origin),
+      );
     }
     return new Response(upstream.body, {
       status: upstream.status,

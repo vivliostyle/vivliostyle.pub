@@ -8,9 +8,14 @@ const upstreamOrigin =
   'https://pr-preview-83-vivliostyle-pub-app.vivliostyle.workers.dev';
 
 function stubUpstream(response: Response) {
-  const fetchMock = vi.fn(async () => response);
+  const fetchMock = vi.fn<typeof fetch>(async () => response);
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
+}
+
+function upstreamCall(fetchMock: ReturnType<typeof stubUpstream>) {
+  const [input, init] = fetchMock.mock.calls[0];
+  return { url: new URL(String(input)), init: init ?? {} };
 }
 
 afterEach(() => {
@@ -28,13 +33,25 @@ describe('preview sandbox proxy', () => {
     );
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    const [target, init] = fetchMock.mock.calls[0] as unknown as [
-      URL,
-      RequestInit,
-    ];
-    expect(target.href).toBe(`${upstreamOrigin}/_cli/index.js?v=1`);
+    const { url, init } = upstreamCall(fetchMock);
+    expect(url.href).toBe(`${upstreamOrigin}/_cli/index.js?v=1`);
     expect(init.redirect).toBe('manual');
     expect(new Headers(init.headers).get('If-None-Match')).toBe('"etag"');
+  });
+
+  it('forwards the method and body', async () => {
+    const fetchMock = stubUpstream(new Response('ok'));
+
+    await worker.fetch(
+      new Request(`https://${sandboxHost}/upload`, {
+        method: 'POST',
+        body: 'payload',
+      }),
+    );
+
+    const { init } = upstreamCall(fetchMock);
+    expect(init.method).toBe('POST');
+    expect(await new Response(init.body).text()).toBe('payload');
   });
 
   it('never lets the path change the upstream host', async () => {
@@ -44,9 +61,9 @@ describe('preview sandbox proxy', () => {
       new Request(`https://${sandboxHost}//evil.example/steal?x=1`),
     );
 
-    const [target] = fetchMock.mock.calls[0] as unknown as [URL];
-    expect(target.origin).toBe(upstreamOrigin);
-    expect(target.pathname).toBe('//evil.example/steal');
+    const { url } = upstreamCall(fetchMock);
+    expect(url.origin).toBe(upstreamOrigin);
+    expect(url.pathname).toBe('//evil.example/steal');
   });
 
   it('keeps upstream headers and adds CORP', async () => {
@@ -67,12 +84,21 @@ describe('preview sandbox proxy', () => {
     );
   });
 
-  it('rewrites redirects to the upstream origin onto the sandbox host', async () => {
+  it('passes a bodiless 304 through', async () => {
+    stubUpstream(new Response(null, { status: 304 }));
+
+    const response = await worker.fetch(new Request(`https://${sandboxHost}/`));
+
+    expect(response.status).toBe(304);
+    expect(response.body).toBeNull();
+  });
+
+  it.each([
+    ['an absolute', `${upstreamOrigin}/sandbox?x=1`],
+    ['a relative', '/sandbox?x=1'],
+  ])('maps %s redirect onto the sandbox host', async (_, location) => {
     stubUpstream(
-      new Response(null, {
-        status: 307,
-        headers: { Location: `${upstreamOrigin}/sandbox?x=1` },
-      }),
+      new Response(null, { status: 307, headers: { Location: location } }),
     );
 
     const response = await worker.fetch(
@@ -85,26 +111,28 @@ describe('preview sandbox proxy', () => {
     );
   });
 
-  it('leaves redirects to other origins untouched', async () => {
+  it.each([
+    ['to another origin', 'https://example.com/elsewhere'],
+    ['that does not parse', 'http://[bad'],
+  ])('leaves a redirect %s untouched', async (_, location) => {
     stubUpstream(
-      new Response(null, {
-        status: 302,
-        headers: { Location: 'https://example.com/elsewhere' },
-      }),
+      new Response(null, { status: 302, headers: { Location: location } }),
     );
 
     const response = await worker.fetch(new Request(`https://${sandboxHost}/`));
 
-    expect(response.headers.get('Location')).toBe(
-      'https://example.com/elsewhere',
-    );
+    expect(response.headers.get('Location')).toBe(location);
   });
 
-  it('rejects hosts without a PR number', async () => {
+  it.each([
+    ['without a PR number', 'sandbox-draft--pr-preview-vspub'],
+    ['with a leading-zero PR number', 'sandbox-draft--083-pr-preview-vspub'],
+    ['without the sandbox prefix', 'app--83-pr-preview-vspub'],
+  ])('rejects a host %s', async (_, label) => {
     const fetchMock = stubUpstream(new Response('ok'));
 
     const response = await worker.fetch(
-      new Request('https://sandbox-draft--pr-preview-vspub.vspub.dev/'),
+      new Request(`https://${label}.vspub.dev/`),
     );
 
     expect(response.status).toBe(404);
