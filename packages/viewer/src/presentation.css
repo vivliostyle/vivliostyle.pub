@@ -6,8 +6,9 @@
 @media screen {
   [data-pub-view-mode] {
     /* The display scale follows the pane width, which must not change when
-       the content starts to overflow. */
-    scrollbar-gutter: stable;
+       the content starts to overflow. Both edges keep the pages centered in
+       the pane. */
+    scrollbar-gutter: stable both-edges;
     /* The position is restored from the page key after every change. */
     overflow-anchor: none;
     overscroll-behavior: contain;

@@ -86,7 +86,9 @@ export function Toolbar({
   );
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-2 py-1">
+    // The host lays its sidebar toggle over the top-left corner of the
+    // leftmost pane, so the first control starts clear of it.
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b py-1 ps-12 pe-2">
       <SegmentedRadioGroup
         aria-label={t('preview_view_mode_aria')}
         value={preferences.viewMode}

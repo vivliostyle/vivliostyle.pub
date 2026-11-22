@@ -23,6 +23,7 @@ import {
   type ScrollGeometry,
   type Span,
   type SpreadIndex,
+  scrollGap,
   scrollTopFor,
   viewedPage,
 } from './layout';
@@ -628,7 +629,17 @@ export class Presentation {
       scroller.getBoundingClientRect().top -
       scroller.clientTop +
       scroller.scrollTop;
-    const geometry: ScrollGeometry = { originTop, padding, scale };
+    const geometry: ScrollGeometry = {
+      originTop,
+      // A page scrolled to in scroll mode starts right below the gap before
+      // it, which shrinks with the scale, so no edge of the previous page
+      // shows above it.
+      padding:
+        this.#mode === 'scroll'
+          ? Math.min(padding, scrollGap * scale)
+          : padding,
+      scale,
+    };
     this.#layout = {
       arrangement,
       geometry,
