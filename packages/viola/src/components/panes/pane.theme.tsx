@@ -218,18 +218,19 @@ function ProjectThemeContent() {
             onCssChange={setCss}
           />
         </Suspense>
-        {themeSnap.stylesheetBundleError?.kind === 'import' && (
-          <p className="text-sm text-destructive" aria-live="polite">
-            {themeSnap.stylesheetBundleError.target
+        {/* Kept mounted while empty: a live region is announced when its text
+            changes, not when it appears. */}
+        <p className="text-sm text-destructive" aria-live="polite">
+          {themeSnap.stylesheetBundleError?.kind === 'import' &&
+            (themeSnap.stylesheetBundleError.target
               ? m.theme_import_error({
                   target: themeSnap.stylesheetBundleError.target,
                   message: themeSnap.stylesheetBundleError.message,
                 })
               : m.theme_import_error_no_target({
                   message: themeSnap.stylesheetBundleError.message,
-                })}
-          </p>
-        )}
+                }))}
+        </p>
       </section>
     </div>
   );

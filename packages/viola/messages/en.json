@@ -164,6 +164,7 @@
   "theme_settings_color_picker_aria": "Pick a color for {name}",
   "theme_settings_css_broken": "The CSS has a syntax error, so some settings may not be shown or saved. Fix it in the CSS editor.",
   "theme_settings_default_hint": "Default: {value}",
+  "theme_settings_error_announcement": "{name}: {message}",
   "theme_settings_error_empty": "Enter a value.",
   "theme_settings_error_invalid_name": "The custom property name is invalid.",
   "theme_settings_error_invalid_value": "This value cannot be written to the CSS.",

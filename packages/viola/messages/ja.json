@@ -164,6 +164,7 @@
   "theme_settings_color_picker_aria": "{name}の色を選択",
   "theme_settings_css_broken": "CSSに構文エラーがあるため、一部の設定を表示・保存できない可能性があります。CSSエディターで修正してください。",
   "theme_settings_default_hint": "デフォルト: {value}",
+  "theme_settings_error_announcement": "{name}：{message}",
   "theme_settings_error_empty": "値を入力してください。",
   "theme_settings_error_invalid_name": "カスタムプロパティ名が正しくありません。",
   "theme_settings_error_invalid_value": "この値はCSSに書き込めません。",

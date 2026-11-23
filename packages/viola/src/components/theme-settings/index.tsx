@@ -34,6 +34,7 @@ import {
   type ThemeVariableSchema,
 } from '../../libs/theme-variables';
 import { commitValue } from './commit';
+import { AnnouncerProvider } from './live-region';
 import { getWritingMode } from './margin-box-content';
 import { getCategoryLabel, getGroupLabel, qualifyLabel } from './messages';
 import {
@@ -450,48 +451,43 @@ export default function ThemeCssEditor({
   const isCss = mode === 'css';
 
   return (
-    <div ref={rootRef} className="@container">
-      <div
-        ref={headerRef}
-        className="sticky top-0 z-10 grid gap-2 bg-background py-2"
-      >
-        <div className="flex items-center gap-2">
-          {showToolbar && (
-            <SettingsSearchField {...settings.search} className="flex-1" />
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="ml-auto"
-            onClick={() => setMode(isCss ? 'gui' : 'css')}
-          >
-            {isCss ? <SlidersHorizontal aria-hidden /> : <Code aria-hidden />}
-            {isCss ? m.theme_settings_mode_gui() : m.theme_settings_mode_css()}
-          </Button>
-        </div>
-        {showToolbar && (
-          <>
-            <SettingsToolbar {...settings.toolbar} />
-            {model && <SettingsSectionSelect {...toc} className="@md:hidden" />}
-          </>
-        )}
-      </div>
-      {isCss ? (
-        <Suspense fallback={<Spinner />}>
-          <CodeEditor
-            aria-label={m.theme_custom_css_editor_aria()}
-            code={css}
-            onCodeUpdate={emit}
-          />
-        </Suspense>
-      ) : (
-        <div className="grid gap-2">
-          {model && model.diagnostics.length > 0 && (
-            <div
-              role="status"
-              className="flex items-start gap-2 rounded-md border border-destructive/50 p-3 text-sm"
+    <AnnouncerProvider>
+      <div ref={rootRef} className="@container">
+        <div
+          ref={headerRef}
+          className="sticky top-0 z-10 grid gap-2 bg-background py-2"
+        >
+          <div className="flex items-center gap-2">
+            {showToolbar && (
+              <SettingsSearchField {...settings.search} className="flex-1" />
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setMode(isCss ? 'gui' : 'css')}
             >
+              {isCss ? <SlidersHorizontal aria-hidden /> : <Code aria-hidden />}
+              {isCss
+                ? m.theme_settings_mode_gui()
+                : m.theme_settings_mode_css()}
+            </Button>
+          </div>
+          {showToolbar && (
+            <>
+              <SettingsToolbar {...settings.toolbar} />
+              {model && (
+                <SettingsSectionSelect {...toc} className="@md:hidden" />
+              )}
+            </>
+          )}
+        </div>
+        {/* Outside the views, so that switching to the settings changes the
+            text of a mounted region, which is what gets announced. */}
+        <div role="status">
+          {model && model.diagnostics.length > 0 && (
+            <div className="mb-2 flex items-start gap-2 rounded-md border border-destructive/50 p-3 text-sm">
               <TriangleAlert
                 aria-hidden
                 className="mt-0.5 size-4 shrink-0 text-destructive"
@@ -509,51 +505,59 @@ export default function ThemeCssEditor({
               </div>
             </div>
           )}
-          {schemaState === Fulfilled && model ? (
-            <div className="grid items-start gap-x-4 @md:grid-cols-[10rem_minmax(0,1fr)] @3xl:grid-cols-[14rem_minmax(0,1fr)]">
-              <SettingsToc
-                {...toc}
-                className="sticky top-(--settings-header-height) hidden max-h-[calc(100svh-var(--settings-header-height))] overflow-y-auto overscroll-contain scrollbar-stable py-2 @md:block"
-              />
-              <div
-                ref={listRef}
-                className="min-w-0 scroll-mt-(--settings-header-height) py-2"
-              >
-                <PrerenderedViews
-                  current={settings.lists.current}
-                  keys={settings.lists.keys}
-                >
-                  {(key) => (
-                    <SettingsList
-                      {...settings.list}
-                      rows={settings.lists.getRows(key)}
-                      model={model}
-                      onCommit={handleCommit}
-                      onSelectSection={handleSelect}
-                    />
-                  )}
-                </PrerenderedViews>
-              </div>
-            </div>
-          ) : schemaState === Rejected ? (
-            <div className="grid justify-items-start gap-2 py-4 text-sm">
-              <p role="alert">{m.theme_settings_load_error()}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setSchemaPromise(loadThemeVariableSchema())}
-              >
-                {m.theme_settings_retry()}
-              </Button>
-            </div>
-          ) : (
-            <div role="status" aria-label={m.theme_settings_loading()}>
-              <Spinner />
-            </div>
-          )}
         </div>
-      )}
-    </div>
+        {isCss ? (
+          <Suspense fallback={<Spinner />}>
+            <CodeEditor
+              aria-label={m.theme_custom_css_editor_aria()}
+              code={css}
+              onCodeUpdate={emit}
+            />
+          </Suspense>
+        ) : schemaState === Fulfilled && model ? (
+          <div className="grid items-start gap-x-4 @md:grid-cols-[10rem_minmax(0,1fr)] @3xl:grid-cols-[14rem_minmax(0,1fr)]">
+            <SettingsToc
+              {...toc}
+              className="sticky top-(--settings-header-height) hidden max-h-[calc(100svh-var(--settings-header-height))] overflow-y-auto overscroll-contain scrollbar-stable py-2 @md:block"
+            />
+            <div
+              ref={listRef}
+              className="min-w-0 scroll-mt-(--settings-header-height) py-2"
+            >
+              <PrerenderedViews
+                current={settings.lists.current}
+                keys={settings.lists.keys}
+              >
+                {(key) => (
+                  <SettingsList
+                    {...settings.list}
+                    rows={settings.lists.getRows(key)}
+                    model={model}
+                    onCommit={handleCommit}
+                    onSelectSection={handleSelect}
+                  />
+                )}
+              </PrerenderedViews>
+            </div>
+          </div>
+        ) : schemaState === Rejected ? (
+          <div className="grid justify-items-start gap-2 py-4 text-sm">
+            <p role="alert">{m.theme_settings_load_error()}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSchemaPromise(loadThemeVariableSchema())}
+            >
+              {m.theme_settings_retry()}
+            </Button>
+          </div>
+        ) : (
+          <div role="progressbar" aria-label={m.theme_settings_loading()}>
+            <Spinner />
+          </div>
+        )}
+      </div>
+    </AnnouncerProvider>
   );
 }

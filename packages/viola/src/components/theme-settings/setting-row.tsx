@@ -1,4 +1,4 @@
-import { memo, useCallback, useId, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo, useState } from 'react';
 
 import { Button, buttonVariants } from '@v/ui/button';
 import { HoverCardArea, HoverCardTrigger } from '@v/ui/hover-card';
@@ -15,6 +15,7 @@ import {
 import type { CommitError } from './commit';
 import { ValueField } from './fields';
 import { getVariableLabel } from './labels';
+import { useAnnouncer } from './live-region';
 import { getCommitErrorMessage, getScopeLabel } from './messages';
 
 export type CommitHandler = (
@@ -33,6 +34,12 @@ const infoButtonClassName = cn(
     className: 'size-5 shrink-0 text-muted-foreground [&_svg]:size-3.5',
   }),
 );
+
+const getErrorAnnouncement = (label: string, error: CommitError) =>
+  m.theme_settings_error_announcement({
+    name: label,
+    message: getCommitErrorMessage(error),
+  });
 
 interface SettingRowProps {
   variable: ThemeVariable;
@@ -63,13 +70,26 @@ function SettingRow({
   const errorId = useId();
   const [error, setError] = useState<CommitError | null>(null);
   const modified = value !== undefined;
+  const { announce, retract } = useAnnouncer();
+  const announcement = error && getErrorAnnouncement(label, error);
 
   const commit = useCallback(
-    (next: string) =>
-      setError(onCommit(scope, variable.name, descriptor, next)),
-    [onCommit, scope, variable.name, descriptor],
+    (next: string) => {
+      const result = onCommit(scope, variable.name, descriptor, next);
+      setError(result);
+      if (result) {
+        announce(getErrorAnnouncement(label, result));
+      }
+    },
+    [onCommit, scope, variable.name, descriptor, label, announce],
   );
   const revert = useCallback(() => setError(null), []);
+  useEffect(() => {
+    if (!announcement) {
+      return;
+    }
+    return () => retract(announcement);
+  }, [announcement, retract]);
 
   const describedBy =
     [defaultValue && hintId, error && errorId].filter(Boolean).join(' ') ||
@@ -165,7 +185,7 @@ function SettingRow({
         </p>
       )}
       {error && (
-        <p id={errorId} role="alert" className="text-xs text-destructive">
+        <p id={errorId} className="text-xs text-destructive">
           {getCommitErrorMessage(error)}
         </p>
       )}
