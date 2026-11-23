@@ -105,9 +105,13 @@ export function isColorScheme(value: unknown): value is ColorScheme {
   return colorSchemes.includes(value as ColorScheme);
 }
 
+export function isZoomFit(value: unknown): value is ZoomFit {
+  return zoomFits.includes(value as ZoomFit);
+}
+
 export function isZoom(value: unknown): value is Zoom {
   return (
-    zoomFits.includes(value as ZoomFit) ||
+    isZoomFit(value) ||
     (typeof value === 'number' && Number.isFinite(value) && value > 0)
   );
 }
@@ -121,8 +125,8 @@ export function parseZoom(value: string | null): Zoom | null {
   if (value === null) {
     return null;
   }
-  if (zoomFits.includes(value as ZoomFit)) {
-    return value as ZoomFit;
+  if (isZoomFit(value)) {
+    return value;
   }
   const scale = Number(value);
   return value !== '' && isZoom(scale) ? scale : null;

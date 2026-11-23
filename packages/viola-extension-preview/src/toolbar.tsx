@@ -3,10 +3,6 @@ import { type ComponentType, useEffect, useRef, useState } from 'react';
 import type { ExtensionTranslate } from '@v/extension-kit';
 import { Button } from '@v/ui/button';
 import {
-  SegmentedRadioGroup,
-  SegmentedRadioGroupItem,
-} from '@v/ui/custom/segmented-radio';
-import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -30,9 +26,11 @@ import {
 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { Separator } from '@v/ui/separator';
+import { ToggleGroup, ToggleGroupItem } from '@v/ui/toggle-group';
 import {
   clampZoomScale,
   isViewMode,
+  isZoomFit,
   type StageState,
   stepZoomScale,
   type ViewMode,
@@ -93,7 +91,10 @@ export function Toolbar({
       {/* The host lays its sidebar toggle over the top-left corner of the
           leftmost pane, so the first control starts clear of it. */}
       <div className="flex flex-1 ps-10">
-        <SegmentedRadioGroup
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
           aria-label={t('preview_view_mode_aria')}
           value={preferences.viewMode}
           onValueChange={(value) => {
@@ -105,17 +106,17 @@ export function Toolbar({
           {viewModes.map((viewMode) => {
             const { icon: Icon, label } = viewModeOptions[viewMode];
             return (
-              <SegmentedRadioGroupItem
+              <ToggleGroupItem
                 key={viewMode}
                 value={viewMode}
                 aria-label={t(label)}
                 title={t(label)}
               >
                 <Icon />
-              </SegmentedRadioGroupItem>
+              </ToggleGroupItem>
             );
           })}
-        </SegmentedRadioGroup>
+        </ToggleGroup>
       </div>
 
       <div className="flex items-center gap-1">
@@ -290,25 +291,33 @@ function ZoomControls({
         <ZoomInput scale={current} disabled={disabled} onZoom={onZoom} t={t} />
         {stepButton('in')}
         <Separator orientation="vertical" className="mx-1 h-5" />
-        {zoomFits.map((fit) => {
-          const { icon: Icon, label } = zoomFitOptions[fit];
-          const pressed = zoom === fit;
-          return (
-            <Button
-              key={fit}
-              variant={pressed ? 'default' : 'ghost'}
-              size="icon"
-              className="size-8"
-              aria-label={t(label)}
-              aria-pressed={pressed}
-              title={t(label)}
-              disabled={disabled}
-              onClick={() => onZoom(fit)}
-            >
-              <Icon />
-            </Button>
-          );
-        })}
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          aria-label={t('preview_zoom_fit_aria')}
+          value={typeof zoom === 'number' ? '' : zoom}
+          onValueChange={(value) => {
+            if (isZoomFit(value)) {
+              onZoom(value);
+            }
+          }}
+          disabled={disabled}
+        >
+          {zoomFits.map((fit) => {
+            const { icon: Icon, label } = zoomFitOptions[fit];
+            return (
+              <ToggleGroupItem
+                key={fit}
+                value={fit}
+                aria-label={t(label)}
+                title={t(label)}
+              >
+                <Icon />
+              </ToggleGroupItem>
+            );
+          })}
+        </ToggleGroup>
       </div>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
