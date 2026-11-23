@@ -4,8 +4,10 @@ import { subscribeFullReload } from './hmr';
 import { printPublication } from './print';
 import { defaultPrintLocale, isPrintLocale } from './print-messages';
 import {
+  type ColorScheme,
   defaultPaperSize,
   defaultViewMode,
+  isColorScheme,
   isPaperSize,
   isViewMode,
   type PaperSize,
@@ -24,6 +26,15 @@ const paperSizeParam = searchParams.get(stageSearchParams.paperSize);
 const paperSize = isPaperSize(paperSizeParam)
   ? paperSizeParam
   : defaultPaperSize;
+
+function applyColorScheme(colorScheme: ColorScheme) {
+  document.documentElement.dataset.pubColorScheme = colorScheme;
+}
+
+const colorSchemeParam = searchParams.get(stageSearchParams.colorScheme);
+if (isColorScheme(colorSchemeParam)) {
+  applyColorScheme(colorSchemeParam);
+}
 
 function publicationUrlFrom(src: string | null): string | null {
   if (!src) {
@@ -63,6 +74,11 @@ function startPreview(
     setDefaultPaperSize: (size) => {
       if (isPaperSize(size)) {
         stage.setDefaultPaperSize(size);
+      }
+    },
+    setColorScheme: (colorScheme) => {
+      if (isColorScheme(colorScheme)) {
+        applyColorScheme(colorScheme);
       }
     },
     subscribe: (listener) => Comlink.proxy(stage.subscribe(listener)),

@@ -62,6 +62,13 @@ export type ExtensionSessionListener = (
   snapshot: ExtensionSessionSnapshot,
 ) => void;
 
+/** The color scheme the host's UI is shown in. */
+export type ExtensionColorScheme = 'light' | 'dark';
+
+export type ExtensionColorSchemeListener = (
+  colorScheme: ExtensionColorScheme,
+) => void;
+
 /**
  * Permissions an extension declares in {@link defineExtension}. The host only
  * activates an extension when every declared permission is grantable in the
@@ -112,7 +119,8 @@ export interface ExtensionApiResponse {
  * Every method is declared here, but each is gated by the {@link
  * ExtensionPermission} shown above; calling one whose permission the extension
  * did not declare rejects at runtime with an error naming the missing
- * permission. `getLocale` needs no permission.
+ * permission. `getLocale`, `getColorScheme` and `subscribeColorScheme` need no
+ * permission.
  */
 export interface ExtensionHostApi {
   getSessionSnapshot(): ExtensionSessionSnapshot;
@@ -124,6 +132,9 @@ export interface ExtensionHostApi {
   clearBearerSession(): Promise<void>;
   startProviderSignIn(provider: string): Promise<void>;
   getLocale(): string;
+  getColorScheme(): ExtensionColorScheme;
+  /** Calls `listener` on every change, not with the current value. */
+  subscribeColorScheme(listener: ExtensionColorSchemeListener): () => void;
   getViewerUrl(): Promise<string>;
   /**
    * Tells the host the default paper size (one of `@v/viewer`'s paper sizes)
@@ -173,6 +184,12 @@ export interface ExtensionMountContext {
   locale: string;
   /** Translator bound to {@link ExtensionMountContext.locale}. */
   t: ExtensionTranslate;
+  /**
+   * The host's current color scheme; the view is rendered again when it
+   * changes. The kit's styles follow it already, so a view only needs it for
+   * what it embeds.
+   */
+  colorScheme: ExtensionColorScheme;
 }
 
 /**

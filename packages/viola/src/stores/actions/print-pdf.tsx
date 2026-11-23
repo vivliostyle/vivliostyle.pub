@@ -3,6 +3,7 @@ import { invariant } from 'outvariant';
 import { stageSearchParams } from '@v/viewer/protocol';
 import { m } from '../../generated/paraglide/messages';
 import { getLocale } from '../../generated/paraglide/runtime';
+import { currentColorScheme } from '../../libs/color-scheme';
 import { $cli, $viewer } from '../accessors';
 
 let printWindow: Window | null = null;
@@ -24,6 +25,8 @@ export async function printPdf() {
   const openedWindow = window.open('about:blank', '_blank');
   invariant(openedWindow, 'Failed to open a tab for printing');
   printWindow = openedWindow;
+  const colorScheme = currentColorScheme();
+  openedWindow.document.documentElement.style.colorScheme = colorScheme;
   openedWindow.document.title = m.print_pdf_preparing();
   openedWindow.document.body.textContent = m.print_pdf_preparing();
   try {
@@ -33,6 +36,7 @@ export async function printPdf() {
       return;
     }
     viewerUrl.searchParams.set(stageSearchParams.paperSize, $viewer.paperSize);
+    viewerUrl.searchParams.set(stageSearchParams.colorScheme, colorScheme);
     viewerUrl.searchParams.set(stageSearchParams.locale, getLocale());
     openedWindow.location.href = viewerUrl.href;
   } catch (error) {

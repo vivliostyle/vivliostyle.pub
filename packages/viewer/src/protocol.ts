@@ -19,6 +19,10 @@ export const paperSizes = [
 export type PaperSize = (typeof paperSizes)[number];
 export const defaultPaperSize: PaperSize = 'a4';
 
+/** Colors of what the stage shows around the pages; pages keep their own. */
+export const colorSchemes = ['light', 'dark'] as const;
+export type ColorScheme = (typeof colorSchemes)[number];
+
 export type PageProgression = 'ltr' | 'rtl';
 
 export interface StageState {
@@ -57,6 +61,7 @@ export interface StageController {
   setViewMode(viewMode: ViewMode): void;
   /** Re-lays out the publication when the size differs from the current one. */
   setDefaultPaperSize(paperSize: PaperSize): void;
+  setColorScheme(colorScheme: ColorScheme): void;
   /** Calls `listener` with the current state at once, then on every change. */
   subscribe(listener: StageStateListener): () => void;
 }
@@ -68,8 +73,9 @@ export interface StageController {
 export const stageBindCommand = 'viewer-stage-bind';
 
 /**
- * Search parameters of the stage URL. The view mode and paper size are
- * initial values, so that a stored preference holds from the first layout on.
+ * Search parameters of the stage URL. The view mode, paper size and color
+ * scheme are initial values, so that the stage starts with them instead of
+ * switching once the embedder binds.
  *
  * With `print=true` the stage is a top-level print tab instead: it lays the
  * publication out, opens the print dialog once, then closes the tab. It has
@@ -79,6 +85,7 @@ export const stageSearchParams = {
   src: 'src',
   viewMode: 'viewMode',
   paperSize: 'paperSize',
+  colorScheme: 'colorScheme',
   print: 'print',
   locale: 'locale',
 } as const;
@@ -89,4 +96,8 @@ export function isViewMode(value: unknown): value is ViewMode {
 
 export function isPaperSize(value: unknown): value is PaperSize {
   return paperSizes.includes(value as PaperSize);
+}
+
+export function isColorScheme(value: unknown): value is ColorScheme {
+  return colorSchemes.includes(value as ColorScheme);
 }

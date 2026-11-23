@@ -1,0 +1,19 @@
+@media screen {
+  /* The root shows where core has set up no viewport, as in a print tab with
+     nothing to load. */
+  :root[data-pub-color-scheme="dark"],
+  :root[data-pub-color-scheme="dark"] [data-vivliostyle-viewer-viewport] {
+    background: #292524;
+  }
+
+  /* Not `color-scheme`: the build lowers it with custom properties of its own,
+     which pages would inherit. */
+  :root[data-pub-color-scheme="dark"] [data-vivliostyle-viewer-viewport] {
+    scrollbar-color: rgb(250 250 249 / 30%) transparent;
+  }
+
+  /* It inherits, and would recolor the scrollbars of what pages contain. */
+  :root[data-pub-color-scheme="dark"] [data-vivliostyle-page-container] {
+    scrollbar-color: auto;
+  }
+}

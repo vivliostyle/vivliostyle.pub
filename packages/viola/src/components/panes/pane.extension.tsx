@@ -16,6 +16,10 @@ import {
   extensionSandboxOrigin,
 } from '../../extensions/sandbox-origin';
 import { getLocale } from '../../generated/paraglide/runtime';
+import {
+  currentColorScheme,
+  subscribeColorScheme,
+} from '../../libs/color-scheme';
 import { $cli, $session, $viewer } from '../../stores/accessors';
 import {
   applyBearerSession,
@@ -89,6 +93,14 @@ const hostApiRegistry: HostApiRegistry = {
   getLocale: {
     permission: null,
     impl: () => getLocale(),
+  },
+  getColorScheme: {
+    permission: null,
+    impl: () => currentColorScheme(),
+  },
+  subscribeColorScheme: {
+    permission: null,
+    impl: (listener) => Comlink.proxy(subscribeColorScheme(listener)),
   },
   getSessionSnapshot: {
     permission: 'session:read',

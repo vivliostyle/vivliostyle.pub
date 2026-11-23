@@ -31,4 +31,15 @@
   [data-pub-print-status="failed"] {
     color: #b3261e;
   }
+
+  :root[data-pub-color-scheme="dark"] [data-pub-print-status] {
+    background: #1c1917;
+    color: #fafaf9;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+  }
+
+  :root[data-pub-color-scheme="dark"] [data-pub-print-status="stalled"],
+  :root[data-pub-color-scheme="dark"] [data-pub-print-status="failed"] {
+    color: #f2b8b5;
+  }
 }

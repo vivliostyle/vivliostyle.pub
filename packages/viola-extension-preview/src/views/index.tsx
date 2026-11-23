@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type {
+  ExtensionColorScheme,
   ExtensionMountContext,
   ExtensionTranslate,
   RemoteExtensionHostApi,
@@ -16,7 +17,11 @@ import { useStage } from '../use-stage';
 
 import '@v/extension-kit/styles.css';
 
-export default function PreviewPane({ host, t }: ExtensionMountContext) {
+export default function PreviewPane({
+  host,
+  t,
+  colorScheme,
+}: ExtensionMountContext) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,21 +40,25 @@ export default function PreviewPane({ host, t }: ExtensionMountContext) {
     return null;
   }
 
-  return <Preview key={url} url={url} host={host} t={t} />;
+  return (
+    <Preview key={url} url={url} host={host} t={t} colorScheme={colorScheme} />
+  );
 }
 
 function Preview({
   url,
   host,
   t,
+  colorScheme,
 }: {
   url: string;
   host: RemoteExtensionHostApi;
   t: ExtensionTranslate;
+  colorScheme: ExtensionColorScheme;
 }) {
   const [preferences, setPreferences] = useState(loadPreferences);
-  // Only the first value goes into the URL, so a preference change does not
-  // reload the frame; later changes go through the stage controller.
+  // Only the first values go into the URL, so a change does not reload the
+  // frame; later changes go through the stage controller.
   const [frameUrl] = useState(() => {
     const stageUrl = new URL(url);
     stageUrl.searchParams.set(stageSearchParams.viewMode, preferences.viewMode);
@@ -57,6 +66,7 @@ function Preview({
       stageSearchParams.paperSize,
       preferences.paperSize,
     );
+    stageUrl.searchParams.set(stageSearchParams.colorScheme, colorScheme);
     return stageUrl.href;
   });
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -78,6 +88,9 @@ function Preview({
   useEffect(() => {
     stage?.setDefaultPaperSize(preferences.paperSize);
   }, [stage, preferences.paperSize]);
+  useEffect(() => {
+    stage?.setColorScheme(colorScheme);
+  }, [stage, colorScheme]);
 
   return (
     <div className="flex size-full flex-col">

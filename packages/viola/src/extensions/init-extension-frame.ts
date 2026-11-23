@@ -8,6 +8,7 @@ import {
   type ExtensionViewModule,
   translate,
 } from '@v/extension-kit';
+import { applyColorScheme } from '../libs/color-scheme';
 import { reportExtensionContentSize } from './iframe-autosize';
 import { installedExtensions } from './installed';
 import { parseExtensionFramePath } from './sandbox-origin';
@@ -31,7 +32,12 @@ export async function initExtensionFrame() {
   );
   const host = Comlink.wrap<ExtensionHostApi>(channel.port1);
 
-  const locale = await host.getLocale();
+  const [locale, initialColorScheme] = await Promise.all([
+    host.getLocale(),
+    host.getColorScheme(),
+  ]);
+  let colorScheme = initialColorScheme;
+  applyColorScheme(colorScheme);
   const t = (key: string) => translate(installed.messages, locale, key);
   const [
     { StrictMode, createElement },
@@ -55,13 +61,26 @@ export async function initExtensionFrame() {
   }
 
   const root = createRoot(document.body);
+  let renderedModule = viewModule;
   const renderView = (module: ExtensionViewModule) => {
+    renderedModule = module;
     const Pane = module.default as ComponentType<ExtensionMountContext>;
     root.render(
-      createElement(StrictMode, null, createElement(Pane, { host, locale, t })),
+      createElement(
+        StrictMode,
+        null,
+        createElement(Pane, { host, locale, t, colorScheme }),
+      ),
     );
   };
   renderView(viewModule);
+  void host.subscribeColorScheme(
+    Comlink.proxy((next) => {
+      colorScheme = next;
+      applyColorScheme(next);
+      renderView(renderedModule);
+    }),
+  );
   if (sizing === 'content') {
     reportExtensionContentSize();
   }

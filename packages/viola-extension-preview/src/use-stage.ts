@@ -43,6 +43,7 @@ export function useStage(
       setViewMode: (viewMode) => void remote.setViewMode(viewMode),
       setDefaultPaperSize: (paperSize) =>
         void remote.setDefaultPaperSize(paperSize),
+      setColorScheme: (colorScheme) => void remote.setColorScheme(colorScheme),
     });
 
     let disposed = false;
