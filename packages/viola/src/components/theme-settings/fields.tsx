@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { ChevronDown } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
@@ -28,33 +28,14 @@ export interface FieldProps {
   onRevert: () => void;
 }
 
-const GENERIC_FONT_FAMILIES = [
-  'serif',
-  'sans-serif',
-  'monospace',
-  'cursive',
-  'fantasy',
-  'system-ui',
-  'math',
-  'ui-serif',
-  'ui-sans-serif',
-  'ui-monospace',
-  'ui-rounded',
-];
-
-const COLOR_KEYWORDS = ['currentColor', 'transparent'];
-
 const isComposing = (event: React.KeyboardEvent) =>
   event.nativeEvent.isComposing || event.keyCode === 229;
-
-const asTyped = (text: string) => text;
 
 function TextValueInput({
   value,
   onCommit,
   onRevert,
-  suggestions = [],
-  complete = asTyped,
+  complete,
   placeholder,
   className,
   ...aria
@@ -68,12 +49,10 @@ function TextValueInput({
     | 'aria-describedby'
     | 'aria-invalid'
   > & {
-    suggestions?: readonly string[];
     /** Rewrites the text before it is committed and shown. */
-    complete?: (text: string) => string;
+    complete: (text: string) => string;
   }) {
   const [draft, setDraft] = useDraft(value);
-  const listId = useId();
   const stepper = useNumberStepper();
   const commit = (text: string) =>
     text.trim() === value.trim() ? onRevert() : onCommit(text);
@@ -86,64 +65,46 @@ function TextValueInput({
   };
 
   return (
-    <>
-      <Input
-        {...aria}
-        ref={stepper.ref}
-        type="text"
-        className={cn('h-8 font-mono text-xs md:text-xs', className)}
-        value={draft}
-        placeholder={placeholder}
-        list={suggestions.length > 0 ? listId : undefined}
-        autoComplete="off"
-        spellCheck={false}
-        onChange={(event) => {
-          stepper.reset();
-          setDraft(event.target.value);
-          // Picking a datalist suggestion is a choice, not typing.
-          const { inputType } = event.nativeEvent as Partial<InputEvent>;
-          if (
-            suggestions.length > 0 &&
-            (inputType === undefined || inputType === 'insertReplacementText')
-          ) {
-            commitDraft(event.target.value);
-          }
-        }}
-        onBlur={() => {
-          stepper.reset();
+    <Input
+      {...aria}
+      ref={stepper.ref}
+      type="text"
+      className={cn('h-8 font-mono text-xs md:text-xs', className)}
+      value={draft}
+      placeholder={placeholder}
+      autoComplete="off"
+      spellCheck={false}
+      onChange={(event) => {
+        stepper.reset();
+        setDraft(event.target.value);
+      }}
+      onBlur={() => {
+        stepper.reset();
+        commitDraft(draft);
+      }}
+      onKeyDown={(event) => {
+        if (isComposing(event)) {
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
           commitDraft(draft);
-        }}
-        onKeyDown={(event) => {
-          if (isComposing(event)) {
-            return;
+        } else if (event.key === 'Escape') {
+          stepper.reset();
+          setDraft(value);
+          onRevert();
+        } else {
+          const stepped = stepper.step(event, {
+            fallback: placeholder,
+            complete,
+          });
+          if (stepped !== null) {
+            setDraft(stepped);
+            onCommit(stepped);
           }
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            commitDraft(draft);
-          } else if (event.key === 'Escape') {
-            stepper.reset();
-            setDraft(value);
-            onRevert();
-          } else {
-            const stepped = stepper.step(event, {
-              fallback: placeholder,
-              complete,
-            });
-            if (stepped !== null) {
-              setDraft(stepped);
-              onCommit(stepped);
-            }
-          }
-        }}
-      />
-      {suggestions.length > 0 && (
-        <datalist id={listId}>
-          {suggestions.map((suggestion) => (
-            <option key={suggestion} value={suggestion} />
-          ))}
-        </datalist>
-      )}
-    </>
+        }
+      }}
+    />
   );
 }
 
@@ -207,7 +168,10 @@ function KeywordMenu({
   );
 }
 
-function KeywordTextField(props: FieldProps) {
+function KeywordTextField({
+  className,
+  ...props
+}: FieldProps & { className?: string }) {
   const { value, descriptor, defaultValue, label, onCommit, onRevert } = props;
   const units = useMemo(() => getDescriptorUnits(descriptor), [descriptor]);
   const complete = (text: string) =>
@@ -218,7 +182,7 @@ function KeywordTextField(props: FieldProps) {
     );
 
   return (
-    <div className="flex gap-2">
+    <div className={cn('flex gap-2', className)}>
       <TextValueInput
         {...fieldAria(props)}
         className="flex-1"
@@ -241,7 +205,7 @@ function KeywordTextField(props: FieldProps) {
 }
 
 function ColorField(props: FieldProps) {
-  const { value, descriptor, defaultValue, label, onCommit, onRevert } = props;
+  const { value, defaultValue, label, onCommit } = props;
   const valueColor = useMemo(() => toPickerColor(value), [value]);
   const defaultColor = useMemo(
     () => (defaultValue ? toPickerColor(defaultValue) : null),
@@ -283,42 +247,15 @@ function ColorField(props: FieldProps) {
           onChange={(event) => setPickerColor(event.target.value)}
         />
       )}
-      <TextValueInput
-        {...fieldAria(props)}
-        className="flex-1"
-        value={value}
-        placeholder={defaultValue}
-        suggestions={[...COLOR_KEYWORDS, ...descriptor.keywords]}
-        onCommit={onCommit}
-        onRevert={onRevert}
-      />
+      <KeywordTextField {...props} className="min-w-0 flex-1" />
     </div>
   );
 }
 
 export function ValueField(props: FieldProps) {
-  const { descriptor, defaultValue } = props;
-  switch (descriptor.input) {
-    case 'color':
-      return <ColorField {...props} />;
-    case 'select':
-    case 'dimension':
-    case 'number':
-      return <KeywordTextField {...props} />;
-    default:
-      return (
-        <TextValueInput
-          {...fieldAria(props)}
-          value={props.value}
-          placeholder={defaultValue}
-          suggestions={
-            descriptor.input === 'font-family'
-              ? [...descriptor.keywords, ...GENERIC_FONT_FAMILIES]
-              : descriptor.keywords
-          }
-          onCommit={props.onCommit}
-          onRevert={props.onRevert}
-        />
-      );
-  }
+  return props.descriptor.input === 'color' ? (
+    <ColorField {...props} />
+  ) : (
+    <KeywordTextField {...props} />
+  );
 }
