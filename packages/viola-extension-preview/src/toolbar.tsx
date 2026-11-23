@@ -40,6 +40,7 @@ import {
   zoomFits,
 } from '@v/viewer/protocol';
 import type { PreviewPreferences } from './preferences';
+import { useToolbarFocus } from './toolbar-focus';
 import type { StageCommands } from './use-stage';
 
 const viewModeOptions: Record<
@@ -64,6 +65,8 @@ export function Toolbar({
   onPreferencesChange: (patch: Partial<PreviewPreferences>) => void;
   t: ExtensionTranslate;
 }) {
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const toolbarFocus = useToolbarFocus(toolbarRef);
   const pageCount = state?.pageCount ?? 0;
   // Pages of a right-to-left publication progress leftward, the way its
   // spreads are laid out, so the left button turns forward there.
@@ -84,86 +87,101 @@ export function Toolbar({
   );
 
   return (
-    // The sides share the width equally so that paging stays centered. A pane
-    // too narrow even for the compact controls scrolls them rather than
+    // A pane too narrow even for the compact controls scrolls them rather than
     // letting them wrap onto a second row.
     <div className="@container flex shrink-0 items-center gap-2 overflow-x-auto border-b px-2 py-1 [scrollbar-width:none]">
-      {/* The host lays its sidebar toggle over the top-left corner of the
-          leftmost pane, so the first control starts clear of it. */}
-      <div className="flex flex-1 ps-10">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          aria-label={t('preview_view_mode_aria')}
-          value={preferences.viewMode}
-          onValueChange={(value) => {
-            if (isViewMode(value)) {
-              onPreferencesChange({ viewMode: value });
-            }
-          }}
-        >
-          {viewModes.map((viewMode) => {
-            const { icon: Icon, label } = viewModeOptions[viewMode];
-            return (
-              <ToggleGroupItem
-                key={viewMode}
-                value={viewMode}
-                aria-label={t(label)}
-                title={t(label)}
-              >
-                <Icon />
-              </ToggleGroupItem>
-            );
-          })}
-        </ToggleGroup>
-      </div>
+      {/* The sides share the width equally so that paging stays centered. */}
+      <div
+        ref={toolbarRef}
+        role="toolbar"
+        aria-label={t('preview_toolbar_aria')}
+        className="flex flex-1 items-center gap-2"
+        {...toolbarFocus}
+      >
+        {/* The host lays its sidebar toggle over the top-left corner of the
+            leftmost pane, so the first control starts clear of it. */}
+        <div className="flex flex-1 ps-10">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            rovingFocus={false}
+            aria-label={t('preview_view_mode_aria')}
+            value={preferences.viewMode}
+            onValueChange={(value) => {
+              if (isViewMode(value)) {
+                onPreferencesChange({ viewMode: value });
+              }
+            }}
+          >
+            {viewModes.map((viewMode) => {
+              const { icon: Icon, label } = viewModeOptions[viewMode];
+              return (
+                <ToggleGroupItem
+                  key={viewMode}
+                  value={viewMode}
+                  aria-label={t(label)}
+                  title={t(label)}
+                >
+                  <Icon />
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        </div>
 
-      <div className="flex items-center gap-1">
-        {pageButton(rtl ? 'next' : 'prev', ChevronLeft)}
-        <PageNumberInput
-          pageIndex={state?.pageIndex ?? 0}
-          pageCount={pageCount}
-          disabled={!stage || pageCount === 0}
-          onGoTo={(pageIndex) => stage?.goTo(pageIndex)}
-          t={t}
-        />
-        <span className="min-w-8 text-sm text-muted-foreground tabular-nums @max-md:hidden">
-          / {pageCount > 0 ? pageCount : '-'}
-        </span>
-        {pageButton(rtl ? 'prev' : 'next', ChevronRight)}
-      </div>
-
-      <div className="flex flex-1 items-center justify-end gap-1">
-        <ZoomControls
-          disabled={!stage}
-          zoom={preferences.zoom}
-          scale={state?.scale ?? null}
-          onZoom={(zoom) => onPreferencesChange({ zoom })}
-          t={t}
-        />
-        <span
-          className="grid size-4 place-items-center"
-          title={state?.failed ? t('preview_update_failed') : undefined}
+        {/* biome-ignore lint/a11y/useSemanticElements: an ARIA group inside a toolbar; fieldset is for form controls */}
+        <div
+          role="group"
+          aria-label={t('preview_paging_aria')}
+          className="flex items-center gap-1"
         >
-          {state?.failed ? (
-            <TriangleAlert
+          {pageButton(rtl ? 'next' : 'prev', ChevronLeft)}
+          <PageNumberInput
+            pageIndex={state?.pageIndex ?? 0}
+            pageCount={pageCount}
+            disabled={!stage || pageCount === 0}
+            onGoTo={(pageIndex) => stage?.goTo(pageIndex)}
+            t={t}
+          />
+          <span className="min-w-8 text-sm text-muted-foreground tabular-nums @max-md:hidden">
+            / {pageCount > 0 ? pageCount : '-'}
+          </span>
+          {pageButton(rtl ? 'prev' : 'next', ChevronRight)}
+        </div>
+
+        <div className="flex flex-1 items-center justify-end gap-1">
+          <ZoomControls
+            disabled={!stage}
+            zoom={preferences.zoom}
+            scale={state?.scale ?? null}
+            onZoom={(zoom) => onPreferencesChange({ zoom })}
+            t={t}
+          />
+        </div>
+      </div>
+      <span
+        role="status"
+        className="grid size-4 shrink-0 place-items-center"
+        title={state?.failed ? t('preview_update_failed') : undefined}
+      >
+        {state?.failed ? (
+          <TriangleAlert
+            role="img"
+            aria-label={t('preview_update_failed')}
+            className="size-4 text-destructive"
+          />
+        ) : (
+          state &&
+          state.status !== 'complete' && (
+            <Loader2
               role="img"
-              aria-label={t('preview_update_failed')}
-              className="size-4 text-destructive"
+              aria-label={t('preview_rendering_aria')}
+              className="size-4 animate-spin text-muted-foreground"
             />
-          ) : (
-            state &&
-            state.status !== 'complete' && (
-              <Loader2
-                role="img"
-                aria-label={t('preview_rendering_aria')}
-                className="size-4 animate-spin text-muted-foreground"
-              />
-            )
-          )}
-        </span>
-      </div>
+          )
+        )}
+      </span>
     </div>
   );
 }
@@ -286,15 +304,25 @@ function ZoomControls({
 
   return (
     <>
-      <div className="flex items-center gap-1 @max-xl:hidden">
+      {/* biome-ignore lint/a11y/useSemanticElements: an ARIA group inside a toolbar; fieldset is for form controls */}
+      <div
+        role="group"
+        aria-label={t('preview_zoom_aria')}
+        className="flex items-center gap-1 @max-xl:hidden"
+      >
         {stepButton('out')}
         <ZoomInput scale={current} disabled={disabled} onZoom={onZoom} t={t} />
         {stepButton('in')}
-        <Separator orientation="vertical" className="mx-1 h-5" />
+        <Separator
+          orientation="vertical"
+          decorative={false}
+          className="mx-1 h-5"
+        />
         <ToggleGroup
           type="single"
           variant="outline"
           size="sm"
+          rovingFocus={false}
           aria-label={t('preview_zoom_fit_aria')}
           value={typeof zoom === 'number' ? '' : zoom}
           onValueChange={(value) => {
