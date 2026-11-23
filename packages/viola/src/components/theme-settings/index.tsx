@@ -10,7 +10,6 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { useDebounce } from 'react-use';
 
 import { Button } from '@v/ui/button';
 import { Code, Loader2, SlidersHorizontal, TriangleAlert } from '@v/ui/icon';
@@ -41,6 +40,7 @@ import { getCategoryLabel, getGroupLabel, qualifyLabel } from './messages';
 import {
   buildSettingsRows,
   findSection,
+  indexSettings,
   isFiltering,
   matchSettings,
   type SettingsRow,
@@ -56,7 +56,6 @@ const CodeEditor = lazy(() => import('../code-editor'));
 type Mode = 'gui' | 'css';
 
 const PAGE_SIZE = 150;
-const SEARCH_DEBOUNCE_MS = 200;
 
 export interface ThemeCssEditorProps {
   css: string;
@@ -124,8 +123,6 @@ function useThemeSettings(
   language: string | undefined,
 ) {
   const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  useDebounce(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS, [query]);
   const [modifiedOnly, setModifiedOnly] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [scope, setScope] = useState<ThemeScopeId>(DEFAULT_THEME_SCOPE);
@@ -133,11 +130,11 @@ function useThemeSettings(
   const [marginBoxSpread, setMarginBoxSpread] = useState(false);
 
   const filter = useMemo(
-    () => ({ query: debouncedQuery, modifiedOnly }),
-    [debouncedQuery, modifiedOnly],
+    () => ({ query, modifiedOnly }),
+    [query, modifiedOnly],
   );
   const filtering = isFiltering(filter);
-  const filterKey = JSON.stringify([debouncedQuery, modifiedOnly, scope]);
+  const filterKey = JSON.stringify([query, modifiedOnly, scope]);
   // The section picked while filtering is tracked apart, so that clearing the
   // filter returns to the section being browsed before.
   const [browseSection, setBrowseSection] = useState<string | null>(null);
@@ -146,22 +143,31 @@ function useThemeSettings(
     noSection,
   );
 
+  const index = useMemo(
+    () =>
+      schema
+        ? indexSettings({
+            groups: schema.groups,
+            getGroupLabel,
+            getCategoryLabel,
+            qualifyLabel,
+          })
+        : null,
+    [schema],
+  );
   const matches = useMemo(() => {
-    if (!schema || !model) {
+    if (!index || !model) {
       return null;
     }
     const variables = model.scopes[scope].variables;
     return matchSettings({
-      groups: schema.groups,
+      index,
       scope,
       filter,
       isModified: (name) => Object.hasOwn(variables, name),
       showAdvanced,
-      getGroupLabel,
-      getCategoryLabel,
-      qualifyLabel,
     });
-  }, [schema, model, scope, filter, showAdvanced]);
+  }, [index, model, scope, filter, showAdvanced]);
   const toc = matches?.toc ?? [];
   const section = resolveSection(
     toc,
@@ -172,6 +178,11 @@ function useThemeSettings(
   // transition while the table of contents shows the pick right away.
   const [, startTransition] = useTransition();
   const [pickedSection, setPickedSection] = useOptimistic(section);
+  // A query re-renders the whole list, which the next keystroke interrupts.
+  const handleQueryChange = useCallback(
+    (next: string) => startTransition(() => setQuery(next)),
+    [],
+  );
 
   const listKey = toListKey(section);
   const prerender = usePrerender(listKey, { resetKey: filterKey });
@@ -244,13 +255,6 @@ function useThemeSettings(
         : 'horizontal-tb',
     [model, schema, theme, language],
   );
-
-  const handleQueryChange = useCallback((next: string, immediate = false) => {
-    setQuery(next);
-    if (immediate) {
-      setDebouncedQuery(next);
-    }
-  }, []);
 
   const handleSelect = useCallback(
     (next: string | null) =>

@@ -10,8 +10,10 @@ import {
   findSection,
   getTocKey,
   groupKey,
+  indexSettings,
   isFiltering,
   matchSettings,
+  type SettingsIndexInput,
   type SettingsMatchInput,
   subgroupKey,
 } from './rows';
@@ -56,25 +58,34 @@ const target = (id: string) => ({ kind: 'target', id }) as const;
 const category = (id: ThemeVariableCategory) =>
   ({ kind: 'category', id }) as const;
 
-function match(overrides: Partial<SettingsMatchInput> = {}) {
+type MatchInput = Partial<
+  Omit<SettingsMatchInput, 'index'> & SettingsIndexInput
+>;
+
+function match({
+  groups = schema.groups,
+  getGroupLabel = (id) => labels[id],
+  getCategoryLabel = (id) => categoryLabels[id] ?? id,
+  qualifyLabel = (module, label) => `${module}: ${label}`,
+  ...overrides
+}: MatchInput = {}) {
   return matchSettings({
-    groups: schema.groups,
+    index: indexSettings({
+      groups,
+      getGroupLabel,
+      getCategoryLabel,
+      qualifyLabel,
+    }),
     scope: 'root',
     filter: { query: '', modifiedOnly: false },
     isModified: () => false,
     showAdvanced: false,
-    getGroupLabel: (id) => labels[id],
-    getCategoryLabel: (id) => categoryLabels[id] ?? id,
-    qualifyLabel: (module, label) => `${module}: ${label}`,
     ...overrides,
   });
 }
 
-const keys = (
-  input: Partial<SettingsMatchInput>,
-  section: string | null = null,
-  limit = 100,
-) => buildSettingsRows(match(input), section, limit).map((row) => row.key);
+const keys = (input: MatchInput, section: string | null = null, limit = 100) =>
+  buildSettingsRows(match(input), section, limit).map((row) => row.key);
 
 describe('matchSettings', () => {
   it('lists the groups and their subgroups with counts', () => {
@@ -257,7 +268,7 @@ describe('matchSettings', () => {
         'root-counter-fig': v(),
       },
     });
-    const names = (input: Partial<SettingsMatchInput>) =>
+    const names = (input: MatchInput) =>
       buildSettingsRows(match({ groups: advanced.groups, ...input }), null, 100)
         .filter((row) => row.kind === 'variable')
         .map((row) => row.key);
@@ -295,7 +306,7 @@ describe('matchSettings', () => {
         'mbox-top-outside-content': v(),
       },
     });
-    const matches = (input: Partial<SettingsMatchInput> = {}) =>
+    const matches = (input: MatchInput = {}) =>
       match({ groups: page.groups, ...input });
     const rowKeys = (section: string | null, input = {}) =>
       buildSettingsRows(matches(input), section, 100).map((row) => row.key);
@@ -508,18 +519,21 @@ describe('buildSettingsRows', () => {
     ]);
   });
 
-  it('keeps the real schema fast enough to rebuild per keystroke', async () => {
+  it('keeps the real schema fast enough to match per query', async () => {
     const real = await loadThemeVariableSchema();
+    const index = indexSettings({
+      groups: real.groups,
+      getGroupLabel: (id) => id,
+      getCategoryLabel: (id) => id,
+      qualifyLabel: (module, label) => `${module}: ${label}`,
+    });
     const started = performance.now();
     const matches = matchSettings({
-      groups: real.groups,
+      index,
       scope: 'root',
       filter: { query: 'color', modifiedOnly: false },
       isModified: () => false,
       showAdvanced: false,
-      getGroupLabel: (id) => id,
-      getCategoryLabel: (id) => id,
-      qualifyLabel: (module, label) => `${module}: ${label}`,
     });
     const rows = buildSettingsRows(matches, null, 150);
     expect(performance.now() - started).toBeLessThan(200);

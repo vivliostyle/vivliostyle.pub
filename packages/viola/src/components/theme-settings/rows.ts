@@ -1,6 +1,7 @@
 import { m } from '../../generated/paraglide/messages';
 import {
   isVariableGroupInScope,
+  THEME_VARIABLE_CATEGORIES,
   type ThemeScopeId,
   type ThemeVariable,
   type ThemeVariableCategory,
@@ -75,17 +76,47 @@ export interface SettingsMatches {
   matchCount: number;
 }
 
-export interface SettingsMatchInput {
+export interface SettingsIndexInput {
   groups: readonly ThemeVariableGroup[];
+  getGroupLabel: (groupId: string) => string;
+  getCategoryLabel: (category: ThemeVariableCategory) => string;
+  /** Labels a subgroup that a module lends to a group of another name. */
+  qualifyLabel: (moduleLabel: string, label: string) => string;
+}
+
+interface IndexedSubgroup {
+  key: string;
+  kind: ThemeVariableSubgroup['kind'];
+  label: string;
+  box: string | null;
+  variables: readonly ThemeVariable[];
+  /** Lowercased text of each variable that the query tokens must occur in. */
+  haystacks: readonly string[];
+}
+
+interface IndexedGroup {
+  id: string;
+  label: string;
+  subgroups: readonly IndexedSubgroup[];
+}
+
+/**
+ * The groups with their labels resolved, which `matchSettings` filters. A
+ * message call resolves the locale anew each time, which adds up over every
+ * variable on every query.
+ */
+export interface SettingsIndex {
+  groups: readonly IndexedGroup[];
+  categoryLabels: Readonly<Record<ThemeVariableCategory, string>>;
+}
+
+export interface SettingsMatchInput {
+  index: SettingsIndex;
   scope: ThemeScopeId;
   filter: SettingsFilter;
   isModified: (name: string) => boolean;
   /** Whether to list the variables marked as advanced. */
   showAdvanced: boolean;
-  getGroupLabel: (groupId: string) => string;
-  getCategoryLabel: (category: ThemeVariableCategory) => string;
-  /** Labels a subgroup that a module lends to a group of another name. */
-  qualifyLabel: (moduleLabel: string, label: string) => string;
 }
 
 export type SettingsRow =
@@ -117,16 +148,12 @@ export function tokenizeQuery(query: string): string[] {
   return query.toLowerCase().split(/\s+/).filter(Boolean);
 }
 
-/** Matches the tokens against a variable and the labels it is shown under. */
-export function matchesQuery(
+/** Text of a variable and the labels it is shown under, for a search. */
+function getHaystack(
   variable: ThemeVariable,
-  tokens: readonly string[],
   labels: readonly string[],
-): boolean {
-  if (tokens.length === 0) {
-    return true;
-  }
-  const haystack = [
+): string {
+  return [
     variable.name,
     variable.key,
     variable.group,
@@ -135,7 +162,6 @@ export function matchesQuery(
   ]
     .join('\n')
     .toLowerCase();
-  return tokens.every((token) => haystack.includes(token));
 }
 
 // The shared box opens the margin boxes, as every other one falls back to it.
@@ -199,7 +225,7 @@ function splitSpreadSides(
 function splitIntoParts(
   sectionKey: string,
   variables: ThemeVariable[],
-  getCategoryLabel: (category: ThemeVariableCategory) => string,
+  categoryLabels: SettingsIndex['categoryLabels'],
 ): MatchedPart[] {
   const byCategory = new Map<ThemeVariableCategory, ThemeVariable[]>();
   for (const variable of variables) {
@@ -215,20 +241,60 @@ function splitIntoParts(
   }
   return [...byCategory].map(([category, part]) => ({
     key: `${sectionKey}/${category}`,
-    label: getCategoryLabel(category),
+    label: categoryLabels[category],
     variables: part,
   }));
 }
 
-export function matchSettings({
+export function indexSettings({
   groups,
+  getGroupLabel,
+  getCategoryLabel,
+  qualifyLabel,
+}: SettingsIndexInput): SettingsIndex {
+  const indexed = groups.map((group): IndexedGroup => {
+    const label = getGroupLabel(group.id);
+    return {
+      id: group.id,
+      label,
+      subgroups: group.subgroups
+        .flatMap(splitSpreadSides)
+        .map((subgroup): IndexedSubgroup => {
+          const ownLabel =
+            subgroup.kind === 'target'
+              ? getTargetLabel(subgroup.group, subgroup.id)
+              : getCategoryLabel(subgroup.id);
+          const subgroupLabel = subgroup.module
+            ? qualifyLabel(getGroupLabel(subgroup.module), ownLabel)
+            : ownLabel;
+          return {
+            key: subgroupKey(subgroup.group, subgroup),
+            kind: subgroup.kind,
+            label: subgroupLabel,
+            box: getMarginBox(subgroup),
+            variables: subgroup.variables,
+            haystacks: subgroup.variables.map((variable) =>
+              getHaystack(variable, [label, subgroupLabel]),
+            ),
+          };
+        }),
+    };
+  });
+  const categoryLabels = Object.fromEntries(
+    THEME_VARIABLE_CATEGORIES.map((category) => [
+      category,
+      getCategoryLabel(category),
+    ]),
+  ) as Record<ThemeVariableCategory, string>;
+  return { groups: indexed, categoryLabels };
+}
+
+export function matchSettings({
+  index,
   scope,
   filter,
   isModified,
   showAdvanced,
-  getGroupLabel,
-  getCategoryLabel,
-  qualifyLabel,
 }: SettingsMatchInput): SettingsMatches {
   const tokens = tokenizeQuery(filter.query);
   const countModified = (variables: ThemeVariable[]) =>
@@ -236,50 +302,41 @@ export function matchSettings({
   const matched: MatchedGroup[] = [];
   let matchCount = 0;
 
-  for (const group of groups) {
-    const label = getGroupLabel(group.id);
-    const subgroups = group.subgroups
-      .flatMap(splitSpreadSides)
-      .flatMap((subgroup): MatchedSubgroup[] => {
-        const ownLabel =
-          subgroup.kind === 'target'
-            ? getTargetLabel(subgroup.group, subgroup.id)
-            : getCategoryLabel(subgroup.id);
-        const subgroupLabel = subgroup.module
-          ? qualifyLabel(getGroupLabel(subgroup.module), ownLabel)
-          : ownLabel;
-        const variables = subgroup.variables.filter(
-          (variable) =>
-            isVariableGroupInScope(scope, variable.group) &&
-            (!filter.modifiedOnly || isModified(variable.name)) &&
-            // A search looks through them all, to find a setting by its name.
-            (showAdvanced ||
-              !variable.advanced ||
-              tokens.length > 0 ||
-              isModified(variable.name)) &&
-            matchesQuery(variable, tokens, [label, subgroupLabel]),
-        );
-        if (variables.length === 0) {
-          return [];
-        }
-        const key = subgroupKey(subgroup.group, subgroup);
-        return [
-          {
-            section: {
-              key,
-              groupId: group.id,
-              label: subgroupLabel,
-              count: variables.length,
-              modified: countModified(variables),
-            },
-            parts:
-              subgroup.kind === 'target'
-                ? splitIntoParts(key, variables, getCategoryLabel)
-                : [{ key, label: null, variables }],
-            box: getMarginBox(subgroup),
+  for (const group of index.groups) {
+    const { label } = group;
+    const subgroups = group.subgroups.flatMap((subgroup): MatchedSubgroup[] => {
+      const variables = subgroup.variables.filter(
+        (variable, i) =>
+          isVariableGroupInScope(scope, variable.group) &&
+          (!filter.modifiedOnly || isModified(variable.name)) &&
+          // A search looks through them all, to find a setting by its name.
+          (showAdvanced ||
+            !variable.advanced ||
+            tokens.length > 0 ||
+            isModified(variable.name)) &&
+          tokens.every((token) => subgroup.haystacks[i].includes(token)),
+      );
+      if (variables.length === 0) {
+        return [];
+      }
+      const { key } = subgroup;
+      return [
+        {
+          section: {
+            key,
+            groupId: group.id,
+            label: subgroup.label,
+            count: variables.length,
+            modified: countModified(variables),
           },
-        ];
-      });
+          parts:
+            subgroup.kind === 'target'
+              ? splitIntoParts(key, variables, index.categoryLabels)
+              : [{ key, label: null, variables }],
+          box: subgroup.box,
+        },
+      ];
+    });
     const sections = getTocSections(subgroups);
     const count = sections.reduce((sum, s) => sum + s.count, 0);
     if (count === 0) {
