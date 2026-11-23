@@ -3,6 +3,7 @@ import { invariant } from 'outvariant';
 import type { ComponentType } from 'react';
 
 import {
+  type ExtensionColorScheme,
   type ExtensionHostApi,
   type ExtensionMountContext,
   type ExtensionViewModule,
@@ -74,13 +75,19 @@ export async function initExtensionFrame() {
     );
   };
   renderView(viewModule);
-  void host.subscribeColorScheme(
-    Comlink.proxy((next) => {
+  const updateColorScheme = (next: ExtensionColorScheme) => {
+    if (next !== colorScheme) {
       colorScheme = next;
       applyColorScheme(next);
       renderView(renderedModule);
-    }),
-  );
+    }
+  };
+  // The subscription reports changes only, so a change made while the view
+  // was loading is caught by reading the scheme again once it is in place.
+  void host
+    .subscribeColorScheme(Comlink.proxy(updateColorScheme))
+    .then(() => host.getColorScheme())
+    .then(updateColorScheme);
   if (sizing === 'content') {
     reportExtensionContentSize();
   }
