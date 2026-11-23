@@ -50,15 +50,21 @@ export function useStage(
     void remote
       .subscribe(Comlink.proxy((next: StageState) => setState(next)))
       .then((unsub) => {
-        if (disposed) {
+        // The returned function is a proxy of its own, holding a port open
+        // in the stage until it is released.
+        const release = () => {
           void unsub();
+          (unsub as Comlink.Remote<() => void>)[Comlink.releaseProxy]();
+        };
+        if (disposed) {
+          release();
         } else {
-          unsubscribe = unsub;
+          unsubscribe = release;
         }
       });
     return () => {
       disposed = true;
-      void unsubscribe?.();
+      unsubscribe?.();
       remote[Comlink.releaseProxy]();
     };
   }, [frameRef, url, frameLoadCount]);
