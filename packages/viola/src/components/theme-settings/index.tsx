@@ -129,6 +129,8 @@ function useThemeSettings(
   const [modifiedOnly, setModifiedOnly] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [scope, setScope] = useState<ThemeScopeId>(DEFAULT_THEME_SCOPE);
+  // Each margin box lists its settings apart, each with a picker of its own.
+  const [marginBoxSpread, setMarginBoxSpread] = useState(false);
 
   const filter = useMemo(
     () => ({ query: debouncedQuery, modifiedOnly }),
@@ -310,6 +312,8 @@ function useThemeSettings(
       getDefaultValue,
       getPageDefault,
       writingMode,
+      marginBoxSpread,
+      onMarginBoxSpreadChange: setMarginBoxSpread,
       onShowMore: handleShowMore,
       onSwitchScope: setScope,
     },

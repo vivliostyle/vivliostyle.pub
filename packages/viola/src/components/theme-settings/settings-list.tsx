@@ -25,6 +25,8 @@ function SettingsList({
   getDefaultValue,
   getPageDefault,
   writingMode,
+  marginBoxSpread,
+  onMarginBoxSpreadChange,
   onShowMore,
   onCommit,
   onSwitchScope,
@@ -40,6 +42,9 @@ function SettingsList({
     name: string,
   ) => string | undefined;
   writingMode: WritingMode;
+  /** Whether the margin box picker shows a spread rather than a page. */
+  marginBoxSpread: boolean;
+  onMarginBoxSpreadChange: (spread: boolean) => void;
   onShowMore: () => void;
   onCommit: CommitHandler;
   onSwitchScope: (scope: ThemeScopeId) => void;
@@ -95,6 +100,8 @@ function SettingsList({
                   scope={scope}
                   writingMode={writingMode}
                   getContent={getContent}
+                  spread={marginBoxSpread}
+                  onSpreadChange={onMarginBoxSpreadChange}
                 />
               );
             case 'category':
