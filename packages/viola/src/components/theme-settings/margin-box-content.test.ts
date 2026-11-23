@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseThemeCss } from '../../libs/theme-variables';
-import { getSpreadContent, previewContent } from './margin-box-content';
+import { getPageContent, previewContent } from './margin-box-content';
 import { findCell, type MarginBoxCell } from './margin-boxes';
 
 const samples = { page: 12, pages: 200 };
@@ -31,7 +31,7 @@ describe('previewContent', () => {
   });
 });
 
-describe('getSpreadContent', () => {
+describe('getPageContent', () => {
   const cell = (id: string) => findCell(id) as MarginBoxCell;
   const model = parseThemeCss(`
     :root {
@@ -47,7 +47,7 @@ describe('getSpreadContent', () => {
     '--vs-page--mbox-top-outside-content': 'env(doc-title)',
   };
   const content = (id: string, page: 'left' | 'right') =>
-    getSpreadContent(cell(id), page, model, (_, name) => defaults[name]);
+    getPageContent(cell(id), page, model, (_, name) => defaults[name]);
 
   it('takes the value a stylesheet scope reaching the page sets', () => {
     expect(content('mbox-top-center', 'left')).toBe('env(pub-title)');
@@ -64,5 +64,26 @@ describe('getSpreadContent', () => {
   it('keeps a value of its own, even an empty one, over the fallback', () => {
     expect(content('mbox-top-left', 'left')).toBe("''");
     expect(content('mbox-top-right', 'right')).toBe('env(doc-title)');
+  });
+
+  it('reads the first page as a right page that `:first` rules override', () => {
+    const first = parseThemeCss(`
+      @page :right {
+        --vs-page--mbox-top-right-content: env(doc-title);
+        --vs-page--mbox-bottom-right-content: counter(page);
+      }
+      @page :first {
+        --vs-page--mbox-top-right-content: '';
+      }
+    `);
+    const onFirst = (id: string) =>
+      getPageContent(cell(id), 'first', first, () => undefined);
+    expect(onFirst('mbox-top-right')).toBe("''");
+    expect(onFirst('mbox-bottom-right')).toBe('counter(page)');
+    expect(
+      getPageContent(cell('mbox-bottom-right'), 'first', model, (_, name) =>
+        name === '--vs-page--mbox-bottom-outside-content' ? '1' : undefined,
+      ),
+    ).toBe('1');
   });
 });

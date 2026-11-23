@@ -26,6 +26,7 @@ import {
   DEFAULT_THEME_SCOPE,
   loadThemeVariableSchema,
   parseThemeCss,
+  resolvePageDefaults,
   resolveThemeDefaults,
   scanThemeDeclarations,
   THEME_SCOPES,
@@ -35,7 +36,7 @@ import {
   type ThemeVariableSchema,
 } from '../../libs/theme-variables';
 import { commitValue } from './commit';
-import type { SpreadPage } from './margin-boxes';
+import { PREVIEW_PAGE_CLASSES, type PreviewPage } from './margin-boxes';
 import { getCategoryLabel, getGroupLabel, qualifyLabel } from './messages';
 import {
   buildSettingsRows,
@@ -211,24 +212,17 @@ function useThemeSettings(
         : noDefaults,
     [schema, theme, language, scope],
   );
-  const getSpreadDefault = useMemo(() => {
+  const getPageDefault = useMemo(() => {
     if (!schema) {
       return noDefaults;
     }
-    const left = resolveThemeDefaults({
-      schema,
-      theme,
-      language,
-      scope: 'page-left',
-    });
-    const right = resolveThemeDefaults({
-      schema,
-      theme,
-      language,
-      scope: 'page-right',
-    });
-    return (page: SpreadPage, name: string) =>
-      page === 'left' ? left(name) : right(name);
+    const resolvers = new Map(
+      Object.entries(PREVIEW_PAGE_CLASSES).map(([page, pageClasses]) => [
+        page,
+        resolvePageDefaults({ schema, theme, language, pageClasses }),
+      ]),
+    );
+    return (page: PreviewPage, name: string) => resolvers.get(page)?.(name);
   }, [schema, theme, language]);
 
   const handleQueryChange = useCallback((next: string, immediate = false) => {
@@ -296,7 +290,7 @@ function useThemeSettings(
       rows,
       scope,
       getDefaultValue,
-      getSpreadDefault,
+      getPageDefault,
       onShowMore: handleShowMore,
       onSwitchScope: setScope,
     },

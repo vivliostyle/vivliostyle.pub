@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { parseThemeCss } from './css-model';
 import {
   matchesLanguageRange,
+  resolvePageDefaults,
   resolveThemeDefaults,
   scanThemeDeclarations,
 } from './defaults';
@@ -273,6 +274,20 @@ describe('resolveThemeDefaults', () => {
     expect(scoped('page-right')).toEqual(['page', 'sides', undefined]);
     expect(scoped('page-first')).toEqual(['first', undefined, undefined]);
     expect(scoped('root')).toEqual(['root', undefined, undefined]);
+  });
+
+  it('matches a page that several page classes describe at once', () => {
+    const page = (css: string) =>
+      resolvePageDefaults({
+        schema,
+        theme: scanThemeDeclarations(css),
+        pageClasses: ['first', 'right'],
+      })('--a');
+    expect(page(':root{--a:root}@page :right{--a:right}')).toBe('right');
+    expect(
+      page('@page :first{--a:first}@page :right{--a:right}@page :left{--a:x}'),
+    ).toBe('first');
+    expect(page(':root{--a:root}@page :left{--a:left}')).toBe('root');
   });
 
   it('scans a stylesheet once while it stays the same', () => {

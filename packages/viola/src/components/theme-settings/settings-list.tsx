@@ -8,12 +8,12 @@ import {
   type ThemeCssModel,
   type ThemeScopeId,
 } from '../../libs/theme-variables';
-import { getSpreadContent } from './margin-box-content';
+import { getPageContent } from './margin-box-content';
 import {
   type MarginBoxContentGetter,
   MarginBoxPicker,
 } from './margin-box-picker';
-import type { SpreadPage } from './margin-boxes';
+import type { PreviewPage } from './margin-boxes';
 import type { SettingsRow } from './rows';
 import { SettingInfoCard } from './setting-info';
 import { type CommitHandler, SettingRow } from './setting-row';
@@ -23,7 +23,7 @@ function SettingsList({
   model,
   scope,
   getDefaultValue,
-  getSpreadDefault,
+  getPageDefault,
   onShowMore,
   onCommit,
   onSwitchScope,
@@ -33,8 +33,8 @@ function SettingsList({
   model: ThemeCssModel;
   scope: ThemeScopeId;
   getDefaultValue: (name: string) => string | undefined;
-  /** Defaults on a page of a spread, whichever scope the list edits. */
-  getSpreadDefault: (page: SpreadPage, name: string) => string | undefined;
+  /** Defaults on a page of the preview, whichever scope the list edits. */
+  getPageDefault: (page: PreviewPage, name: string) => string | undefined;
   onShowMore: () => void;
   onCommit: CommitHandler;
   onSwitchScope: (scope: ThemeScopeId) => void;
@@ -50,8 +50,8 @@ function SettingsList({
     [rows],
   );
   const getContent = useCallback<MarginBoxContentGetter>(
-    (cell, page) => getSpreadContent(cell, page, model, getSpreadDefault),
-    [model, getSpreadDefault],
+    (cell, page) => getPageContent(cell, page, model, getPageDefault),
+    [model, getPageDefault],
   );
   if (rows.length === 0) {
     return (
@@ -87,6 +87,7 @@ function SettingsList({
                   boxes={row.boxes}
                   current={row.current}
                   onSelect={onSelectSection}
+                  scope={scope}
                   getContent={getContent}
                 />
               );

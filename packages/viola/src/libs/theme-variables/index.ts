@@ -14,6 +14,7 @@ export {
 } from './css-model';
 export type { CssDiagnostic, CssDiagnosticCode } from './css-scanner';
 export {
+  resolvePageDefaults,
   resolveThemeDefaults,
   scanThemeDeclarations,
   type ThemeDeclarations,

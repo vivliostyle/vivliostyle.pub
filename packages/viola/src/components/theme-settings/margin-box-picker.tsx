@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode, useState } from 'react';
 
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
+import type { ThemeScopeId } from '../../libs/theme-variables';
 import { getTargetLabel } from './labels';
 import { previewContent } from './margin-box-content';
 import {
@@ -18,10 +19,12 @@ import {
   MARGIN_BOX_GROUP,
   type MarginBoxCell,
   type MarginBoxEdge,
+  type PreviewPage,
   SHARED_MARGIN_BOXES,
   SPREAD_SIDE_BOXES,
   type SpreadPage,
   type SpreadSide,
+  sideOfPage,
 } from './margin-boxes';
 import type { MarginBoxOption } from './rows';
 import { ModifiedDot } from './settings-toc';
@@ -35,9 +38,10 @@ const PLACED = new Set([
 const EDGES = new Set(Object.values(EDGE_MARGIN_BOXES));
 
 // Numbers a left and a right page of a book that starts on a right page.
-const SAMPLE_PAGES: Readonly<Record<SpreadPage, number>> = {
+const SAMPLE_PAGES: Readonly<Record<PreviewPage, number>> = {
   left: 12,
   right: 13,
+  first: 1,
 };
 const SAMPLE_PAGE_COUNT = 200;
 
@@ -50,8 +54,26 @@ const boxLabel = (id: string) => getTargetLabel(MARGIN_BOX_GROUP, id);
 
 export type MarginBoxContentGetter = (
   cell: MarginBoxCell,
-  page: SpreadPage,
+  page: PreviewPage,
 ) => string | undefined;
+
+/**
+ * The pages the preview draws for the scope the list edits, and whether that
+ * scope reaches them. The first page stands alone where it opens a book.
+ */
+function getPreviewPages(
+  scope: ThemeScopeId,
+): { page: PreviewPage; reached: boolean }[] {
+  if (scope === 'page-first') {
+    return [{ page: 'first', reached: true }];
+  }
+  // Rules for the screen never reach a page.
+  const both = scope !== 'screen-root';
+  return [
+    { page: 'left', reached: both && scope !== 'page-right' },
+    { page: 'right', reached: both && scope !== 'page-left' },
+  ];
+}
 
 interface Picker {
   options: ReadonlyMap<string, MarginBoxOption>;
@@ -217,20 +239,25 @@ function EdgeBand({
   );
 }
 
-function SpreadPageView({
+function PreviewPageView({
   picker,
   page,
+  reached,
   getContent,
 }: {
   picker: Picker;
-  page: SpreadPage;
+  page: PreviewPage;
+  reached: boolean;
   getContent: MarginBoxContentGetter;
 }) {
   return (
     <div
       className={cn(
-        'grid aspect-[148/210] min-w-0 grid-cols-[1.25rem_repeat(3,minmax(0,1fr))_1.25rem] grid-rows-[1.5rem_repeat(3,minmax(0,1fr))_1.5rem] gap-0.5 border bg-background p-0.5 shadow-sm',
-        page === 'left' ? 'rounded-l-md' : 'rounded-r-md border-l-0',
+        'grid aspect-[148/210] min-w-0 grid-cols-[1.25rem_repeat(3,minmax(0,1fr))_1.25rem] grid-rows-[1.5rem_repeat(3,minmax(0,1fr))_1.5rem] gap-0.5 border bg-background p-0.5 shadow-sm transition-opacity',
+        page === 'left' && 'rounded-l-md',
+        page === 'right' && 'rounded-r-md border-l-0',
+        page === 'first' && 'col-start-2 rounded-r-md',
+        !reached && 'opacity-40',
       )}
     >
       {MARGIN_BOX_CELLS.map((cell) => {
@@ -243,7 +270,7 @@ function SpreadPageView({
             key={cell.id}
             picker={picker}
             id={cell.id}
-            page={page}
+            page={sideOfPage(page)}
             style={{ gridRow: cell.row, gridColumn: cell.column }}
             // Both pages show the same boxes, so the keyboard visits them once.
             tabIndex={page === 'right' ? -1 : undefined}
@@ -283,12 +310,15 @@ export function MarginBoxPicker({
   boxes,
   current,
   onSelect,
+  scope,
   getContent,
 }: {
   /** The boxes with settings to show; the rest are disabled. */
   boxes: readonly MarginBoxOption[];
   current: string;
   onSelect: (section: string) => void;
+  /** The scope the list edits, whose pages the preview sets apart. */
+  scope: ThemeScopeId;
   getContent: MarginBoxContentGetter;
 }) {
   const picker = usePicker(boxes, current, onSelect);
@@ -310,12 +340,15 @@ export function MarginBoxPicker({
           className="col-start-1 row-start-2"
         />
         <div className="col-start-2 col-end-4 row-start-2 grid grid-cols-2">
-          <SpreadPageView picker={picker} page="left" getContent={getContent} />
-          <SpreadPageView
-            picker={picker}
-            page="right"
-            getContent={getContent}
-          />
+          {getPreviewPages(scope).map(({ page, reached }) => (
+            <PreviewPageView
+              key={page}
+              picker={picker}
+              page={page}
+              reached={reached}
+              getContent={getContent}
+            />
+          ))}
         </div>
         <EdgeBand
           picker={picker}

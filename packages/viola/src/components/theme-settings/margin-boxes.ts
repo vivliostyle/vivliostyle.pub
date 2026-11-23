@@ -23,6 +23,22 @@ export type SpreadPage = 'left' | 'right';
 
 export type SpreadSide = 'outside' | 'inside';
 
+/** A page the preview draws: either page of a spread, or the first alone. */
+export type PreviewPage = SpreadPage | 'first';
+
+/** The page classes that a preview page matches. */
+export const PREVIEW_PAGE_CLASSES: Readonly<
+  Record<PreviewPage, readonly string[]>
+> = {
+  left: ['left'],
+  right: ['right'],
+  // A book opens on a right page.
+  first: ['first', 'right'],
+};
+
+export const sideOfPage = (page: PreviewPage): SpreadPage =>
+  page === 'first' ? 'right' : page;
+
 export type MarginBoxPosition =
   | 'corner'
   | 'left'

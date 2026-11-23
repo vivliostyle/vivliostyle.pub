@@ -611,19 +611,10 @@ function normalizeValue(value: string): string {
   return out;
 }
 
-/**
- * The value each variable takes in `scope` when no user stylesheet sets it:
- * what the cascade of the installed theme yields, else what theme-base
- * documents. A theme value equal to the documented one is reported in the
- * documented form, which reads better than the minified bundle.
- */
-export function resolveThemeDefaults({
-  schema,
-  theme,
-  language,
-  scope,
-}: ThemeDefaultsOptions): (name: string) => string | undefined {
-  const context = getScopeContext(scope);
+function resolveDefaults(
+  { schema, theme, language }: Omit<ThemeDefaultsOptions, 'scope'>,
+  context: ScopeContext,
+): (name: string) => string | undefined {
   const documented = createCascade(
     getSchemaDeclarations(schema),
     context,
@@ -641,4 +632,33 @@ export function resolveThemeDefaults({
         ? fromSchema
         : fromTheme;
     });
+}
+
+/**
+ * The value each variable takes in `scope` when no user stylesheet sets it:
+ * what the cascade of the installed theme yields, else what theme-base
+ * documents. A theme value equal to the documented one is reported in the
+ * documented form, which reads better than the minified bundle.
+ */
+export function resolveThemeDefaults({
+  scope,
+  ...options
+}: ThemeDefaultsOptions): (name: string) => string | undefined {
+  return resolveDefaults(options, getScopeContext(scope));
+}
+
+/**
+ * Like `resolveThemeDefaults`, for a page that every one of `pageClasses`
+ * matches at once, such as the first page, which is a right page as well.
+ */
+export function resolvePageDefaults({
+  pageClasses,
+  ...options
+}: Omit<ThemeDefaultsOptions, 'scope'> & {
+  pageClasses: readonly string[];
+}): (name: string) => string | undefined {
+  return resolveDefaults(options, {
+    medium: 'print',
+    page: new Set(pageClasses),
+  });
 }

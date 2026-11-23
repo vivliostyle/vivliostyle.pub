@@ -3,7 +3,8 @@ import type { ThemeCssModel, ThemeScopeId } from '../../libs/theme-variables';
 import {
   getSpreadContentFallback,
   type MarginBoxCell,
-  type SpreadPage,
+  type PreviewPage,
+  sideOfPage,
 } from './margin-boxes';
 
 export interface ContentSamples {
@@ -118,25 +119,26 @@ export function previewContent(
 }
 
 // Later scopes of the stylesheet win the cascade at equal specificity, and a
-// page context inherits what the root element sets.
-const SPREAD_SCOPES: Readonly<Record<SpreadPage, readonly ThemeScopeId[]>> = {
+// page context inherits what the root element sets. `:first` outranks `:right`.
+const PAGE_SCOPES: Readonly<Record<PreviewPage, readonly ThemeScopeId[]>> = {
   left: ['page-left', 'page', 'print-root', 'root'],
   right: ['page-right', 'page', 'print-root', 'root'],
+  first: ['page-first', 'page-right', 'page', 'print-root', 'root'],
 };
 
 /**
- * The `content` value a cell takes on a page of a spread: its own, else the
- * one theme-base words by the inside or outside of the spread. Each is looked
- * up in the stylesheet's scopes that reach the page, then in the theme.
+ * The `content` value a cell takes on a page: its own, else the one
+ * theme-base words by the inside or outside of the spread. Each is looked up
+ * in the stylesheet's scopes that reach the page, then in the theme.
  */
-export function getSpreadContent(
+export function getPageContent(
   cell: MarginBoxCell,
-  page: SpreadPage,
+  page: PreviewPage,
   model: ThemeCssModel,
-  getDefault: (page: SpreadPage, name: string) => string | undefined,
+  getDefault: (page: PreviewPage, name: string) => string | undefined,
 ): string | undefined {
   const lookUp = (name: string) => {
-    for (const scope of SPREAD_SCOPES[page]) {
+    for (const scope of PAGE_SCOPES[page]) {
       const value = model.scopes[scope].variables[name]?.value;
       if (value !== undefined) {
         return value;
@@ -148,6 +150,6 @@ export function getSpreadContent(
   if (own !== undefined) {
     return own;
   }
-  const fallback = getSpreadContentFallback(cell, page);
+  const fallback = getSpreadContentFallback(cell, sideOfPage(page));
   return fallback === null ? undefined : lookUp(fallback);
 }
