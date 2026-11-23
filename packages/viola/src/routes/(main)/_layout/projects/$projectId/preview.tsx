@@ -26,6 +26,7 @@ export const Route = createFileRoute(
       },
       // The route names the extension, not one of its panes.
       {
+        besideEditor: true,
         keepIfShown: (tab) =>
           tab.type === 'extension' && tab.extensionId === 'preview',
       },
