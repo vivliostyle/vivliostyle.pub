@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 
 import { Button } from '@v/ui/button';
 import { HoverPopover } from '@v/ui/hover-popover';
@@ -8,7 +8,12 @@ import {
   type ThemeCssModel,
   type ThemeScopeId,
 } from '../../libs/theme-variables';
-import { MarginBoxPicker } from './margin-box-picker';
+import { getSpreadContent } from './margin-box-content';
+import {
+  type MarginBoxContentGetter,
+  MarginBoxPicker,
+} from './margin-box-picker';
+import type { SpreadPage } from './margin-boxes';
 import type { SettingsRow } from './rows';
 import { SettingInfoCard } from './setting-info';
 import { type CommitHandler, SettingRow } from './setting-row';
@@ -18,6 +23,7 @@ function SettingsList({
   model,
   scope,
   getDefaultValue,
+  getSpreadDefault,
   onShowMore,
   onCommit,
   onSwitchScope,
@@ -27,6 +33,8 @@ function SettingsList({
   model: ThemeCssModel;
   scope: ThemeScopeId;
   getDefaultValue: (name: string) => string | undefined;
+  /** Defaults on a page of a spread, whichever scope the list edits. */
+  getSpreadDefault: (page: SpreadPage, name: string) => string | undefined;
   onShowMore: () => void;
   onCommit: CommitHandler;
   onSwitchScope: (scope: ThemeScopeId) => void;
@@ -40,6 +48,10 @@ function SettingsList({
         ),
       ),
     [rows],
+  );
+  const getContent = useCallback<MarginBoxContentGetter>(
+    (cell, page) => getSpreadContent(cell, page, model, getSpreadDefault),
+    [model, getSpreadDefault],
   );
   if (rows.length === 0) {
     return (
@@ -75,6 +87,7 @@ function SettingsList({
                   boxes={row.boxes}
                   current={row.current}
                   onSelect={onSelectSection}
+                  getContent={getContent}
                 />
               );
             case 'category':

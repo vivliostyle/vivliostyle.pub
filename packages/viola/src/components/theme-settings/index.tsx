@@ -35,6 +35,7 @@ import {
   type ThemeVariableSchema,
 } from '../../libs/theme-variables';
 import { commitValue } from './commit';
+import type { SpreadPage } from './margin-boxes';
 import { getCategoryLabel, getGroupLabel, qualifyLabel } from './messages';
 import {
   buildSettingsRows,
@@ -210,6 +211,25 @@ function useThemeSettings(
         : noDefaults,
     [schema, theme, language, scope],
   );
+  const getSpreadDefault = useMemo(() => {
+    if (!schema) {
+      return noDefaults;
+    }
+    const left = resolveThemeDefaults({
+      schema,
+      theme,
+      language,
+      scope: 'page-left',
+    });
+    const right = resolveThemeDefaults({
+      schema,
+      theme,
+      language,
+      scope: 'page-right',
+    });
+    return (page: SpreadPage, name: string) =>
+      page === 'left' ? left(name) : right(name);
+  }, [schema, theme, language]);
 
   const handleQueryChange = useCallback((next: string, immediate = false) => {
     setQuery(next);
@@ -276,6 +296,7 @@ function useThemeSettings(
       rows,
       scope,
       getDefaultValue,
+      getSpreadDefault,
       onShowMore: handleShowMore,
       onSwitchScope: setScope,
     },

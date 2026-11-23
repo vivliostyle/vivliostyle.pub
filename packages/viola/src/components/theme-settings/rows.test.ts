@@ -292,6 +292,7 @@ describe('matchSettings', () => {
         'mbox-top-left-text-color': v('color'),
         'mbox-top-font-size': v('font-size'),
         'mbox-top-text-color': v('color'),
+        'mbox-top-outside-content': v(),
       },
     });
     const matches = (input: Partial<SettingsMatchInput> = {}) =>
@@ -304,12 +305,13 @@ describe('matchSettings', () => {
       const { subgroups } = matches().toc[0];
       expect(subgroups.map((s) => [s.key, s.label, s.count])).toEqual([
         [subgroupKey('page', category('page-setup')), 'Page size and marks', 1],
-        [box('mbox'), 'Margin boxes', 6],
+        [box('mbox'), 'Margin boxes', 7],
       ]);
       expect(subgroups[1].members?.map((s) => s.key)).toEqual([
         box('mbox'),
         box('mbox-top-left'),
         box('mbox-top'),
+        box('mbox-top-outside'),
       ]);
     });
 
@@ -330,6 +332,7 @@ describe('matchSettings', () => {
           { id: 'mbox', count: 2 },
           { id: 'mbox-top-left', count: 2 },
           { id: 'mbox-top', count: 2 },
+          { id: 'mbox-top-outside', count: 1 },
         ],
       });
       expect(rowKeys(groupKey('page')).slice(0, 5)).toEqual([
@@ -353,6 +356,26 @@ describe('matchSettings', () => {
         '--vs-page--mbox-top-left-font-size',
         box('mbox-top'),
         '--vs-page--mbox-top-font-size',
+      ]);
+    });
+
+    it('gives what a side of a spread shows a section of its own', () => {
+      expect(rowKeys(box('mbox-top'))).not.toContain(
+        '--vs-page--mbox-top-outside-content',
+      );
+      expect(rowKeys(box('mbox-top-outside')).slice(2)).toEqual([
+        box('mbox-top-outside'),
+        '--vs-page--mbox-top-outside-content',
+      ]);
+      expect(findSection(matches().toc, box('mbox-top-outside'))?.label).toBe(
+        'Top edge, outside of a spread',
+      );
+      expect(
+        rowKeys(null, { filter: { query: 'outside', modifiedOnly: false } }),
+      ).toEqual([
+        'g:page',
+        box('mbox-top-outside'),
+        '--vs-page--mbox-top-outside-content',
       ]);
     });
 

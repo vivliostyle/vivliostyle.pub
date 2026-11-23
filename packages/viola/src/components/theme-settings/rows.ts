@@ -5,10 +5,15 @@ import {
   type ThemeVariable,
   type ThemeVariableCategory,
   type ThemeVariableGroup,
+  type ThemeVariableSubgroup,
   type ThemeVariableSubgroupRef,
 } from '../../libs/theme-variables';
 import { getTargetLabel, getVariableLabel } from './labels';
-import { ALL_MARGIN_BOXES, getMarginBox } from './margin-boxes';
+import {
+  ALL_MARGIN_BOXES,
+  findSpreadSideBox,
+  getMarginBox,
+} from './margin-boxes';
 
 export interface SettingsFilter {
   query: string;
@@ -158,6 +163,38 @@ function getTocSections(subgroups: readonly MatchedSubgroup[]) {
   );
 }
 
+// theme-base sets what the boxes show on either side of a spread among the
+// settings of the shared boxes, where it reads as a setting of those boxes.
+function splitSpreadSides(
+  subgroup: ThemeVariableSubgroup,
+): ThemeVariableSubgroup[] {
+  if (getMarginBox(subgroup) === null) {
+    return [subgroup];
+  }
+  const own: ThemeVariable[] = [];
+  const sides = new Map<string, ThemeVariable[]>();
+  for (const variable of subgroup.variables) {
+    const box = findSpreadSideBox(variable.name);
+    if (box === null) {
+      own.push(variable);
+    } else {
+      sides.set(box, [...(sides.get(box) ?? []), variable]);
+    }
+  }
+  return [
+    { ...subgroup, variables: own },
+    ...[...sides].map(
+      ([id, variables]): ThemeVariableSubgroup => ({
+        kind: 'target',
+        id,
+        group: subgroup.group,
+        module: subgroup.module,
+        variables,
+      }),
+    ),
+  ];
+}
+
 // Category headings only pay off once a target spans several categories.
 function splitIntoParts(
   sectionKey: string,
@@ -201,46 +238,48 @@ export function matchSettings({
 
   for (const group of groups) {
     const label = getGroupLabel(group.id);
-    const subgroups = group.subgroups.flatMap((subgroup): MatchedSubgroup[] => {
-      const ownLabel =
-        subgroup.kind === 'target'
-          ? getTargetLabel(subgroup.group, subgroup.id)
-          : getCategoryLabel(subgroup.id);
-      const subgroupLabel = subgroup.module
-        ? qualifyLabel(getGroupLabel(subgroup.module), ownLabel)
-        : ownLabel;
-      const variables = subgroup.variables.filter(
-        (variable) =>
-          isVariableGroupInScope(scope, variable.group) &&
-          (!filter.modifiedOnly || isModified(variable.name)) &&
-          // A search looks through them all, to find a setting by its name.
-          (showAdvanced ||
-            !variable.advanced ||
-            tokens.length > 0 ||
-            isModified(variable.name)) &&
-          matchesQuery(variable, tokens, [label, subgroupLabel]),
-      );
-      if (variables.length === 0) {
-        return [];
-      }
-      const key = subgroupKey(subgroup.group, subgroup);
-      return [
-        {
-          section: {
-            key,
-            groupId: group.id,
-            label: subgroupLabel,
-            count: variables.length,
-            modified: countModified(variables),
+    const subgroups = group.subgroups
+      .flatMap(splitSpreadSides)
+      .flatMap((subgroup): MatchedSubgroup[] => {
+        const ownLabel =
+          subgroup.kind === 'target'
+            ? getTargetLabel(subgroup.group, subgroup.id)
+            : getCategoryLabel(subgroup.id);
+        const subgroupLabel = subgroup.module
+          ? qualifyLabel(getGroupLabel(subgroup.module), ownLabel)
+          : ownLabel;
+        const variables = subgroup.variables.filter(
+          (variable) =>
+            isVariableGroupInScope(scope, variable.group) &&
+            (!filter.modifiedOnly || isModified(variable.name)) &&
+            // A search looks through them all, to find a setting by its name.
+            (showAdvanced ||
+              !variable.advanced ||
+              tokens.length > 0 ||
+              isModified(variable.name)) &&
+            matchesQuery(variable, tokens, [label, subgroupLabel]),
+        );
+        if (variables.length === 0) {
+          return [];
+        }
+        const key = subgroupKey(subgroup.group, subgroup);
+        return [
+          {
+            section: {
+              key,
+              groupId: group.id,
+              label: subgroupLabel,
+              count: variables.length,
+              modified: countModified(variables),
+            },
+            parts:
+              subgroup.kind === 'target'
+                ? splitIntoParts(key, variables, getCategoryLabel)
+                : [{ key, label: null, variables }],
+            box: getMarginBox(subgroup),
           },
-          parts:
-            subgroup.kind === 'target'
-              ? splitIntoParts(key, variables, getCategoryLabel)
-              : [{ key, label: null, variables }],
-          box: getMarginBox(subgroup),
-        },
-      ];
-    });
+        ];
+      });
     const sections = getTocSections(subgroups);
     const count = sections.reduce((sum, s) => sum + s.count, 0);
     if (count === 0) {
