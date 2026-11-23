@@ -279,6 +279,22 @@ async function initLightningCss() {
   return await init(wasmUrl);
 }
 
+// LightningCSS hands a visitor the optional fields it leaves empty as `null`
+// but fails to read them back from a rule the visitor returns.
+function omitNulls<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(omitNulls) as T;
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => item !== null)
+      .map(([key, item]) => [key, omitNulls(item)]),
+  ) as T;
+}
+
 /**
  * `virtualFiles` supplies stylesheets that live outside the package store
  * (e.g. a project's own files), keyed by a path relative to the entry.
@@ -337,6 +353,14 @@ export async function bundleCss(
                 value: { loc: rule.loc, url },
               } satisfies lightningCss.ReturnedRule;
             }
+          }
+          // Written back unparsed, as the theme settings read the defaults
+          // a theme gives pages from them
+          if (rule.name === '-page') {
+            return {
+              type: 'unknown',
+              value: omitNulls({ ...rule, name: 'page' }),
+            } satisfies lightningCss.ReturnedRule;
           }
           // Suppress output of unknown rules
           return [];

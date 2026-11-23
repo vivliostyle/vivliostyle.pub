@@ -334,6 +334,27 @@ describe('bundleCss', () => {
     expect(css).not.toContain('@vivliostyle/theme-base');
   });
 
+  it('keeps @page rules as they were written', async () => {
+    mount('node_modules/@vivliostyle/theme-base', themeBase, {
+      ...themeBaseCss,
+      'css/define.css': `
+        @page { --vs-page--size: A5; }
+        @page :left { --vs-page--mbox-top-outside-content: env(pub-title); }
+        @page :nth(1) { @top-center { content: var(--x, 'x'); } }
+        @page { @top-left { content: var(--vs-page--mbox-top-left-content); } }
+      `,
+    });
+
+    const css = await bundle('@import "@vivliostyle/theme-base";');
+    expect(css).toMatch(/@page\s*\{\s*--vs-page--size:\s*A5/);
+    expect(css).toMatch(
+      /@page :left\s*\{\s*--vs-page--mbox-top-outside-content:\s*env\(pub-title\)/,
+    );
+    expect(css).toMatch(/@page :nth\(1\)\s*\{\s*@top-center/);
+    expect(css).toMatch(/var\(--vs-page--mbox-top-left-content\)/);
+    expect(css).not.toContain('@-page');
+  });
+
   it('bundles virtual files that import packages and each other', async () => {
     mount('node_modules/@vivliostyle/theme-base', themeBase, themeBaseCss);
     const files = new Map([
