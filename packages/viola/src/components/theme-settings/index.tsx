@@ -13,7 +13,6 @@ import {
 
 import { Button } from '@v/ui/button';
 import { Code, Loader2, SlidersHorizontal, TriangleAlert } from '@v/ui/icon';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@v/ui/tabs';
 import { m } from '../../generated/paraglide/messages';
 import { PrerenderedViews, usePrerender } from '../../hooks/use-prerender';
 import {
@@ -49,7 +48,7 @@ import {
 import type { CommitHandler } from './setting-row';
 import { SettingsList } from './settings-list';
 import { SettingsSectionSelect, SettingsToc } from './settings-toc';
-import { SettingsToolbar } from './settings-toolbar';
+import { SettingsSearchField, SettingsToolbar } from './settings-toolbar';
 
 const CodeEditor = lazy(() => import('../code-editor'));
 
@@ -288,9 +287,8 @@ function useThemeSettings(
 
   const matchCount = matches?.matchCount ?? 0;
   return {
+    search: { query, onQueryChange: handleQueryChange },
     toolbar: {
-      query,
-      onQueryChange: handleQueryChange,
       scope,
       onScopeChange: setScope,
       scopeCounts,
@@ -336,19 +334,6 @@ export default function ThemeCssEditor({
   onCssChange,
 }: ThemeCssEditorProps) {
   const [mode, setMode] = useState<Mode>('gui');
-  const guiPanelRef = useRef<HTMLDivElement>(null);
-  const switchMode = (next: Mode) => {
-    // Radix activates a tab on mousedown and unmounts the inactive panel right
-    // away, before a focused field gets the blur that commits its draft.
-    const active = document.activeElement;
-    if (
-      active instanceof HTMLElement &&
-      guiPanelRef.current?.contains(active)
-    ) {
-      active.blur();
-    }
-    setMode(next);
-  };
   const cssRef = useRef(css);
   const onCssChangeRef = useRef(onCssChange);
   useLayoutEffect(() => {
@@ -461,103 +446,38 @@ export default function ThemeCssEditor({
     }
   }, [rows, revealList]);
   const toc = { ...settings.toc, onSelect: handleSelect };
+  const showToolbar = mode === 'gui' && schemaState === Fulfilled;
+  const isCss = mode === 'css';
 
   return (
-    <Tabs
-      ref={rootRef}
-      className="@container"
-      value={mode}
-      onValueChange={(value) => switchMode(value as Mode)}
-    >
+    <div ref={rootRef} className="@container">
       <div
         ref={headerRef}
         className="sticky top-0 z-10 grid gap-2 bg-background py-2"
       >
-        <TabsList aria-label={m.theme_settings_mode_aria()} className="w-full">
-          <TabsTrigger value="gui">
-            <SlidersHorizontal aria-hidden />
-            {m.theme_settings_mode_gui()}
-          </TabsTrigger>
-          <TabsTrigger value="css">
-            <Code aria-hidden />
-            {m.theme_settings_mode_css()}
-          </TabsTrigger>
-        </TabsList>
-        {mode === 'gui' && schemaState === Fulfilled && (
+        <div className="flex items-center gap-2">
+          {showToolbar && (
+            <SettingsSearchField {...settings.search} className="flex-1" />
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => setMode(isCss ? 'gui' : 'css')}
+          >
+            {isCss ? <SlidersHorizontal aria-hidden /> : <Code aria-hidden />}
+            {isCss ? m.theme_settings_mode_gui() : m.theme_settings_mode_css()}
+          </Button>
+        </div>
+        {showToolbar && (
           <>
             <SettingsToolbar {...settings.toolbar} />
             {model && <SettingsSectionSelect {...toc} className="@md:hidden" />}
           </>
         )}
       </div>
-      <TabsContent ref={guiPanelRef} value="gui" className="grid gap-2">
-        {model && model.diagnostics.length > 0 && (
-          <div
-            role="status"
-            className="flex items-start gap-2 rounded-md border border-destructive/50 p-3 text-sm"
-          >
-            <TriangleAlert
-              aria-hidden
-              className="mt-0.5 size-4 shrink-0 text-destructive"
-            />
-            <div className="grid flex-1 justify-items-start gap-2">
-              <p>{m.theme_settings_css_broken()}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => switchMode('css')}
-              >
-                {m.theme_settings_open_css_editor()}
-              </Button>
-            </div>
-          </div>
-        )}
-        {schemaState === Fulfilled && model ? (
-          <div className="grid items-start gap-x-4 @md:grid-cols-[10rem_minmax(0,1fr)] @3xl:grid-cols-[14rem_minmax(0,1fr)]">
-            <SettingsToc
-              {...toc}
-              className="sticky top-(--settings-header-height) hidden max-h-[calc(100svh-var(--settings-header-height))] overflow-y-auto overscroll-contain scrollbar-stable py-2 @md:block"
-            />
-            <div
-              ref={listRef}
-              className="min-w-0 scroll-mt-(--settings-header-height) py-2"
-            >
-              <PrerenderedViews
-                current={settings.lists.current}
-                keys={settings.lists.keys}
-              >
-                {(key) => (
-                  <SettingsList
-                    {...settings.list}
-                    rows={settings.lists.getRows(key)}
-                    model={model}
-                    onCommit={handleCommit}
-                    onSelectSection={handleSelect}
-                  />
-                )}
-              </PrerenderedViews>
-            </div>
-          </div>
-        ) : schemaState === Rejected ? (
-          <div className="grid justify-items-start gap-2 py-4 text-sm">
-            <p role="alert">{m.theme_settings_load_error()}</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setSchemaPromise(loadThemeVariableSchema())}
-            >
-              {m.theme_settings_retry()}
-            </Button>
-          </div>
-        ) : (
-          <div role="status" aria-label={m.theme_settings_loading()}>
-            <Spinner />
-          </div>
-        )}
-      </TabsContent>
-      <TabsContent value="css">
+      {isCss ? (
         <Suspense fallback={<Spinner />}>
           <CodeEditor
             aria-label={m.theme_custom_css_editor_aria()}
@@ -565,7 +485,75 @@ export default function ThemeCssEditor({
             onCodeUpdate={emit}
           />
         </Suspense>
-      </TabsContent>
-    </Tabs>
+      ) : (
+        <div className="grid gap-2">
+          {model && model.diagnostics.length > 0 && (
+            <div
+              role="status"
+              className="flex items-start gap-2 rounded-md border border-destructive/50 p-3 text-sm"
+            >
+              <TriangleAlert
+                aria-hidden
+                className="mt-0.5 size-4 shrink-0 text-destructive"
+              />
+              <div className="grid flex-1 justify-items-start gap-2">
+                <p>{m.theme_settings_css_broken()}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMode('css')}
+                >
+                  {m.theme_settings_open_css_editor()}
+                </Button>
+              </div>
+            </div>
+          )}
+          {schemaState === Fulfilled && model ? (
+            <div className="grid items-start gap-x-4 @md:grid-cols-[10rem_minmax(0,1fr)] @3xl:grid-cols-[14rem_minmax(0,1fr)]">
+              <SettingsToc
+                {...toc}
+                className="sticky top-(--settings-header-height) hidden max-h-[calc(100svh-var(--settings-header-height))] overflow-y-auto overscroll-contain scrollbar-stable py-2 @md:block"
+              />
+              <div
+                ref={listRef}
+                className="min-w-0 scroll-mt-(--settings-header-height) py-2"
+              >
+                <PrerenderedViews
+                  current={settings.lists.current}
+                  keys={settings.lists.keys}
+                >
+                  {(key) => (
+                    <SettingsList
+                      {...settings.list}
+                      rows={settings.lists.getRows(key)}
+                      model={model}
+                      onCommit={handleCommit}
+                      onSelectSection={handleSelect}
+                    />
+                  )}
+                </PrerenderedViews>
+              </div>
+            </div>
+          ) : schemaState === Rejected ? (
+            <div className="grid justify-items-start gap-2 py-4 text-sm">
+              <p role="alert">{m.theme_settings_load_error()}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSchemaPromise(loadThemeVariableSchema())}
+              >
+                {m.theme_settings_retry()}
+              </Button>
+            </div>
+          ) : (
+            <div role="status" aria-label={m.theme_settings_loading()}>
+              <Spinner />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

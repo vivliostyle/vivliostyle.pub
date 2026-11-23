@@ -6,6 +6,7 @@ import { Checkbox } from '@v/ui/checkbox';
 import { Search, X } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { Label } from '@v/ui/label';
+import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
   getThemeScope,
@@ -19,12 +20,16 @@ const SEARCH_DEBOUNCE_MS = 200;
 
 // Holds the text being typed, so that a keystroke re-renders only the field
 // and the settings only see the query once typing pauses.
-function SearchField({
+function SettingsSearchField({
   query,
   onQueryChange,
+  className,
 }: {
+  /** The query in effect, which the field starts from when it mounts. */
   query: string;
+  /** Called once typing pauses, or right away when the search is cleared. */
   onQueryChange: (query: string) => void;
+  className?: string;
 }) {
   const [text, setText] = useState(query);
   useDebounce(() => onQueryChange(text), SEARCH_DEBOUNCE_MS, [text]);
@@ -34,7 +39,7 @@ function SearchField({
   };
 
   return (
-    <div className="relative">
+    <div className={cn('relative', className)}>
       <Search
         aria-hidden
         className="pointer-events-none absolute inset-y-0 left-2.5 my-auto size-4 text-muted-foreground"
@@ -70,8 +75,6 @@ function SearchField({
 }
 
 function SettingsToolbar({
-  query,
-  onQueryChange,
   scope,
   onScopeChange,
   scopeCounts,
@@ -81,10 +84,6 @@ function SettingsToolbar({
   onShowAdvancedChange,
   matchCount,
 }: {
-  /** The query in effect, which the field starts from when it mounts. */
-  query: string;
-  /** Called once typing pauses, or right away when the search is cleared. */
-  onQueryChange: (query: string) => void;
   scope: ThemeScopeId;
   onScopeChange: (scope: ThemeScopeId) => void;
   /** Schema variables each scope sets. */
@@ -103,7 +102,6 @@ function SettingsToolbar({
 
   return (
     <div className="grid gap-2">
-      <SearchField query={query} onQueryChange={onQueryChange} />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Label htmlFor={scopeSelectId} className="shrink-0">
@@ -170,6 +168,10 @@ function SettingsToolbar({
   );
 }
 
+const MemoizedSettingsSearchField = memo(SettingsSearchField);
 const MemoizedSettingsToolbar = memo(SettingsToolbar);
 
-export { MemoizedSettingsToolbar as SettingsToolbar };
+export {
+  MemoizedSettingsSearchField as SettingsSearchField,
+  MemoizedSettingsToolbar as SettingsToolbar,
+};
