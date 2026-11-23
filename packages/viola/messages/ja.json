@@ -199,6 +199,7 @@
   "theme_settings_info_any_value": "任意のCSS値",
   "theme_settings_info_aria": "{name}の詳細",
   "theme_settings_info_copied": "コピーしました",
+  "theme_settings_info_copy_failed": "コピーできませんでした。名前を選択しました。",
   "theme_settings_info_copy_name_aria": "カスタムプロパティ名をコピー",
   "theme_settings_info_keywords": "キーワード",
   "theme_settings_info_list_comma": "カンマで区切って複数の値を指定できます。",

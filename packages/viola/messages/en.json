@@ -199,6 +199,7 @@
   "theme_settings_info_any_value": "Any CSS value",
   "theme_settings_info_aria": "Details of {name}",
   "theme_settings_info_copied": "Copied",
+  "theme_settings_info_copy_failed": "Copy failed. The name is selected.",
   "theme_settings_info_copy_name_aria": "Copy the custom property name",
   "theme_settings_info_keywords": "Keywords",
   "theme_settings_info_list_comma": "Several values can be given, separated by commas.",

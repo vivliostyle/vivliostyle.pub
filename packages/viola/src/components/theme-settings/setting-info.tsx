@@ -11,6 +11,7 @@ import {
   type ValueType,
 } from '../../libs/theme-variables';
 import { getVariableLabel } from './labels';
+import { useDistinctMessage } from './live-region';
 import { getValueTypeLabel } from './messages';
 import {
   type CssReference,
@@ -167,54 +168,80 @@ function VariableName({
   important: boolean;
 }) {
   const codeRef = useRef<HTMLElement>(null);
-  const [copied, setCopied] = useState(false);
+  // A new object on every copy, so that a repeated copy restarts the timer.
+  const [feedback, setFeedback] = useState<{
+    copied: boolean;
+    message: string;
+  } | null>(null);
+  const distinct = useDistinctMessage();
 
   useEffect(() => {
-    if (!copied) {
+    if (!feedback) {
       return;
     }
-    const timer = setTimeout(() => setCopied(false), 1500);
+    // A failure takes longer to read, and the user goes on to copy by hand.
+    const timer = setTimeout(
+      () => setFeedback(null),
+      feedback.copied ? 1500 : 4000,
+    );
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [feedback]);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(name);
-      setCopied(true);
+      setFeedback({
+        copied: true,
+        message: distinct(m.theme_settings_info_copied()),
+      });
     } catch {
       // Selecting the name leaves copying to the user.
       if (codeRef.current) {
         window.getSelection()?.selectAllChildren(codeRef.current);
       }
+      setFeedback({
+        copied: false,
+        message: distinct(m.theme_settings_info_copy_failed()),
+      });
     }
   };
 
   return (
-    <div className="flex items-start gap-1">
-      <code
-        ref={codeRef}
-        className="min-w-0 flex-1 break-all py-0.5 font-mono text-muted-foreground select-all"
-      >
-        {name}
-      </code>
-      {important && (
-        <code className="mt-0.5 shrink-0 rounded-sm border px-1 font-mono text-[10px]">
-          !important
+    <div className="grid">
+      <div className="flex items-start gap-1">
+        <code
+          ref={codeRef}
+          className="min-w-0 flex-1 break-all py-0.5 font-mono text-muted-foreground select-all"
+        >
+          {name}
         </code>
-      )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="-my-0.5 size-6 shrink-0 [&_svg]:size-3.5"
-        aria-label={m.theme_settings_info_copy_name_aria()}
-        title={m.theme_settings_info_copy_name_aria()}
-        onClick={copy}
+        {important && (
+          <code className="mt-0.5 shrink-0 rounded-sm border px-1 font-mono text-[10px]">
+            !important
+          </code>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="-my-0.5 size-6 shrink-0 [&_svg]:size-3.5"
+          aria-label={m.theme_settings_info_copy_name_aria()}
+          title={m.theme_settings_info_copy_name_aria()}
+          onClick={copy}
+        >
+          {feedback?.copied ? <Check /> : <Copy />}
+        </Button>
+      </div>
+      {/* Kept mounted while empty: a live region is announced when its text
+          changes, not when it appears. */}
+      <output
+        className={
+          feedback?.copied === false
+            ? 'text-destructive'
+            : 'text-muted-foreground'
+        }
       >
-        {copied ? <Check /> : <Copy />}
-      </Button>
-      <output className="sr-only">
-        {copied ? m.theme_settings_info_copied() : ''}
+        {feedback?.message}
       </output>
     </div>
   );
