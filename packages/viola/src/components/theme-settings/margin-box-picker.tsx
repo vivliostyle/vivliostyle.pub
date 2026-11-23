@@ -386,13 +386,15 @@ export function MarginBoxPicker({
         {m.theme_settings_margin_boxes_spread()}
       </Button>
       <fieldset
-        aria-label={m.theme_settings_margin_boxes_position_aria()}
         className={cn(
           'grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_1.25rem] gap-1',
           // As wide as a page of the spread
           !shown && 'w-full max-w-62 justify-self-center',
         )}
       >
+        <legend className="sr-only">
+          {m.theme_settings_margin_boxes_position_aria()}
+        </legend>
         <EdgeBand
           picker={picker}
           edge="top"
