@@ -16,7 +16,8 @@
   font-weight: var(--vs-font-weight);
   letter-spacing: var(--vs-letter-spacing);
   line-height: var(--vs-line-height);
-  background-color: var(--vs-color-background);
+  /* The host is only one viewport tall; painting here would scroll away with the content. */
+  background-color: transparent;
   color: var(--vs-color-foreground);
   tab-size: var(--vs-tab-size);
   hyphens: var(--vs-hyphens);
@@ -39,4 +40,8 @@
   hanging-punctuation: var(--vs-hanging-punctuation);
   text-align: var(--vs-text-align);
   word-spacing: var(--vs-word-spacing);
+}
+
+.tiptap {
+  background-color: var(--vs-color-background);
 }

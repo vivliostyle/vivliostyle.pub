@@ -334,6 +334,55 @@ describe('bundleCss', () => {
     expect(css).not.toContain('@vivliostyle/theme-base');
   });
 
+  it('keeps @page rules as they were written', async () => {
+    mount('node_modules/@vivliostyle/theme-base', themeBase, {
+      ...themeBaseCss,
+      'css/define.css': `
+        @page { --vs-page--size: A5; }
+        @page :left { --vs-page--mbox-top-outside-content: env(pub-title); }
+        @page :nth(1) { @top-center { content: var(--x, 'x'); } }
+        @page { @top-left { content: var(--vs-page--mbox-top-left-content); } }
+      `,
+    });
+
+    const css = await bundle('@import "@vivliostyle/theme-base";');
+    expect(css).toMatch(/@page\s*\{\s*--vs-page--size:\s*A5/);
+    expect(css).toMatch(
+      /@page :left\s*\{\s*--vs-page--mbox-top-outside-content:\s*env\(pub-title\)/,
+    );
+    expect(css).toMatch(/@page :nth\(1\)\s*\{\s*@top-center/);
+    expect(css).toMatch(/var\(--vs-page--mbox-top-left-content\)/);
+    expect(css).not.toContain('@-page');
+  });
+
+  it('bundles virtual files that import packages and each other', async () => {
+    mount('node_modules/@vivliostyle/theme-base', themeBase, themeBaseCss);
+    const files = new Map([
+      [
+        'project/style.css',
+        '@import "@vivliostyle/theme-base/figure" layer(base);\n@import "./sub/a.css";\n.mine { color: red }',
+      ],
+      ['project/sub/a.css', '@import "../b.css";\n.a { color: blue }'],
+      ['project/b.css', '.b { margin: 0 }'],
+    ]);
+
+    const code = (await bundleCss('@import "./project/style.css";', files))
+      .code;
+    const css = new TextDecoder().decode(code);
+    expect(css).toContain('.b{margin:0}');
+    expect(css).toContain('.a{color:#00f}');
+    expect(css).toContain('.mine{color:red}');
+    expect(css).toContain('@layer base');
+    expect(css).toContain('figcaption');
+  });
+
+  it('reports a missing virtual import', async () => {
+    const files = new Map([['project/style.css', '@import "./nope.css";']]);
+    await expect(
+      bundleCss('@import "./project/style.css";', files),
+    ).rejects.toThrow(/File not found/);
+  });
+
   it('prefers a nested dependency over the hoisted one', async () => {
     mount('node_modules/@vivliostyle/theme-base', themeBase, {
       ...themeBaseCss,

@@ -10,6 +10,7 @@ import {
 } from '../../libs/editor';
 import { generateId } from '../../libs/generate-id';
 import { SandboxFile } from '../../libs/sandbox/file';
+import { toConfigThemeEntries } from '../../libs/user-stylesheets';
 import { officialThemes } from '../catalog';
 import { Content, type ContentId } from './content';
 import { Sandbox } from './sandbox';
@@ -185,13 +186,7 @@ export class Project {
       });
     }
     this.content.readingOrder = readingOrder;
-    const styleCss = sandbox.files['style.css'];
-    if (styleCss) {
-      this.theme.customCss = await styleCss.text();
-    } else {
-      this.theme.customCss = '';
-      sandbox.files['style.css'] = ref(new SandboxFile('text/css', ''));
-    }
+    await this.theme.loadStylesheets(sandbox);
     if (
       Array.isArray(sandbox.vivliostyleConfig.theme) &&
       sandbox.vivliostyleConfig.theme[0] in officialThemes
@@ -242,14 +237,6 @@ export class Project {
     );
   }
 
-  updateCustomCss(css: string) {
-    if (!this.sandbox) {
-      return;
-    }
-    this.theme.customCss = css;
-    this.sandbox.files['style.css'] = ref(new SandboxFile('text/css', css));
-  }
-
   dispose(): Promise<void> {
     this.disposePromise ??= this.teardown();
     return this.disposePromise;
@@ -260,6 +247,7 @@ export class Project {
       delete projects.value[this.projectId];
     }
     this.unsubscribe();
+    this.theme.dispose();
     for (const file of this.content.files.values()) {
       file.editor.destroy();
     }
@@ -314,11 +302,23 @@ export class Project {
   protected async handleThemeUpdate() {
     const sandbox = await this.sandboxPromise;
     const installedTheme = await this.theme.installPromise;
-    if (!installedTheme?.packageName) {
+    // An empty list means `loadStylesheets` has not run yet; writing now would drop the stylesheet entries
+    if (!installedTheme?.packageName || this.theme.stylesheets.length === 0) {
+      return;
+    }
+    const entries = toConfigThemeEntries(
+      installedTheme.packageName,
+      this.theme.stylesheets.map((it) => it.path),
+    );
+    // Derived theme state also notifies the subscription; don't rewrite an unchanged config
+    if (
+      JSON.stringify(sandbox.vivliostyleConfig.theme) ===
+      JSON.stringify(entries)
+    ) {
       return;
     }
     sandbox.updateVivliostyleConfig((config) => {
-      config.theme = [installedTheme.packageName, './style.css'];
+      config.theme = entries;
     });
   }
 }

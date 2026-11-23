@@ -68,6 +68,7 @@
     "nanoid-dictionary": "catalog:",
     "outvariant": "catalog:",
     "pathe": "catalog:",
+    "postcss-variable-theming": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-use": "catalog:",

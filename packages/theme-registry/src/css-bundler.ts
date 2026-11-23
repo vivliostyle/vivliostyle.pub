@@ -221,19 +221,29 @@ function findPackage(
   }
 }
 
-function resolve(specifier: string, from: string): string {
+function resolve(
+  specifier: string,
+  from: string,
+  virtualFiles?: ReadonlyMap<string, string>,
+): string {
   const path = specifier.replace(/[?#].*$/, '');
   const relativeFile = path.startsWith('/')
     ? undefined
     : normalizePath(`${from.slice(0, from.lastIndexOf('/') + 1)}${path}`);
   if (specifier.startsWith('.')) {
+    if (relativeFile && virtualFiles?.has(relativeFile)) {
+      return relativeFile;
+    }
     if (!relativeFile || !fileMap.has(relativeFile)) {
       throw new Error(`File not found: ${specifier} from ${from}`);
     }
     return relativeFile;
   }
   // Like @vivliostyle/cli, a bare specifier is a package only if it doesn't name a sibling stylesheet
-  if (relativeFile?.endsWith('.css') && fileMap.has(relativeFile)) {
+  if (
+    relativeFile?.endsWith('.css') &&
+    (virtualFiles?.has(relativeFile) || fileMap.has(relativeFile))
+  ) {
     return relativeFile;
   }
 
@@ -269,25 +279,48 @@ async function initLightningCss() {
   return await init(wasmUrl);
 }
 
-export async function bundleCss(source: string) {
+// LightningCSS hands a visitor the optional fields it leaves empty as `null`
+// but fails to read them back from a rule the visitor returns.
+function omitNulls<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(omitNulls) as T;
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => item !== null)
+      .map(([key, item]) => [key, omitNulls(item)]),
+  ) as T;
+}
+
+/**
+ * `virtualFiles` supplies stylesheets that live outside the package store
+ * (e.g. a project's own files), keyed by a path relative to the entry.
+ */
+export async function bundleCss(
+  source: string,
+  virtualFiles?: ReadonlyMap<string, string>,
+) {
   await initLightningCss();
 
   return await lightningCss.bundleAsync({
     filename: 'index.css',
     minify: true,
     resolver: {
-      resolve,
+      resolve: (specifier, from) => resolve(specifier, from, virtualFiles),
       read: async (file) => {
         if (file === 'index.css') {
           return source;
         }
+        const virtual = virtualFiles?.get(file);
         const fileData = fileMap.get(file);
-        if (!fileData) {
+        if (virtual === undefined && !fileData) {
           throw new Error(`File not found: ${file}`);
         }
         return (
-          new TextDecoder()
-            .decode(fileData.fileData)
+          (virtual ?? new TextDecoder().decode(fileData?.fileData))
             // Replace them with a dummy rule since some @page rules throw a parse error in LightningCSS
             .replace(/@page/g, '@-page')
             // Keep external @import rules out of the bundler until LightningCSS supports them
@@ -320,6 +353,14 @@ export async function bundleCss(source: string) {
                 value: { loc: rule.loc, url },
               } satisfies lightningCss.ReturnedRule;
             }
+          }
+          // Written back unparsed, as the theme settings read the defaults
+          // a theme gives pages from them
+          if (rule.name === '-page') {
+            return {
+              type: 'unknown',
+              value: omitNulls({ ...rule, name: 'page' }),
+            } satisfies lightningCss.ReturnedRule;
           }
           // Suppress output of unknown rules
           return [];

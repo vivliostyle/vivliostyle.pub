@@ -16,6 +16,6 @@ export const Route = createFileRoute(
     } catch {
       throw redirect({ to: '/' });
     }
-    $ui.showPane({ type: 'theme' }, { besideEditor: true });
+    $ui.showPane({ type: 'theme' }, { besideEditor: true, keepIfShown: true });
   },
 });
