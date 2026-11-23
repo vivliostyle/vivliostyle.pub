@@ -73,6 +73,8 @@ function TextValueInput({
       value={draft}
       placeholder={placeholder}
       autoComplete="off"
+      autoCapitalize="none"
+      autoCorrect="off"
       spellCheck={false}
       onChange={(event) => {
         stepper.reset();

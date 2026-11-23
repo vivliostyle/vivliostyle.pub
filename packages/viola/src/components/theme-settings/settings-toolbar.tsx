@@ -39,7 +39,7 @@ function SettingsSearchField({
   };
 
   return (
-    <div className={cn('relative', className)}>
+    <search className={cn('relative', className)}>
       <Search
         aria-hidden
         className="pointer-events-none absolute inset-y-0 left-2.5 my-auto size-4 text-muted-foreground"
@@ -49,6 +49,10 @@ function SettingsSearchField({
         aria-label={m.theme_settings_search_aria()}
         placeholder={m.theme_settings_search_placeholder()}
         className="px-8 [&::-webkit-search-cancel-button]:hidden"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        enterKeyHint="search"
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
@@ -70,7 +74,7 @@ function SettingsSearchField({
           <X />
         </Button>
       )}
-    </div>
+    </search>
   );
 }
 
