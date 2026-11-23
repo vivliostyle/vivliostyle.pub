@@ -3,9 +3,9 @@
 
 export type StageStatus = 'loading' | 'interactive' | 'complete';
 
-export const viewModes = ['single', 'spread', 'scroll'] as const;
+export const viewModes = ['scroll', 'single', 'spread'] as const;
 export type ViewMode = (typeof viewModes)[number];
-export const defaultViewMode: ViewMode = 'single';
+export const defaultViewMode: ViewMode = 'scroll';
 
 /** Paper sizes the stage lays out documents on when they have no `@page` size. */
 export const paperSizes = [
