@@ -1,4 +1,15 @@
 @media screen {
+  /* The host's scrollbars, in the host's primary color. */
+  [data-vivliostyle-viewer-viewport] {
+    scrollbar-color: rgb(28 25 23 / 30%) transparent;
+    scrollbar-width: thin;
+  }
+
+  /* It inherits, and would recolor the scrollbars of what pages contain. */
+  [data-vivliostyle-page-container] {
+    scrollbar-color: auto;
+  }
+
   /* The root shows where core has set up no viewport, as in a print tab with
      nothing to load. */
   :root[data-pub-color-scheme="dark"],
@@ -10,10 +21,5 @@
      which pages would inherit. */
   :root[data-pub-color-scheme="dark"] [data-vivliostyle-viewer-viewport] {
     scrollbar-color: rgb(250 250 249 / 30%) transparent;
-  }
-
-  /* It inherits, and would recolor the scrollbars of what pages contain. */
-  :root[data-pub-color-scheme="dark"] [data-vivliostyle-page-container] {
-    scrollbar-color: auto;
   }
 }
