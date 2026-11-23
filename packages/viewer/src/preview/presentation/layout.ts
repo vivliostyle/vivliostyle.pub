@@ -1,17 +1,11 @@
-import type { PageProgression, ViewMode } from './protocol';
+import type { PageKey } from '../../core/page-key';
+import type { PageProgression, ViewMode } from '../../protocol';
 
 // Pure geometry of the presentation layer. Lengths are in page CSS px (the
 // unit core lays pages out in) unless a name says otherwise; the display scale
 // turns them into screen px.
 
 export type PageSide = 'left' | 'right';
-
-/** Identifies a page across re-layouts, the way core addresses it. */
-export interface PageKey {
-  spineIndex: number;
-  /** Index within the spine item. */
-  pageIndex: number;
-}
 
 export interface PageBox extends PageKey {
   side: PageSide;

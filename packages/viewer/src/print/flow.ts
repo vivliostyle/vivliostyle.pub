@@ -1,4 +1,4 @@
-import { defaultStallTimeout } from './reload';
+import { defaultStallTimeout } from '../core/stall';
 
 export type PrintPhase =
   | 'preparing'

@@ -127,7 +127,7 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
 
 - **`packages/viewer/`** (`@v/viewer`) — Pub's own viewer, built with Vite into a static stage document on `@vivliostyle/core` (no stock `@vivliostyle/viewer`). The app copies the build to `/_viewer/`. In the preview it lays out once per load and presents pages in its own view modes, scale and paging without making core lay out again, and reloads in place on the HMR channel. With the print URL parameter it lays the publication out, opens the print dialog once every page is laid out, and closes the tab. Its only export is the protocol module (controller types, URL parameters, paper sizes) that embedders import.
   - Core puts the pages and its own CSS into the stage document, so the stage's CSS stays minimal, never styles page content, and keeps every presentation rule under `@media screen`: in print media only core's rules apply to the pages.
-  - Logic that can be tested without a browser lives in pure modules with unit tests; the DOM wiring around them is not unit-tested.
+  - Logic that can be tested without a browser lives in pure modules with unit tests; the DOM wiring around them is not unit-tested. Those modules import `@vivliostyle/core` for types only, even indirectly: core touches `window` as soon as it is imported, and the tests run in Node.
 
 - **`packages/theme-registry/`** (`@v/theme-registry`) — in-browser npm theme fetcher: hits `registry.npmjs.org`, untars `.tgz`s with `@andrewbranch/untar.js`, and bundles theme CSS using `lightningcss-wasm`.
 

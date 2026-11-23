@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { paperSizes } from '../protocol';
 import { paperSizeToPx } from './paper-size';
-import { paperSizes } from './protocol';
 
 describe('paperSizeToPx', () => {
   it('converts every preset to CSS px', () => {

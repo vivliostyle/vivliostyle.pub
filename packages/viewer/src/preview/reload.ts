@@ -1,5 +1,6 @@
-import type { CommandGate } from './command-gate';
-import type { StageStatus } from './protocol';
+import type { CommandGate } from '../core/command-gate';
+import { defaultStallTimeout } from '../core/stall';
+import type { StageStatus } from '../protocol';
 
 export interface ReloadState {
   /**
@@ -226,10 +227,6 @@ export function reloadStatus(state: ReloadState): StageStatus {
 export function reloadFailed(state: ReloadState): boolean {
   return state.errored || state.stalled;
 }
-
-// Long enough for a cold start, where the worker compiles every manuscript
-// and core fetches remote fonts before the first page.
-export const defaultStallTimeout = 30_000;
 
 export interface ReloadControllerOptions {
   gate: CommandGate;

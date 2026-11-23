@@ -1,15 +1,15 @@
 import { ReadyState } from '@vivliostyle/core';
 
-import { createCoreViewer } from './engine';
+import { createCoreViewer } from '../core/viewer';
+import type { PaperSize } from '../protocol';
 import {
   isPrintSettled,
   type PrintEffect,
   type PrintEvent,
   type PrintPhase,
   reducePrint,
-} from './print-flow';
-import { type PrintLocale, printMessages } from './print-messages';
-import type { PaperSize } from './protocol';
+} from './flow';
+import { type PrintLocale, printMessages } from './messages';
 
 const spreadContainerSelector =
   ':scope > [data-vivliostyle-outer-zoom-box] > [data-vivliostyle-spread-container]';

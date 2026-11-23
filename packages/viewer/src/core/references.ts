@@ -1,10 +1,6 @@
 import type { CoreViewer } from '@vivliostyle/core';
 
-import type { PageKey } from './layout';
-
-export function pageKeyId({ spineIndex, pageIndex }: PageKey): string {
-  return `${spineIndex}:${pageIndex}`;
-}
+import { type PageKey, pageKeyId } from './page-key';
 
 /**
  * Ids (see `pageKeyId`) of the pages the references were laid out on, read

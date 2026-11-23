@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { PageKey } from '../../core/page-key';
+import type { ViewMode } from '../../protocol';
 import {
   arrangeScroll,
   arrangeSingle,
@@ -13,7 +15,6 @@ import {
   moveTarget,
   offsetFor,
   type PageBox,
-  type PageKey,
   type PageSide,
   pairSpreads,
   resolvePage,
@@ -23,7 +24,6 @@ import {
   spreadGap,
   viewedPage,
 } from './layout';
-import type { ViewMode } from './protocol';
 
 function page(
   spineIndex: number,

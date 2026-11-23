@@ -7,7 +7,7 @@ import {
   printErrorTimeout,
   printStallTimeout,
   reducePrint,
-} from './print-flow';
+} from './flow';
 
 function run(events: PrintEvent[], from: PrintPhase = 'preparing') {
   let phase = from;

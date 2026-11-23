@@ -1,7 +1,7 @@
 /* biome-ignore-all lint/complexity/noImportantStyles: core writes inline styles on these boxes, and only `!important` overrides them */
 
-/* Presentation layer over core's page containers; `presentation.ts` writes
-   the rule for the sizes that change. Overrides core's inline styles the way
+/* Presentation layer over core's page containers; `Presentation` writes the
+   rule for the sizes that change. Overrides core's inline styles the way
    core's print CSS does. Never style page content here. */
 @media screen {
   [data-pub-view-mode] {

@@ -1,4 +1,4 @@
-import type { PageProgression, ViewMode } from './protocol';
+import type { PageProgression, ViewMode } from '../../protocol';
 import type { ScrollDirection } from './scrollable';
 
 /** `prevEnd` lands on the previous page scrolled to its end. */

@@ -1,9 +1,8 @@
-import {
-  initialWheelState,
-  keyCommand,
-  type PageCommand,
-  reduceWheel,
-} from './input';
+import { type PageKey, pageKeyId } from '../../core/page-key';
+import type { Size } from '../../core/paper-size';
+import type { PageProgression, ViewMode } from '../../protocol';
+import type { PageCommand } from './input';
+import { InputHandler } from './input-handler';
 import {
   type Arrangement,
   arrangeScroll,
@@ -17,7 +16,6 @@ import {
   moveTarget,
   offsetFor,
   type PageBox,
-  type PageKey,
   pairSpreads,
   resolvePage,
   type ScrollGeometry,
@@ -27,16 +25,6 @@ import {
   scrollTopFor,
   viewedPage,
 } from './layout';
-import { linkFragment } from './links';
-import type { Size } from './paper-size';
-import type { PageProgression, ViewMode } from './protocol';
-import { pageKeyId } from './references';
-import {
-  canScrollToward,
-  type ScrollBox,
-  type ScrollDirection,
-  type ScrollStyle,
-} from './scrollable';
 
 export interface PresentationSnapshot {
   pageIndex: number;
@@ -96,21 +84,6 @@ const padding = 16;
 const pageContainerAttribute = 'data-vivliostyle-page-container';
 const pagesCounterAttribute = 'data-vivliostyle-pages-counter';
 const visibleAttribute = 'data-pub-visible';
-const xlinkNamespace = 'http://www.w3.org/1999/xlink';
-
-function scrollStyle(box: ScrollBox): ScrollStyle {
-  const { overflowX, overflowY, writingMode, direction } = getComputedStyle(
-    box as Element,
-  );
-  return { overflowX, overflowY, writingMode, direction };
-}
-
-function isEditable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || target.matches('input, textarea, select'))
-  );
-}
 
 // Focusing an element of a frame that is not focused would take the focus
 // from the page around it, where the user is likely typing.
@@ -198,7 +171,7 @@ export class Presentation {
   readonly #style = document.createElement('style');
   #appliedScrollTop = 0;
   #desiredScrollTop = 0;
-  #wheel = initialWheelState;
+  readonly #input: InputHandler;
   // The most pages, and the tallest scroll arrangement, shown since core last
   // completed, so that pages still to come, or taken away to be laid out
   // again, do not seem to have been removed.
@@ -213,12 +186,18 @@ export class Presentation {
     viewport.setAttribute('data-pub-view-mode', this.#mode);
     this.#rootObserver.observe(viewport, { childList: true });
     viewport.addEventListener('scroll', this.#onScroll, { passive: true });
-    // Capturing on the window runs before any listener of the document's
-    // scripts, which could otherwise stop the event before it is cancelled.
-    window.addEventListener('click', this.#onClick, { capture: true });
-    window.addEventListener('keydown', this.#onKeyDown);
     window.addEventListener('resize', this.#onResize);
-    this.#listenToWheel();
+    this.#input = new InputHandler({
+      scroller: () => this.#scroller,
+      viewMode: () => this.#mode,
+      pageProgression: () => this.#progression,
+      spreadContainer: () => this.#spreadContainer,
+      move: (command) => this.move(command),
+      followLink: (fragment) =>
+        this.#update(() => {
+          this.#pendingFragment = fragment;
+        }),
+    });
     this.#attach();
   }
 
@@ -240,7 +219,7 @@ export class Presentation {
       this.#mode = mode;
       this.#viewport.setAttribute('data-pub-view-mode', mode);
       this.#stale?.layer.setAttribute('data-pub-view-mode', mode);
-      this.#listenToWheel();
+      this.#input.listenToWheel();
     });
   }
 
@@ -430,7 +409,7 @@ export class Presentation {
       tree,
     };
     this.#appliedScrollTop = layer.scrollTop;
-    this.#listenToWheel();
+    this.#input.listenToWheel();
   }
 
   #dropStale() {
@@ -450,7 +429,7 @@ export class Presentation {
     }
     this.#unplaceAll();
     this.#appliedScrollTop = this.#viewport.scrollTop;
-    this.#listenToWheel();
+    this.#input.listenToWheel();
   }
 
   #unplaceAll() {
@@ -800,27 +779,6 @@ export class Presentation {
     });
   }
 
-  #listenToWheel() {
-    this.#viewport.removeEventListener('wheel', this.#onWheel);
-    this.#stale?.layer.removeEventListener('wheel', this.#onWheel);
-    // A non-passive wheel listener makes every scroll wait for the main
-    // thread, which core keeps busy while it lays pages out.
-    if (this.#mode !== 'scroll') {
-      this.#scroller.addEventListener('wheel', this.#onWheel, {
-        passive: false,
-      });
-    }
-  }
-
-  #canScroll(target: EventTarget | null, direction: ScrollDirection): boolean {
-    return canScrollToward(
-      target instanceof Element ? target : null,
-      this.#scroller,
-      direction,
-      scrollStyle,
-    );
-  }
-
   readonly #onScroll = (event: Event) => {
     if (
       event.currentTarget === this.#scroller &&
@@ -833,94 +791,5 @@ export class Presentation {
 
   readonly #onResize = () => {
     this.#update();
-  };
-
-  readonly #onWheel = (event: WheelEvent) => {
-    if (event.ctrlKey || event.defaultPrevented) {
-      return;
-    }
-    const unit =
-      event.deltaMode === WheelEvent.DOM_DELTA_LINE
-        ? 16
-        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-          ? this.#scroller.clientHeight
-          : 1;
-    const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
-    const physical = horizontal ? event.deltaX : event.deltaY;
-    const direction: ScrollDirection = horizontal
-      ? physical > 0
-        ? 'right'
-        : 'left'
-      : physical > 0
-        ? 'down'
-        : 'up';
-    // A sideways swipe turns pages the way they progress.
-    const delta =
-      physical * unit * (horizontal && this.#progression === 'rtl' ? -1 : 1);
-    const { state, action } = reduceWheel(this.#wheel, {
-      time: event.timeStamp,
-      delta,
-      canScroll: physical !== 0 && this.#canScroll(event.target, direction),
-    });
-    this.#wheel = state;
-    if (action === 'native') {
-      return;
-    }
-    event.preventDefault();
-    if (action === 'next') {
-      this.move('next');
-    } else if (action === 'prev') {
-      this.move(horizontal ? 'prev' : 'prevEnd');
-    }
-  };
-
-  readonly #onKeyDown = (event: KeyboardEvent) => {
-    if (
-      event.defaultPrevented ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey ||
-      isEditable(event.target)
-    ) {
-      return;
-    }
-    const command = keyCommand({
-      key: event.key,
-      mode: this.#mode,
-      progression: this.#progression,
-      canScroll: (direction) => this.#canScroll(event.target, direction),
-    });
-    if (command) {
-      event.preventDefault();
-      this.move(command);
-    }
-  };
-
-  // Core only handles links on the page it considers current, and only by
-  // reporting them, so every link in a displayed page is handled here. The
-  // browser must never follow one: that would navigate the stage document.
-  readonly #onClick = (event: MouseEvent) => {
-    if (!(event.target instanceof Element)) {
-      return;
-    }
-    const link = event.target.closest('a[href], a[*|href], area[href]');
-    if (!link) {
-      return;
-    }
-    event.preventDefault();
-    if (event.button !== 0 || !this.#spreadContainer?.contains(link)) {
-      return;
-    }
-    const fragment = linkFragment(
-      link.getAttribute('href') ??
-        link.getAttributeNS(xlinkNamespace, 'href') ??
-        '',
-    );
-    if (fragment !== null) {
-      this.#update(() => {
-        this.#pendingFragment = fragment;
-      });
-    }
   };
 }

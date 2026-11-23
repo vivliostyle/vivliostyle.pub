@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { pageKeyId, referringPages } from './references';
+import { pageKeyId } from './page-key';
+import { referringPages } from './references';
 
 describe('referringPages', () => {
   it('collects the pages the references were laid out on', () => {

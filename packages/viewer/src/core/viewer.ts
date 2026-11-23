@@ -5,8 +5,8 @@ import {
   ReadyState,
 } from '@vivliostyle/core';
 
+import type { PaperSize, StageStatus } from '../protocol';
 import { paperSizeToPx } from './paper-size';
-import type { PaperSize, StageStatus } from './protocol';
 
 const viewerOptions: CoreViewerOptions = {
   // View modes are ours (see `Presentation`): core re-lays out everything

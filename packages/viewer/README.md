@@ -15,4 +15,14 @@ In the preview, the stage lays the publication out once per load, then presents 
 
 With `print=true` the stage is a top-level tab instead: it lays the publication out, opens the print dialog once every page is laid out, then closes itself. All of the stage's own CSS sits under `@media screen`, so in print only core's rules apply to the pages.
 
+## Source layout
+
+- `src/main.ts` reads the search parameters and starts either the preview or the print tab.
+- `src/protocol.ts` is the contract with the embedder, exported as `@v/viewer/protocol`. Both sides import it, so it must not pull in the stage's runtime.
+- `src/core/` drives `@vivliostyle/core`: the options the stage creates it with, the order of the commands sent to it, and what the stage reads from or resets in its internals.
+- `src/preview/` is the preview. Its stage ties core to the reload policy and the presentation, and its entry binds the stage to the embedder and the HMR channel. `src/preview/presentation/` shows core's pages in the stage's own view modes, scale and paging, and turns keys, wheel gestures and link clicks into page moves.
+- `src/print/` is the print tab.
+
+Logic that can be tested without a browser sits in modules of its own, next to its tests.
+
 `pnpm --filter @v/viewer dev` rebuilds `dist/` on every change, and the viola dev server serves the result.

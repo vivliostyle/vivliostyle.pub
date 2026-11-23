@@ -1,4 +1,4 @@
-import type { PaperSize } from './protocol';
+import type { PaperSize } from '../protocol';
 
 export interface Size {
   width: number;

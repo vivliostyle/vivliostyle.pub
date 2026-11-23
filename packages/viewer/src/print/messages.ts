@@ -1,4 +1,4 @@
-import type { PrintPhase } from './print-flow';
+import type { PrintPhase } from './flow';
 
 type PrintStatusPhase = Exclude<PrintPhase, 'printing'>;
 

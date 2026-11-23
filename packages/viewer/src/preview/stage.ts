@@ -1,17 +1,17 @@
 import { type CoreViewer, PageProgression } from '@vivliostyle/core';
 
-import { CommandGate } from './command-gate';
-import { createCoreViewer, stageStatus } from './engine';
-import { dropFontCache, viewFontStyles } from './font-cache';
-import { paperSizeToPx } from './paper-size';
-import { Presentation, type PresentationSnapshot } from './presentation';
+import { CommandGate } from '../core/command-gate';
+import { dropFontCache, viewFontStyles } from '../core/font-cache';
+import { paperSizeToPx } from '../core/paper-size';
+import { pagesAwaitingTargets } from '../core/references';
+import { createCoreViewer, stageStatus } from '../core/viewer';
 import type {
   PaperSize,
   StageState,
   StageStateListener,
   ViewMode,
-} from './protocol';
-import { pagesAwaitingTargets } from './references';
+} from '../protocol';
+import { Presentation, type PresentationSnapshot } from './presentation';
 import { ReloadController, reloadFailed, reloadStatus } from './reload';
 
 export interface StageOptions {

@@ -5,7 +5,7 @@ import {
   type CoreAction,
   type CoreCommandEvents,
   type CoreCommandPayload,
-} from './command-gate';
+} from '../core/command-gate';
 import {
   initialReloadState,
   isBusy,
