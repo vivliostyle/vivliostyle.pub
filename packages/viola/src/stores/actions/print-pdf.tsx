@@ -4,7 +4,7 @@ import { stageSearchParams } from '@v/viewer/protocol';
 import { m } from '../../generated/paraglide/messages';
 import { getLocale } from '../../generated/paraglide/runtime';
 import { currentColorScheme } from '../../libs/color-scheme';
-import { $cli, $viewer } from '../accessors';
+import { $cli } from '../accessors';
 
 let printWindow: Window | null = null;
 let printSession = 0;
@@ -35,7 +35,6 @@ export async function printPdf() {
     if (openedWindow.closed || session !== printSession) {
       return;
     }
-    viewerUrl.searchParams.set(stageSearchParams.paperSize, $viewer.paperSize);
     viewerUrl.searchParams.set(stageSearchParams.colorScheme, colorScheme);
     viewerUrl.searchParams.set(stageSearchParams.locale, getLocale());
     openedWindow.location.href = viewerUrl.href;

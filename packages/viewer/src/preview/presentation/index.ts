@@ -37,7 +37,7 @@ export interface PresentationSnapshot {
 export interface PresentationOptions {
   viewMode: ViewMode;
   /** Size of a page whose container carries no size of its own. */
-  fallbackPageSize: () => Size;
+  fallbackPageSize: Readonly<Size>;
   pageProgression: () => PageProgression | null;
   onChange: (snapshot: PresentationSnapshot) => void;
   /** Core put pages in place or started to lay the publication out anew. */
@@ -443,7 +443,7 @@ export class Presentation {
   #liveCoversView(): boolean {
     const { containers, pages } = readTree(
       this.#liveSpreadContainer,
-      this.#options.fallbackPageSize(),
+      this.#options.fallbackPageSize,
     );
     const index = resolvePage(pages, this.#target, this.#complete);
     if (index === null) {
@@ -507,7 +507,7 @@ export class Presentation {
   #present() {
     const { containers, pages } =
       this.#stale?.tree ??
-      readTree(this.#liveSpreadContainer, this.#options.fallbackPageSize());
+      readTree(this.#liveSpreadContainer, this.#options.fallbackPageSize);
     this.#containers = containers;
     this.#pages = pages;
     if (!this.#complete) {

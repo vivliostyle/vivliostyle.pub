@@ -2,22 +2,12 @@ import { type CoreViewer, PageProgression } from '@vivliostyle/core';
 
 import { CommandGate } from '../core/command-gate';
 import { dropFontCache, viewFontStyles } from '../core/font-cache';
-import { paperSizeToPx } from '../core/paper-size';
+import { defaultPaperSize } from '../core/paper-size';
 import { pagesAwaitingTargets } from '../core/references';
 import { createCoreViewer, stageStatus } from '../core/viewer';
-import type {
-  PaperSize,
-  StageState,
-  StageStateListener,
-  ViewMode,
-} from '../protocol';
+import type { StageState, StageStateListener, ViewMode } from '../protocol';
 import { Presentation, type PresentationSnapshot } from './presentation';
 import { ReloadController, reloadFailed, reloadStatus } from './reload';
-
-export interface StageOptions {
-  viewMode: ViewMode;
-  paperSize: PaperSize;
-}
 
 export class Stage {
   readonly #viewer: CoreViewer;
@@ -36,17 +26,13 @@ export class Stage {
     liveGeneration: number;
   } | null = null;
 
-  constructor(
-    viewportElement: HTMLElement,
-    { viewMode, paperSize }: StageOptions,
-  ) {
-    this.#viewer = createCoreViewer(viewportElement, paperSize);
+  constructor(viewportElement: HTMLElement, viewMode: ViewMode) {
+    this.#viewer = createCoreViewer(viewportElement);
     this.#gate = new CommandGate(this.#viewer);
     this.#state = {
       status: 'loading',
       failed: false,
       viewMode,
-      paperSize,
       pageProgression: 'ltr',
       pageIndex: 0,
       pageCount: 0,
@@ -68,7 +54,7 @@ export class Stage {
     });
     this.#presentation = new Presentation(viewportElement, {
       viewMode,
-      fallbackPageSize: () => paperSizeToPx(this.#state.paperSize),
+      fallbackPageSize: defaultPaperSize,
       pageProgression: () => {
         const progression = this.#viewer.getCurrentPageProgression();
         return progression === null
@@ -124,31 +110,6 @@ export class Stage {
   setViewMode(viewMode: ViewMode) {
     this.#presentation.setViewMode(viewMode);
     this.#update({ viewMode });
-  }
-
-  setDefaultPaperSize(paperSize: PaperSize) {
-    if (paperSize === this.#state.paperSize) {
-      return;
-    }
-    this.#update({ paperSize });
-    const configure = () =>
-      this.#viewer.setOptions({
-        defaultPaperSize: paperSizeToPx(this.#state.paperSize),
-      });
-    if (this.#publicationUrl) {
-      void this.#gate.run(
-        'configure',
-        () => {
-          configure();
-          this.#reload.dispatch({ type: 'configure' });
-        },
-        { key: 'paperSize' },
-      );
-    } else {
-      // Core has no command loop before its first load, so no `done` would
-      // release the gate; it records the option for that load instead.
-      configure();
-    }
   }
 
   subscribe(listener: StageStateListener): () => void {

@@ -168,58 +168,11 @@ describe('reduceReload', () => {
     expect(issued(hardLayout.effects)).toEqual([false]);
   });
 
-  describe('with a paper size change', () => {
-    const idle = run([soft, ...laidOutToView, status('complete')]).state;
-
-    it('holds a reload for the layout the change makes', () => {
-      expect(isBusy(idle)).toBe(false);
-      const resized = run([{ type: 'configure' }, soft], idle);
-      expect(issued(resized.effects)).toEqual([]);
-      // The view shown before core starts the new layout is the old one.
-      const early = run([shown, status('complete')], resized.state);
-      expect(issued(early.effects)).toEqual([]);
-      expect(issued(run([layoutStart, shown], early.state).effects)).toEqual([
-        false,
-      ]);
-    });
-
-    it('waits for its layout when it follows a load', () => {
-      // The load's layout starts first and is cancelled by the change.
-      const { state, effects } = run(
-        [
-          soft,
-          { type: 'configure' },
-          settled,
-          layoutStart,
-          shown,
-          soft,
-          layoutStart,
-        ],
-        idle,
-      );
-      expect(issued(effects)).toEqual([false]);
-      expect(issued(run([shown], state).effects)).toEqual([false]);
-    });
-
-    it('takes the place of the layout a hold waits for', () => {
-      const holding = run([soft, settled, layoutStart, soft], idle).state;
-      const restarted = run(
-        [{ type: 'configure' }, shown, layoutStart, status('interactive')],
-        holding,
-      );
-      expect(issued(restarted.effects)).toEqual([]);
-      expect(issued(run([shown], restarted.state).effects)).toEqual([false]);
-    });
-  });
-
-  it('stops waiting for layouts core never starts after a failure', () => {
-    const failed = run([soft, { type: 'configure' }, { type: 'error' }]);
-    expect(isHolding(failed.state)).toBe(false);
-    const unissued = run([soft, settled, layoutStart, { type: 'configure' }]);
-    // A load that could not be sent owes no layout; the change still does.
-    const thrown = run([hard, { type: 'settled', ran: false }], unissued.state);
+  it('owes no layout for a load that could not be sent', () => {
+    const holding = run([soft, settled, layoutStart]).state;
+    const thrown = run([hard, { type: 'settled', ran: false }], holding);
     expect(issued(thrown.effects)).toEqual([true]);
-    expect(thrown.state.owedStarts).toBe(1);
+    expect(thrown.state.owedStarts).toBe(0);
   });
 
   it('does not restart the stall timer on requests', () => {
@@ -346,44 +299,6 @@ describe('ReloadController', () => {
     core.done('loadPublication');
     await vi.waitFor(() => expect(controller.state.inFlight).toBe(false));
     expect(core.issued).toEqual(['load', 'hard load']);
-  });
-
-  it('shares the gate with paper size changes without losing the last reload', async () => {
-    const { core, gate, controller } = setup();
-    const configure = (size: string) =>
-      void gate.run('configure', () => core.issued.push(`configure ${size}`), {
-        key: 'paperSize',
-      });
-    configure('a5');
-    controller.dispatch(soft);
-    configure('b5');
-    configure('a6');
-    // Issued to the gate, the load waits there; the request after it waits
-    // for its layout to be shown.
-    controller.dispatch(soft);
-    expect(core.issued).toEqual(['configure a5']);
-
-    core.done('configure');
-    await vi.waitFor(() =>
-      expect(core.issued).toEqual(['configure a5', 'load']),
-    );
-    core.done('loadPublication');
-    await vi.waitFor(() =>
-      expect(core.issued).toEqual(['configure a5', 'load', 'configure a6']),
-    );
-    core.done('configure');
-    controller.dispatch(layoutStart);
-    await vi.waitFor(() => expect(controller.state.inFlight).toBe(false));
-    expect(core.issued).toHaveLength(3);
-    controller.dispatch(shown);
-    await vi.waitFor(() =>
-      expect(core.issued).toEqual([
-        'configure a5',
-        'load',
-        'configure a6',
-        'load',
-      ]),
-    );
   });
 
   it('reports a stall once nothing moved forward for the timeout', async () => {

@@ -17,17 +17,7 @@ import {
 } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@v/ui/select';
-import {
-  isPaperSize,
   isViewMode,
-  type PaperSize,
-  paperSizes,
   type StageState,
   type ViewMode,
   viewModes,
@@ -42,15 +32,6 @@ const viewModeOptions: Record<
   single: { icon: RectangleVertical, label: 'preview_view_mode_single' },
   spread: { icon: BookOpen, label: 'preview_view_mode_spread' },
   scroll: { icon: GalleryVerticalEnd, label: 'preview_view_mode_scroll' },
-};
-
-const paperSizeLabels: Record<PaperSize, string> = {
-  a4: 'preview_paper_size_a4',
-  a5: 'preview_paper_size_a5',
-  a6: 'preview_paper_size_a6',
-  'jis-b5': 'preview_paper_size_jis_b5',
-  'jis-b6': 'preview_paper_size_jis_b6',
-  letter: 'preview_paper_size_letter',
 };
 
 export function Toolbar({
@@ -86,32 +67,35 @@ export function Toolbar({
   );
 
   return (
-    // The host lays its sidebar toggle over the top-left corner of the
-    // leftmost pane, so the first control starts clear of it.
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b py-1 ps-12 pe-2">
-      <SegmentedRadioGroup
-        aria-label={t('preview_view_mode_aria')}
-        value={preferences.viewMode}
-        onValueChange={(value) => {
-          if (isViewMode(value)) {
-            onPreferencesChange({ viewMode: value });
-          }
-        }}
-      >
-        {viewModes.map((viewMode) => {
-          const { icon: Icon, label } = viewModeOptions[viewMode];
-          return (
-            <SegmentedRadioGroupItem
-              key={viewMode}
-              value={viewMode}
-              aria-label={t(label)}
-              title={t(label)}
-            >
-              <Icon />
-            </SegmentedRadioGroupItem>
-          );
-        })}
-      </SegmentedRadioGroup>
+    // The sides share the width equally so that paging stays centered.
+    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b px-2 py-1">
+      {/* The host lays its sidebar toggle over the top-left corner of the
+          leftmost pane, so the first control starts clear of it. */}
+      <div className="flex flex-1 ps-10">
+        <SegmentedRadioGroup
+          aria-label={t('preview_view_mode_aria')}
+          value={preferences.viewMode}
+          onValueChange={(value) => {
+            if (isViewMode(value)) {
+              onPreferencesChange({ viewMode: value });
+            }
+          }}
+        >
+          {viewModes.map((viewMode) => {
+            const { icon: Icon, label } = viewModeOptions[viewMode];
+            return (
+              <SegmentedRadioGroupItem
+                key={viewMode}
+                value={viewMode}
+                aria-label={t(label)}
+                title={t(label)}
+              >
+                <Icon />
+              </SegmentedRadioGroupItem>
+            );
+          })}
+        </SegmentedRadioGroup>
+      </div>
 
       <div className="flex items-center gap-1">
         {pageButton(rtl ? 'next' : 'prev', ChevronLeft)}
@@ -128,30 +112,7 @@ export function Toolbar({
         {pageButton(rtl ? 'prev' : 'next', ChevronRight)}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Select
-          value={preferences.paperSize}
-          onValueChange={(value) => {
-            if (isPaperSize(value)) {
-              onPreferencesChange({ paperSize: value });
-            }
-          }}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label={t('preview_paper_size_aria')}
-            title={t('preview_paper_size_hint')}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {paperSizes.map((paperSize) => (
-              <SelectItem key={paperSize} value={paperSize}>
-                {t(paperSizeLabels[paperSize])}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-1 justify-end">
         <span
           className="grid size-4 place-items-center"
           title={state?.failed ? t('preview_update_failed') : undefined}

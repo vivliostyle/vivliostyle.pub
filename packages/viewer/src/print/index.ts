@@ -1,7 +1,6 @@
 import { ReadyState } from '@vivliostyle/core';
 
 import { createCoreViewer } from '../core/viewer';
-import type { PaperSize } from '../protocol';
 import {
   isPrintSettled,
   type PrintEffect,
@@ -18,7 +17,6 @@ const titleProperty = 'http://purl.org/dc/terms/title';
 export interface PrintOptions {
   /** Null when there is no publication the stage may load. */
   publicationUrl: string | null;
-  paperSize: PaperSize;
   locale: PrintLocale;
 }
 
@@ -30,7 +28,7 @@ export interface PrintOptions {
  */
 export function printPublication(
   viewportElement: HTMLElement,
-  { publicationUrl, paperSize, locale }: PrintOptions,
+  { publicationUrl, locale }: PrintOptions,
 ) {
   const stageTitle = document.title;
   const status = document.createElement('div');
@@ -49,7 +47,7 @@ export function printPublication(
     return;
   }
 
-  const viewer = createCoreViewer(viewportElement, paperSize);
+  const viewer = createCoreViewer(viewportElement);
   let phase: PrintPhase = 'preparing';
   let timer: ReturnType<typeof setTimeout> | undefined;
   let spreadContainer: Element | null = null;

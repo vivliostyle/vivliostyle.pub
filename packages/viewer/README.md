@@ -5,11 +5,11 @@ The stage document that renders a publication's pages in Vivliostyle Pub. It is 
 The stage takes its input from search parameters:
 
 ```
-/_viewer/?src=<publication>&viewMode=scroll&paperSize=a4&colorScheme=dark
-/_viewer/?src=<publication>&paperSize=a4&print=true&locale=ja
+/_viewer/?src=<publication>&viewMode=scroll&colorScheme=dark
+/_viewer/?src=<publication>&print=true&locale=ja
 ```
 
-`src` must be on the stage's own origin, since the publication's scripts run in the stage window. The other parameters are initial values, and the paper size applies only to documents without an `@page` size.
+`src` must be on the stage's own origin, since the publication's scripts run in the stage window. The other parameters are initial values. Documents without an `@page` size are laid out on A4.
 
 In the preview, the stage lays the publication out once per load, then presents the pages in its own view modes, scale and paging without making core lay out again. It reloads in place on every `full-reload` that the in-worker Vite posts to the `worker:vite-hmr` BroadcastChannel. The embedder drives it through Comlink: once the frame has loaded, it posts `{ command: 'viewer-stage-bind' }` to the frame window with a `MessagePort`, on which the stage exposes a `StageController`. That contract is the package's only export, `@v/viewer/protocol`.
 

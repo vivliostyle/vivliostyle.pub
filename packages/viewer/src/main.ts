@@ -3,10 +3,8 @@ import { startPreview } from './preview';
 import { printPublication } from './print';
 import { defaultPrintLocale, isPrintLocale } from './print/messages';
 import {
-  defaultPaperSize,
   defaultViewMode,
   isColorScheme,
-  isPaperSize,
   isViewMode,
   stageSearchParams,
 } from './protocol';
@@ -40,16 +38,11 @@ function publicationUrlFrom(src: string | null): string | null {
 const publicationUrl = publicationUrlFrom(
   searchParams.get(stageSearchParams.src),
 );
-const paperSizeParam = searchParams.get(stageSearchParams.paperSize);
-const paperSize = isPaperSize(paperSizeParam)
-  ? paperSizeParam
-  : defaultPaperSize;
 
 if (searchParams.get(stageSearchParams.print) === 'true') {
   const locale = searchParams.get(stageSearchParams.locale);
   printPublication(viewportElement, {
     publicationUrl,
-    paperSize,
     locale: isPrintLocale(locale) ? locale : defaultPrintLocale,
   });
 } else {
@@ -57,6 +50,5 @@ if (searchParams.get(stageSearchParams.print) === 'true') {
   startPreview(viewportElement, {
     publicationUrl,
     viewMode: isViewMode(viewMode) ? viewMode : defaultViewMode,
-    paperSize,
   });
 }

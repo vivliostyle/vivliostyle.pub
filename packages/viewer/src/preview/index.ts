@@ -3,9 +3,7 @@ import * as Comlink from 'comlink';
 import { applyColorScheme } from '../color-scheme';
 import {
   isColorScheme,
-  isPaperSize,
   isViewMode,
-  type PaperSize,
   type StageController,
   stageBindCommand,
   type ViewMode,
@@ -17,7 +15,6 @@ export interface PreviewOptions {
   /** Null when there is no publication the stage may load. */
   publicationUrl: string | null;
   viewMode: ViewMode;
-  paperSize: PaperSize;
 }
 
 /**
@@ -26,9 +23,9 @@ export interface PreviewOptions {
  */
 export function startPreview(
   viewportElement: HTMLElement,
-  { publicationUrl, viewMode, paperSize }: PreviewOptions,
+  { publicationUrl, viewMode }: PreviewOptions,
 ) {
-  const stage = new Stage(viewportElement, { viewMode, paperSize });
+  const stage = new Stage(viewportElement, viewMode);
 
   const controller: StageController = {
     next: () => stage.next(),
@@ -37,11 +34,6 @@ export function startPreview(
     setViewMode: (mode) => {
       if (isViewMode(mode)) {
         stage.setViewMode(mode);
-      }
-    },
-    setDefaultPaperSize: (size) => {
-      if (isPaperSize(size)) {
-        stage.setDefaultPaperSize(size);
       }
     },
     setColorScheme: (colorScheme) => {

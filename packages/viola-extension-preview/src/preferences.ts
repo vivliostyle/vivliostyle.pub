@@ -1,15 +1,7 @@
-import {
-  defaultPaperSize,
-  defaultViewMode,
-  isPaperSize,
-  isViewMode,
-  type PaperSize,
-  type ViewMode,
-} from '@v/viewer/protocol';
+import { defaultViewMode, isViewMode, type ViewMode } from '@v/viewer/protocol';
 
 export interface PreviewPreferences {
   viewMode: ViewMode;
-  paperSize: PaperSize;
 }
 
 // Kept by this view rather than the stage: the view's origin is the same for
@@ -18,7 +10,6 @@ const storageKey = 'preview-preferences';
 
 const defaults: PreviewPreferences = {
   viewMode: defaultViewMode,
-  paperSize: defaultPaperSize,
 };
 
 // Storage access throws where the browser blocks storage for this frame
@@ -31,11 +22,8 @@ export function loadPreferences(): PreviewPreferences {
     if (typeof stored !== 'object' || stored === null) {
       return defaults;
     }
-    const { viewMode, paperSize } = stored as Record<string, unknown>;
-    return {
-      viewMode: isViewMode(viewMode) ? viewMode : defaults.viewMode,
-      paperSize: isPaperSize(paperSize) ? paperSize : defaults.paperSize,
-    };
+    const { viewMode } = stored as Record<string, unknown>;
+    return { viewMode: isViewMode(viewMode) ? viewMode : defaults.viewMode };
   } catch {
     return defaults;
   }

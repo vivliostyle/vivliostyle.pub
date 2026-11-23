@@ -7,7 +7,6 @@ import { draftProjectId, projects } from './proxies/project';
 import { sandboxes } from './proxies/sandbox';
 import { session } from './proxies/session';
 import { ui } from './proxies/ui';
-import { viewer } from './proxies/viewer';
 
 export {
   extensions as $extensions,
@@ -15,7 +14,6 @@ export {
   sandboxes as $sandboxes,
   session as $session,
   ui as $ui,
-  viewer as $viewer,
 };
 
 function createProxyGetter<S extends unknown[], T>(

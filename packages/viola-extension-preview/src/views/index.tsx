@@ -4,7 +4,6 @@ import type {
   ExtensionColorScheme,
   ExtensionMountContext,
   ExtensionTranslate,
-  RemoteExtensionHostApi,
 } from '@v/extension-kit';
 import { stageSearchParams } from '@v/viewer/protocol';
 import {
@@ -40,19 +39,15 @@ export default function PreviewPane({
     return null;
   }
 
-  return (
-    <Preview key={url} url={url} host={host} t={t} colorScheme={colorScheme} />
-  );
+  return <Preview key={url} url={url} t={t} colorScheme={colorScheme} />;
 }
 
 function Preview({
   url,
-  host,
   t,
   colorScheme,
 }: {
   url: string;
-  host: RemoteExtensionHostApi;
   t: ExtensionTranslate;
   colorScheme: ExtensionColorScheme;
 }) {
@@ -62,10 +57,6 @@ function Preview({
   const [frameUrl] = useState(() => {
     const stageUrl = new URL(url);
     stageUrl.searchParams.set(stageSearchParams.viewMode, preferences.viewMode);
-    stageUrl.searchParams.set(
-      stageSearchParams.paperSize,
-      preferences.paperSize,
-    );
     stageUrl.searchParams.set(stageSearchParams.colorScheme, colorScheme);
     return stageUrl.href;
   });
@@ -76,18 +67,12 @@ function Preview({
   useEffect(() => {
     savePreferences(preferences);
   }, [preferences]);
-  useEffect(() => {
-    void host.setViewerPaperSize(preferences.paperSize);
-  }, [host, preferences.paperSize]);
 
   // The stage ignores values it already has, so this costs nothing on a fresh
   // bind and brings a reloaded frame up to date.
   useEffect(() => {
     stage?.setViewMode(preferences.viewMode);
   }, [stage, preferences.viewMode]);
-  useEffect(() => {
-    stage?.setDefaultPaperSize(preferences.paperSize);
-  }, [stage, preferences.paperSize]);
   useEffect(() => {
     stage?.setColorScheme(colorScheme);
   }, [stage, colorScheme]);

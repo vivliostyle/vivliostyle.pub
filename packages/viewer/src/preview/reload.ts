@@ -13,16 +13,15 @@ export interface ReloadState {
   /** Whether the latest load issued was hard. */
   issuedHard: boolean;
   /**
-   * Layouts core is still to start for the commands sent to it: loads and
-   * paper size changes. Until they have, what is shown or completed is a
-   * layout those commands replace.
+   * Layouts core is still to start for the loads sent to it. Until it has,
+   * what is shown or completed is a layout those loads replace.
    */
   owedStarts: number;
   /** The layout core started last is not shown yet. */
   awaitingView: boolean;
   /** Whether a load was ever issued; nothing is in progress before that. */
   started: boolean;
-  /** Core's ready state, which a load or a re-configuration moves back. */
+  /** Core's ready state, which a load moves back. */
   coreStatus: StageStatus;
   /** Core reported an error since the latest load was issued. */
   errored: boolean;
@@ -50,15 +49,10 @@ export type ReloadEvent =
   | { type: 'status'; status: StageStatus }
   /** Core put pages in place or started a layout over. */
   | { type: 'progress' }
-  /**
-   * Core started a layout, for the latest load or for a change of the paper
-   * size, which shows the same content.
-   */
+  /** Core started a layout. */
   | { type: 'layoutStart' }
   /** The pages of the layout core started last cover the view. */
   | { type: 'shown' }
-  /** A paper size change was sent to core, which lays out again for it. */
-  | { type: 'configure' }
   | { type: 'error' }
   | { type: 'stallTimeout' };
 
@@ -183,8 +177,6 @@ export function reduceReload(
         },
         true,
       );
-    case 'configure':
-      return settle({ ...state, owedStarts: state.owedStarts + 1 }, true);
     case 'layoutStart': {
       if (!state.started) {
         return [state, []];

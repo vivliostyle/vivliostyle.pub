@@ -10,5 +10,5 @@ export default defineExtension({
       sizing: 'fill',
     },
   ],
-  permissions: ['viewer:read', 'viewer:write'],
+  permissions: ['viewer:read'],
 });

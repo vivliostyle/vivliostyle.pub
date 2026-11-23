@@ -9,7 +9,6 @@ import type {
   ExtensionSessionSnapshot,
 } from '@v/extension-kit';
 import { Loader2 } from '@v/ui/icon';
-import { isPaperSize } from '@v/viewer/protocol';
 import { attachExtensionAutoSize } from '../../extensions/iframe-autosize';
 import {
   extensionFramePath,
@@ -20,7 +19,7 @@ import {
   currentColorScheme,
   subscribeColorScheme,
 } from '../../libs/color-scheme';
-import { $cli, $session, $viewer } from '../../stores/accessors';
+import { $cli, $session } from '../../stores/accessors';
 import {
   applyBearerSession,
   clearBearerSession,
@@ -142,14 +141,6 @@ const hostApiRegistry: HostApiRegistry = {
     impl: async () => {
       const cli = await $cli.awaiter({ timeout: 10_000 });
       return await cli.createViewerUrlPromise();
-    },
-  },
-  setViewerPaperSize: {
-    permission: 'viewer:write',
-    impl: (paperSize) => {
-      if (isPaperSize(paperSize)) {
-        $viewer.paperSize = paperSize;
-      }
     },
   },
   apiFetch: {

@@ -5,8 +5,8 @@ import {
   ReadyState,
 } from '@vivliostyle/core';
 
-import type { PaperSize, StageStatus } from '../protocol';
-import { paperSizeToPx } from './paper-size';
+import type { StageStatus } from '../protocol';
+import { defaultPaperSize } from './paper-size';
 
 const viewerOptions: CoreViewerOptions = {
   // View modes are ours (see `Presentation`): core re-lays out everything
@@ -18,6 +18,7 @@ const viewerOptions: CoreViewerOptions = {
   autoResize: false,
   fitToScreen: false,
   zoom: 1,
+  defaultPaperSize: { ...defaultPaperSize },
 };
 
 export const stageStatus: Record<ReadyState, StageStatus> = {
@@ -26,14 +27,6 @@ export const stageStatus: Record<ReadyState, StageStatus> = {
   [ReadyState.COMPLETE]: 'complete',
 };
 
-export function createCoreViewer(
-  viewportElement: HTMLElement,
-  paperSize: PaperSize,
-): CoreViewer {
-  // Given up front, the paper size is in effect from the first layout on; a
-  // configure command would lay everything out a second time.
-  return new CoreViewer(
-    { viewportElement },
-    { ...viewerOptions, defaultPaperSize: paperSizeToPx(paperSize) },
-  );
+export function createCoreViewer(viewportElement: HTMLElement): CoreViewer {
+  return new CoreViewer({ viewportElement }, viewerOptions);
 }
