@@ -20,7 +20,7 @@ interface CardState {
 
 type Pending = { kind: OpenReason | 'close'; value: string | null };
 
-interface HoverPopoverContextValue {
+interface HoverCardContextValue {
   contentId: string;
   getState: () => CardState;
   subscribe: (listener: () => void) => () => void;
@@ -36,25 +36,26 @@ interface HoverPopoverContextValue {
   cancel: (kind: Pending['kind'], value?: string) => void;
 }
 
-const HoverPopoverContext =
-  React.createContext<HoverPopoverContextValue | null>(null);
+const HoverCardContext = React.createContext<HoverCardContextValue | null>(
+  null,
+);
 
-function useHoverPopoverContext() {
-  const context = React.useContext(HoverPopoverContext);
+function useHoverCardContext() {
+  const context = React.useContext(HoverCardContext);
   if (!context) {
-    throw new Error('HoverPopover parts must be rendered in a HoverPopover');
+    throw new Error('HoverCard parts must be rendered in a HoverCard');
   }
   return context;
 }
 
 function useCardState(): CardState {
-  const { getState, subscribe } = useHoverPopoverContext();
+  const { getState, subscribe } = useHoverCardContext();
   return React.useSyncExternalStore(subscribe, getState);
 }
 
 /** Re-renders a trigger only when its own card opens or closes. */
 function useIsShown(value: string): boolean {
-  const { getState, subscribe } = useHoverPopoverContext();
+  const { getState, subscribe } = useHoverCardContext();
   return React.useSyncExternalStore(subscribe, () => {
     const state = getState();
     return state.open && state.value === value;
@@ -75,7 +76,7 @@ type AnchorRef = NonNullable<
  * A long list of triggers then mounts no per-item state or popover machinery,
  * and a trigger re-renders only when its own card opens or closes.
  */
-function HoverPopover({
+function HoverCard({
   openDelay = 300,
   closeDelay = 150,
   children,
@@ -100,7 +101,7 @@ function HoverPopover({
     delaysRef.current = { openDelay, closeDelay };
   });
 
-  const value = React.useMemo<HoverPopoverContextValue>(() => {
+  const value = React.useMemo<HoverCardContextValue>(() => {
     const setState = (next: CardState) => {
       stateRef.current = next;
       for (const listener of listenersRef.current) {
@@ -203,9 +204,9 @@ function HoverPopover({
   );
 
   return (
-    <HoverPopoverContext.Provider value={value}>
+    <HoverCardContext.Provider value={value}>
       {children}
-    </HoverPopoverContext.Provider>
+    </HoverCardContext.Provider>
   );
 }
 
@@ -214,7 +215,7 @@ function HoverPopover({
  * trigger. Keep the content outside of it: React counts a portal as part of
  * its parent.
  */
-function HoverPopoverArea({
+function HoverCardArea({
   value,
   asChild = false,
   onPointerEnter,
@@ -222,12 +223,12 @@ function HoverPopoverArea({
   ...props
 }: React.ComponentProps<'div'> & { value: string; asChild?: boolean }) {
   const { getState, reasonRef, scheduleOpen, scheduleClose, cancel } =
-    useHoverPopoverContext();
+    useHoverCardContext();
   const Comp = asChild ? Slot : 'div';
 
   return (
     <Comp
-      data-slot="hover-popover-area"
+      data-slot="hover-card-area"
       onPointerEnter={(event: React.PointerEvent<HTMLDivElement>) => {
         onPointerEnter?.(event);
         if (isTouch(event)) {
@@ -265,7 +266,7 @@ function HoverPopoverArea({
  * popover machinery. The parts here stand in for what that trigger did: its
  * ARIA state, its outside-click exemption and the focus return.
  */
-function HoverPopoverTrigger({
+function HoverCardTrigger({
   value,
   asChild = false,
   ref,
@@ -284,7 +285,7 @@ function HoverPopoverTrigger({
     close,
     scheduleOpen,
     cancel,
-  } = useHoverPopoverContext();
+  } = useHoverCardContext();
   const shown = useIsShown(value);
   const Comp = asChild ? Slot : 'button';
   const setRef = React.useCallback(
@@ -303,7 +304,7 @@ function HoverPopoverTrigger({
     <Comp
       ref={setRef}
       type={asChild ? undefined : 'button'}
-      data-slot="hover-popover-trigger"
+      data-slot="hover-card-trigger"
       aria-haspopup="dialog"
       aria-expanded={shown}
       aria-controls={shown ? contentId : undefined}
@@ -340,7 +341,7 @@ function HoverPopoverTrigger({
   );
 }
 
-function HoverPopoverContent({
+function HoverCardContent({
   className,
   align = 'center',
   sideOffset = 4,
@@ -370,7 +371,7 @@ function HoverPopoverContent({
     close,
     scheduleClose,
     cancel,
-  } = useHoverPopoverContext();
+  } = useHoverCardContext();
   const { open, value } = useCardState();
   const [mounted, setMounted] = React.useState(false);
   if (open && !mounted) {
@@ -391,7 +392,7 @@ function HoverPopoverContent({
         <PopoverPrimitive.Content
           ref={contentRef}
           id={contentId}
-          data-slot="hover-popover-content"
+          data-slot="hover-card-content"
           align={align}
           sideOffset={sideOffset}
           collisionPadding={collisionPadding}
@@ -455,9 +456,4 @@ function HoverPopoverContent({
   );
 }
 
-export {
-  HoverPopover,
-  HoverPopoverArea,
-  HoverPopoverContent,
-  HoverPopoverTrigger,
-};
+export { HoverCard, HoverCardArea, HoverCardContent, HoverCardTrigger };

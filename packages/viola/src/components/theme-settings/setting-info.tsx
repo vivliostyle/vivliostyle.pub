@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@v/ui/button';
-import { HoverPopoverContent } from '@v/ui/hover-popover';
+import { HoverCardContent } from '@v/ui/hover-card';
 import { Check, Copy, ExternalLink } from '@v/ui/icon';
 import { m } from '../../generated/paraglide/messages';
 import {
@@ -29,7 +29,7 @@ export function SettingInfoCard({
 }) {
   const titleId = useId();
   return (
-    <HoverPopoverContent
+    <HoverCardContent
       align="start"
       hideWhenDetached
       aria-labelledby={titleId}
@@ -49,7 +49,7 @@ export function SettingInfoCard({
           )
         );
       }}
-    </HoverPopoverContent>
+    </HoverCardContent>
   );
 }
 

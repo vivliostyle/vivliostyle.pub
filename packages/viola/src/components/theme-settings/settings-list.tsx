@@ -1,7 +1,7 @@
 import { memo, useCallback, useMemo } from 'react';
 
 import { Button } from '@v/ui/button';
-import { HoverPopover } from '@v/ui/hover-popover';
+import { HoverCard } from '@v/ui/hover-card';
 import { m } from '../../generated/paraglide/messages';
 import {
   THEME_SCOPES,
@@ -71,7 +71,7 @@ function SettingsList({
     );
   }
   return (
-    <HoverPopover>
+    <HoverCard>
       <div className="grid">
         {rows.map((row) => {
           switch (row.kind) {
@@ -157,7 +157,7 @@ function SettingsList({
           model.scopes[scope].variables[name]?.important ?? false
         }
       />
-    </HoverPopover>
+    </HoverCard>
   );
 }
 

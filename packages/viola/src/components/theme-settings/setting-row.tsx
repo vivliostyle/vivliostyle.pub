@@ -1,7 +1,7 @@
 import { memo, useCallback, useId, useMemo, useState } from 'react';
 
 import { Button, buttonVariants } from '@v/ui/button';
-import { HoverPopoverArea, HoverPopoverTrigger } from '@v/ui/hover-popover';
+import { HoverCardArea, HoverCardTrigger } from '@v/ui/hover-card';
 import { Info, RotateCcw } from '@v/ui/icon';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
@@ -89,7 +89,7 @@ function SettingRow({
       <div className="flex items-start gap-2">
         {/* Hovering the label opens the card as well. The card is shared by
             the list and picked by the variable name. */}
-        <HoverPopoverArea
+        <HoverCardArea
           value={variable.name}
           className="flex min-w-0 items-start gap-0.5"
         >
@@ -102,14 +102,14 @@ function SettingRow({
               </span>
             )}
           </div>
-          <HoverPopoverTrigger
+          <HoverCardTrigger
             value={variable.name}
             className={infoButtonClassName}
             aria-label={m.theme_settings_info_aria({ name: label })}
           >
             <Info />
-          </HoverPopoverTrigger>
-        </HoverPopoverArea>
+          </HoverCardTrigger>
+        </HoverCardArea>
         {modified && (
           <Button
             type="button"
