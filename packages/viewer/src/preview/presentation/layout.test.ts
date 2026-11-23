@@ -10,7 +10,6 @@ import {
   dominantSpan,
   endOffset,
   firstPageAfter,
-  fitScale,
   locatePage,
   moveTarget,
   offsetFor,
@@ -23,6 +22,7 @@ import {
   scrollTopFor,
   spreadGap,
   viewedPage,
+  zoomScale,
 } from './layout';
 
 function page(
@@ -159,27 +159,46 @@ describe('arrangeScroll', () => {
   });
 });
 
-describe('fitScale', () => {
-  it('stays at 100% while the content fits', () => {
-    expect(fitScale(794, 1000)).toBe(1);
-    expect(fitScale(794, 794)).toBe(1);
+describe('zoomScale', () => {
+  const available = { width: 400, height: 300 };
+
+  it('shows a fixed zoom at its scale', () => {
+    expect(zoomScale(1.5, { width: 100, height: 100 }, available)).toBe(1.5);
   });
 
-  it('never enlarges', () => {
-    expect(fitScale(200, 2000)).toBe(1);
+  it('fits the width, enlarging as well as shrinking', () => {
+    expect(zoomScale('fit-width', { width: 800, height: 100 }, available)).toBe(
+      0.5,
+    );
+    expect(zoomScale('fit-width', { width: 200, height: 900 }, available)).toBe(
+      2,
+    );
   });
 
-  it('shrinks content wider than the available width', () => {
-    expect(fitScale(800, 400)).toBe(0.5);
+  it('fits a page by the side that is tighter', () => {
+    expect(zoomScale('fit-page', { width: 200, height: 600 }, available)).toBe(
+      0.5,
+    );
+    expect(zoomScale('fit-page', { width: 800, height: 100 }, available)).toBe(
+      0.5,
+    );
+    expect(zoomScale('fit-page', { width: 100, height: 100 }, available)).toBe(
+      3,
+    );
   });
 
-  it('keeps a lower bound for a collapsed pane', () => {
-    expect(fitScale(800, 0)).toBeGreaterThan(0);
-    expect(fitScale(800, -32)).toBeGreaterThan(0);
+  it('stays at 100% without content', () => {
+    expect(zoomScale('fit-page', { width: 0, height: 0 }, available)).toBe(1);
   });
 
-  it('treats empty content as 100%', () => {
-    expect(fitScale(0, 400)).toBe(1);
+  it('never shrinks to nothing', () => {
+    expect(
+      zoomScale(
+        'fit-width',
+        { width: 800, height: 100 },
+        { width: 0, height: 0 },
+      ),
+    ).toBeGreaterThan(0);
   });
 });
 

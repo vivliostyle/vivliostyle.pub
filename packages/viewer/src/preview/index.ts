@@ -4,9 +4,11 @@ import { applyColorScheme } from '../color-scheme';
 import {
   isColorScheme,
   isViewMode,
+  isZoom,
   type StageController,
   stageBindCommand,
   type ViewMode,
+  type Zoom,
 } from '../protocol';
 import { subscribeFullReload } from './hmr';
 import { Stage } from './stage';
@@ -15,6 +17,7 @@ export interface PreviewOptions {
   /** Null when there is no publication the stage may load. */
   publicationUrl: string | null;
   viewMode: ViewMode;
+  zoom: Zoom;
 }
 
 /**
@@ -23,9 +26,9 @@ export interface PreviewOptions {
  */
 export function startPreview(
   viewportElement: HTMLElement,
-  { publicationUrl, viewMode }: PreviewOptions,
+  { publicationUrl, viewMode, zoom }: PreviewOptions,
 ) {
-  const stage = new Stage(viewportElement, viewMode);
+  const stage = new Stage(viewportElement, viewMode, zoom);
 
   const controller: StageController = {
     next: () => stage.next(),
@@ -34,6 +37,11 @@ export function startPreview(
     setViewMode: (mode) => {
       if (isViewMode(mode)) {
         stage.setViewMode(mode);
+      }
+    },
+    setZoom: (zoom) => {
+      if (isZoom(zoom)) {
+        stage.setZoom(zoom);
       }
     },
     setColorScheme: (colorScheme) => {

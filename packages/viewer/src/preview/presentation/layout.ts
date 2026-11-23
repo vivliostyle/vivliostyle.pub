@@ -1,5 +1,5 @@
 import type { PageKey } from '../../core/page-key';
-import type { PageProgression, ViewMode } from '../../protocol';
+import type { PageProgression, ViewMode, Zoom } from '../../protocol';
 
 // Pure geometry of the presentation layer. Lengths are in page CSS px (the
 // unit core lays pages out in) unless a name says otherwise; the display scale
@@ -119,12 +119,34 @@ export function arrangeScroll(pages: readonly PageBox[]): Arrangement {
   return { placements, width, height: y };
 }
 
-/** 100%, shrunk only as far as needed to fit `availableWidth` (screen px). */
-export function fitScale(contentWidth: number, availableWidth: number): number {
-  if (contentWidth <= 0 || availableWidth >= contentWidth) {
+export interface Extent {
+  width: number;
+  height: number;
+}
+
+/**
+ * The scale `zoom` shows content at in an area of `available` screen px.
+ * `content` is what has to fit: in scroll mode, the arrangement's width and
+ * its tallest page.
+ */
+export function zoomScale(
+  zoom: Zoom,
+  content: Extent,
+  available: Extent,
+): number {
+  if (typeof zoom === 'number') {
+    return zoom;
+  }
+  if (content.width <= 0 || content.height <= 0) {
     return 1;
   }
-  return Math.max(minScale, availableWidth / contentWidth);
+  const widthScale = available.width / content.width;
+  return Math.max(
+    minScale,
+    zoom === 'fit-width'
+      ? widthScale
+      : Math.min(widthScale, available.height / content.height),
+  );
 }
 
 export interface ScrollGeometry {

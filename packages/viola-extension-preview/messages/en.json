@@ -10,5 +10,10 @@
   "preview_view_mode_aria": "View mode",
   "preview_view_mode_scroll": "Continuous scroll",
   "preview_view_mode_single": "Single page",
-  "preview_view_mode_spread": "Spread"
+  "preview_view_mode_spread": "Spread",
+  "preview_zoom_fit_page": "Fit to page",
+  "preview_zoom_fit_width": "Fit to width",
+  "preview_zoom_in_aria": "Zoom in",
+  "preview_zoom_level_aria": "Zoom level",
+  "preview_zoom_out_aria": "Zoom out"
 }

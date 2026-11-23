@@ -1,7 +1,16 @@
-import { defaultViewMode, isViewMode, type ViewMode } from '@v/viewer/protocol';
+import {
+  clampZoomScale,
+  defaultViewMode,
+  defaultZoom,
+  isViewMode,
+  isZoom,
+  type ViewMode,
+  type Zoom,
+} from '@v/viewer/protocol';
 
 export interface PreviewPreferences {
   viewMode: ViewMode;
+  zoom: Zoom;
 }
 
 // Kept by this view rather than the stage: the view's origin is the same for
@@ -10,6 +19,7 @@ const storageKey = 'preview-preferences';
 
 const defaults: PreviewPreferences = {
   viewMode: defaultViewMode,
+  zoom: defaultZoom,
 };
 
 // Storage access throws where the browser blocks storage for this frame
@@ -22,8 +32,15 @@ export function loadPreferences(): PreviewPreferences {
     if (typeof stored !== 'object' || stored === null) {
       return defaults;
     }
-    const { viewMode } = stored as Record<string, unknown>;
-    return { viewMode: isViewMode(viewMode) ? viewMode : defaults.viewMode };
+    const { viewMode, zoom } = stored as Record<string, unknown>;
+    return {
+      viewMode: isViewMode(viewMode) ? viewMode : defaults.viewMode,
+      zoom: !isZoom(zoom)
+        ? defaults.zoom
+        : typeof zoom === 'number'
+          ? clampZoomScale(zoom)
+          : zoom,
+    };
   } catch {
     return defaults;
   }

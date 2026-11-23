@@ -57,6 +57,7 @@ function Preview({
   const [frameUrl] = useState(() => {
     const stageUrl = new URL(url);
     stageUrl.searchParams.set(stageSearchParams.viewMode, preferences.viewMode);
+    stageUrl.searchParams.set(stageSearchParams.zoom, `${preferences.zoom}`);
     stageUrl.searchParams.set(stageSearchParams.colorScheme, colorScheme);
     return stageUrl.href;
   });
@@ -73,6 +74,9 @@ function Preview({
   useEffect(() => {
     stage?.setViewMode(preferences.viewMode);
   }, [stage, preferences.viewMode]);
+  useEffect(() => {
+    stage?.setZoom(preferences.zoom);
+  }, [stage, preferences.zoom]);
   useEffect(() => {
     stage?.setColorScheme(colorScheme);
   }, [stage, colorScheme]);

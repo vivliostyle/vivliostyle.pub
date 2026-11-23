@@ -4,8 +4,10 @@ import { printPublication } from './print';
 import { defaultPrintLocale, isPrintLocale } from './print/messages';
 import {
   defaultViewMode,
+  defaultZoom,
   isColorScheme,
   isViewMode,
+  parseZoom,
   stageSearchParams,
 } from './protocol';
 
@@ -50,5 +52,6 @@ if (searchParams.get(stageSearchParams.print) === 'true') {
   startPreview(viewportElement, {
     publicationUrl,
     viewMode: isViewMode(viewMode) ? viewMode : defaultViewMode,
+    zoom: parseZoom(searchParams.get(stageSearchParams.zoom)) ?? defaultZoom,
   });
 }

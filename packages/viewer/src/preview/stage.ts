@@ -5,7 +5,13 @@ import { dropFontCache, viewFontStyles } from '../core/font-cache';
 import { defaultPaperSize } from '../core/paper-size';
 import { pagesAwaitingTargets } from '../core/references';
 import { createCoreViewer, stageStatus } from '../core/viewer';
-import type { StageState, StageStateListener, ViewMode } from '../protocol';
+import {
+  clampZoomScale,
+  type StageState,
+  type StageStateListener,
+  type ViewMode,
+  type Zoom,
+} from '../protocol';
 import { Presentation, type PresentationSnapshot } from './presentation';
 import { ReloadController, reloadFailed, reloadStatus } from './reload';
 
@@ -26,13 +32,16 @@ export class Stage {
     liveGeneration: number;
   } | null = null;
 
-  constructor(viewportElement: HTMLElement, viewMode: ViewMode) {
+  constructor(viewportElement: HTMLElement, viewMode: ViewMode, zoom: Zoom) {
     this.#viewer = createCoreViewer(viewportElement);
     this.#gate = new CommandGate(this.#viewer);
+    zoom = clampZoom(zoom);
     this.#state = {
       status: 'loading',
       failed: false,
       viewMode,
+      zoom,
+      scale: typeof zoom === 'number' ? zoom : 1,
       pageProgression: 'ltr',
       pageIndex: 0,
       pageCount: 0,
@@ -54,6 +63,7 @@ export class Stage {
     });
     this.#presentation = new Presentation(viewportElement, {
       viewMode,
+      zoom,
       fallbackPageSize: defaultPaperSize,
       pageProgression: () => {
         const progression = this.#viewer.getCurrentPageProgression();
@@ -112,6 +122,12 @@ export class Stage {
     this.#update({ viewMode });
   }
 
+  setZoom(zoom: Zoom) {
+    const clamped = clampZoom(zoom);
+    this.#presentation.setZoom(clamped);
+    this.#update({ zoom: clamped });
+  }
+
   subscribe(listener: StageStateListener): () => void {
     this.#listeners.add(listener);
     listener(this.#state);
@@ -168,4 +184,8 @@ export class Stage {
       listener(next);
     }
   }
+}
+
+function clampZoom(zoom: Zoom): Zoom {
+  return typeof zoom === 'number' ? clampZoomScale(zoom) : zoom;
 }

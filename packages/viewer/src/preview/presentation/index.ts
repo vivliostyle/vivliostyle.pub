@@ -1,6 +1,6 @@
 import { type PageKey, pageKeyId } from '../../core/page-key';
 import type { Size } from '../../core/paper-size';
-import type { PageProgression, ViewMode } from '../../protocol';
+import type { PageProgression, ViewMode, Zoom } from '../../protocol';
 import type { PageCommand } from './input';
 import { InputHandler } from './input-handler';
 import {
@@ -11,7 +11,6 @@ import {
   coversView,
   endOffset,
   firstPageAfter,
-  fitScale,
   locatePage,
   moveTarget,
   offsetFor,
@@ -24,6 +23,7 @@ import {
   scrollGap,
   scrollTopFor,
   viewedPage,
+  zoomScale,
 } from './layout';
 
 export interface PresentationSnapshot {
@@ -32,10 +32,12 @@ export interface PresentationSnapshot {
   canPrev: boolean;
   canNext: boolean;
   pageProgression: PageProgression;
+  scale: number;
 }
 
 export interface PresentationOptions {
   viewMode: ViewMode;
+  zoom: Zoom;
   /** Size of a page whose container carries no size of its own. */
   fallbackPageSize: Readonly<Size>;
   pageProgression: () => PageProgression | null;
@@ -142,6 +144,8 @@ export class Presentation {
     this.#update();
   });
   #mode: ViewMode;
+  #zoom: Zoom;
+  #scale = 1;
   #complete = false;
   #layoutFailed = false;
   #target: PageKey = { spineIndex: 0, pageIndex: 0 };
@@ -182,6 +186,7 @@ export class Presentation {
     this.#viewport = viewport;
     this.#options = options;
     this.#mode = options.viewMode;
+    this.#zoom = options.zoom;
     document.head.append(this.#style);
     viewport.setAttribute('data-pub-view-mode', this.#mode);
     this.#rootObserver.observe(viewport, { childList: true });
@@ -221,6 +226,14 @@ export class Presentation {
       this.#stale?.layer.setAttribute('data-pub-view-mode', mode);
       this.#input.listenToWheel();
     });
+  }
+
+  setZoom(zoom: Zoom) {
+    if (zoom !== this.#zoom) {
+      this.#update(() => {
+        this.#zoom = zoom;
+      });
+    }
   }
 
   /**
@@ -452,10 +465,7 @@ export class Presentation {
     let awaitingTargets: ReadonlySet<string> | undefined;
     const scale =
       this.#mode === 'scroll'
-        ? fitScale(
-            arrangeScroll(pages).width,
-            this.#viewport.clientWidth - padding * 2,
-          )
+        ? this.#scaleFor(arrangeScroll(pages), pages, this.#viewport)
         : 1;
     return coversView(pages, index, {
       mode: this.#mode,
@@ -544,11 +554,13 @@ export class Presentation {
         ? location.index
         : null;
     const arrangement = this.#arrange();
-    const scale = fitScale(
-      arrangement?.width ?? 0,
-      this.#scroller.clientWidth - padding * 2,
-    );
+    const scale = this.#scaleFor(arrangement, this.#pages, this.#scroller);
+    const anchor = scale !== this.#scale ? this.#horizontalAnchor() : null;
+    this.#scale = scale;
     this.#place(arrangement, scale);
+    if (anchor) {
+      this.#restoreHorizontalAnchor(anchor, scale);
+    }
     if (linked && this.#current === linked.index) {
       this.#targetOffset =
         (linked.element.getBoundingClientRect().top -
@@ -599,6 +611,70 @@ export class Presentation {
       return arrangeSpread(this.#pages, spreads[spreadOf[this.#current]]);
     }
     return arrangeSingle(this.#pages, this.#current);
+  }
+
+  #scaleFor(
+    arrangement: Arrangement | null,
+    pages: readonly PageBox[],
+    scroller: HTMLElement,
+  ): number {
+    return zoomScale(
+      this.#zoom,
+      {
+        width: arrangement?.width ?? 0,
+        // A fitted page in scroll mode is the tallest one, so that the scale
+        // stays put while scrolling.
+        height:
+          this.#mode === 'scroll'
+            ? Math.max(0, ...pages.map((page) => page.height))
+            : (arrangement?.height ?? 0),
+      },
+      {
+        width: scroller.clientWidth - padding * 2,
+        height: scroller.clientHeight - padding * 2,
+      },
+    );
+  }
+
+  /**
+   * The point of the content, in page px from its left edge, at the
+   * horizontal center of the view. The vertical position is kept in the
+   * target already.
+   */
+  #horizontalAnchor(): { x: number; scroller: HTMLElement } | null {
+    const box = this.#spreadContainer?.parentElement;
+    if (!box || !this.#layout) {
+      return null;
+    }
+    const scroller = this.#scroller;
+    return {
+      x:
+        (this.#viewCenterX(scroller) - box.getBoundingClientRect().left) /
+        this.#scale,
+      scroller,
+    };
+  }
+
+  #restoreHorizontalAnchor(
+    anchor: { x: number; scroller: HTMLElement },
+    scale: number,
+  ) {
+    const box = this.#spreadContainer?.parentElement;
+    if (!box || anchor.scroller !== this.#scroller) {
+      return;
+    }
+    anchor.scroller.scrollLeft +=
+      box.getBoundingClientRect().left +
+      anchor.x * scale -
+      this.#viewCenterX(anchor.scroller);
+  }
+
+  #viewCenterX(scroller: HTMLElement): number {
+    return (
+      scroller.getBoundingClientRect().left +
+      scroller.clientLeft +
+      scroller.clientWidth / 2
+    );
   }
 
   #place(arrangement: Arrangement | null, scale: number) {
@@ -776,6 +852,7 @@ export class Presentation {
       canPrev: canMove('prev'),
       canNext: canMove('next'),
       pageProgression: this.#progression,
+      scale: this.#scale,
     });
   }
 

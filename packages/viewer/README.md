@@ -5,7 +5,7 @@ The stage document that renders a publication's pages in Vivliostyle Pub. It is 
 The stage takes its input from search parameters:
 
 ```
-/_viewer/?src=<publication>&viewMode=scroll&colorScheme=dark
+/_viewer/?src=<publication>&viewMode=scroll&zoom=fit-width&colorScheme=dark
 /_viewer/?src=<publication>&print=true&locale=ja
 ```
 

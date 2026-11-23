@@ -41,6 +41,7 @@ export function useStage(
       prev: () => void remote.prev(),
       goTo: (pageIndex) => void remote.goTo(pageIndex),
       setViewMode: (viewMode) => void remote.setViewMode(viewMode),
+      setZoom: (zoom) => void remote.setZoom(zoom),
       setColorScheme: (colorScheme) => void remote.setColorScheme(colorScheme),
     });
 
