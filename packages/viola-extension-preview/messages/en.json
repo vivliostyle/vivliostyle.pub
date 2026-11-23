@@ -1,5 +1,23 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
+  "preview_iframe_title": "Preview",
+  "preview_next_page_aria": "Next page",
+  "preview_page_number_aria": "Page number",
+  "preview_paging_aria": "Page navigation",
   "preview_pane_title": "Preview",
-  "preview_iframe_title": "Preview"
+  "preview_prev_page_aria": "Previous page",
+  "preview_rendering_aria": "Rendering pages",
+  "preview_toolbar_aria": "Preview controls",
+  "preview_update_failed": "The preview could not be updated and may show an earlier version",
+  "preview_view_mode_aria": "View mode",
+  "preview_view_mode_scroll": "Continuous scroll",
+  "preview_view_mode_single": "Single page",
+  "preview_view_mode_spread": "Spread",
+  "preview_zoom_aria": "Zoom",
+  "preview_zoom_fit_aria": "Zoom to fit",
+  "preview_zoom_fit_page": "Fit to page",
+  "preview_zoom_fit_width": "Fit to width",
+  "preview_zoom_in_aria": "Zoom in",
+  "preview_zoom_level_aria": "Zoom level",
+  "preview_zoom_out_aria": "Zoom out"
 }

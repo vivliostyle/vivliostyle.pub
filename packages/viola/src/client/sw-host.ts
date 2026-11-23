@@ -26,10 +26,7 @@ export function setupSwHost() {
       return;
     }
 
-    if (
-      url.pathname.startsWith('/vivliostyle/') ||
-      url.pathname === '/@vivliostyle:viewer:client'
-    ) {
+    if (url.pathname.startsWith('/vivliostyle/')) {
       return event.respondWith(handleRequest(event));
     }
   });

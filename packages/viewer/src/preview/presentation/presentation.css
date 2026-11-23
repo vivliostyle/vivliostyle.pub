@@ -1,0 +1,45 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: core writes inline styles on these boxes, and only `!important` overrides them */
+
+/* Presentation layer over core's page containers; `Presentation` writes the
+   rule for the sizes that change. Overrides core's inline styles the way
+   core's print CSS does. Never style page content here. */
+@media screen {
+  [data-pub-view-mode] {
+    /* The display scale follows the pane width, which must not change when
+       the content starts to overflow. Both edges keep the pages centered in
+       the pane. */
+    scrollbar-gutter: stable both-edges;
+    /* The position is restored from the page key after every change. */
+    overflow-anchor: none;
+    overscroll-behavior: contain;
+  }
+
+  [data-pub-view-mode]
+    [data-vivliostyle-spread-container]
+    > [data-vivliostyle-page-container] {
+    display: none !important;
+  }
+
+  /* Placed at the inline `left` and `top` the presentation sets. */
+  [data-pub-view-mode]
+    [data-vivliostyle-spread-container]
+    > [data-vivliostyle-page-container][data-pub-visible] {
+    display: block !important;
+    position: absolute !important;
+    margin: 0 !important;
+  }
+
+  [data-pub-view-mode="scroll"]
+    [data-vivliostyle-spread-container]
+    > [data-vivliostyle-page-container][data-pub-visible] {
+    content-visibility: auto;
+  }
+
+  /* Copies the viewport's attributes, so the rules above and core's style it
+     like the viewport; this puts it over the viewport, which fills the stage. */
+  [data-pub-stale][data-pub-view-mode] {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+}

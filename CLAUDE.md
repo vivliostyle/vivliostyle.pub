@@ -39,9 +39,9 @@ Run from the repo root unless noted.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm dev` | Dev server (Turbo: builds `@v/cli-bundle` first, then `vite` for `@v/viola`; `server.host` is forced on in `vite.config.ts`). Requires `VITE_APP_HOSTNAME` — see *Local dev prerequisites*. |
+| `pnpm dev` | Dev server (Turbo: builds `@v/cli-bundle` and `@v/viewer` first, then `vite` for `@v/viola`; `server.host` is forced on in `vite.config.ts`). Requires `VITE_APP_HOSTNAME` — see *Local dev prerequisites*. |
 | `pnpm build` | Full production build via Turbo. |
-| `pnpm test` | Runs Vitest across packages (currently only `@v/cli-bundle` has real tests; others use `--passWithNoTests`). |
+| `pnpm test` | Runs Vitest across packages (packages without tests use `--passWithNoTests`). |
 | `pnpm typecheck` | `tsc --noEmit` across all packages. |
 | `pnpm check` | Biome lint + format check. Also enforced by the husky pre-commit hook. |
 | `pnpm fix` | Biome auto-fix with `--unsafe`. |
@@ -51,7 +51,7 @@ Single-package and single-test invocations:
 - `pnpm --filter @v/cli-bundle build` — bundle just `cli-bundle` (Rolldown).
 - `pnpm --filter @v/cli-bundle dev` — Rolldown watch mode for `cli-bundle`.
 - `pnpm --filter @v/cli-bundle exec vitest run src/index.test.ts` — single test file.
-- `pnpm --filter @v/viola dev` — Vite dev server for the app alone (assumes `cli-bundle` is already built).
+- `pnpm --filter @v/viola dev` — Vite dev server for the app alone (assumes `cli-bundle` and `viewer` are already built).
 
 **Do not precede builds with `rm -rf dist`** while iterating — run the build script directly. All build, test, and verification commands must run inside the sandbox (see *Execution policy* above).
 
@@ -78,26 +78,29 @@ Spawning a second dev server on top of an existing one wastes the user's time, c
 
 ### Why this is unusual
 
-`@v/cli-bundle` packages the **entire `@vivliostyle/cli` toolchain — Vite 8, Rolldown, `@vivliostyle/viewer`, jsdom, EPUB packing, etc. — to run inside a browser Web Worker**. The user's project files live in an in-memory `memfs` volume at `/workdir`, and Vite's dev server runs against that virtual FS. Builds (EPUB, Web Publication, Vivliostyle project zip) all happen client-side.
+`@v/cli-bundle` packages the **entire `@vivliostyle/cli` toolchain — Vite 8, Rolldown, jsdom, EPUB packing, etc. — to run inside a browser Web Worker**. The user's project files live in an in-memory `memfs` volume at `/workdir`, and Vite's dev server runs against that virtual FS. Builds (EPUB, Web Publication, Vivliostyle project zip) all happen client-side.
 
 Most of the complexity in this repo is in making Node-targeted code run in a browser worker. When making changes near the worker bundle, expect to deal with Node-builtin polyfills, alias maps, and `import.meta.url` rewriting.
 
 ### Runtime topology
 
-Three coordinated browser contexts (cross-origin isolation matters):
+Four coordinated browser contexts (cross-origin isolation matters):
 
 1. **Host page** (`${VITE_APP_HOSTNAME}`) — the React/TanStack Router app (`@v/viola`). Owns project state, mounts a service worker (`sw-host.ts`).
 2. **Sandbox iframe** (`sandbox-<id>.${VITE_APP_HOSTNAME}`) — loaded into the host via the `serveCli` plugin. Subdomain isolation is intentional: the iframe runs untrusted user content. Mounts its own service worker (`sw-iframe.ts`) and spawns the CLI worker.
 3. **CLI Web Worker** (inside the iframe) — loads `@v/cli-bundle` dist via the `#cli-bundle` virtual import → `/_cli/index.js`. Runs Vite + Vivliostyle CLI on memfs.
+4. **Viewer stage** (`@v/viewer`, served at `/_viewer/` by both origins) — the document that renders the publication's pages. The preview extension embeds it on the project's sandbox origin. Printing opens it as a top-level tab on the host origin instead: Firefox crashes printing the nested isolated iframe, and a top-level sandbox-origin tab would sit in a storage partition of its own, out of reach of the CLI worker.
 
 Communication is layered:
 
 - **Comlink over BroadcastChannel** (`worker:cli`, `host:project`, `worker:theme-registry`). The iframe relays Comlink messages between the host's BroadcastChannel and a MessageChannel that bridges to the worker (see `packages/viola/src/iframe.ts`).
-- **Service workers** intercept `/vivliostyle/...` and `/__vivliostyle-viewer/...` requests:
-  - Host SW (`sw-host.ts`) forwards `/vivliostyle/...` to `cli.serve()` via the project channel.
-  - Iframe SW (`sw-iframe.ts`) forwards `/vivliostyle/...` to the CLI worker's `serve()`, and proxies `/__vivliostyle-viewer/...` to the bundled Vivliostyle viewer assets served from `/_cli/viewer/`.
+- **The in-worker Vite's HMR payloads** go to a BroadcastChannel on the sandbox origin (`worker:vite-hmr`) instead of a WebSocket; the preview stage subscribes to it and reloads in place. No Vite client runs anywhere.
+- **The preview stage is driven through Comlink over a `MessagePort`** that its embedder transfers to it; the stage and the extension view embedding it are on different origins, so everything goes through that controller.
+- **Service workers** intercept `/vivliostyle/...` requests and leave the app's static assets (`/_cli/`, `/_viewer/`) to the network:
+  - Host SW (`sw-host.ts`) relays them over the project channel to the host tab that owns the project (the print tab addresses it as `/vivliostyle/p/<projectId>/...`), which serves them through `cli.serve()`.
+  - Iframe SW (`sw-iframe.ts`) forwards them to the CLI worker's `serve()`.
 
-All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`. Don't drop these headers — they're load-bearing for `SharedArrayBuffer` access. Because `require-corp` (unlike `credentialless`) requires every cross-origin subresource to carry an explicit CORP header, the cross-origin assets the iframe pulls from the host origin must be served with CORP — see the `_headers` rules (prod) and the `serveCli` plugin headers (dev). The headers are mirrored in several places that must stay in sync: `packages/viola/public/_headers` (Cloudflare prod), `vite.config.ts` `server.headers` + the `serveCli` plugin (dev), the two service workers (`sw-utils.ts`, `sw-iframe.ts`), `@v/cli-bundle`'s `commonHeaders` in `src/index.ts`, and the CORP header that `@v/preview-sandbox-proxy` adds for PR-preview sandbox hosts.
+All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`. Don't drop these headers — they're load-bearing for `SharedArrayBuffer` access. Because `require-corp` (unlike `credentialless`) requires every cross-origin subresource to carry an explicit CORP header, the cross-origin assets the iframe pulls from the host origin must be served with CORP — see the `_headers` rules (prod) and the headers of the plugins that serve the CLI bundle and the stage (dev). The headers are mirrored in several places that must stay in sync: `packages/viola/public/_headers` (Cloudflare prod), `vite.config.ts` `server.headers` + those static-asset plugins (dev), the two service workers (`sw-utils.ts`, `sw-iframe.ts`), `@v/cli-bundle`'s `commonHeaders` in `src/index.ts`, and the CORP header that `@v/preview-sandbox-proxy` adds for PR-preview sandbox hosts.
 
 ### Package layout
 
@@ -114,15 +117,17 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
   - `templates/basic/`, `templates/minimal/` — project starter templates packed into `.tar.gz` on the fly by the `serveTemplates` Vite plugin and extracted into memfs via `setupTemplate`.
   - `src/client/` — service worker entry (`sw.ts` branches on hostname to call `setupSwHost` or `setupSwIframe`), the CLI worker entry (`cli-worker.ts`), and the host page's end of the `host:project` relay that the host SW forwards to.
 
-- **`packages/cli-bundle/`** (`@v/cli-bundle`) — the browserified Vivliostyle CLI worker. Build is **Rolldown directly** (not Vite), config in `rolldown.config.ts`. Emits four outputs:
+- **`packages/cli-bundle/`** (`@v/cli-bundle`) — the browserified Vivliostyle CLI worker. Build is **Rolldown directly** (not Vite), config in `rolldown.config.ts`. Emits three outputs:
   1. `dist/index.js` — the worker bundle (ESM, ~5 MB).
   2. `dist/index.d.ts` — Comlink-typed remote interface.
-  3. `dist/client/*.js` — `vite-client`, `custom-hmr`, `viewer-adapter` — injected into iframes served by the in-worker Vite.
-  4. `dist/rolldown-wasi-worker.js` + `dist/rolldown-binding.wasm32-wasi.wasm` — WASI worker for `@rolldown/browser`.
+  3. `dist/rolldown-wasi-worker.js` + `dist/rolldown-binding.wasm32-wasi.wasm` — WASI worker for `@rolldown/browser`.
   - `src/stubs/` — hand-written Node builtin shims layered on top of `unenv`. Look here first when fixing browser-incompat bugs.
-  - `src/volume.ts` — pre-populates the memfs `node_modules` from `__volume__` (injected by Rolldown's `define`); `restoreBundledNodeModules()` re-installs them after `setupTemplate` wipes `/workdir`.
-  - `scripts/build-viewer-resource.ts` — copies the `@vivliostyle/viewer` static assets into `dist/viewer/` for the iframe SW to proxy. Invoked via `node --import tsx` (not the `tsx` CLI) because the tsx CLI binds a Unix domain socket at `/tmp/tsx-<uid>/` for IPC, which some sandboxes block. `@vivliostyle/viewer` is declared as a direct dep of `@v/cli-bundle` so this script can `require.resolve` it under pnpm's isolated layout.
+  - `src/volume.ts` — pre-populates the memfs `node_modules` from `__volume__` (injected by Rolldown's `define`); `restoreBundledNodeModules()` re-installs them after `setupTemplate` wipes `/workdir`. Besides files of Vite and the CLI, it holds what the CLI looks up of the stock `@vivliostyle/viewer` at startup (its `package.json` and an empty `lib/`). Pub never serves the stock viewer; the package is only installed as the CLI's own dependency.
   - **Filesystem API** — beyond the build/serve lifecycle, the bundle also exports direct memfs operations so the host can sync project state across the Comlink boundary: `read` / `write` / `rm` (file ops), `fromJSON` / `toJSON` (memfs JSON-snapshot format), `fromBinarySnapshot` / `toBinarySnapshot` (CBOR binary snapshots via `@jsonjoy.com/fs-snapshot`), and `printTree` (debug tree via `@jsonjoy.com/fs-print`).
+
+- **`packages/viewer/`** (`@v/viewer`) — Pub's own viewer, built with Vite into a static stage document on `@vivliostyle/core` (no stock `@vivliostyle/viewer`). The app copies the build to `/_viewer/`. In the preview it lays out once per load and presents pages in its own view modes, scale and paging without making core lay out again, and reloads in place on the HMR channel. With the print URL parameter it lays the publication out, opens the print dialog once every page is laid out, and closes the tab. Its only export is the protocol module (controller types and URL parameters) that embedders import.
+  - Core puts the pages and its own CSS into the stage document, so the stage's CSS stays minimal, never styles page content, and keeps every presentation rule under `@media screen`: in print media only core's rules apply to the pages.
+  - Logic that can be tested without a browser lives in pure modules with unit tests; the DOM wiring around them is not unit-tested. Those modules import `@vivliostyle/core` for types only, even indirectly: core touches `window` as soon as it is imported, and the tests run in Node.
 
 - **`packages/theme-registry/`** (`@v/theme-registry`) — in-browser npm theme fetcher: hits `registry.npmjs.org`, untars `.tgz`s with `@andrewbranch/untar.js`, and bundles theme CSS using `lightningcss-wasm`.
 
@@ -143,9 +148,8 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
 - `patchRolldownBindingPlugin` — rewrites the two `new URL(..., import.meta.url)` calls inside `rolldown-binding.wasi-browser.js` to absolute `/_cli/...` URLs **before** `resolveImportMetaPlugin` rewrites them.
 - `resolveImportMetaPlugin` — replaces `import.meta.url|env|require` AST nodes with virtual `file:///workdir/node_modules/<pkg>/...` URLs so packages that read `import.meta.url` (e.g. for self-locating) get a stable, parse-safe value.
 - `patchEmnapiEnvDetectionPlugin` — forces `ENVIRONMENT_IS_NODE = false` in `@emnapi/*` so the WASM binding doesn't take Node-only code paths.
-- `resolveViteClientPlugin` — inlines Vite's `client.mjs` / `env.mjs` with all `__DEFINES__` / `__HMR_*__` placeholders filled in (since the in-worker Vite never goes through Vite's normal client-injection pipeline).
 
-Tests (`src/index.test.ts`) validate the build artifact, not behavior: they parse `dist/index.js` with `rolldown/parseAst` and check that all expected exports exist (`setupServer`, `teardownServer`, `serve`, `setupTemplate`, `buildEpub`, `buildWebPub`, `exportProjectZip`, `fromJSON`, `toJSON`, `read`, `write`, `rm`, `fromBinarySnapshot`, `toBinarySnapshot`, `printTree`, `webSocketConnect`). Booting the bundle in jsdom/happy-dom doesn't work (see comment in the file).
+Tests (`src/index.test.ts`) validate the build artifact, not behavior: they parse `dist/index.js` with `rolldown/parseAst` and check that all expected exports exist (`setupServer`, `teardownServer`, `serve`, `setupTemplate`, `buildEpub`, `buildWebPub`, `exportProjectZip`, `fromJSON`, `toJSON`, `read`, `write`, `rm`, `fromBinarySnapshot`, `toBinarySnapshot`, `printTree`) and that the volume holds what the CLI reads of the stock viewer. Booting the bundle in jsdom/happy-dom doesn't work (see comment in the file).
 
 ## Conventions
 

@@ -53,6 +53,7 @@
     "@v/theme-registry": "workspace:*",
     "@v/tiptap-extensions": "workspace:*",
     "@v/ui": "workspace:*",
+    "@v/viewer": "workspace:*",
     "@vitejs/plugin-react-swc": "catalog:",
     "@vivliostyle/cli": "catalog:",
     "@vivliostyle/theme-base": "catalog:",

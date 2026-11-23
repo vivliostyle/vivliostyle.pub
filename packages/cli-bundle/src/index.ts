@@ -34,6 +34,8 @@ const commonHeaders = {
   'cross-origin-resource-policy': 'cross-origin',
 };
 
+// Read by the preview stage (`@v/viewer`), which reloads in place; no Vite
+// client ever connects to this server.
 const hmrChannel = new BroadcastChannel('worker:vite-hmr');
 function sendHotPayload(payload: HotPayload) {
   hmrChannel.postMessage(payload);
@@ -75,6 +77,12 @@ async function doSetupServer() {
     server: {
       middlewareMode: true,
       allowedHosts: true,
+      watch: {
+        // The CLI writes its outputs (manuscript HTML, the manifest) into its
+        // workspace as it serves them. Seen by the watcher, each write makes
+        // Vite or the CLI ask the preview to reload once more.
+        ignored: ['**/.vivliostyle/**'],
+      },
     },
     plugins: [
       createVitePlugin({
@@ -92,10 +100,6 @@ export async function teardownServer() {
   setupServerPromise = undefined;
   await server?.close();
   server = undefined;
-}
-
-export function webSocketConnect() {
-  sendHotPayload({ type: 'connected' });
 }
 
 function zipDirectory(pwd: string) {

@@ -1,5 +1,23 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
+  "preview_iframe_title": "プレビュー",
+  "preview_next_page_aria": "次のページ",
+  "preview_page_number_aria": "ページ番号",
+  "preview_paging_aria": "ページ送り",
   "preview_pane_title": "プレビュー",
-  "preview_iframe_title": "プレビュー"
+  "preview_prev_page_aria": "前のページ",
+  "preview_rendering_aria": "ページを組版中",
+  "preview_toolbar_aria": "プレビューの操作",
+  "preview_update_failed": "プレビューを更新できませんでした。以前の内容が表示されている可能性があります",
+  "preview_view_mode_aria": "表示モード",
+  "preview_view_mode_scroll": "連続スクロール",
+  "preview_view_mode_single": "単ページ",
+  "preview_view_mode_spread": "見開き",
+  "preview_zoom_aria": "ズーム",
+  "preview_zoom_fit_aria": "表示倍率の自動調整",
+  "preview_zoom_fit_page": "ページサイズに合わせる",
+  "preview_zoom_fit_width": "ウィンドウ幅に合わせる",
+  "preview_zoom_in_aria": "拡大",
+  "preview_zoom_level_aria": "表示倍率",
+  "preview_zoom_out_aria": "縮小"
 }

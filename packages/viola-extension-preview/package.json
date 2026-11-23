@@ -17,6 +17,7 @@
     "@v/config": "workspace:*",
     "@v/extension-kit": "workspace:*",
     "@v/ui": "workspace:*",
+    "@v/viewer": "workspace:*",
     "comlink": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

@@ -1,6 +1,9 @@
 import { invariant } from 'outvariant';
 
+import { stageSearchParams } from '@v/viewer/protocol';
 import { m } from '../../generated/paraglide/messages';
+import { getLocale } from '../../generated/paraglide/runtime';
+import { currentColorScheme } from '../../libs/color-scheme';
 import { $cli } from '../accessors';
 
 let printWindow: Window | null = null;
@@ -9,8 +12,8 @@ let printSession = 0;
 // Printing happens in a top-level tab because Firefox crashes generating its
 // print preview for the nested cross-origin isolated viewer iframe (#64).
 export async function printPdf() {
-  // A COOP-severed handle (after navigation) also reports `closed`, so each
-  // click after a successful navigation starts a fresh tab.
+  // The tab closes itself after printing, so one still open is a print in
+  // progress.
   if (printWindow && !printWindow.closed) {
     printWindow.focus();
     return;
@@ -18,19 +21,23 @@ export async function printPdf() {
   const session = ++printSession;
 
   // Open synchronously to stay within the user gesture; the viewer prints
-  // itself and closes the tab when it sees the `print` hash parameter.
+  // itself and closes the tab when its URL asks it to print.
   const openedWindow = window.open('about:blank', '_blank');
   invariant(openedWindow, 'Failed to open a tab for printing');
   printWindow = openedWindow;
+  const colorScheme = currentColorScheme();
+  openedWindow.document.documentElement.style.colorScheme = colorScheme;
   openedWindow.document.title = m.print_pdf_preparing();
   openedWindow.document.body.textContent = m.print_pdf_preparing();
   try {
     const cli = await $cli.awaiter({ timeout: 10_000 });
-    const viewerUrl = await cli.createPrintViewerUrlPromise();
+    const viewerUrl = new URL(await cli.createPrintViewerUrlPromise());
     if (openedWindow.closed || session !== printSession) {
       return;
     }
-    openedWindow.location.href = `${viewerUrl}&print=true`;
+    viewerUrl.searchParams.set(stageSearchParams.colorScheme, colorScheme);
+    viewerUrl.searchParams.set(stageSearchParams.locale, getLocale());
+    openedWindow.location.href = viewerUrl.href;
   } catch (error) {
     openedWindow.close();
     throw error;

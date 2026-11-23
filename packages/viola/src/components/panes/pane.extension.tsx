@@ -15,6 +15,10 @@ import {
   extensionSandboxOrigin,
 } from '../../extensions/sandbox-origin';
 import { getLocale } from '../../generated/paraglide/runtime';
+import {
+  currentColorScheme,
+  subscribeColorScheme,
+} from '../../libs/color-scheme';
 import { $cli, $session } from '../../stores/accessors';
 import {
   applyBearerSession,
@@ -75,10 +79,18 @@ async function runAuth(action: () => Promise<void>): Promise<void> {
   }
 }
 
+/**
+ * Ends a subscription along with the frame's binding. The returned function
+ * ends it early, and does nothing once it has ended.
+ */
+type TrackSubscription = (unsubscribe: () => void) => () => void;
+
 type HostApiMethod<K extends keyof ExtensionHostApi> = {
   permission: ExtensionPermission | null;
-  impl: ExtensionHostApi[K];
-};
+} & (
+  | { impl: ExtensionHostApi[K] }
+  | { bind: (track: TrackSubscription) => ExtensionHostApi[K] }
+);
 
 type HostApiRegistry = {
   [K in keyof ExtensionHostApi]: HostApiMethod<K>;
@@ -89,14 +101,25 @@ const hostApiRegistry: HostApiRegistry = {
     permission: null,
     impl: () => getLocale(),
   },
+  getColorScheme: {
+    permission: null,
+    impl: () => currentColorScheme(),
+  },
+  subscribeColorScheme: {
+    permission: null,
+    bind: (track) => (listener) =>
+      Comlink.proxy(track(subscribeColorScheme(listener))),
+  },
   getSessionSnapshot: {
     permission: 'session:read',
     impl: () => sessionSnapshot(),
   },
   subscribeSession: {
     permission: 'session:read',
-    impl: (listener) =>
-      Comlink.proxy(subscribe($session, () => listener(sessionSnapshot()))),
+    bind: (track) => (listener) =>
+      Comlink.proxy(
+        track(subscribe($session, () => listener(sessionSnapshot()))),
+      ),
   },
   login: {
     permission: 'session:write',
@@ -166,18 +189,48 @@ function denyPermission(
 
 function createExtensionHostApi(
   permissions: ReadonlySet<ExtensionPermission>,
+  track: TrackSubscription,
 ): ExtensionHostApi {
   const api = {} as Record<keyof ExtensionHostApi, unknown>;
   for (const name of Object.keys(
     hostApiRegistry,
   ) as (keyof ExtensionHostApi)[]) {
-    const { permission, impl } = hostApiRegistry[name];
+    const method = hostApiRegistry[name];
     api[name] =
-      permission === null || permissions.has(permission)
-        ? impl
-        : denyPermission(name, permission);
+      method.permission === null || permissions.has(method.permission)
+        ? 'impl' in method
+          ? method.impl
+          : method.bind(track)
+        : denyPermission(name, method.permission);
   }
   return api as ExtensionHostApi;
+}
+
+/**
+ * Exposes the host API on `port`. The returned function closes the port and
+ * ends every subscription the extension made through it.
+ */
+function bindExtensionHostApi(
+  port: MessagePort,
+  permissions: ReadonlySet<ExtensionPermission>,
+): () => void {
+  const subscriptions = new Set<() => void>();
+  const track: TrackSubscription = (unsubscribe) => {
+    const tracked = () => {
+      if (subscriptions.delete(tracked)) {
+        unsubscribe();
+      }
+    };
+    subscriptions.add(tracked);
+    return tracked;
+  };
+  Comlink.expose(createExtensionHostApi(permissions, track), port);
+  return () => {
+    port.close();
+    for (const unsubscribe of subscriptions) {
+      unsubscribe();
+    }
+  };
 }
 
 export const Pane = createPane<ExtensionPaneProperty>({
@@ -197,16 +250,16 @@ function Content({ extensionId, panePath }: ExtensionPaneProperty) {
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
+    let unbind: (() => void) | undefined;
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== origin) return;
       if (event.source !== iframe.contentWindow) return;
       if (event.data?.command !== 'extension-bind') return;
       const [port] = event.ports;
       if (!port) return;
-      Comlink.expose(
-        createExtensionHostApi(getExtensionPermissions(extensionId)),
-        port,
-      );
+      // A frame binds once per document, so the previous document is gone.
+      unbind?.();
+      unbind = bindExtensionHostApi(port, getExtensionPermissions(extensionId));
     };
     window.addEventListener('message', onMessage);
     const detachAutoSize =
@@ -215,6 +268,7 @@ function Content({ extensionId, panePath }: ExtensionPaneProperty) {
         : undefined;
     return () => {
       window.removeEventListener('message', onMessage);
+      unbind?.();
       detachAutoSize?.();
     };
   }, [origin, extensionId, sizing]);

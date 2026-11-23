@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "build": "rolldown -c",
-    "build:viewer-resource": "node --import tsx scripts/build-viewer-resource.ts",
     "dev": "rolldown -c -w",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -21,7 +20,6 @@
   "devDependencies": {
     "@jsonjoy.com/fs-print": "catalog:",
     "@jsonjoy.com/fs-snapshot": "catalog:",
-    "@mswjs/interceptors": "0.41.9",
     "@npmcli/arborist": "9.5.0",
     "@rolldown/browser": "catalog:",
     "@types/connect": "3.4.38",
@@ -33,7 +31,6 @@
     "@v/config": "workspace:*",
     "@v/theme-registry": "workspace:*",
     "@vivliostyle/cli": "catalog:",
-    "@vivliostyle/viewer": "catalog:",
     "browserify-zlib": "catalog:",
     "comlink": "catalog:",
     "connect": "3.7.0",
@@ -50,7 +47,6 @@
     "rolldown-plugin-dts": "catalog:",
     "rollup-plugin-visualizer": "catalog:",
     "semver": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:",
     "unenv": "catalog:",
     "vite": "catalog:",
