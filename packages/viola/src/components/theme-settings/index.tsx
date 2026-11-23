@@ -36,7 +36,7 @@ import {
   type ThemeVariableSchema,
 } from '../../libs/theme-variables';
 import { commitValue } from './commit';
-import { PREVIEW_PAGE_CLASSES, type PreviewPage } from './margin-boxes';
+import { getWritingMode } from './margin-box-content';
 import { getCategoryLabel, getGroupLabel, qualifyLabel } from './messages';
 import {
   buildSettingsRows,
@@ -216,14 +216,32 @@ function useThemeSettings(
     if (!schema) {
       return noDefaults;
     }
-    const resolvers = new Map(
-      Object.entries(PREVIEW_PAGE_CLASSES).map(([page, pageClasses]) => [
-        page,
-        resolvePageDefaults({ schema, theme, language, pageClasses }),
-      ]),
-    );
-    return (page: PreviewPage, name: string) => resolvers.get(page)?.(name);
+    const resolvers = new Map<string, (name: string) => string | undefined>();
+    return (pageClasses: readonly string[], name: string) => {
+      const key = pageClasses.join(' ');
+      let resolve = resolvers.get(key);
+      if (!resolve) {
+        resolve = resolvePageDefaults({ schema, theme, language, pageClasses });
+        resolvers.set(key, resolve);
+      }
+      return resolve(name);
+    };
   }, [schema, theme, language]);
+  const writingMode = useMemo(
+    () =>
+      model && schema
+        ? getWritingMode(
+            model,
+            resolveThemeDefaults({
+              schema,
+              theme,
+              language,
+              scope: 'print-root',
+            }),
+          )
+        : 'horizontal-tb',
+    [model, schema, theme, language],
+  );
 
   const handleQueryChange = useCallback((next: string, immediate = false) => {
     setQuery(next);
@@ -291,6 +309,7 @@ function useThemeSettings(
       scope,
       getDefaultValue,
       getPageDefault,
+      writingMode,
       onShowMore: handleShowMore,
       onSwitchScope: setScope,
     },

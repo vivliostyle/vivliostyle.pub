@@ -23,21 +23,30 @@ export type SpreadPage = 'left' | 'right';
 
 export type SpreadSide = 'outside' | 'inside';
 
-/** A page the preview draws: either page of a spread, or the first alone. */
-export type PreviewPage = SpreadPage | 'first';
+export type PageProgression = 'ltr' | 'rtl';
+
+/** The writing modes that set how the lines of a page and its pages run. */
+export type WritingMode = 'horizontal-tb' | 'vertical-rl' | 'vertical-lr';
+
+export const getPageProgression = (mode: WritingMode): PageProgression =>
+  mode === 'vertical-rl' ? 'rtl' : 'ltr';
+
+/**
+ * A page the preview draws: a page of a spread, or the first page, which
+ * stands alone on the side a book opens on.
+ */
+export interface PreviewPage {
+  side: SpreadPage;
+  first: boolean;
+}
+
+/** The side of a spread the first page of a book is on. */
+export const getFirstPageSide = (progression: PageProgression): SpreadPage =>
+  progression === 'rtl' ? 'left' : 'right';
 
 /** The page classes that a preview page matches. */
-export const PREVIEW_PAGE_CLASSES: Readonly<
-  Record<PreviewPage, readonly string[]>
-> = {
-  left: ['left'],
-  right: ['right'],
-  // A book opens on a right page.
-  first: ['first', 'right'],
-};
-
-export const sideOfPage = (page: PreviewPage): SpreadPage =>
-  page === 'first' ? 'right' : page;
+export const getPageClasses = ({ side, first }: PreviewPage) =>
+  first ? ['first', side] : [side];
 
 export type MarginBoxPosition =
   | 'corner'

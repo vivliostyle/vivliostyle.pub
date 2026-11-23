@@ -13,7 +13,7 @@ import {
   type MarginBoxContentGetter,
   MarginBoxPicker,
 } from './margin-box-picker';
-import type { PreviewPage } from './margin-boxes';
+import type { WritingMode } from './margin-boxes';
 import type { SettingsRow } from './rows';
 import { SettingInfoCard } from './setting-info';
 import { type CommitHandler, SettingRow } from './setting-row';
@@ -24,6 +24,7 @@ function SettingsList({
   scope,
   getDefaultValue,
   getPageDefault,
+  writingMode,
   onShowMore,
   onCommit,
   onSwitchScope,
@@ -34,7 +35,11 @@ function SettingsList({
   scope: ThemeScopeId;
   getDefaultValue: (name: string) => string | undefined;
   /** Defaults on a page of the preview, whichever scope the list edits. */
-  getPageDefault: (page: PreviewPage, name: string) => string | undefined;
+  getPageDefault: (
+    pageClasses: readonly string[],
+    name: string,
+  ) => string | undefined;
+  writingMode: WritingMode;
   onShowMore: () => void;
   onCommit: CommitHandler;
   onSwitchScope: (scope: ThemeScopeId) => void;
@@ -88,6 +93,7 @@ function SettingsList({
                   current={row.current}
                   onSelect={onSelectSection}
                   scope={scope}
+                  writingMode={writingMode}
                   getContent={getContent}
                 />
               );

@@ -1,10 +1,11 @@
 import { m } from '../../generated/paraglide/messages';
 import type { ThemeCssModel, ThemeScopeId } from '../../libs/theme-variables';
 import {
+  getPageClasses,
   getSpreadContentFallback,
   type MarginBoxCell,
   type PreviewPage,
-  sideOfPage,
+  type WritingMode,
 } from './margin-boxes';
 
 export interface ContentSamples {
@@ -119,12 +120,15 @@ export function previewContent(
 }
 
 // Later scopes of the stylesheet win the cascade at equal specificity, and a
-// page context inherits what the root element sets. `:first` outranks `:right`.
-const PAGE_SCOPES: Readonly<Record<PreviewPage, readonly ThemeScopeId[]>> = {
-  left: ['page-left', 'page', 'print-root', 'root'],
-  right: ['page-right', 'page', 'print-root', 'root'],
-  first: ['page-first', 'page-right', 'page', 'print-root', 'root'],
-};
+// page context inherits what the root element sets. `:first` outranks the
+// side of the page.
+const getPageScopes = ({ side, first }: PreviewPage): ThemeScopeId[] => [
+  ...(first ? (['page-first'] as const) : []),
+  side === 'left' ? 'page-left' : 'page-right',
+  'page',
+  'print-root',
+  'root',
+];
 
 /**
  * The `content` value a cell takes on a page: its own, else the one
@@ -135,21 +139,48 @@ export function getPageContent(
   cell: MarginBoxCell,
   page: PreviewPage,
   model: ThemeCssModel,
-  getDefault: (page: PreviewPage, name: string) => string | undefined,
+  getDefault: (
+    pageClasses: readonly string[],
+    name: string,
+  ) => string | undefined,
 ): string | undefined {
+  const scopes = getPageScopes(page);
+  const pageClasses = getPageClasses(page);
   const lookUp = (name: string) => {
-    for (const scope of PAGE_SCOPES[page]) {
+    for (const scope of scopes) {
       const value = model.scopes[scope].variables[name]?.value;
       if (value !== undefined) {
         return value;
       }
     }
-    return getDefault(page, name);
+    return getDefault(pageClasses, name);
   };
   const own = lookUp(`--vs-page--${cell.id}-content`);
   if (own !== undefined) {
     return own;
   }
-  const fallback = getSpreadContentFallback(cell, sideOfPage(page));
+  const fallback = getSpreadContentFallback(cell, page.side);
   return fallback === null ? undefined : lookUp(fallback);
+}
+
+const WRITING_MODE = '--vs-writing-mode';
+
+/**
+ * The writing mode of the root element as theme-base applies it in print,
+ * which sets how the lines of the pages and the pages themselves run. A
+ * sideways mode runs as the vertical one of the same side.
+ */
+export function getWritingMode(
+  model: ThemeCssModel,
+  getRootDefault: (name: string) => string | undefined,
+): WritingMode {
+  const value =
+    model.scopes['print-root'].variables[WRITING_MODE]?.value ??
+    model.scopes.root.variables[WRITING_MODE]?.value ??
+    getRootDefault(WRITING_MODE);
+  const mode = value
+    ?.trim()
+    .toLowerCase()
+    .match(/^(?:vertical|sideways)-(rl|lr)\b/);
+  return mode ? `vertical-${mode[1] as 'rl' | 'lr'}` : 'horizontal-tb';
 }

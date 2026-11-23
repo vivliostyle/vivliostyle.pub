@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseThemeCss } from '../../libs/theme-variables';
-import { getPageContent, previewContent } from './margin-box-content';
+import {
+  getPageContent,
+  getWritingMode,
+  previewContent,
+} from './margin-box-content';
 import { findCell, type MarginBoxCell } from './margin-boxes';
 
 const samples = { page: 12, pages: 200 };
@@ -46,8 +50,13 @@ describe('getPageContent', () => {
     '--vs-page--mbox-bottom-outside-content': 'counter(page)',
     '--vs-page--mbox-top-outside-content': 'env(doc-title)',
   };
-  const content = (id: string, page: 'left' | 'right') =>
-    getPageContent(cell(id), page, model, (_, name) => defaults[name]);
+  const content = (id: string, side: 'left' | 'right') =>
+    getPageContent(
+      cell(id),
+      { side, first: false },
+      model,
+      (_, name) => defaults[name],
+    );
 
   it('takes the value a stylesheet scope reaching the page sets', () => {
     expect(content('mbox-top-center', 'left')).toBe('env(pub-title)');
@@ -77,13 +86,76 @@ describe('getPageContent', () => {
       }
     `);
     const onFirst = (id: string) =>
-      getPageContent(cell(id), 'first', first, () => undefined);
+      getPageContent(
+        cell(id),
+        { side: 'right', first: true },
+        first,
+        () => undefined,
+      );
     expect(onFirst('mbox-top-right')).toBe("''");
     expect(onFirst('mbox-bottom-right')).toBe('counter(page)');
     expect(
-      getPageContent(cell('mbox-bottom-right'), 'first', model, (_, name) =>
-        name === '--vs-page--mbox-bottom-outside-content' ? '1' : undefined,
+      getPageContent(
+        cell('mbox-bottom-right'),
+        { side: 'right', first: true },
+        model,
+        (_, name) =>
+          name === '--vs-page--mbox-bottom-outside-content' ? '1' : undefined,
       ),
     ).toBe('1');
+  });
+
+  it('reads a first page on the left with `:left` rules and its outside', () => {
+    const first = parseThemeCss(`
+      @page :left {
+        --vs-page--mbox-top-left-content: env(doc-title);
+      }
+    `);
+    const page = { side: 'left', first: true } as const;
+    const classes: (readonly string[])[] = [];
+    expect(
+      getPageContent(cell('mbox-top-left'), page, first, (pageClasses) => {
+        classes.push(pageClasses);
+        return undefined;
+      }),
+    ).toBe('env(doc-title)');
+    expect(
+      getPageContent(
+        cell('mbox-bottom-left'),
+        page,
+        first,
+        (pageClasses, name) => {
+          classes.push(pageClasses);
+          return name === '--vs-page--mbox-bottom-outside-content'
+            ? '1'
+            : undefined;
+        },
+      ),
+    ).toBe('1');
+    expect(classes).toContainEqual(['first', 'left']);
+  });
+});
+
+describe('getWritingMode', () => {
+  const mode = (css: string, fallback?: string) =>
+    getWritingMode(parseThemeCss(css), () => fallback);
+
+  it('takes a sideways mode for the vertical one of its side', () => {
+    expect(mode(':root{--vs-writing-mode:vertical-rl}')).toBe('vertical-rl');
+    expect(mode(':root{--vs-writing-mode:sideways-rl}')).toBe('vertical-rl');
+    expect(mode(':root{--vs-writing-mode:Vertical-LR}')).toBe('vertical-lr');
+    expect(mode('', 'vertical-rl')).toBe('vertical-rl');
+    expect(mode('')).toBe('horizontal-tb');
+  });
+
+  it('prefers what the stylesheet sets for print to the theme', () => {
+    expect(
+      mode(
+        ':root{--vs-writing-mode:vertical-rl}@media print{:root{--vs-writing-mode:horizontal-tb}}',
+      ),
+    ).toBe('horizontal-tb');
+    expect(mode(':root{--vs-writing-mode:horizontal-tb}', 'vertical-rl')).toBe(
+      'horizontal-tb',
+    );
   });
 });

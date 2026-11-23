@@ -11,6 +11,8 @@ import {
   findCell,
   findSpreadSideBox,
   getCellsSharing,
+  getFirstPageSide,
+  getPageProgression,
   getSpreadContentFallback,
   getSpreadSideBox,
   getSpreadSideVariables,
@@ -19,12 +21,13 @@ import {
   MARGIN_BOX_GROUP,
   type MarginBoxCell,
   type MarginBoxEdge,
+  type PageProgression,
   type PreviewPage,
   SHARED_MARGIN_BOXES,
   SPREAD_SIDE_BOXES,
   type SpreadPage,
   type SpreadSide,
-  sideOfPage,
+  type WritingMode,
 } from './margin-boxes';
 import type { MarginBoxOption } from './rows';
 import { ModifiedDot } from './settings-toc';
@@ -37,13 +40,17 @@ const PLACED = new Set([
 
 const EDGES = new Set(Object.values(EDGE_MARGIN_BOXES));
 
-// Numbers a left and a right page of a book that starts on a right page.
-const SAMPLE_PAGES: Readonly<Record<PreviewPage, number>> = {
-  left: 12,
-  right: 13,
-  first: 1,
-};
 const SAMPLE_PAGE_COUNT = 200;
+
+// The lines of text start from the side the writing mode starts a page on.
+const TEXT_LINES: Readonly<Record<WritingMode, string>> = {
+  'horizontal-tb':
+    'bg-[repeating-linear-gradient(to_bottom,var(--color-muted)_0_2px,transparent_2px_6px)]',
+  'vertical-rl':
+    'bg-[repeating-linear-gradient(to_left,var(--color-muted)_0_2px,transparent_2px_6px)]',
+  'vertical-lr':
+    'bg-[repeating-linear-gradient(to_right,var(--color-muted)_0_2px,transparent_2px_6px)]',
+};
 
 const SPREAD_SIDE_LABELS: Readonly<Record<SpreadSide, () => string>> = {
   outside: m.theme_settings_margin_boxes_outside,
@@ -58,21 +65,31 @@ export type MarginBoxContentGetter = (
 ) => string | undefined;
 
 /**
- * The pages the preview draws for the scope the list edits, and whether that
- * scope reaches them. The first page stands alone where it opens a book.
+ * The pages the preview draws for the scope the list edits, with a sample
+ * number each, and whether that scope reaches them. Of a spread, the page a
+ * book comes to first bears the even number.
  */
 function getPreviewPages(
   scope: ThemeScopeId,
-): { page: PreviewPage; reached: boolean }[] {
+  progression: PageProgression,
+): { page: PreviewPage; number: number; reached: boolean }[] {
   if (scope === 'page-first') {
-    return [{ page: 'first', reached: true }];
+    return [
+      {
+        page: { side: getFirstPageSide(progression), first: true },
+        number: 1,
+        reached: true,
+      },
+    ];
   }
   // Rules for the screen never reach a page.
   const both = scope !== 'screen-root';
-  return [
-    { page: 'left', reached: both && scope !== 'page-right' },
-    { page: 'right', reached: both && scope !== 'page-left' },
-  ];
+  const earlier: SpreadPage = progression === 'rtl' ? 'right' : 'left';
+  return (['left', 'right'] as const).map((side) => ({
+    page: { side, first: false },
+    number: side === earlier ? 12 : 13,
+    reached: both && scope !== (side === 'left' ? 'page-right' : 'page-left'),
+  }));
 }
 
 interface Picker {
@@ -242,27 +259,31 @@ function EdgeBand({
 function PreviewPageView({
   picker,
   page,
+  number,
   reached,
+  writingMode,
   getContent,
 }: {
   picker: Picker;
   page: PreviewPage;
+  number: number;
   reached: boolean;
+  writingMode: WritingMode;
   getContent: MarginBoxContentGetter;
 }) {
   return (
     <div
       className={cn(
         'grid aspect-[148/210] min-w-0 grid-cols-[1.25rem_repeat(3,minmax(0,1fr))_1.25rem] grid-rows-[1.5rem_repeat(3,minmax(0,1fr))_1.5rem] gap-0.5 border bg-background p-0.5 shadow-sm transition-opacity',
-        page === 'left' && 'rounded-l-md',
-        page === 'right' && 'rounded-r-md border-l-0',
-        page === 'first' && 'col-start-2 rounded-r-md',
+        page.side === 'left'
+          ? 'col-start-1 rounded-l-md'
+          : cn('col-start-2 rounded-r-md', !page.first && 'border-l-0'),
         !reached && 'opacity-40',
       )}
     >
       {MARGIN_BOX_CELLS.map((cell) => {
         const text = previewContent(getContent(cell, page), {
-          page: SAMPLE_PAGES[page],
+          page: number,
           pages: SAMPLE_PAGE_COUNT,
         });
         return (
@@ -270,10 +291,10 @@ function PreviewPageView({
             key={cell.id}
             picker={picker}
             id={cell.id}
-            page={sideOfPage(page)}
+            page={page.side}
             style={{ gridRow: cell.row, gridColumn: cell.column }}
             // Both pages show the same boxes, so the keyboard visits them once.
-            tabIndex={page === 'right' ? -1 : undefined}
+            tabIndex={!page.first && page.side === 'right' ? -1 : undefined}
             className={cn(
               'rounded-sm p-0 text-[0.625rem]',
               text === null &&
@@ -295,7 +316,10 @@ function PreviewPageView({
       })}
       <div
         aria-hidden
-        className="col-start-2 col-end-5 row-start-2 row-end-5 m-1 bg-[repeating-linear-gradient(to_bottom,var(--color-muted)_0_2px,transparent_2px_6px)]"
+        className={cn(
+          'col-start-2 col-end-5 row-start-2 row-end-5 m-1',
+          TEXT_LINES[writingMode],
+        )}
       />
     </div>
   );
@@ -311,6 +335,7 @@ export function MarginBoxPicker({
   current,
   onSelect,
   scope,
+  writingMode,
   getContent,
 }: {
   /** The boxes with settings to show; the rest are disabled. */
@@ -319,6 +344,7 @@ export function MarginBoxPicker({
   onSelect: (section: string) => void;
   /** The scope the list edits, whose pages the preview sets apart. */
   scope: ThemeScopeId;
+  writingMode: WritingMode;
   getContent: MarginBoxContentGetter;
 }) {
   const picker = usePicker(boxes, current, onSelect);
@@ -340,15 +366,19 @@ export function MarginBoxPicker({
           className="col-start-1 row-start-2"
         />
         <div className="col-start-2 col-end-4 row-start-2 grid grid-cols-2">
-          {getPreviewPages(scope).map(({ page, reached }) => (
-            <PreviewPageView
-              key={page}
-              picker={picker}
-              page={page}
-              reached={reached}
-              getContent={getContent}
-            />
-          ))}
+          {getPreviewPages(scope, getPageProgression(writingMode)).map(
+            ({ page, number, reached }) => (
+              <PreviewPageView
+                key={page.side}
+                picker={picker}
+                page={page}
+                number={number}
+                reached={reached}
+                writingMode={writingMode}
+                getContent={getContent}
+              />
+            ),
+          )}
         </div>
         <EdgeBand
           picker={picker}
