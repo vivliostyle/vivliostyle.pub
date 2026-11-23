@@ -101,8 +101,9 @@ function SettingRow({
       role="group"
       aria-labelledby={labelId}
       className={cn(
-        // Rows off screen skip layout and paint until scrolled to.
-        'grid gap-1.5 border-l-2 py-2 pr-1 pl-3 [contain-intrinsic-size:auto_5rem] [content-visibility:auto]',
+        // Rows off screen skip layout and paint until scrolled to. They are
+        // held at the average height of a row with and without a default hint.
+        'grid gap-1.5 border-l-2 py-2 pr-1 pl-3 [contain-intrinsic-size:auto_none_auto_5.25rem] [content-visibility:auto]',
         modified ? 'border-primary' : 'border-transparent',
       )}
     >
