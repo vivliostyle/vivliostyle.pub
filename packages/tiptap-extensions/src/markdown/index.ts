@@ -33,6 +33,7 @@ export {
   type HtmlElementSpec,
   type HtmlMarkDeclaration,
   type InlineRun,
+  type MarkDecorator,
   type MarkToMarkdown,
   type NodeToMarkdown,
   type NodeWriter,
@@ -40,6 +41,7 @@ export {
   type NotationDefinition,
   type ParseContext,
   type StyleSpec,
+  TEXT_EDGE,
   type WriteContext,
 } from './notation';
 export { commonMarkNotations } from './notations/commonmark';

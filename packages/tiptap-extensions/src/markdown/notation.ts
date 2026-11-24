@@ -43,8 +43,16 @@ export interface ParseContext {
   within<T>(prefix: LinePrefix, convert: () => T): T;
 }
 
+/**
+ * `next` converts the node as the definition registered before this one
+ * would, so a definition can adjust another's result instead of replacing it.
+ */
 type Handler<Node> = {
-  bivarianceHack(node: Node, context: ParseContext): FromMarkdownResult;
+  bivarianceHack(
+    node: Node,
+    context: ParseContext,
+    next: () => FromMarkdownResult,
+  ): FromMarkdownResult;
 }['bivarianceHack'];
 
 export type FromMarkdownHandler = Handler<UnknownMdastNode>;
@@ -132,6 +140,12 @@ export interface MarkToMarkdown {
   implied?: (run: InlineRun, context: WriteContext) => boolean;
 }
 
+/**
+ * Changes how the definition registered before this one writes a mark, e.g.
+ * to add something after its closing delimiter.
+ */
+export type MarkDecorator = (previous: MarkToMarkdown) => MarkToMarkdown;
+
 export interface InlineRun {
   node: ProseMirrorNode;
   previous: ProseMirrorNode | undefined;
@@ -150,10 +164,17 @@ export interface StyleSpec {
 }
 
 /**
+ * What a text run starts after when it does not start a line, and ends before
+ * when it does not end the block, as escape rules see it: next to another
+ * inline node or to text under other marks.
+ */
+export const TEXT_EDGE = '\u0000';
+
+/**
  * Characters that `safe` escaping has to escape in text. Each match of
  * `pattern` (which must be global) is one character. A text starts after a
  * `\n` when it starts a line, and ends before one when it ends a block, so
- * patterns can look around for `\n`.
+ * patterns can look around for `\n`; otherwise it is `TEXT_EDGE`.
  */
 export interface EscapeRule {
   pattern: RegExp;
@@ -224,7 +245,7 @@ export interface NotationDefinition {
   fromMarkdown?: FromMarkdownHandlers;
   htmlElements?: HtmlElementSpec[];
   nodes?: Record<string, NodeToMarkdown | NodeWriter>;
-  marks?: Record<string, MarkToMarkdown>;
+  marks?: Record<string, MarkToMarkdown | MarkDecorator>;
   styles?: Record<string, StyleSpec>;
   escapes?: EscapeRule[];
 }

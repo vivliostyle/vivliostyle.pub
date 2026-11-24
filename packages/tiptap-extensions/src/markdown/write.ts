@@ -2,13 +2,14 @@ import type { Mark, Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
 
 import type { BaseContent, BaseDocument, BaseNode } from './base';
 import { keyOf, matchSequences } from './match';
-import type {
-  ChildrenOptions,
-  EscapeRule,
-  MarkToMarkdown,
-  NodeWriter,
-  NotationDefinition,
-  WriteContext,
+import {
+  type ChildrenOptions,
+  type EscapeRule,
+  type MarkToMarkdown,
+  type NodeWriter,
+  type NotationDefinition,
+  TEXT_EDGE,
+  type WriteContext,
 } from './notation';
 import { type MarkdownParser, RAW_BLOCK, RAW_INLINE } from './parse';
 import { firstDifference, WrittenForm } from './written';
@@ -124,7 +125,12 @@ export class MarkdownWriter {
         );
       }
       for (const [name, writer] of Object.entries(notation.marks ?? {})) {
-        this.markWriters.set(name, writer);
+        const previous = this.markWriters.get(name);
+        if (typeof writer !== 'function') {
+          this.markWriters.set(name, writer);
+        } else if (previous) {
+          this.markWriters.set(name, writer(previous));
+        }
       }
     }
     this.escapes = notations.flatMap((notation) => notation.escapes ?? []);
@@ -537,7 +543,7 @@ export class MarkdownWriter {
   }
 
   private escapeText(text: string, lineStart: boolean, blockEnd: boolean) {
-    const subject = `${lineStart ? '\n' : '\u0000'}${text}${blockEnd ? '\n' : '\u0000'}`;
+    const subject = `${lineStart ? '\n' : TEXT_EDGE}${text}${blockEnd ? '\n' : TEXT_EDGE}`;
     const actions = new Map<number, 'backslash' | 'entity'>();
     for (const rule of this.escapes) {
       for (const match of subject.matchAll(rule.pattern)) {
