@@ -6,7 +6,11 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 
 import type { SyncProvider } from '@v/sync-client';
-import { PubExtensions } from '@v/tiptap-extensions';
+import {
+  getMarkdown,
+  PubExtensions,
+  setMarkdownBaseline,
+} from '@v/tiptap-extensions';
 import type { ProjectId } from '../stores/proxies/project';
 import { debounce } from './debounce';
 import { createSandboxImageSaver } from './editor/image-saver';
@@ -18,6 +22,13 @@ import { type EditorSyncContext, startEditorSync } from './editor-sync';
 import type { SandboxFile } from './sandbox/file';
 
 export type { EditorSyncContext } from './editor-sync';
+
+// Documents made while the editor parsed with marked hold content as marked
+// read it. Rewriting a shared document from several clients would duplicate
+// it, so they are kept and saved against the file as marked reads it.
+const MARKDOWN_META = 'markdown';
+const PARSER_KEY = 'parser';
+const CURRENT_PARSER = 'remark';
 
 function editorPersistenceKey(projectId: ProjectId, filename: string): string {
   return `viola:editor:${projectId}:${filename}`;
@@ -57,6 +68,12 @@ export async function setupEditor({
   }
 
   const doc = new Y.Doc();
+  const meta = doc.getMap<string>(MARKDOWN_META);
+  const markCurrentParser = () => {
+    if (meta.get(PARSER_KEY) !== CURRENT_PARSER) {
+      meta.set(PARSER_KEY, CURRENT_PARSER);
+    }
+  };
   // Editor state is persisted to IndexedDB keyed by a stable project + file
   // path. contentId is regenerated on every load, so it cannot serve as the
   // persistence key.
@@ -66,10 +83,9 @@ export async function setupEditor({
 
   const saveContent = debounce(
     (editor: Editor) => {
-      onSave({
-        markdown: editor.getMarkdown(),
-        summary: getEditorSummary(editor),
-      });
+      const markdown = getMarkdown(editor);
+      setMarkdownBaseline(editor, markdown);
+      onSave({ markdown, summary: getEditorSummary(editor) });
     },
     1000,
     { trailing: true },
@@ -86,6 +102,7 @@ export async function setupEditor({
       onFilePaste: (editor, files) => {
         insertImageFiles({ editor, files });
       },
+      onSetMarkdown: markCurrentParser,
       onDrop: (editor, payload, pos) => {
         switch (payload.type) {
           case 'asset':
@@ -138,14 +155,18 @@ export async function setupEditor({
       filename,
     });
   }
-  if (doc.getXmlFragment('default').length === 0) {
-    const markdown = (await initialFile?.text())?.trim();
-    if (markdown) {
-      editor.commands.setContent(markdown, {
-        contentType: 'markdown',
-        emitUpdate: false,
-      });
-    }
+  // The file on disk is what saving compares the document with, also when
+  // the document comes from IndexedDB or the server instead of the file.
+  const markdown = (await initialFile?.text()) ?? '';
+  if (doc.getXmlFragment('default').length > 0) {
+    setMarkdownBaseline(editor, markdown, {
+      legacy: meta.get(PARSER_KEY) !== CURRENT_PARSER,
+    });
+  } else if (markdown.trim()) {
+    editor.commands.setMarkdown(markdown, { emitUpdate: false });
+  } else {
+    setMarkdownBaseline(editor, markdown, { legacy: false });
+    markCurrentParser();
   }
 
   return editor;

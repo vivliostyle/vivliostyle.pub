@@ -19,6 +19,12 @@
     outline: none;
   }
 
+  /* Markdown the editor has no node for, shown as written. */
+  & [data-raw-block],
+  & [data-raw-inline] {
+    color: var(--muted-foreground);
+  }
+
   &:not(.ProseMirror-focused) .is-editor-empty:first-child::before {
     color: var(--muted-foreground);
     content: attr(data-placeholder);

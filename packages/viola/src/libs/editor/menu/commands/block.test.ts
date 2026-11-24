@@ -3,7 +3,7 @@ import type { Node } from '@tiptap/pm/model';
 import { VFM } from '@vivliostyle/vfm';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '@v/tiptap-extensions';
+import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
 import { getEditorMenuCommand } from '../registry';
 import './block';
 
@@ -293,7 +293,7 @@ describe('block commands across nesting levels', () => {
           command(id).run?.({ editor, surface: 'selection' }),
         ).not.toThrow();
         expect(() => editor.state.doc.check()).not.toThrow();
-        expect(vfmTexts(editor.getMarkdown())).toEqual(
+        expect(vfmTexts(getMarkdown(editor))).toEqual(
           editorTexts(editor.state.doc),
         );
       });

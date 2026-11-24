@@ -1,7 +1,7 @@
 import { Editor, type JSONContent } from '@tiptap/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '@v/tiptap-extensions';
+import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
 import {
   getEditableSelectionText,
   getSelectedLinkHref,
@@ -97,7 +97,7 @@ describe('editing a selection', () => {
       false,
     );
     expect(setLinkOnSelection(editor, { href: './chapter.md' })).toBe(true);
-    expect(editor.getMarkdown()).toBe(
+    expect(getMarkdown(editor)).toBe(
       `[see](./chapter.md) [example site](${href})`,
     );
   });
@@ -133,36 +133,32 @@ describe('editing the link text', () => {
   it('replaces the text and keeps it selected', () => {
     const editor = select(createEditor(), 5, 17);
     setLinkOnSelection(editor, { href: './docs.md', text: 'docs' });
-    expect(editor.getMarkdown()).toBe('see [docs](./docs.md)');
+    expect(getMarkdown(editor)).toBe('see [docs](./docs.md)');
     const { from, to } = editor.state.selection;
     expect(editor.state.doc.textBetween(from, to)).toBe('docs');
   });
 
   it('keeps marks shared by the whole selection', () => {
     const editor = createEditor();
-    editor.commands.setContent(`**[example](${href})** end`, {
-      contentType: 'markdown',
-    });
+    editor.commands.setMarkdown(`**[example](${href})** end`);
     setLinkOnSelection(select(editor, 1, 8), { href, text: 'docs' });
-    expect(editor.getMarkdown()).toBe(`[**docs**](${href}) end`);
+    expect(getMarkdown(editor)).toBe(`[**docs**](${href}) end`);
   });
 
   it('falls back to the URL when the text is blank', () => {
     const editor = select(createEditor(), 5, 17);
     setLinkOnSelection(editor, { href: 'https://vivliostyle.org', text: ' ' });
-    expect(editor.getMarkdown()).toBe('see https://vivliostyle.org');
+    expect(getMarkdown(editor)).toBe('see https://vivliostyle.org');
   });
 
   it('leaves unchanged text and its formatting alone', () => {
     const editor = createEditor();
-    editor.commands.setContent(`see [**exa**mple](${href})`, {
-      contentType: 'markdown',
-    });
+    editor.commands.setMarkdown(`see [**exa**mple](${href})`);
     setLinkOnSelection(select(editor, 5, 12), {
       href: './a.md',
       text: 'example',
     });
-    expect(editor.getMarkdown()).toBe('see [**exa**mple](./a.md)');
+    expect(getMarkdown(editor)).toBe('see [**exa**mple](./a.md)');
   });
 });
 
@@ -171,7 +167,7 @@ describe('insertLink', () => {
     const editor = select(createEditor(), 1);
     expect(insertLink(editor, { href: 'https://vivliostyle.org' })).toBe(true);
     typeText(editor, ' ');
-    expect(editor.getMarkdown()).toBe(
+    expect(getMarkdown(editor)).toBe(
       `https://vivliostyle.org see [example site](${href})`,
     );
   });
@@ -180,14 +176,12 @@ describe('insertLink', () => {
     const editor = select(createEditor(), 1);
     insertLink(editor, { href: './a.md', text: 'A' });
     typeText(editor, '!');
-    expect(editor.getMarkdown()).toBe(
-      `[A](./a.md)!see [example site](${href})`,
-    );
+    expect(getMarkdown(editor)).toBe(`[A](./a.md)!see [example site](${href})`);
   });
 
   it('rejects unsafe URLs', () => {
     const editor = select(createEditor(), 1);
     expect(insertLink(editor, { href: 'javascript:alert(1)' })).toBe(false);
-    expect(editor.getMarkdown()).toBe(`see [example site](${href})`);
+    expect(getMarkdown(editor)).toBe(`see [example site](${href})`);
   });
 });

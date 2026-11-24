@@ -1,6 +1,7 @@
 import { invariant } from 'outvariant';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { getMarkdown } from '@v/tiptap-extensions';
 import { m } from '../../generated/paraglide/messages';
 import { debounce } from '../../libs/debounce';
 import { $project } from '../../stores/accessors';
@@ -46,7 +47,7 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
 
   // The collaborative XmlFragment stays the source of truth; the source view
   // is seeded once from its current markdown and never re-reads it while open.
-  const latestCode = useRef(editor.getMarkdown());
+  const latestCode = useRef(getMarkdown(editor));
   const initialCode = useRef(latestCode.current).current;
 
   const saveToSandbox = useMemo(
@@ -84,10 +85,7 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
     return () => {
       saveToSandbox.cancel();
       if (!editor.isDestroyed && latestCode.current !== initialCode) {
-        editor.commands.setContent(latestCode.current, {
-          contentType: 'markdown',
-          emitUpdate: true,
-        });
+        editor.commands.setMarkdown(latestCode.current, { emitUpdate: true });
       }
     };
   }, [editor, saveToSandbox, initialCode]);
