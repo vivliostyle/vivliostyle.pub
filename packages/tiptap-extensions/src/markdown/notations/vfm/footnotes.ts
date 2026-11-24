@@ -1,14 +1,18 @@
 import { Node } from '@tiptap/core';
 
+import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
   type Code,
+  type Construct,
   codes,
   currentNode,
   type Effects,
+  endsOpen,
   enterNode,
   type FromMarkdownExtension,
   isLineEnding,
+  openBefore,
   type State,
   syntaxPlugin,
   type Token,
@@ -23,6 +27,7 @@ import {
   wrapSelection,
 } from './commands';
 import { inlineSourceRules } from './input-rules';
+import { inlineNodeRules } from './normalize';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -63,6 +68,48 @@ function isLabelCode(code: Code): boolean {
 }
 
 /**
+ * A `(` that a `)` on the line closes, which makes the brackets before it a
+ * link with VFM 2.
+ */
+const resourceAhead: Construct = {
+  partial: true,
+  tokenize(effects, ok, nok) {
+    const inside: State = (code) => {
+      if (code === null || isLineEnding(code)) {
+        return nok(code);
+      }
+      effects.consume(code);
+      return code === codes.rightParenthesis ? ok : inside;
+    };
+    return (code) => {
+      effects.enter(types.callMarker);
+      effects.consume(code);
+      return inside;
+    };
+  },
+};
+
+/** `![^label]`: VFM 2 reads the `!` as text before the reference. */
+const callAfterBang: Construct = {
+  name: 'vfmFootnoteCallAfterBang',
+  tokenize(effects, ok, nok) {
+    return (code) => {
+      if (code !== codes.exclamationMark) {
+        return nok(code);
+      }
+      effects.enter(tokenType('data'));
+      effects.consume(code);
+      effects.exit(tokenType('data'));
+      return effects.attempt(
+        { tokenize: tokenizeCall, partial: true },
+        ok,
+        nok,
+      );
+    };
+  },
+};
+
+/**
  * `[^label]` as VFM 2 reads it, whether or not the label has a definition:
  * the label runs to the first `]` and has no whitespace. A `(` after it makes
  * the brackets a link instead.
@@ -88,13 +135,15 @@ function tokenizeCall(
     return label;
   };
 
-  const after: State = (code) => {
-    if (code === codes.leftParenthesis) {
-      return nok(code);
-    }
+  const done: State = (code) => {
     effects.exit(types.call);
     return ok(code);
   };
+
+  const after: State = (code) =>
+    code === codes.leftParenthesis
+      ? effects.check(resourceAhead, nok, done)(code)
+      : done(code);
 
   return (code) => {
     if (code !== codes.leftSquareBracket) {
@@ -132,6 +181,9 @@ function inlineFootnoteTokenizer(allowEmpty: boolean) {
     ok: State,
     nok: State,
   ): State {
+    // A link's label is not ended by brackets the note balances.
+    const open = { ...openBefore(this), label: false };
+    let last: Code = null;
     let balance = 0;
     let escaped = false;
     let run = 0;
@@ -167,9 +219,10 @@ function inlineFootnoteTokenizer(allowEmpty: boolean) {
     };
 
     const content: State = (code) => {
-      if (code === null) {
+      if (code === null || endsOpen(open, code, last)) {
         return nok(code);
       }
+      last = code;
       if (code === codes.graveAccent && !escaped) {
         run++;
         openChunk();
@@ -301,7 +354,14 @@ export const FootnoteReference = Node.create({
 
   parseHTML() {
     // Before links, which an `a` with an `href` is otherwise.
-    return [{ tag: 'a.footnote-ref', priority: 60 }];
+    return [
+      {
+        tag: 'a.footnote-ref',
+        priority: 60,
+        getAttrs: (element) =>
+          isWritableFootnoteLabel(element.textContent ?? '') ? null : false,
+      },
+    ];
   },
 
   // As VFM's default footnote mode renders a reference, but with the label in
@@ -329,7 +389,13 @@ export const FootnoteReference = Node.create({
     return {
       setFootnoteReference:
         (label) =>
-        ({ state, tr, dispatch }) => {
+        ({ editor, state, tr, dispatch }) => {
+          if (!hasDocumentNotation(editor, this.name)) {
+            return false;
+          }
+          if (!isWritableFootnoteLabel(label)) {
+            return false;
+          }
           const found = findSelectedInline(state, this.name);
           if (found) {
             dispatch?.(tr.setNodeMarkup(found.pos, undefined, { label }));
@@ -340,28 +406,42 @@ export const FootnoteReference = Node.create({
             tr,
             this.type.create({ label }),
             !!dispatch,
+            ['code'],
           );
         },
     };
   },
 
+  addProseMirrorPlugins() {
+    return [inlineNodeRules(this.name, { marks: ['code'] })];
+  },
+
   addInputRules() {
-    return [referenceRules.input];
+    return [
+      referenceRules(() => hasDocumentNotation(this.editor, this.name)).input,
+    ];
   },
 
   addPasteRules() {
-    return [referenceRules.paste];
+    return [
+      referenceRules(() => hasDocumentNotation(this.editor, this.name)).paste,
+    ];
   },
 });
 
-const referenceRules = inlineSourceRules({
-  find: /(?<![\\!])\[\^([^\s\]]+)\]$/,
-  build: ({ state, match }) =>
-    match[1]
-      ? (state.schema.nodes.footnoteReference?.create({ label: match[1] }) ??
-        null)
-      : null,
-});
+const referenceRules = (enabled: () => boolean) =>
+  inlineSourceRules({
+    enabled,
+    find: /(?<!\\)\[\^([^\s\]]+)\]$/,
+    build: ({ state, from, match }) =>
+      // At the start of a block it would begin the note's definition, which
+      // has no node yet.
+      match[1] && state.doc.resolve(from).parentOffset > 0
+        ? (state.schema.nodes.footnoteReference?.create({
+            label: match[1],
+          }) ?? null)
+        : null,
+  });
 
 export const InlineFootnote = Node.create({
   name: 'inlineFootnote',
@@ -387,23 +467,32 @@ export const InlineFootnote = Node.create({
     return {
       setInlineFootnote:
         (text) =>
-        ({ state, tr, dispatch }) => {
+        ({ editor, state, tr, dispatch }) => {
+          if (!hasDocumentNotation(editor, this.name)) {
+            return false;
+          }
           if (findSelectedInline(state, this.name)) {
             return false;
           }
           if (!state.selection.empty) {
-            return wrapSelection(state, tr, this.type, null, !!dispatch);
+            return wrapSelection(state, tr, this.type, null, !!dispatch, {
+              unmarked: ['code', 'link'],
+            });
           }
           return insertInline(
             state,
             tr,
             this.type.create(null, text ? state.schema.text(text) : null),
             !!dispatch,
+            ['code', 'link'],
           );
         },
       unsetInlineFootnote:
         () =>
-        ({ state, tr, dispatch }) => {
+        ({ editor, state, tr, dispatch }) => {
+          if (!hasDocumentNotation(editor, this.name)) {
+            return false;
+          }
           const found = findSelectedInline(state, this.name);
           if (!found) {
             return false;
@@ -414,25 +503,32 @@ export const InlineFootnote = Node.create({
     };
   },
 
+  // A note in a link would hold the link's end, and code cannot hold one.
+  addProseMirrorPlugins() {
+    return [inlineNodeRules(this.name, { marks: ['code', 'link'] })];
+  },
+
   addInputRules() {
-    return [noteRules.input];
+    return [noteRules(() => hasDocumentNotation(this.editor, this.name)).input];
   },
 
   addPasteRules() {
-    return [noteRules.paste];
+    return [noteRules(() => hasDocumentNotation(this.editor, this.name)).paste];
   },
 });
 
-const noteRules = inlineSourceRules({
-  find: /(?<!\\)\^\[([^[\]\n]+)\]$/,
-  build: ({ state, match, content }) =>
-    match[1]
-      ? (state.schema.nodes.inlineFootnote?.create(
-          null,
-          content(2, 2 + match[1].length),
-        ) ?? null)
-      : null,
-});
+const noteRules = (enabled: () => boolean) =>
+  inlineSourceRules({
+    enabled,
+    find: /(?<!\\)\^\[([^[\]\n]+)\]$/,
+    build: ({ state, match, content }) =>
+      match[1]
+        ? (state.schema.nodes.inlineFootnote?.create(
+            null,
+            content(2, 2 + match[1].length),
+          ) ?? null)
+        : null,
+  });
 
 export interface FootnoteOptions {
   /**
@@ -462,6 +558,7 @@ export function footnoteNotations({
                     name: 'vfmFootnoteCall',
                     tokenize: tokenizeCall,
                   },
+                  [codes.exclamationMark]: callAfterBang,
                 },
               },
               callFromMarkdown,

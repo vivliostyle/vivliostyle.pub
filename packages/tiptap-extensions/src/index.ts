@@ -43,7 +43,9 @@ export {
   findSelectedInline,
   formatAttributes,
   getMarkdown,
+  hasDocumentNotation,
   type InlineAttributes,
+  isAttributeName,
   isWritableFootnoteLabel,
   isWritableMath,
   isWritableRubyText,
@@ -57,6 +59,7 @@ export {
   upgradeDocumentNotations,
   VFM_2_SYNTAX,
   type VfmSyntax,
+  writableAttributes,
 } from './markdown';
 
 export const IMAGE_MIME_TYPES = [

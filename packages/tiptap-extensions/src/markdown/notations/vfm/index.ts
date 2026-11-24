@@ -38,7 +38,10 @@ export function vfmNotations(
 export {
   formatAttributes,
   type InlineAttributes,
+  isAttributeName,
   parseAttributes,
+  renderedAttributes,
+  writableAttributes,
 } from './attributes';
 export { type FoundNode, findSelectedInline } from './commands';
 export { isWritableFootnoteLabel } from './footnotes';

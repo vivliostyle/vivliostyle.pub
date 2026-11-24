@@ -1,16 +1,21 @@
 import { Node } from '@tiptap/core';
 
+import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
+  type Code,
   type Construct,
   codes,
   currentNode,
   type Effects,
+  endsOpen,
   enterNode,
   type FromMarkdownExtension,
   isDigit,
   isJsWhitespace,
   isLineEnding,
+  openBefore,
+  type Resolver,
   type State,
   syntaxPlugin,
   type TokenizeContext,
@@ -19,6 +24,7 @@ import {
 import { defineNotation } from '../../notation';
 import { findSelectedInline, insertInline } from './commands';
 import { inlineSourceRules } from './input-rules';
+import { inlineNodeRules } from './normalize';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -90,6 +96,8 @@ function mathTokenizer(display: boolean) {
     ok: State,
     nok: State,
   ): State {
+    const open = openBefore(this);
+    let previous: Code = null;
     let inValue = false;
     // What the value ends with decides whether a `$` can close it.
     let backslashes = 0;
@@ -108,6 +116,7 @@ function mathTokenizer(display: boolean) {
         return nok(code);
       }
       if (isLineEnding(code)) {
+        previous = code;
         closeValue();
         effects.enter(types.lineEnding);
         effects.consume(code);
@@ -135,6 +144,10 @@ function mathTokenizer(display: boolean) {
     };
 
     const content: State = (code) => {
+      if (endsOpen(open, code, previous)) {
+        return nok(code);
+      }
+      previous = code;
       if (!inValue) {
         effects.enter(types.value);
         inValue = true;
@@ -201,6 +214,29 @@ function mathTokenizer(display: boolean) {
     };
   };
 }
+
+// VFM 2 reads no math in the text of a link, so what is there stays text.
+// The events are changed in place: micromark keeps the array it gave.
+const resolveMathInLinks: Resolver = (events) => {
+  let depth = 0;
+  for (let index = 0; index < events.length; index++) {
+    const [kind, token] = events[index];
+    const type = token.type as string;
+    if (type === 'link' || type === 'image') {
+      depth += kind === 'enter' ? 1 : -1;
+    } else if (depth > 0) {
+      if (type === types.inline || type === types.display) {
+        events.splice(index, 1);
+        index--;
+      } else if (type === types.marker || type === types.value) {
+        token.type = tokenType('data');
+      } else if (type === types.lineEnding) {
+        token.type = tokenType('lineEnding');
+      }
+    }
+  }
+  return events;
+};
 
 const mathFromMarkdown: FromMarkdownExtension = {
   enter: {
@@ -288,6 +324,15 @@ export function isWritableMath(latex: string, display: boolean): boolean {
   );
 }
 
+/** The LaTeX of math as VFM renders it for MathJax. */
+function mathSource(text: string): string {
+  return (
+    text.match(/^\\\(([\s\S]*)\\\)$/)?.[1] ??
+    text.match(/^\$\$([\s\S]*)\$\$$/)?.[1] ??
+    text
+  );
+}
+
 export const MathNode = Node.create({
   name: 'math',
   group: 'inline',
@@ -298,14 +343,7 @@ export const MathNode = Node.create({
     return {
       latex: {
         default: '',
-        parseHTML: (element) => {
-          const text = element.textContent ?? '';
-          return (
-            text.match(/^\\\(([\s\S]*)\\\)$/)?.[1] ??
-            text.match(/^\$\$([\s\S]*)\$\$$/)?.[1] ??
-            text
-          );
-        },
+        parseHTML: (element) => mathSource(element.textContent ?? ''),
         renderHTML: () => ({}),
       },
       display: {
@@ -317,7 +355,18 @@ export const MathNode = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'span.math[data-math-typeset]' }];
+    return [
+      {
+        tag: 'span.math[data-math-typeset]',
+        getAttrs: (element) =>
+          isWritableMath(
+            mathSource(element.textContent ?? ''),
+            element.classList.contains('display'),
+          )
+            ? null
+            : false,
+      },
+    ];
   },
 
   // As VFM renders it for MathJax, which the editor does not run, so the
@@ -354,32 +403,54 @@ export const MathNode = Node.create({
     return {
       setMath:
         (attrs) =>
-        ({ state, tr, dispatch }) => {
+        ({ editor, state, tr, dispatch }) => {
+          if (!hasDocumentNotation(editor, this.name)) {
+            return false;
+          }
+          if (!isWritableMath(attrs.latex, attrs.display)) {
+            return false;
+          }
           const found = findSelectedInline(state, this.name);
           if (found) {
             dispatch?.(tr.setNodeMarkup(found.pos, undefined, attrs));
             return true;
           }
-          return insertInline(state, tr, this.type.create(attrs), !!dispatch);
+          return insertInline(state, tr, this.type.create(attrs), !!dispatch, [
+            'code',
+            'link',
+          ]);
         },
     };
   },
 
+  // VFM reads no math in code or in a link.
+  addProseMirrorPlugins() {
+    return [inlineNodeRules(this.name, { marks: ['code', 'link'] })];
+  },
+
   addInputRules() {
-    return [inlineRules.input, displayRules.input];
+    const enabled = () => hasDocumentNotation(this.editor, 'math');
+    return [mathRules(false, enabled).input, mathRules(true, enabled).input];
   },
 
   addPasteRules() {
-    return [displayRules.paste, inlineRules.paste];
+    const enabled = () => hasDocumentNotation(this.editor, 'math');
+    return [mathRules(true, enabled).paste, mathRules(false, enabled).paste];
   },
 });
 
-function mathRules(display: boolean) {
+// The content: no `$` inside, so the last of several on the line is the one
+// closed. A digit after the closing `$` keeps it from closing, so the rule
+// waits for the character after it.
+const INLINE =
+  '(?<![$\\\\])\\$((?:[^$\\s\\\\]|\\\\[^\\n])(?:(?:[^$\\n\\\\]|\\\\[^\\n])*(?:[^$\\s\\\\]|\\\\[^\\n]))?)\\$';
+const DISPLAY = '(?<![$\\\\])\\$\\$((?:[^$\\n\\\\]|\\\\[^\\n])+)\\$\\$';
+
+function mathRules(display: boolean, enabled: () => boolean) {
+  const source = display ? DISPLAY : INLINE;
   return inlineSourceRules({
-    // No `$` inside, so the last of several on the line is the one closed.
-    find: display
-      ? /(?<![$\\])\$\$((?:[^$\n\\]|\\[^\n])+)\$\$$/
-      : /(?<![$\\])\$((?:[^$\s\\]|\\[^\n])(?:(?:[^$\n\\]|\\[^\n])*(?:[^$\s\\]|\\[^\n]))?)\$$/,
+    find: new RegExp(`${source}(?<after>[^\\d$])$`),
+    paste: new RegExp(`${source}(?![\\d$])`, 'g'),
     build: ({ state, match }) => {
       const latex = match[1];
       if (latex === undefined || !isWritableMath(latex, display)) {
@@ -387,11 +458,9 @@ function mathRules(display: boolean) {
       }
       return state.schema.nodes.math?.create({ latex, display }) ?? null;
     },
+    enabled,
   });
 }
-
-const inlineRules = mathRules(false);
-const displayRules = mathRules(true);
 
 export const mathNotation = defineNotation({
   name: 'math',
@@ -402,8 +471,16 @@ export const mathNotation = defineNotation({
       {
         text: {
           [codes.dollarSign]: [
-            { name: 'vfmMathDisplay', tokenize: mathTokenizer(true) },
-            { name: 'vfmMathInline', tokenize: mathTokenizer(false) },
+            {
+              name: 'vfmMathDisplay',
+              tokenize: mathTokenizer(true),
+              resolveAll: resolveMathInLinks,
+            },
+            {
+              name: 'vfmMathInline',
+              tokenize: mathTokenizer(false),
+              resolveAll: resolveMathInLinks,
+            },
           ],
         },
       },

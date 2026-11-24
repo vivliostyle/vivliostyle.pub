@@ -47,6 +47,15 @@ export function wrapSelection(
   type: NodeType,
   attrs: Record<string, unknown> | null,
   dispatch: boolean,
+  {
+    oneLine = false,
+    unmarked = [],
+  }: {
+    /** The content cannot hold a line break. */
+    oneLine?: boolean;
+    /** Marks the node cannot have, which its content keeps instead. */
+    unmarked?: readonly string[];
+  } = {},
 ): boolean {
   const { from, to, empty, $from, $to } = state.selection;
   if (
@@ -59,7 +68,20 @@ export function wrapSelection(
     return false;
   }
   const content = state.doc.slice(from, to).content;
-  const marks = sharedMarks(content);
+  if (oneLine) {
+    let breaks = false;
+    content.descendants((node) => {
+      breaks ||=
+        Boolean(node.type.spec.linebreakReplacement) ||
+        Boolean(node.isText && node.text?.includes('\n'));
+    });
+    if (breaks) {
+      return false;
+    }
+  }
+  const marks = sharedMarks(content).filter(
+    (mark) => !unmarked.includes(mark.type.name),
+  );
   if (dispatch) {
     tr.replaceWith(
       from,
@@ -98,6 +120,8 @@ export function insertInline(
   tr: Transaction,
   node: ProseMirrorNode,
   dispatch: boolean,
+  /** Marks there that the node cannot have. */
+  unmarked: readonly string[] = [],
 ): boolean {
   const { $from, $to } = state.selection;
   if (
@@ -109,7 +133,12 @@ export function insertInline(
     return false;
   }
   if (dispatch) {
-    tr.replaceSelectionWith(node);
+    tr.replaceSelectionWith(
+      node.mark(
+        $from.marks().filter((mark) => !unmarked.includes(mark.type.name)),
+      ),
+      false,
+    );
   }
   return true;
 }

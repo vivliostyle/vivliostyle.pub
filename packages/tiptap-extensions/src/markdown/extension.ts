@@ -157,6 +157,27 @@ export function currentNotations(editor: Editor): string {
 }
 
 /**
+ * Whether the definitions the document is read and written with include the
+ * one named, i.e. whether its syntax means something in the document. The
+ * record is read anew, as for a write.
+ */
+export function hasDocumentNotation(editor: Editor, name: string): boolean {
+  const storage = storageOf(editor);
+  const record = optionsOf(editor).documentRecord?.(editor);
+  const signature = record ? record.notations : storage.documentNotations;
+  if (signature === null || signature === currentNotations(editor)) {
+    return optionsOf(editor).notations.some((it) => it.name === name);
+  }
+  if (signature === MARKED_NOTATIONS) {
+    const names = optionsOf(editor).markedEraNotations;
+    return names
+      ? names.includes(name)
+      : optionsOf(editor).notations.some((it) => it.name === name);
+  }
+  return signature.split(' ').some((entry) => entry.split('@')[0] === name);
+}
+
+/**
  * The pipeline that writes the document the way it was read, and how to read
  * its baseline: a document keeps meaning what it meant when it was made.
  */

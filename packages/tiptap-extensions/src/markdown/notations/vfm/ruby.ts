@@ -1,24 +1,37 @@
 import { Node } from '@tiptap/core';
-import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { Plugin } from '@tiptap/pm/state';
+import {
+  Fragment,
+  type Mark,
+  type Node as ProseMirrorNode,
+} from '@tiptap/pm/model';
+import { type EditorState, Plugin } from '@tiptap/pm/state';
 
+import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
   type Code,
   codes,
   currentNode,
   type Effects,
+  endsOpen,
   enterNode,
   type FromMarkdownExtension,
   isLineEnding,
+  openBefore,
   type State,
   syntaxPlugin,
   type TokenizeContext,
   tokenType,
 } from '../../micromark';
 import { defineNotation } from '../../notation';
-import { findSelectedInline, unwrap, wrapSelection } from './commands';
-import { inlineSourceRules } from './input-rules';
+import {
+  findSelectedInline,
+  insertInline,
+  unwrap,
+  wrapSelection,
+} from './commands';
+import { inlineSourceRules, sharedMarks } from './input-rules';
+import { inlineNodeRules } from './normalize';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -30,6 +43,8 @@ declare module '@tiptap/core' {
       setRuby: (rubyText: string) => ReturnType;
       /** Leaves the base of the ruby the selection is in as text. */
       unsetRuby: () => ReturnType;
+      /** Inserts a ruby in place of the selection. */
+      insertRuby: (ruby: { base: string; rubyText: string }) => ReturnType;
     };
   }
 }
@@ -65,8 +80,18 @@ function tokenizeRuby(
   ok: State,
   nok: State,
 ): State {
+  const open = openBefore(this);
   let previous: Code = null;
+  let last: Code = null;
   let size = 0;
+
+  // Emphasis or a link opened before would end inside, and VFM 2 reads
+  // that first.
+  const ends = (code: Code) => {
+    const before = last;
+    last = code;
+    return endsOpen(open, code, before);
+  };
 
   const start: State = (code) => {
     if (code !== codes.leftCurlyBrace) {
@@ -89,7 +114,7 @@ function tokenizeRuby(
   };
 
   const base: State = (code) => {
-    if (endsRuby(code)) {
+    if (endsRuby(code) || ends(code)) {
       return nok(code);
     }
     if (
@@ -114,7 +139,7 @@ function tokenizeRuby(
   };
 
   const textStart: State = (code) => {
-    if (endsRuby(code)) {
+    if (endsRuby(code) || ends(code)) {
       return nok(code);
     }
     effects.enter(types.text);
@@ -123,7 +148,7 @@ function tokenizeRuby(
   };
 
   const text: State = (code) => {
-    if (endsRuby(code)) {
+    if (endsRuby(code) || ends(code)) {
       return nok(code);
     }
     if (code === codes.rightCurlyBrace) {
@@ -165,6 +190,37 @@ export function isWritableRubyText(text: string): boolean {
   return /^[^\n\r\u2028\u2029][^}\n\r\u2028\u2029]*$/.test(text);
 }
 
+/**
+ * Gives every ruby text of pasted HTML a ruby of its own, as in
+ * `<ruby>日<rt>に</rt>本<rt>ほん</rt></ruby>`: a ruby node has one.
+ */
+function splitRubies(html: string): string {
+  if (typeof DOMParser === 'undefined' || !/<rt[\s>]/i.test(html)) {
+    return html;
+  }
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  for (const ruby of document.querySelectorAll('ruby')) {
+    if (ruby.querySelectorAll(':scope > rt').length < 2) {
+      continue;
+    }
+    const parts: globalThis.Node[] = [];
+    let current = document.createElement('ruby');
+    for (const child of [...ruby.childNodes]) {
+      if (child.nodeName === 'RP') {
+        continue;
+      }
+      current.append(child);
+      if (child.nodeName === 'RT') {
+        parts.push(current);
+        current = document.createElement('ruby');
+      }
+    }
+    parts.push(...current.childNodes);
+    ruby.replaceWith(...parts);
+  }
+  return document.body.innerHTML;
+}
+
 export const Ruby = Node.create({
   name: 'ruby',
   group: 'inline',
@@ -185,6 +241,11 @@ export const Ruby = Node.create({
     return [
       {
         tag: 'ruby',
+        // Without ruby text there is no ruby to write.
+        getAttrs: (element) => {
+          const text = element.querySelector('rt')?.textContent ?? '';
+          return isWritableRubyText(text) ? null : false;
+        },
         contentElement: (element) => {
           const base = element.cloneNode(true) as HTMLElement;
           for (const annotation of base.querySelectorAll('rt, rp')) {
@@ -211,7 +272,13 @@ export const Ruby = Node.create({
     return {
       setRuby:
         (rubyText) =>
-        ({ state, tr, dispatch }) => {
+        ({ editor, state, tr, dispatch }) => {
+          if (!hasDocumentNotation(editor, this.name)) {
+            return false;
+          }
+          if (!isWritableRubyText(rubyText)) {
+            return false;
+          }
           const found = findSelectedInline(state, this.name);
           if (found) {
             dispatch?.(
@@ -222,11 +289,53 @@ export const Ruby = Node.create({
             );
             return true;
           }
-          return wrapSelection(state, tr, this.type, { rubyText }, !!dispatch);
+          if (
+            followsAttributable(
+              state,
+              state.selection.from,
+              sharedMarks(
+                state.doc.slice(state.selection.from, state.selection.to)
+                  .content,
+              ),
+            )
+          ) {
+            return false;
+          }
+          return wrapSelection(state, tr, this.type, { rubyText }, !!dispatch, {
+            oneLine: true,
+            unmarked: ['code'],
+          });
+        },
+      insertRuby:
+        ({ base, rubyText }) =>
+        ({ editor, state, tr, dispatch }) => {
+          if (
+            !hasDocumentNotation(editor, this.name) ||
+            !base ||
+            /[\n\r]/.test(base) ||
+            !isWritableRubyText(rubyText) ||
+            followsAttributable(
+              state,
+              state.selection.from,
+              state.selection.$from.marks(),
+            )
+          ) {
+            return false;
+          }
+          return insertInline(
+            state,
+            tr,
+            this.type.create({ rubyText }, state.schema.text(base)),
+            !!dispatch,
+            ['code'],
+          );
         },
       unsetRuby:
         () =>
-        ({ state, tr, dispatch }) => {
+        ({ editor, state, tr, dispatch }) => {
+          if (!hasDocumentNotation(editor, this.name)) {
+            return false;
+          }
           const found = findSelectedInline(state, this.name);
           if (!found) {
             return false;
@@ -238,56 +347,69 @@ export const Ruby = Node.create({
   },
 
   addInputRules() {
-    return [rubyRules.input];
+    return [rubyRules(() => hasDocumentNotation(this.editor, 'ruby')).input];
   },
 
   addPasteRules() {
-    return [rubyRules.paste];
+    return [rubyRules(() => hasDocumentNotation(this.editor, 'ruby')).paste];
   },
 
-  // A ruby without a base has no markdown, so it goes with its last character.
+  // A ruby without a base has no markdown, so it goes with its last
+  // character; one whose base takes a line break is left as its base; and
+  // code cannot hold a ruby.
   addProseMirrorPlugins() {
     return [
-      new Plugin({
-        appendTransaction: (transactions, _, state) => {
-          if (!transactions.some((tr) => tr.docChanged)) {
-            return null;
-          }
-          const empty: { from: number; to: number }[] = [];
-          state.doc.descendants((node, pos) => {
-            if (node.type.name === this.name && node.childCount === 0) {
-              empty.push({ from: pos, to: pos + node.nodeSize });
-            }
-          });
-          if (empty.length === 0) {
-            return null;
-          }
-          const { tr } = state;
-          for (const { from, to } of empty.toReversed()) {
-            tr.delete(from, to);
-          }
-          return tr;
-        },
+      inlineNodeRules(this.name, {
+        marks: ['code'],
+        needsContent: true,
+        oneLine: true,
       }),
+      new Plugin({ props: { transformPastedHTML: splitRubies } }),
     ];
   },
 });
 
-const rubyRules = inlineSourceRules({
-  find: /(?<!\\)\{((?:[^{}|\n\\]|\\[^\n])*[^{}|\n\\])\|([^{}\n]+)\}$/,
-  build: ({ state, match, content }) => {
-    const [, base, text] = match;
-    if (base === undefined || text === undefined) {
-      return null;
-    }
-    return (
-      state.schema.nodes.ruby?.create(
-        { rubyText: text },
-        unescapePipes(content(1, 1 + base.length)),
-      ) ?? null
-    );
-  },
-});
+/**
+ * Whether a link or code span ends right before `pos` without going on into
+ * what is put there: VFM reads `{…}` after one as its attributes, and no
+ * markdown keeps a ruby apart from it.
+ */
+function followsAttributable(
+  state: EditorState,
+  pos: number,
+  marks: readonly Mark[],
+): boolean {
+  const before = state.doc.resolve(pos).nodeBefore;
+  return Boolean(
+    before?.marks.some(
+      (mark) =>
+        (mark.type.name === 'link' || mark.type.name === 'code') &&
+        !mark.isInSet(marks),
+    ),
+  );
+}
+
+const rubyRules = (enabled: () => boolean) =>
+  inlineSourceRules({
+    enabled,
+    find: /(?<!\\)\{((?:[^{}|\n\\]|\\[^\n])*[^{}|\n\\])\|([^{}\n]+)\}$/,
+    build: ({ state, from, match, content }) => {
+      const [, base, text] = match;
+      if (
+        base === undefined ||
+        text === undefined ||
+        followsAttributable(state, from, state.doc.nodeAt(from)?.marks ?? [])
+      ) {
+        return null;
+      }
+      return (
+        state.schema.nodes.ruby?.create(
+          { rubyText: text },
+          unescapePipes(content(1, 1 + base.length)),
+        ) ?? null
+      );
+    },
+  });
 
 function unescapePipes(fragment: Fragment): Fragment {
   const nodes: ProseMirrorNode[] = [];

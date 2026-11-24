@@ -5,6 +5,7 @@ export {
   type GetMarkdownOptions,
   getMarkdown,
   getMarkdownWithResult,
+  hasDocumentNotation,
   MARKED_NOTATIONS,
   markdownPipeline,
   PubMarkdown,
@@ -52,13 +53,16 @@ export {
   findSelectedInline,
   formatAttributes,
   type InlineAttributes,
+  isAttributeName,
   isWritableFootnoteLabel,
   isWritableMath,
   isWritableRubyText,
   parseAttributes,
+  renderedAttributes,
   VFM_2_SYNTAX,
   type VfmSyntax,
   vfmNotations,
+  writableAttributes,
 } from './notations/vfm';
 export { RAW_BLOCK, RAW_INLINE } from './parse';
 export {

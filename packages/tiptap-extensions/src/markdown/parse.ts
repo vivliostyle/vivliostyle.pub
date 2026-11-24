@@ -93,12 +93,23 @@ function matchOpeningTag(
     ...Object.keys(spec.match ?? {}),
     ...(spec.capture ?? []),
   ]);
-  if (Object.keys(attributes).some((name) => !known.has(name))) {
+  const others = Object.entries(attributes).filter(
+    ([name]) => !known.has(name),
+  );
+  if (others.length > 0 && !spec.rest) {
     return null;
   }
-  return Object.fromEntries(
-    (spec.capture ?? []).map((name) => [name, attributes[name] ?? null]),
-  );
+  return {
+    ...Object.fromEntries(
+      (spec.capture ?? []).map((name) => [name, attributes[name] ?? null]),
+    ),
+    ...(spec.rest &&
+      others.length > 0 && {
+        [spec.rest]: Object.fromEntries(
+          others.map(([name, value]) => [name, decodeString(value)]),
+        ),
+      }),
+  };
 }
 
 function isClosingTag(value: string | undefined, spec: HtmlElementSpec) {

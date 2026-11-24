@@ -230,6 +230,24 @@ describe('documents made by the old parser', () => {
     return editor;
   }
 
+  it.each([
+    {
+      type: 'ruby',
+      attrs: { rubyText: 'かんじ' },
+      content: [{ type: 'text', text: '漢字' }],
+    },
+    { type: 'math', attrs: { latex: 'x', display: false } },
+    { type: 'footnoteReference', attrs: { label: '1' } },
+    { type: 'inlineFootnote', content: [{ type: 'text', text: '注' }] },
+  ])('refuses to write $type, which its definitions lack', (node) => {
+    const editor = loadMarked('keep\n\nnew end\n');
+    const end = editor.state.doc.content.size - 1;
+    editor.view.dispatch(
+      editor.state.tr.insert(end, editor.schema.nodeFromJSON(node)),
+    );
+    expect(() => getMarkdown(editor)).toThrow(MarkdownWriteError);
+  });
+
   it('keeps the source of blocks the old parser read differently', () => {
     const markdown =
       'text[^1] <span class="x">y</span>\n\n[^1]: note\n\n| a |\n| - |\n\n1. a\n\n   ```js title=x\n   b\n   ```\n- > c\n\nedit me\n';
@@ -603,6 +621,36 @@ describe('what the document records', () => {
     appendTo(editor, 'd', 'Z');
     expect(getMarkdownWithResult(editor)).toEqual({
       markdown: 'a %b dZ\n',
+      strategy: 'reused',
+    });
+  });
+});
+
+describe('documents made with an earlier version of GFM', () => {
+  it('keep `~a~` as strikethrough written as it was', () => {
+    const editor = load('');
+    const { schema } = editor.state;
+    const strike = schema.marks.strike.create();
+    editor.commands.setContent(
+      schema.topNodeType
+        .create(null, [
+          schema.nodes.paragraph.create(null, [
+            schema.text('a '),
+            schema.text('b', [strike]),
+            schema.text(' c'),
+          ]),
+          schema.nodes.paragraph.create(null, schema.text('edit')),
+        ])
+        .toJSON(),
+    );
+    setMarkdownBaseline(editor, 'a ~b~ c\n\nedit\n');
+    setDocumentNotations(
+      editor,
+      currentNotations(editor).replace('gfm@2', 'gfm@1'),
+    );
+    appendTo(editor, 'edit', 'ed');
+    expect(getMarkdownWithResult(editor)).toEqual({
+      markdown: 'a ~b~ c\n\nedited\n',
       strategy: 'reused',
     });
   });

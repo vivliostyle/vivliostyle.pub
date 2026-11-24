@@ -73,8 +73,18 @@ function charsOf(
         lineBreak: true,
       });
     } else {
+      // Inline content holds what a textblock's holds.
+      const value = child.inlineContent
+        ? {
+            type: child.type.name,
+            attrs: child.attrs,
+            content: normalizeChars(charsOf(child, used), used).map(
+              ({ value, marks, raw }) => [value, marks, raw],
+            ),
+          }
+        : child.toJSON();
       chars.push({
-        value: JSON.stringify(child.toJSON()),
+        value: JSON.stringify(value),
         marks,
         raw,
         lineBreak: false,

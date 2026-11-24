@@ -589,6 +589,40 @@ const INSERTS = [
 ];
 const MARKS = ['bold', 'italic', 'strike', 'code', 'link'];
 
+/** Pieces of VFM's own syntax, and characters that start or end it. */
+export const VFM_FRAGMENTS = [
+  '{漢字|かんじ}と{**太**字|ふとじ}、{a\\|b|c}',
+  '式$x = y$と$$\n\\sum_i a_i\n$$、価格は$5と$10',
+  '注^[本文 *強調* と [リンク](u)]と^[複数\n行]',
+  '参照[^1]と[^note]、Wow![^2]',
+  '[^1]: 定義',
+  '**強調**{.x}と`code`{#c}、[l](u){target=_blank}',
+  '![a](b.png){.figure}',
+  '> {引用|いんよう}の$y$^[注]',
+  '*a $b* c$ と [a {b](u)|c}',
+  'これは「重要」です。{漢字|かんじ}',
+];
+export const VFM_INSERTS = [
+  'X',
+  '{',
+  '}',
+  '|',
+  '$',
+  '^',
+  '[',
+  ']',
+  '*',
+  '!',
+  '\\',
+  '「',
+  '\n',
+  '{a|b}',
+  '$z$ ',
+  '^[n]',
+  '[^9]',
+  '{.c}',
+];
+
 /** A seeded pseudo-random number generator, so a failure can be replayed. */
 function random(seed: number): (n: number) => number {
   let state = seed;
@@ -602,6 +636,7 @@ function random(seed: number): (n: number) => number {
 function randomEdit(
   state: Editor['state'],
   rnd: (n: number) => number,
+  inserts: readonly string[],
 ): { tr: Transaction; inserted: boolean } {
   const pick = <T>(items: readonly T[]): T => items[rnd(items.length)];
   const { schema } = state;
@@ -621,7 +656,7 @@ function randomEdit(
   };
   if (kind <= 1 && textblocks.length > 0) {
     const { pos, node } = pick(textblocks);
-    tr.insertText(pick(INSERTS), pos + 1 + rnd(node.content.size + 1));
+    tr.insertText(pick(inserts), pos + 1 + rnd(node.content.size + 1));
     return { tr, inserted: true };
   }
   if (kind === 2 && state.doc.childCount > 1) {
@@ -704,18 +739,24 @@ export function fuzzMarkdownEdits(
     documents,
     edits,
     statistics,
+    fragments = FRAGMENTS,
+    inserts = INSERTS,
   }: {
     seed: number;
     documents: number;
     edits: number;
     statistics?: FuzzStatistics;
+    /** What documents are made of. */
+    fragments?: readonly string[];
+    /** What is typed into them. */
+    inserts?: readonly string[];
   },
 ): PropertyViolation[] {
   const rnd = random(seed);
   const pick = <T>(items: readonly T[]): T => items[rnd(items.length)];
   const violations: PropertyViolation[] = [];
   for (let n = 0; n < documents; n++) {
-    const parts = Array.from({ length: 1 + rnd(5) }, () => pick(FRAGMENTS));
+    const parts = Array.from({ length: 1 + rnd(5) }, () => pick(fragments));
     let markdown = parts[0];
     for (const part of parts.slice(1)) {
       markdown += pick(['\n', '\n\n', '\n\n', '\n\n\n']) + part;
@@ -727,7 +768,7 @@ export function fuzzMarkdownEdits(
       for (let k = 0; k < edits; k++) {
         let edit: ReturnType<typeof randomEdit>;
         try {
-          edit = randomEdit(editor.state, rnd);
+          edit = randomEdit(editor.state, rnd, inserts);
           edit.tr.doc.check();
         } catch {
           continue;

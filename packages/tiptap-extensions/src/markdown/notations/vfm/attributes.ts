@@ -34,8 +34,17 @@ const types = {
   text: tokenType('chunkText'),
 };
 
-// The characters that can end an element the attributes may follow.
-const CLOSERS = new Set([...'*_~`)]>'].map((char) => char.charCodeAt(0)));
+// The characters that can end an element the attributes may follow, and
+// the tokens that end it there. Emphasis is only known once it is resolved.
+const CLOSERS = new Map<number, readonly string[]>([
+  [42, ['attentionSequence']],
+  [95, ['attentionSequence']],
+  [126, ['strikethroughSequenceTemporary']],
+  [96, ['codeText']],
+  [41, ['link', 'image']],
+  [93, ['link', 'image']],
+  [62, ['autolink']],
+]);
 
 // mdast types of the elements VFM puts attributes on. References are among
 // them so that their attributes stay in their source when they are raw.
@@ -160,11 +169,24 @@ class AttributeScanner {
 
 function attributesOf(items: readonly Item[]): InlineAttributes {
   let id: string | undefined;
+  // As VFM's parser has it, `#b` replaces an id given as `id=a` right
+  // before, and is ignored after one given as `#a`.
+  let idByKey = false;
   const classes: string[] = [];
   const others: [string, string][] = [];
   for (const { kind, name, value } of items) {
-    if (kind === 'id' || (kind === 'key' && name === 'id')) {
-      id ??= kind === 'id' ? name : (value ?? '');
+    if (kind === 'id') {
+      if (idByKey) {
+        id = name;
+        idByKey = false;
+      } else {
+        id ??= name;
+      }
+    } else if (kind === 'key' && name === 'id') {
+      if (id === undefined) {
+        id = value ?? '';
+        idByKey = true;
+      }
     } else if (kind === 'class' || name === 'class') {
       for (const it of (kind === 'class' ? name : (value ?? '')).split(/\s+/)) {
         if (it && !classes.includes(it)) {
@@ -201,16 +223,16 @@ export function parseAttributes(source: string): InlineAttributes | null {
 }
 
 const NAME = /^[^\s=}{"']+$/;
-const BARE_VALUE = /^[^\s=}{"'\\]+$/;
+const BARE_VALUE = /^[^\s=}{"']+$/;
 
 /** `{…}` holding the attributes, or null when they cannot be written. */
 export function formatAttributes(attributes: InlineAttributes): string | null {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(attributes)) {
-    if (/[\n\r]/.test(value) || value.endsWith('\\')) {
+    if (/[\n\r]/.test(value)) {
       return null;
     }
-    if (key === 'id' && NAME.test(value) && !/^[.#]/.test(value)) {
+    if (key === 'id' && NAME.test(value)) {
       parts.push(`#${value}`);
       continue;
     }
@@ -224,33 +246,81 @@ export function formatAttributes(attributes: InlineAttributes): string | null {
     if (!NAME.test(key) || /^[.#]/.test(key)) {
       return null;
     }
-    parts.push(
-      value === ''
-        ? key
-        : BARE_VALUE.test(value)
-          ? `${key}=${value}`
-          : `${key}="${value.replaceAll('"', '\\"')}"`,
-    );
+    if (value === '') {
+      parts.push(key);
+    } else if (BARE_VALUE.test(value)) {
+      parts.push(`${key}=${value}`);
+    } else if (value.endsWith('\\')) {
+      // The backslash would escape the closing quote.
+      return null;
+    } else {
+      parts.push(`${key}="${value.replaceAll('"', '\\"')}"`);
+    }
   }
   return `{${parts.join(' ')}}`;
 }
 
-// The editor's own rendering depends on these, and event handlers are left
-// out as VFM leaves them out.
-const UNRENDERED = /^(?:on.*|href|src|srcset|contenteditable)$/i;
+/**
+ * The attributes as `{…}` can hold them, with an empty class left out, or
+ * null when no `{…}` reads back as them.
+ */
+export function writableAttributes(
+  attributes: InlineAttributes,
+): InlineAttributes | null {
+  const normalized = Object.fromEntries(
+    Object.entries(attributes).filter(
+      ([key, value]) => !(key === 'class' && !value.trim()),
+    ),
+  );
+  const written = formatAttributes(normalized);
+  const read = written === null ? null : parseAttributes(written);
+  return read && JSON.stringify(read) === JSON.stringify(normalized)
+    ? normalized
+    : null;
+}
 
-/** The attributes as the editor puts them on its own element. */
+/** A name an attribute can have on an element: VFM reads more. */
+export function isAttributeName(name: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name);
+}
+
+// Event handlers run script, the editor's own rendering depends on the
+// others, and the data attributes and classes would make pasted HTML read
+// as the editor's other nodes. VFM itself leaves out only some handlers.
+const UNRENDERED =
+  /^(?:on.*|href|src|srcset|srcdoc|style|ping|action|formaction|contenteditable|draggable|xmlns.*|data-(?:pm|raw|math).*)$/i;
+const OWN_CLASSES = new Set(['footnote-ref', 'footnote', 'math']);
+
+/**
+ * The attributes the editor puts on its own element: the document keeps the
+ * others, which are written back to markdown.
+ */
 export function renderedAttributes(
   attributes: unknown,
 ): Record<string, string> {
   if (!attributes || typeof attributes !== 'object') {
     return {};
   }
-  return Object.fromEntries(
-    Object.entries(attributes as InlineAttributes).filter(
-      ([key, value]) => typeof value === 'string' && !UNRENDERED.test(key),
-    ),
-  );
+  const rendered: Record<string, string> = {};
+  for (const [key, value] of Object.entries(attributes as InlineAttributes)) {
+    if (typeof value !== 'string' || !isAttributeName(key)) {
+      continue;
+    }
+    if (UNRENDERED.test(key)) {
+      continue;
+    }
+    if (key.toLowerCase() === 'class') {
+      const classes = value
+        .split(/\s+/)
+        .filter((it) => it && !OWN_CLASSES.has(it));
+      if (classes.length > 0) {
+        rendered.class = classes.join(' ');
+      }
+      continue;
+    }
+    rendered[key] = value;
+  }
+  return rendered;
 }
 
 /**
@@ -285,10 +355,13 @@ function tokenizeAttributes(
   };
 
   return (code) => {
+    const last = this.events.at(-1);
     if (
       code !== codes.leftCurlyBrace ||
       this.previous === null ||
-      !CLOSERS.has(this.previous)
+      !last ||
+      last[0] !== 'exit' ||
+      !CLOSERS.get(this.previous)?.includes(last[1].type)
     ) {
       return nok(code);
     }
@@ -406,6 +479,12 @@ function delimiter(
 
 const decorate: MarkDecorator = (previous) => ({
   ...previous,
+  ...(previous.html && {
+    htmlAttributes: (mark) => ({
+      ...previous.htmlAttributes?.(mark),
+      ...(mark.attrs.attributes as InlineAttributes | null),
+    }),
+  }),
   close: (mark, context, text) =>
     delimiter(previous.close, mark, context, text) + written(mark),
   ...(previous.run && {
@@ -484,5 +563,11 @@ export const inlineAttributesNotation = defineNotation({
   marks: Object.fromEntries(
     Object.values(ATTRIBUTED_MARKS).map((name) => [name, decorate]),
   ),
+  // Where emphasis is written as its element, the attributes go on the tag.
+  htmlElements: [
+    { kind: 'mark', type: 'bold', tag: 'strong', rest: 'attributes' },
+    { kind: 'mark', type: 'italic', tag: 'em', rest: 'attributes' },
+    { kind: 'mark', type: 'strike', tag: 'del', rest: 'attributes' },
+  ],
   escapes: [{ pattern: /\{/g }],
 });

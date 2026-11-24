@@ -113,8 +113,12 @@ function replaceSource(
   if (!range) {
     return null;
   }
-  const length = range.to - range.from;
-  const whole = doc.slice(range.from, range.to).content;
+  // A character the rule had to see after the source, which stays text.
+  const after = match.groups?.after ?? '';
+  const typed = range.to - range.from < match[0].length;
+  const to = Math.min(range.to, range.from + match[0].length - after.length);
+  const length = to - range.from;
+  const whole = doc.slice(range.from, to).content;
   const marks = sharedMarks(whole);
   const node = build({
     state,
@@ -131,14 +135,22 @@ function replaceSource(
     return null;
   }
   const $from = doc.resolve(range.from);
-  const $to = doc.resolve(range.to);
+  const $to = doc.resolve(to);
   if (
     !$from.sameParent($to) ||
     !$from.parent.canReplaceWith($from.index(), $to.indexAfter(), node.type)
   ) {
     return null;
   }
-  tr.replaceWith(range.from, range.to, node.mark(marks));
+  tr.replaceWith(range.from, to, node.mark(marks));
+  if (after && typed) {
+    const at = range.from + node.nodeSize;
+    if (after === '\n') {
+      tr.split(at);
+    } else {
+      tr.insertText(after, at);
+    }
+  }
   return undefined;
 }
 
@@ -148,25 +160,38 @@ function replaceSource(
  */
 export function inlineSourceRules({
   find,
+  paste,
   build,
+  enabled,
 }: {
-  /** Matches the source at the end of the text before the caret. */
+  /**
+   * Matches the source at the end of the text before the caret. A group
+   * named `after` is a character after the source that the rule waits for.
+   */
   find: RegExp;
+  /** Matches the source in pasted text, when `find` cannot. */
+  paste?: RegExp;
   build: InlineBuilder;
+  /** Whether the syntax means something in the document being edited. */
+  enabled: () => boolean;
 }): { input: InputRule; paste: PasteRule } {
   return {
     input: new InputRule({
       find,
       handler: ({ state, range, match }) =>
-        replaceSource(state, range, match, build, false),
+        enabled() ? replaceSource(state, range, match, build, false) : null,
     }),
     paste: new PasteRule({
-      find: new RegExp(
-        find.source.replace(/\$$/, ''),
-        `${find.flags.replace('g', '')}g`,
-      ),
+      find:
+        paste ??
+        new RegExp(
+          find.source.replace(/\$$/, ''),
+          `${find.flags.replace('g', '')}g`,
+        ),
       handler: ({ state, range, match }) => {
-        replaceSource(state, range, match, build, true);
+        if (enabled()) {
+          replaceSource(state, range, match, build, true);
+        }
       },
     }),
   };

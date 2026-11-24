@@ -7,13 +7,14 @@ import {
   type SourceSegment,
 } from './inline-reuse';
 import { keyOf, matchSequences } from './match';
-import type {
-  ChildrenOptions,
-  EscapeRule,
-  MarkToMarkdown,
-  NodeWriter,
-  NotationDefinition,
-  WriteContext,
+import {
+  type ChildrenOptions,
+  type EscapeRule,
+  type MarkToMarkdown,
+  type NodeWriter,
+  type NotationDefinition,
+  openingTag,
+  type WriteContext,
 } from './notation';
 import {
   type MarkdownParser,
@@ -331,6 +332,10 @@ export class MarkdownWriter {
     styles: ReadonlyMap<string, string>,
     options: WriteBodyOptions,
   ): WriteResult {
+    const unwritable = this.unwritableBlock(doc);
+    if (unwritable !== -1) {
+      throw new MarkdownWriteError('', unwritable);
+    }
     const { check } = options;
     this.readBlock = options.readBlock;
     this.definitions = this.definitionsOf(doc);
@@ -396,6 +401,35 @@ export class MarkdownWriter {
       last?.markdown ?? generated.markdown,
       Math.min(...(last?.differing ?? differing)),
     );
+  }
+
+  /**
+   * The first top-level block holding an inline node or a mark that no
+   * definition writes, as when a document's definitions lack the syntax the
+   * editor made it with, or -1. Leaving it out would lose it unnoticed.
+   */
+  private unwritableBlock(doc: ProseMirrorNode): number {
+    let found = -1;
+    doc.forEach((block, _, index) => {
+      if (found !== -1) {
+        return;
+      }
+      const check = (node: ProseMirrorNode) => {
+        if (
+          node.marks.some((mark) => !this.markWriters.has(mark.type.name)) ||
+          (node.isInline &&
+            !node.isText &&
+            !this.nodeWriters.has(node.type.name))
+        ) {
+          found = index;
+        }
+        return found === -1;
+      };
+      if (check(block)) {
+        block.descendants(check);
+      }
+    });
+    return found;
   }
 
   private writeDocument(
@@ -1020,7 +1054,13 @@ export class MarkdownWriter {
   ): string {
     const writer = this.markWriter(mark);
     if (form === 'html' && writer?.html) {
-      return side === 'open' ? `<${writer.html}>` : `</${writer.html}>`;
+      return side === 'open'
+        ? openingTag(
+            { tag: writer.html, capture: [] },
+            {},
+            writer.htmlAttributes?.(mark),
+          )
+        : `</${writer.html}>`;
     }
     const value = writer?.[side];
     const used =

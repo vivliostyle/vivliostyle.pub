@@ -139,6 +139,8 @@ export interface MarkToMarkdown {
    * the element as the mark too.
    */
   html?: string;
+  /** The attributes the HTML element is written with. */
+  htmlAttributes?: (mark: Mark) => Record<string, string>;
   /** The text under the mark is written as is. */
   verbatim?: boolean;
   /** Writes a whole run of text under the mark, delimiters included. */
@@ -199,6 +201,11 @@ export interface HtmlElementSpec {
   match?: Record<string, string>;
   /** Attributes the opening tag may have, kept as the type's attributes. */
   capture?: string[];
+  /**
+   * The attribute of the type that keeps the tag's other attributes, by
+   * name. Without it, a tag with other attributes is not the element.
+   */
+  rest?: string;
 }
 
 /** The attributes of an opening tag, from the text after its name. */
@@ -220,12 +227,14 @@ function escapeAttribute(value: string): string {
 export function openingTag(
   spec: Pick<HtmlElementSpec, 'tag' | 'match' | 'capture'>,
   attrs: Readonly<Record<string, unknown>>,
+  others: Readonly<Record<string, string>> = {},
 ): string {
   const parts = [
     ...Object.entries(spec.match ?? {}),
     ...(spec.capture ?? []).flatMap((name) =>
       typeof attrs[name] === 'string' ? [[name, attrs[name] as string]] : [],
     ),
+    ...Object.entries(others),
   ].map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`);
   return `<${spec.tag}${parts.join('')}>`;
 }

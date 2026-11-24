@@ -194,10 +194,18 @@ export class WrittenForm {
         .map((mark) => JSON.stringify(mark.toJSON()));
       if (!child.isText) {
         const lineBreak = child.type.spec.linebreakReplacement === true;
+        // Inline content, like a textblock's, holds what its markdown holds.
+        const content = child.inlineContent
+          ? {
+              type: child.type.name,
+              attrs: this.options.attrsOf?.(child) ?? child.attrs,
+              runs: this.runs(child, read),
+            }
+          : null;
         // Markdown has no marks for a line break, e.g. code cannot hold one.
         chars.push({
           atom: JSON.stringify(
-            lineBreak ? child.mark([]).toJSON() : child.toJSON(),
+            content ?? (lineBreak ? child.mark([]).toJSON() : child.toJSON()),
           ),
           lineBreak,
           marks: lineBreak ? [] : marks,

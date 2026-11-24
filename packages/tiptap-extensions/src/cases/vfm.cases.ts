@@ -1,5 +1,6 @@
 import type { Editor, JSONContent } from '@tiptap/core';
 
+import { MARKED_NOTATIONS, setDocumentNotations } from '../markdown';
 import { press, run } from '../testing/steps';
 import type { CaseSuite } from '../testing/vitest';
 
@@ -606,6 +607,205 @@ export const vfmSuites: CaseSuite[] = [
     ],
   },
   {
+    title: 'VFM syntax that emphasis or a link ends first',
+    cases: [
+      {
+        name: 'emphasis around the opening of math',
+        given: '*a $b* c$',
+        doc: 'doc(paragraph(italic("a $b"), " c$"))',
+      },
+      {
+        name: 'a link around the opening of math',
+        given: '[a $b](u) c$',
+        doc: 'doc(paragraph(link("a $b"), " c$"))',
+      },
+      {
+        name: 'strong emphasis around the opening of math',
+        given: '**a $b** c$',
+        doc: 'doc(paragraph(bold("a $b"), " c$"))',
+      },
+      {
+        name: 'emphasis around the opening of ruby',
+        given: '*a {b* |c}',
+        doc: 'doc(paragraph(italic("a {b"), " |c}"))',
+      },
+      {
+        name: 'a link around the opening of ruby',
+        given: '[a {b](u)|c}',
+        doc: 'doc(paragraph(link("a {b"), "|c}"))',
+      },
+      {
+        name: 'emphasis around the opening of a note',
+        given: '*a ^[b* c]',
+        doc: 'doc(paragraph(italic("a ^[b"), " c]"))',
+      },
+      {
+        name: 'closed emphasis before math',
+        given: '**a** $b*c$',
+        doc: 'doc(paragraph(bold("a"), " ", math))',
+      },
+      {
+        name: 'no math in the text of a link',
+        given: '[$x$](u) $y$',
+        doc: 'doc(paragraph(link("$x$"), " ", math))',
+      },
+      {
+        name: 'math in brackets that are no link',
+        given: '[$x$] and [x] $a]b$',
+        doc: 'doc(paragraph("[", math, "] and [x] ", math))',
+      },
+    ],
+  },
+  {
+    title: 'VFM next to other syntax',
+    cases: [
+      {
+        name: 'a reference after an exclamation mark',
+        given: 'Wow![^1]',
+        doc: 'doc(paragraph("Wow!", footnoteReference))',
+      },
+      {
+        name: 'an image whose text looks like a reference',
+        given: '![^1](a.png)',
+        doc: 'doc(image)',
+      },
+      {
+        name: 'a reference before a parenthesis that closes nothing',
+        given: 'a[^1](b',
+        doc: 'doc(paragraph("a", footnoteReference, "(b"))',
+      },
+      {
+        name: 'a label holding a bracket',
+        given: 'a[^a[b]',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('a'),
+              { type: 'footnoteReference', attrs: { label: 'a[b' } },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'an id given by a key and then by a hash',
+        given: '**s**{id=a #b}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('s', [{ type: 'bold', attrs: { attributes: { id: 'b' } } }]),
+            ],
+          },
+        ],
+      },
+      {
+        name: 'ruby right after strong emphasis',
+        given: '**重要**‸',
+        steps: [
+          insert('insert a ruby', {
+            type: 'ruby',
+            attrs: { rubyText: 'かんじ' },
+            content: [text('漢字')],
+          }),
+        ],
+        expect: '<strong>重要</strong>{漢字|かんじ}‸',
+      },
+      {
+        name: 'strong emphasis with attributes where its delimiters cannot close',
+        given: 'これは‸です',
+        steps: [
+          insert('insert strong emphasis with attributes', {
+            type: 'text',
+            text: '「強調」',
+            marks: [{ type: 'bold', attrs: { attributes: { class: 'x' } } }],
+          }),
+        ],
+        expect: 'これは<strong class="x">「強調」</strong>‸です',
+      },
+      {
+        name: 'no ruby typed right after a link',
+        given: '[リンク](u)‸',
+        steps: [
+          run('type outside the link', (editor) => {
+            editor.view.dispatch(editor.state.tr.setStoredMarks([]));
+          }),
+          '{漢字|かんじ}',
+        ],
+        expect: '[リンク](u)\\{漢字|かんじ}‸',
+        doc: 'doc(paragraph(link("リンク"), "{漢字|かんじ}"))',
+      },
+      {
+        name: 'no ruby of a selection over a line break',
+        given: 'a‸b  \nc‸d',
+        steps: [
+          run('make a ruby', (editor) => {
+            if (editor.commands.setRuby('x')) {
+              throw new Error('The ruby was made');
+            }
+          }),
+        ],
+        expect: 'a‸b  \nc‸d',
+      },
+      {
+        name: 'no ruby text that cannot be written',
+        given: 'a ‸b‸ c',
+        steps: [
+          run('make rubies', (editor) => {
+            const made = ['', 'x}y', 'x\ny'].filter((text) =>
+              editor.can().setRuby(text),
+            );
+            if (made.length > 0) {
+              throw new Error(`Rubies were made with ${made}`);
+            }
+          }),
+        ],
+        expect: 'a ‸b‸ c',
+      },
+      {
+        name: 'no labels that cannot be written',
+        given: 'a‸',
+        steps: [
+          run('insert references', (editor) => {
+            const made = ['', 'a b', 'a]'].filter((label) =>
+              editor.can().setFootnoteReference(label),
+            );
+            if (made.length > 0) {
+              throw new Error(`References were made with ${made}`);
+            }
+          }),
+        ],
+        expect: 'a‸',
+      },
+      {
+        name: 'a note made in a link leaves the link out',
+        given: '[a ‸b‸ c](u)',
+        steps: [
+          run('make a note', (editor) => {
+            editor.commands.setInlineFootnote();
+          }),
+        ],
+        expect: '[a ](u)^[[b](u)][ c](u)',
+      },
+      {
+        name: 'code over math leaves the math out',
+        given: '‸a $x$ b‸',
+        steps: [
+          run('make code', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr.addMark(
+                editor.state.selection.from,
+                editor.state.selection.to,
+                editor.schema.marks.code.create(),
+              ),
+            );
+          }),
+        ],
+        expect: '‸`a `$x$` b`‸',
+      },
+    ],
+  },
+  {
     title: 'VFM blocks',
     cases: [
       { name: 'code with a caption', given: '```js:app.js\nconst a = 1;\n```' },
@@ -627,6 +827,44 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'line that closes a section',
         given: '# A\n\ntext\n\n#\n\nafter',
+      },
+    ],
+  },
+  {
+    title: 'VFM in a document whose definitions lack it',
+    cases: [
+      {
+        name: 'typed syntax stays text',
+        given: 'a‸',
+        steps: [
+          run('record the document as made with marked', (editor) => {
+            setDocumentNotations(editor, MARKED_NOTATIONS);
+          }),
+          '{漢字|かんじ}と$x$ と^[注]',
+        ],
+        expect: 'a{漢字|かんじ}と$x$ と^[注]‸',
+        doc: 'doc(paragraph("a{漢字|かんじ}と$x$ と^[注]"))',
+      },
+      {
+        name: 'commands do nothing',
+        given: 'a ‸漢字‸ b',
+        steps: [
+          run('record the document as made with marked', (editor) => {
+            setDocumentNotations(editor, MARKED_NOTATIONS);
+          }),
+          run('try every command', (editor) => {
+            const done = [
+              editor.commands.setRuby('かんじ'),
+              editor.commands.setMath({ latex: 'x', display: false }),
+              editor.commands.setFootnoteReference('1'),
+              editor.commands.setInlineFootnote(),
+            ];
+            if (done.some(Boolean)) {
+              throw new Error(`A command ran: ${done}`);
+            }
+          }),
+        ],
+        expect: 'a ‸漢字‸ b',
       },
     ],
   },
@@ -662,16 +900,38 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("式 ", math, " です"))',
       },
       {
-        name: 'display math',
+        name: 'display math, made when the paragraph ends',
         given: '‸',
-        steps: ['$$x$$'],
-        expect: '$$x$$‸',
+        steps: ['$$x$$', press('Enter'), 'y'],
+        expect: '$$x$$\n\ny‸',
         json: [
           {
             type: 'paragraph',
             content: [{ type: 'math', attrs: { latex: 'x', display: true } }],
           },
+          { type: 'paragraph' },
         ],
+      },
+      {
+        name: 'math waits for the character after it, so typed last it stays text',
+        given: '‸',
+        steps: ['$x$'],
+        expect: '\\$x\\$‸',
+        doc: 'doc(paragraph("$x$"))',
+      },
+      {
+        name: 'a digit after the closing dollar keeps a price text',
+        given: '‸',
+        steps: ['costs $5-$10 and 価格は$10と$20です'],
+        expect: 'costs $5-$10 and 価格は$10と$20です‸',
+        doc: 'doc(paragraph("costs $5-$10 and 価格は$10と$20です"))',
+      },
+      {
+        name: 'pasted prices stay text',
+        given: '‸',
+        steps: [paste('costs $5-$10 and $x$.')],
+        expect: 'costs \\$5-\\$10 and $x$.‸',
+        doc: 'doc(paragraph("costs $5-$10 and ", math, "."))',
       },
       {
         name: 'a price is not math',
@@ -693,6 +953,15 @@ export const vfmSuites: CaseSuite[] = [
         steps: ['[^1]'],
         expect: '本文[^1]‸',
         doc: 'doc(paragraph("本文", footnoteReference))',
+      },
+      {
+        // A definition has no node yet: typed into a paragraph it stays text,
+        // instead of the reference node that would hide its label.
+        name: 'a reference typed at the start of a paragraph stays text',
+        given: '本文[^1]‸',
+        steps: [press('Enter'), '[^1]: 注の本文'],
+        expect: '本文[^1]\n\n\\[^1]: 注の本文‸',
+        doc: 'doc(paragraph("本文", footnoteReference), paragraph("[^1]: 注の本文"))',
       },
       {
         name: 'nothing while composing',

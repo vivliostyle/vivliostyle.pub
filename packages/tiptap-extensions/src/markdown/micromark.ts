@@ -18,7 +18,7 @@ export type TokenizeContext = ThisParameterType<Tokenizer>;
 export type Effects = Parameters<Tokenizer>[0];
 export type State = Parameters<Tokenizer>[1];
 export type Code = Parameters<State>[0];
-type Resolver = NonNullable<Construct['resolveAll']>;
+export type Resolver = NonNullable<Construct['resolveAll']>;
 type Event = Parameters<Resolver>[0][number];
 export type Token = Event[1];
 export type TokenType = Token['type'];
@@ -78,11 +78,13 @@ export const codes = {
   horizontalTab: -2,
   virtualSpace: -1,
   space: 32,
+  exclamationMark: 33,
   quotationMark: 34,
   numberSign: 35,
   dollarSign: 36,
   apostrophe: 39,
   leftParenthesis: 40,
+  rightParenthesis: 41,
   dot: 46,
   equalsTo: 61,
   leftSquareBracket: 91,
@@ -126,4 +128,70 @@ export function charOf(code: Code): string {
     return '\n';
   }
   return String.fromCharCode(code);
+}
+
+/**
+ * What would end emphasis or a link opened before the current position: the
+ * markers of open emphasis and strikethrough, and whether a link's label is
+ * open. VFM 2 reads those first, so a construct that would run past one of
+ * them does not start there.
+ */
+export function openBefore(context: TokenizeContext): {
+  markers: ReadonlySet<number>;
+  label: boolean;
+} {
+  const open = new Map<number, number>();
+  const links = new Set<number>();
+  for (const [kind, token] of context.events) {
+    if (kind === 'enter' && (token.type === 'link' || token.type === 'image')) {
+      links.add(token.start.offset);
+    }
+  }
+  let label = false;
+  for (const [kind, token] of context.events) {
+    if (kind !== 'exit') {
+      continue;
+    }
+    const type = token.type as string;
+    if (
+      type === 'attentionSequence' ||
+      type === 'strikethroughSequenceTemporary'
+    ) {
+      const marker = context.sliceSerialize(token).charCodeAt(0);
+      const count = open.get(marker) ?? 0;
+      if (token._close && count > 0) {
+        open.set(marker, count - 1);
+      } else if (token._open) {
+        open.set(marker, count + 1);
+      }
+    } else if (
+      (type === 'labelLink' || type === 'labelImage') &&
+      !token._balanced &&
+      !token._inactive &&
+      !links.has(token.start.offset)
+    ) {
+      label = true;
+    }
+  }
+  return {
+    markers: new Set(
+      [...open].filter(([, count]) => count > 0).map(([marker]) => marker),
+    ),
+    label,
+  };
+}
+
+/** Whether `code`, after `previous`, would end what `openBefore` found. */
+export function endsOpen(
+  open: ReturnType<typeof openBefore>,
+  code: Code,
+  previous: Code,
+): boolean {
+  if (code === null) {
+    return false;
+  }
+  return (
+    (open.label && code === codes.rightSquareBracket) ||
+    (open.markers.has(code) && previous !== null && !isJsWhitespace(previous))
+  );
 }

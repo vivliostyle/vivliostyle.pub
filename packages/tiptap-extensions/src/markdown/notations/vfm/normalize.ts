@@ -1,0 +1,117 @@
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Plugin, type Transaction } from '@tiptap/pm/state';
+
+import { unwrap } from './commands';
+
+/**
+ * Where the transactions changed the document they end with. Steps that
+ * change marks move nothing, so they are found by the range they cover.
+ */
+function changedRanges(
+  transactions: readonly Transaction[],
+): { from: number; to: number }[] {
+  const ranges: { from: number; to: number }[] = [];
+  transactions.forEach((tr, t) => {
+    tr.steps.forEach((step, index) => {
+      const covered: { from: number; to: number }[] = [];
+      step.getMap().forEach((_, __, from, to) => {
+        covered.push({ from, to });
+      });
+      const { from, to, pos } = step as unknown as {
+        from?: number;
+        to?: number;
+        pos?: number;
+      };
+      if (typeof from === 'number' && typeof to === 'number') {
+        covered.push({ from, to });
+      } else if (typeof pos === 'number') {
+        covered.push({ from: pos, to: pos + 1 });
+      }
+      const rest = tr.mapping.slice(index + 1);
+      for (const range of covered) {
+        let start = rest.map(range.from, -1);
+        let end = rest.map(range.to, 1);
+        for (const later of transactions.slice(t + 1)) {
+          start = later.mapping.map(start, -1);
+          end = later.mapping.map(end, 1);
+        }
+        ranges.push({ from: start, to: end });
+      }
+    });
+  });
+  return ranges;
+}
+
+function hasLineBreak(node: ProseMirrorNode): boolean {
+  let found = false;
+  node.descendants((child) => {
+    found ||=
+      Boolean(child.type.spec.linebreakReplacement) ||
+      Boolean(child.isText && child.text?.includes('\n'));
+    return !found;
+  });
+  return found;
+}
+
+/**
+ * Keeps nodes of a type in a state their markdown can hold, where the
+ * transactions changed the document: the marks markdown cannot put on them
+ * are taken off, and a node without content is removed when it has to have
+ * some.
+ */
+export function inlineNodeRules(
+  name: string,
+  {
+    marks = [],
+    needsContent = false,
+    oneLine = false,
+  }: {
+    marks?: readonly string[];
+    needsContent?: boolean;
+    /** A node whose content takes a line break is left as its content. */
+    oneLine?: boolean;
+  },
+): Plugin {
+  return new Plugin({
+    appendTransaction: (transactions, _, state) => {
+      if (!transactions.some((tr) => tr.docChanged)) {
+        return null;
+      }
+      const ranges = changedRanges(transactions);
+      const found: { pos: number; node: ProseMirrorNode }[] = [];
+      const size = state.doc.content.size;
+      for (const { from, to } of ranges) {
+        // A deletion is a point: the nodes around it are what it changed.
+        state.doc.nodesBetween(
+          Math.max(0, Math.min(from - 1, size)),
+          Math.max(0, Math.min(to + 1, size)),
+          (node, pos) => {
+            if (
+              node.type.name === name &&
+              !found.some((it) => it.pos === pos)
+            ) {
+              found.push({ pos, node });
+            }
+          },
+        );
+      }
+      const { tr } = state;
+      for (const { pos, node } of found.sort((a, b) => b.pos - a.pos)) {
+        if (needsContent && node.childCount === 0) {
+          tr.delete(pos, pos + node.nodeSize);
+          continue;
+        }
+        if (oneLine && hasLineBreak(node)) {
+          unwrap(tr, { pos, node });
+          continue;
+        }
+        for (const mark of node.marks) {
+          if (marks.includes(mark.type.name)) {
+            tr.removeNodeMark(pos, mark);
+          }
+        }
+      }
+      return tr.docChanged ? tr : null;
+    },
+  });
+}
