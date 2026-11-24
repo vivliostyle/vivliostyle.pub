@@ -13,10 +13,17 @@ import {
 } from '../markdown';
 import { createLegacyBaselineReader } from '../markdown/legacy';
 import { splitSource } from '../markdown/source';
+import { judgeReadBack, rawMeaningOf } from './read-back-judge';
 
 /** A way the markdown conversion breaks one of its guarantees. */
 export interface PropertyViolation {
-  property: 'identity' | 'locality' | 'round trip' | 'regeneration' | 'error';
+  property:
+    | 'identity'
+    | 'locality'
+    | 'round trip'
+    | 'judge'
+    | 'regeneration'
+    | 'error';
   detail: string;
   actual: string;
   expected: string;
@@ -32,6 +39,85 @@ export function readsBackAs(
 ): boolean {
   const { writer } = markdownPipeline(editor);
   return writer.difference(parseMarkdown(editor, markdown).doc, doc) === -1;
+}
+
+function holdsRaw(node: ProseMirrorNode): boolean {
+  let raw = node.type.name === 'rawBlock';
+  node.descendants((child) => {
+    raw ||=
+      child.type.name === 'rawBlock' ||
+      child.marks.some((mark) => mark.type.name === 'rawInline');
+    return !raw;
+  });
+  return raw;
+}
+
+/**
+ * Where `markdown` does not read back as `doc`, judged without the writer's
+ * comparison, see `judgeReadBack`. A block whose raw markdown was edited
+ * into other syntax means what the writer's markdown of it reads as, which
+ * the judge cannot tell, so there the writer's comparison decides.
+ */
+export function unexplainedDifferences(
+  editor: Editor,
+  markdown: string,
+  doc: ProseMirrorNode,
+): string[] {
+  const read = (text: string) => parseMarkdown(editor, text).doc;
+  const { unexplained } = judgeReadBack(
+    doc,
+    read(markdown),
+    rawMeaningOf(read),
+  );
+  if (unexplained.length === 0 || !readsBackAs(editor, markdown, doc)) {
+    return unexplained;
+  }
+  const blocks: ProseMirrorNode[] = [];
+  doc.forEach((child) => {
+    if (!(child.type.name === 'paragraph' && child.childCount === 0)) {
+      blocks.push(child);
+    }
+  });
+  const indexOf = (entry: string) => Number(entry.match(/^\d+/)?.[0] ?? -1);
+  const deferred = unexplained
+    .map(indexOf)
+    .find((index) => blocks[index] && holdsRaw(blocks[index]));
+  // The blocks after one read as other blocks can no longer be paired.
+  return deferred === undefined
+    ? unexplained
+    : unexplained.filter((entry) => indexOf(entry) < deferred);
+}
+
+/**
+ * Whether `output` is `baseline` with text inserted between `start` and
+ * `end` and nothing removed: what was not edited stays byte for byte.
+ */
+function insertsOnly(
+  baseline: string,
+  output: string,
+  start: number,
+  end: number,
+): boolean {
+  let prefix = 0;
+  while (
+    prefix < baseline.length &&
+    prefix < output.length &&
+    baseline[prefix] === output[prefix]
+  ) {
+    prefix++;
+  }
+  let suffix = 0;
+  while (
+    suffix < baseline.length - prefix &&
+    suffix < output.length - prefix &&
+    baseline[baseline.length - 1 - suffix] ===
+      output[output.length - 1 - suffix]
+  ) {
+    suffix++;
+  }
+  return (
+    prefix + suffix === baseline.length && prefix >= start && prefix <= end
+  );
 }
 
 interface Block {
@@ -74,7 +160,11 @@ function textblocksIn(block: Block): { pos: number; node: ProseMirrorNode }[] {
   return found;
 }
 
-type Edit = [string, (tr: Transaction) => void, 'edit' | 'delete' | 'insert'];
+type Edit = [
+  string,
+  (tr: Transaction) => void,
+  'append' | 'edit' | 'delete' | 'insert',
+];
 
 function editsOf(editor: Editor, block: Block): Edit[] {
   const { schema } = editor.state;
@@ -90,6 +180,12 @@ function editsOf(editor: Editor, block: Block): Edit[] {
       (tr) => tr.insertText('X', end(first)),
       'edit',
     ]);
+    // Text without the marks before it only adds to the source.
+    edits.push([
+      'appending plain text to',
+      (tr) => tr.insert(end(first), schema.text('X')),
+      'append',
+    ]);
     edits.push([
       'deleting the first character of',
       (tr) => tr.delete(first.pos + 1, first.pos + 2),
@@ -104,8 +200,8 @@ function editsOf(editor: Editor, block: Block): Edit[] {
   if (last && last !== first && last.node.content.size > 0) {
     edits.push([
       'appending to the last textblock of',
-      (tr) => tr.insertText('X', end(last)),
-      'edit',
+      (tr) => tr.insert(end(last), schema.text('X')),
+      'append',
     ]);
   }
   const { heading, paragraph } = schema.nodes;
@@ -240,6 +336,26 @@ export function checkMarkdownProperties(
             detail,
             actual: String(parseMarkdown(editor, output).doc),
             expected: String(doc),
+          });
+        }
+        const unexplained = unexplainedDifferences(editor, output, doc);
+        if (unexplained.length > 0) {
+          violations.push({
+            property: 'judge',
+            detail,
+            actual: unexplained.join('\n'),
+            expected: String(doc),
+          });
+        }
+        if (
+          kind === 'append' &&
+          !insertsOnly(markdown, output, block.start, block.end)
+        ) {
+          violations.push({
+            property: 'locality',
+            detail: `${detail}, character by character`,
+            actual: output,
+            expected: markdown,
           });
         }
         // Lists of one type that deleting the block between them would bring
@@ -428,6 +544,16 @@ const FRAGMENTS = [
   'x ~~del~~ y and a|b',
   '$x^2$ and $$\ny\n$$',
   'はじめに',
+  '# 第一章 https://a.jp',
+  '連絡は user@example.com まで、詳細は www.example.com を参照',
+  'これは「重要」です。金額（税込）は**千円**。',
+  'これは<strong>「重要」</strong>で<em>（注）</em>です',
+  '式 $x^2$ を示す。{漢字|かんじ}と $a_1$',
+  '価格*1、送料*2 と __init__',
+  'a\\\\b と $a \\\\ b$',
+  '<https://example.com> &copy; a&nbsp;b',
+  '本文\n![図](a.png)',
+  '以下の通り：\n- 項目A',
 ];
 const INSERTS = [
   'X',
@@ -448,7 +574,20 @@ const INSERTS = [
   '{',
   '$',
   '\n',
+  '「',
+  '」',
+  '。',
+  '（',
+  '**',
+  '__',
+  '~~',
+  '&amp;',
+  'https://x.jp',
+  ' user@a.jp ',
+  'www.a.jp',
+  '価格*1',
 ];
+const MARKS = ['bold', 'italic', 'strike', 'code', 'link'];
 
 /** A seeded pseudo-random number generator, so a failure can be replayed. */
 function random(seed: number): (n: number) => number {
@@ -459,10 +598,104 @@ function random(seed: number): (n: number) => number {
   };
 }
 
+/** Changes the document at random, in one of the ways a user would. */
+function randomEdit(
+  state: Editor['state'],
+  rnd: (n: number) => number,
+): { tr: Transaction; inserted: boolean } {
+  const pick = <T>(items: readonly T[]): T => items[rnd(items.length)];
+  const { schema } = state;
+  const textblocks: { pos: number; node: ProseMirrorNode }[] = [];
+  state.doc.descendants((node, pos) => {
+    if (node.isTextblock && !node.type.spec.code) {
+      textblocks.push({ pos, node });
+    }
+  });
+  const tr = state.tr;
+  const kind = rnd(9);
+  const range = () => {
+    const { pos, node } = pick(textblocks);
+    const from = pos + 1 + rnd(node.content.size + 1);
+    const to = Math.min(pos + 1 + node.content.size, from + 1 + rnd(6));
+    return { from, to };
+  };
+  if (kind <= 1 && textblocks.length > 0) {
+    const { pos, node } = pick(textblocks);
+    tr.insertText(pick(INSERTS), pos + 1 + rnd(node.content.size + 1));
+    return { tr, inserted: true };
+  }
+  if (kind === 2 && state.doc.childCount > 1) {
+    const index = rnd(state.doc.childCount);
+    let offset = 0;
+    for (let i = 0; i < index; i++) {
+      offset += state.doc.child(i).nodeSize;
+    }
+    tr.delete(offset, offset + state.doc.child(index).nodeSize);
+  } else if (kind === 3 && textblocks.length > 0) {
+    const { pos, node } = pick(textblocks);
+    if (node.content.size > 0) {
+      tr.delete(pos + 1, pos + 2 + rnd(node.content.size));
+    }
+  } else if (kind === 4) {
+    const items: { pos: number; node: ProseMirrorNode }[] = [];
+    state.doc.descendants((node, pos) => {
+      if (node.type.name === 'listItem') {
+        items.push({ pos, node });
+      }
+    });
+    if (items.length > 0) {
+      const { pos, node } = pick(items);
+      tr.delete(pos, pos + node.nodeSize);
+    }
+  } else if (kind === 5 && textblocks.length > 0) {
+    // Raw markdown under a mark means whatever the writer's markdown of it
+    // reads as, which no judge independent of the writer can tell.
+    const { from, to } = range();
+    const name = pick(MARKS);
+    const type = schema.marks[name];
+    const raw = schema.marks.rawInline;
+    if (type && from < to && !(raw && state.doc.rangeHasMark(from, to, raw))) {
+      tr.addMark(
+        from,
+        to,
+        type.create(name === 'link' ? { href: 'https://x.jp' } : null),
+      );
+    }
+  } else if (kind === 6 && textblocks.length > 0) {
+    const { from, to } = range();
+    for (const name of MARKS) {
+      const type = schema.marks[name];
+      if (type) {
+        tr.removeMark(from, to, type);
+      }
+    }
+  } else if (kind === 7 && textblocks.length > 0) {
+    const { pos, node } = pick(textblocks);
+    tr.split(pos + 1 + rnd(node.content.size + 1));
+  } else if (kind === 8 && textblocks.length > 1) {
+    const index = rnd(textblocks.length - 1);
+    const first = textblocks[index];
+    tr.delete(
+      first.pos + first.node.nodeSize - 1,
+      textblocks[index + 1].pos + 1,
+    );
+  }
+  return { tr, inserted: false };
+}
+
+export interface FuzzStatistics {
+  /** How each save was written. */
+  strategies: Map<string, number>;
+  /** Saves after inserting text that removed something else. */
+  collateral: number;
+  saves: number;
+}
+
 /**
  * Builds documents from common pieces of syntax and edits them at random,
  * saving after every edit against the previous save, and checks that each
- * save reads back as the document and never gives up on the baseline.
+ * save reads back as the document, by the writer's comparison and by the
+ * independent judge, and never gives up on the baseline.
  */
 export function fuzzMarkdownEdits(
   createEditor: () => Editor,
@@ -470,13 +703,12 @@ export function fuzzMarkdownEdits(
     seed,
     documents,
     edits,
-    strategies,
+    statistics,
   }: {
     seed: number;
     documents: number;
     edits: number;
-    /** Counts how each save was written. */
-    strategies?: Map<string, number>;
+    statistics?: FuzzStatistics;
   },
 ): PropertyViolation[] {
   const rnd = random(seed);
@@ -493,57 +725,20 @@ export function fuzzMarkdownEdits(
     try {
       editor.commands.setMarkdown(markdown, { emitUpdate: false });
       for (let k = 0; k < edits; k++) {
-        const { state } = editor;
-        const textblocks: { pos: number; node: ProseMirrorNode }[] = [];
-        state.doc.descendants((node, pos) => {
-          if (node.isTextblock && !node.type.spec.code) {
-            textblocks.push({ pos, node });
-          }
-        });
-        const tr = state.tr;
-        const kind = rnd(5);
+        let edit: ReturnType<typeof randomEdit>;
         try {
-          if (kind <= 1 && textblocks.length > 0) {
-            const { pos, node } = pick(textblocks);
-            tr.insertText(pick(INSERTS), pos + 1 + rnd(node.content.size + 1));
-          } else if (kind === 2 && state.doc.childCount > 1) {
-            const index = rnd(state.doc.childCount);
-            let offset = 0;
-            for (let i = 0; i < index; i++) {
-              offset += state.doc.child(i).nodeSize;
-            }
-            tr.delete(offset, offset + state.doc.child(index).nodeSize);
-          } else if (kind === 3 && textblocks.length > 0) {
-            const { pos, node } = pick(textblocks);
-            if (node.content.size > 0) {
-              tr.delete(pos + 1, pos + 2 + rnd(node.content.size));
-            }
-          } else {
-            const items: { pos: number; node: ProseMirrorNode }[] = [];
-            state.doc.descendants((node, pos) => {
-              if (node.type.name === 'listItem') {
-                items.push({ pos, node });
-              }
-            });
-            if (items.length > 0) {
-              const { pos, node } = pick(items);
-              tr.delete(pos, pos + node.nodeSize);
-            }
-          }
+          edit = randomEdit(editor.state, rnd);
+          edit.tr.doc.check();
         } catch {
           continue;
         }
-        if (!tr.docChanged) {
+        if (!edit.tr.docChanged) {
           continue;
         }
-        try {
-          tr.doc.check();
-        } catch {
-          continue;
-        }
-        editor.view.dispatch(tr);
+        const baseline = editor.storage.pubMarkdown.baseline;
+        editor.view.dispatch(edit.tr);
         const doc = editor.state.doc;
-        const detail = `${JSON.stringify(markdown)}, edit ${k}`;
+        const detail = `seed ${seed}: ${JSON.stringify(markdown)}, edit ${k}`;
         const result = write(editor, doc);
         if ('error' in result) {
           violations.push({
@@ -554,16 +749,25 @@ export function fuzzMarkdownEdits(
           });
           break;
         }
-        strategies?.set(
-          result.strategy,
-          (strategies.get(result.strategy) ?? 0) + 1,
-        );
+        if (statistics) {
+          statistics.saves++;
+          statistics.strategies.set(
+            result.strategy,
+            (statistics.strategies.get(result.strategy) ?? 0) + 1,
+          );
+          if (
+            edit.inserted &&
+            !insertsOnly(baseline, result.markdown, 0, baseline.length)
+          ) {
+            statistics.collateral++;
+          }
+        }
         if (result.strategy === 'generated') {
           violations.push({
             property: 'regeneration',
             detail,
             actual: result.markdown,
-            expected: editor.storage.pubMarkdown.baseline,
+            expected: baseline,
           });
         }
         if (!readsBackAs(editor, result.markdown, doc)) {
@@ -571,6 +775,19 @@ export function fuzzMarkdownEdits(
             property: 'round trip',
             detail,
             actual: String(parseMarkdown(editor, result.markdown).doc),
+            expected: String(doc),
+          });
+        }
+        const unexplained = unexplainedDifferences(
+          editor,
+          result.markdown,
+          doc,
+        );
+        if (unexplained.length > 0) {
+          violations.push({
+            property: 'judge',
+            detail,
+            actual: `${unexplained.join('\n')}\n${result.markdown}`,
             expected: String(doc),
           });
         }
