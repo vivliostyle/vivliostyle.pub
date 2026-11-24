@@ -37,11 +37,13 @@ export function AttributesPanel({ editor, close }: EditorMenuPanelProps) {
       return;
     }
     const attributes = text ? parseAttributes(`{${text}}`) : null;
-    if (text && !attributes) {
+    if (
+      (text && !attributes) ||
+      !setMarkAttributes(editor, target, attributes)
+    ) {
       setInvalid(true);
       return;
     }
-    setMarkAttributes(editor, target, attributes);
     close();
   };
 

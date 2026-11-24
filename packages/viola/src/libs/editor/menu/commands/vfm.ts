@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/core';
 
-import { findSelectedInline } from '@v/tiptap-extensions';
+import { findSelectedInline, hasDocumentNotation } from '@v/tiptap-extensions';
 import {
   LanguagesIcon,
   SigmaIcon,
@@ -36,6 +36,7 @@ registerEditorMenuCommand({
     'ruby',
   ],
   icon: LanguagesIcon,
+  isEnabled: (editor) => editor.can().insertRuby({ base: '-', rubyText: '-' }),
   panel: RubyPanel,
 });
 
@@ -49,6 +50,7 @@ registerEditorMenuCommand({
     '$',
   ],
   icon: SigmaIcon,
+  isEnabled: (editor) => editor.can().setMath({ latex: 'x', display: false }),
   panel: MathPanel,
 });
 
@@ -62,6 +64,7 @@ registerEditorMenuCommand({
     'note',
   ],
   icon: StickyNoteIcon,
+  isEnabled: (editor) => editor.can().setInlineFootnote('-'),
   panel: FootnotePanel,
 });
 
@@ -75,6 +78,7 @@ registerEditorMenuCommand({
     'reference',
   ],
   icon: SuperscriptIcon,
+  isEnabled: (editor) => editor.can().setFootnoteReference('1'),
   panel: FootnoteReferencePanel,
 });
 
@@ -118,6 +122,7 @@ registerEditorMenuCommand({
   icon: TagIcon,
   isActive: (editor) =>
     Boolean(attributedMarkOf(editor.state)?.mark.attrs.attributes),
+  isEnabled: (editor) => hasDocumentNotation(editor, 'inlineAttributes'),
   isVisible: (editor) =>
     isTextSelection(editor) && attributedMarkOf(editor.state) !== null,
   panel: AttributesPanel,

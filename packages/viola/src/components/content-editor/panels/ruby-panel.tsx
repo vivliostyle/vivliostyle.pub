@@ -17,7 +17,7 @@ export function RubyPanel({ editor, close }: EditorMenuPanelProps) {
   const [initialText] = useState(() =>
     ruby ? String(ruby.attrs.rubyText ?? '') : '',
   );
-  const [invalid, setInvalid] = useState(false);
+  const [invalid, setInvalid] = useState<'text' | 'place' | null>(null);
 
   const apply = () => {
     const text = textRef.current?.value ?? '';
@@ -27,20 +27,16 @@ export function RubyPanel({ editor, close }: EditorMenuPanelProps) {
       return;
     }
     if (!isWritableRubyText(text)) {
-      setInvalid(true);
+      setInvalid('text');
       return;
     }
-    const chain = editor.chain().focus();
-    if (isInsert) {
-      chain.insertContent({
-        type: 'ruby',
-        attrs: { rubyText: text },
-        content: [{ type: 'text', text: base }],
-      });
-    } else {
-      chain.setRuby(text);
+    const applied = isInsert
+      ? editor.chain().focus().insertRuby({ base, rubyText: text }).run()
+      : editor.chain().focus().setRuby(text).run();
+    if (!applied) {
+      setInvalid('place');
+      return;
     }
-    chain.run();
     close();
   };
 
@@ -63,7 +59,11 @@ export function RubyPanel({ editor, close }: EditorMenuPanelProps) {
           </PanelButton>
         )
       }
-      error={invalid && m.ruby_panel_invalid_text()}
+      error={
+        invalid === 'text'
+          ? m.ruby_panel_invalid_text()
+          : invalid === 'place' && m.ruby_panel_unwritable()
+      }
     >
       <div className="flex flex-col gap-1">
         {isInsert && (
@@ -79,9 +79,9 @@ export function RubyPanel({ editor, close }: EditorMenuPanelProps) {
           defaultValue={initialText}
           placeholder={m.ruby_panel_text_placeholder()}
           aria-label={m.ruby_panel_text_aria()}
-          aria-invalid={invalid}
+          aria-invalid={invalid === 'text'}
           className="h-7 w-56"
-          onChange={() => setInvalid(false)}
+          onChange={() => setInvalid(null)}
         />
       </div>
     </PanelForm>

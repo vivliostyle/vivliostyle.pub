@@ -252,8 +252,8 @@ const comparisons: Record<string, Comparison[]> = {
       differs: {
         vfm: '<p><a href="u">$x$</a></p>',
         editor:
-          '<p><a href="u" rel="noopener noreferrer nofollow" target="_blank"><span class="inline math" data-math-typeset="true">\\(x\\)</span></a></p>',
-        reason: `VFM 2 reads no math in link text. ${LINK_TARGET}`,
+          '<p><a href="u" rel="noopener noreferrer nofollow" target="_blank">$x$</a></p>',
+        reason: LINK_TARGET,
       },
     },
     {
@@ -263,7 +263,7 @@ const comparisons: Record<string, Comparison[]> = {
         editor:
           '<p><span class="inline math" data-math-typeset="true">\\(x\\)</span></p>',
         reason:
-          'The editor reads math whatever the frontmatter says; it writes the same source back.',
+          'The editor chooses the definitions a document is read with from the record kept with it, not from its frontmatter, so it reads math even where VFM does not. It writes the source back as it was.',
       },
     },
   ],
@@ -331,6 +331,42 @@ const comparisons: Record<string, Comparison[]> = {
         editor:
           '<p>a<span class="footnote" role="doc-footnote">注 <em>md</em></span> b</p>',
         reason: 'VFM numbers notes in the order of the book.',
+      },
+    },
+  ],
+  'VFM next to other syntax': [
+    { markdown: '*a $b* c$ と **a $b** c$' },
+    { markdown: '*a {b* |c} と *a ^[b* c]' },
+    { markdown: '**a** $b*c$ と [x] $a]b$' },
+    { markdown: 'Wow![^1]' },
+    { markdown: 'a[^1](b' },
+    {
+      markdown: '<strong>重要</strong>{漢字|かんじ}',
+      differs: {
+        vfm: '<p><strong>重要</strong><ruby>漢字<rt>かんじ</rt></ruby></p>',
+        editor:
+          '<p><strong>重要</strong><ruby><span>漢字</span><rt>かんじ</rt></ruby></p>',
+        reason: RUBY_BASE,
+      },
+    },
+    { markdown: '**s**{id=a #b}' },
+    {
+      markdown: 'a[^a[b]',
+      differs: {
+        vfm: '<p>a<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>',
+        editor:
+          '<p>a<a class="footnote-ref" href="#fna[b" id="fnrefa[b" role="doc-noteref"><sup>a[b</sup></a></p>',
+        reason:
+          'VFM numbers references in the order of the book; the editor shows their labels.',
+      },
+    },
+    {
+      markdown: '[a $b](u) c$ と [a {b](u)|c}',
+      differs: {
+        vfm: '<p><a href="u">a $b</a> c$ と <a href="u">a {b</a>|c}</p>',
+        editor:
+          '<p><a href="u" rel="noopener noreferrer nofollow" target="_blank">a $b</a> c$ と <a href="u" rel="noopener noreferrer nofollow" target="_blank">a {b</a>|c}</p>',
+        reason: LINK_TARGET,
       },
     },
   ],

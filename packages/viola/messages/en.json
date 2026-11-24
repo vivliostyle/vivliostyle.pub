@@ -122,6 +122,7 @@
   "ruby_panel_remove_aria": "Remove ruby",
   "ruby_panel_text_aria": "Ruby text",
   "ruby_panel_text_placeholder": "Reading",
+  "ruby_panel_unwritable": "A ruby cannot go here: right after a link or inline code, or over a line break.",
   "selection_toolbar_aria": "Text formatting",
   "selection_toolbar_block_type_aria": "Block type",
   "selection_toolbar_block_type_mixed": "Mixed",

@@ -113,6 +113,20 @@ describe('attributes of the selected element', () => {
     expect(getMarkdown(editor)).toBe('`c` d');
   });
 
+  it('are refused where markdown or the DOM cannot hold them', () => {
+    const editor = load('a **bold** c');
+    selectText(editor, 'old');
+    const target = attributedMarkOf(editor.state);
+    expect(target).not.toBeNull();
+    if (target) {
+      expect(
+        setMarkAttributes(editor, target, { 'http://example.com': '' }),
+      ).toBe(false);
+      expect(setMarkAttributes(editor, target, { k: 'a b\\' })).toBe(false);
+    }
+    expect(getMarkdown(editor)).toBe('a **bold** c');
+  });
+
   it('are not there without an element', () => {
     const editor = load('plain text');
     selectText(editor, 'text');

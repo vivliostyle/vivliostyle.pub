@@ -33,7 +33,10 @@ export function MathPanel({ editor, close }: EditorMenuPanelProps) {
       setInvalid(true);
       return;
     }
-    editor.chain().focus().setMath({ latex, display }).run();
+    if (!editor.chain().focus().setMath({ latex, display }).run()) {
+      setInvalid(true);
+      return;
+    }
     close();
   };
 

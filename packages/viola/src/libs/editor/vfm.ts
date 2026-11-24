@@ -4,9 +4,12 @@ import { type EditorState, NodeSelection } from '@tiptap/pm/state';
 
 import {
   findSelectedInline,
+  hasDocumentNotation,
   type InlineAttributes,
+  isAttributeName,
   isWritableMath,
   parseMarkdown,
+  writableAttributes,
 } from '@v/tiptap-extensions';
 
 /** The node of one of the types that a node selection selects. */
@@ -113,17 +116,28 @@ export function attributedMarkOf(state: EditorState): AttributedMark | null {
   return best;
 }
 
-/** Gives the mark the attributes, or takes them away with `null`. */
+/**
+ * Gives the mark the attributes, or takes them away with `null`. False when
+ * markdown cannot hold them there, or the document's definitions do not
+ * read attributes.
+ */
 export function setMarkAttributes(
   editor: Editor,
   { mark, from, to }: AttributedMark,
   attributes: InlineAttributes | null,
-): void {
-  const next = mark.type.create({
-    ...mark.attrs,
-    attributes:
-      attributes && Object.keys(attributes).length > 0 ? attributes : null,
-  });
+): boolean {
+  const written =
+    attributes && Object.keys(attributes).length > 0
+      ? writableAttributes(attributes)
+      : null;
+  if (
+    !hasDocumentNotation(editor, 'inlineAttributes') ||
+    (attributes && Object.keys(attributes).length > 0 && !written) ||
+    Object.keys(attributes ?? {}).some((name) => !isAttributeName(name))
+  ) {
+    return false;
+  }
+  const next = mark.type.create({ ...mark.attrs, attributes: written });
   editor
     .chain()
     .focus()
@@ -132,4 +146,5 @@ export function setMarkAttributes(
       return true;
     })
     .run();
+  return true;
 }

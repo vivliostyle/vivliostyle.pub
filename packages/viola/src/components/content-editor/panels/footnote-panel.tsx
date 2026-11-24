@@ -65,7 +65,10 @@ export function FootnoteReferencePanel({
       setInvalid(true);
       return;
     }
-    editor.chain().focus().setFootnoteReference(label).run();
+    if (!editor.chain().focus().setFootnoteReference(label).run()) {
+      setInvalid(true);
+      return;
+    }
     close();
   };
 
