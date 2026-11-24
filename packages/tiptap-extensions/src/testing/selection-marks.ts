@@ -6,17 +6,29 @@ import { serializeDoc } from './editor-io';
 
 /**
  * Stands for the selection in a case's markdown: one mark is the caret, two
- * are the ends of a range. U+2038 has no meaning in Markdown or VFM, so it
- * goes through the parser as ordinary text.
+ * are the ends of a range, without its direction. U+2038 is punctuation to
+ * Unicode, so next to `*` or `_` it can change what the parser reads as
+ * emphasis; a case has to check that the marks leave the parse as it is.
  */
 export const CARET = '‸';
+
+export function countSelectionMarks(markdown: string): number {
+  return markdown.split(CARET).length - 1;
+}
 
 export function hasSelectionMarks(markdown: string): boolean {
   return markdown.includes(CARET);
 }
 
-/** Removes the marks from the loaded document and selects what they marked. */
-export function takeSelectionMarks(editor: Editor): void {
+export function removeSelectionMarks(markdown: string): string {
+  return markdown.replaceAll(CARET, '');
+}
+
+/**
+ * Removes the marks from the loaded document and selects what they marked.
+ * Returns how many marks it found in the document's text.
+ */
+export function takeSelectionMarks(editor: Editor): number {
   const positions: number[] = [];
   editor.state.doc.descendants((node, pos) => {
     if (!node.isText || !node.text) {
@@ -29,7 +41,7 @@ export function takeSelectionMarks(editor: Editor): void {
     }
   });
   if (positions.length === 0) {
-    return;
+    return 0;
   }
   if (positions.length > 2) {
     throw new Error(`Expected at most two ${CARET} marks`);
@@ -42,6 +54,7 @@ export function takeSelectionMarks(editor: Editor): void {
   const head = end === undefined ? anchor : end - CARET.length;
   tr.setSelection(TextSelection.create(tr.doc, anchor, head));
   editor.view.dispatch(tr.setMeta('addToHistory', false));
+  return positions.length;
 }
 
 // A mark at the edge of formatted text goes outside the formatting, so the
@@ -60,8 +73,9 @@ function insertMark(tr: Transaction, pos: number): void {
 export function serializeWithSelectionMarks(editor: Editor): string {
   const { selection } = editor.state;
   if (!(selection instanceof TextSelection)) {
+    const type = selection.toJSON().type;
     throw new Error(
-      `Only a text selection can be written as ${CARET} marks, got ${selection.toJSON().type}`,
+      `${CARET} marks can only stand for a text selection, but the steps leave a ${type} selection. Leave the marks out of \`expect\` and check the selection in a \`run\` step.`,
     );
   }
   const { tr } = editor.state;

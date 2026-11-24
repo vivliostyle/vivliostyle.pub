@@ -2,47 +2,68 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type EditorCase,
-  expectedMarkdown,
   failureReason,
+  type Mismatch,
   runCase,
   stepsOf,
 } from './case';
-import type { DriverFactory, DriverName } from './driver';
+import type { DriverFactory, DriverTarget } from './driver';
 
 export interface CaseSuite {
   title: string;
   cases: readonly EditorCase[];
 }
 
+/**
+ * Fails the test unless the mismatches match the case's `fails` reason: none
+ * for a case that should pass, at least one for a case that should fail.
+ */
+export function assertOutcome(
+  mismatches: readonly Mismatch[],
+  reason: string | undefined,
+): void {
+  if (reason !== undefined) {
+    if (mismatches.length === 0) {
+      throw new Error(
+        `The case passes now, so remove its \`fails\` reason: ${reason}`,
+      );
+    }
+    return;
+  }
+  for (const mismatch of mismatches) {
+    if ('error' in mismatch) {
+      expect
+        .soft(() => {
+          throw mismatch.error;
+        }, mismatch.label)
+        .not.toThrow();
+    } else {
+      expect.soft(mismatch.actual, mismatch.label).toEqual(mismatch.expected);
+    }
+  }
+}
+
 /** Registers every case of the suites as a test that runs on `createDriver`. */
 export function describeCases(
-  driverName: DriverName,
+  target: DriverTarget,
   createDriver: DriverFactory,
   suites: readonly CaseSuite[],
 ): void {
   for (const suite of suites) {
     describe(suite.title, () => {
       for (const testCase of suite.cases) {
-        if (testCase.only && testCase.only !== driverName) {
+        if (testCase.only && testCase.only !== target.name) {
           continue;
         }
-        const reason = failureReason(testCase, driverName);
-        const register = reason ? it.fails : it;
+        const reason = failureReason(testCase, target);
         const name = reason ? `${testCase.name} (${reason})` : testCase.name;
-        register(name, async (context) => {
+        it(name, async (context) => {
           const driver = await createDriver();
           try {
             if (!stepsOf(testCase).every((step) => driver.supports(step))) {
               context.skip();
             }
-            const result = await runCase(driver, testCase);
-            expect(result.markdown).toBe(expectedMarkdown(testCase));
-            if (testCase.doc !== undefined) {
-              expect(result.doc).toBe(testCase.doc);
-            }
-            if (testCase.json !== undefined) {
-              expect(result.json).toMatchObject(testCase.json);
-            }
+            assertOutcome(await runCase(driver, testCase), reason);
           } finally {
             driver.destroy();
           }

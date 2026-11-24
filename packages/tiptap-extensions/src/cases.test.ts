@@ -4,7 +4,7 @@ import { createNodeDriver } from './testing/node-driver';
 import { describeCases } from './testing/vitest';
 
 describeCases(
-  'node',
+  { name: 'node' },
   () => createNodeDriver([PubExtensions.configure({})]),
   suites,
 );
