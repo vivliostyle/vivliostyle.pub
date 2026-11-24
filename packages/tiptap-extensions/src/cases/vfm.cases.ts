@@ -1,8 +1,6 @@
 import type { CaseSuite } from '../testing/vitest';
 
 const PLAIN_TEXT = 'kept as plain text';
-const DROPPED_ESCAPE =
-  'the backslash is dropped together with the character it escapes';
 
 export const vfmSuites: CaseSuite[] = [
   {
@@ -18,12 +16,10 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'escaped pipe in the base text',
         given: 'a {a\\|b|c} b',
-        fails: DROPPED_ESCAPE,
       },
       {
         name: 'escaped brace is not ruby',
         given: '\\{a|b}',
-        fails: DROPPED_ESCAPE,
       },
     ],
   },
@@ -37,6 +33,14 @@ export const vfmSuites: CaseSuite[] = [
         given: '$x^2$ と',
         doc: 'doc(paragraph(math, " と"))',
         fails: PLAIN_TEXT,
+      },
+      {
+        name: 'editing next to inline math keeps the escapes in it',
+        given: 'a $\\{x\\}$ b‸',
+        steps: ['c'],
+        expect: 'a $\\{x\\}$ bc‸',
+        fails:
+          'the math is text, so the paragraph is written anew without the backslashes markdown read away',
       },
     ],
   },
@@ -59,8 +63,6 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'image attributes',
         given: '![cap](a.png){width=100}',
-        fails:
-          'the block image and the text end up in one paragraph, an invalid document',
       },
       { name: 'inline attributes', given: '**s**{.x}' },
     ],
@@ -72,7 +74,6 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'footnote reference and definition',
         given: '脚注[^1]です。\n\n[^1]: 本文',
-        fails: 'the definition becomes the URL of a link on the reference',
       },
     ],
   },
@@ -88,12 +89,18 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'heading that opens no section',
         given: '## D ##',
-        fails: 'the closing sequence is dropped',
+      },
+      {
+        name: 'editing a heading that opens no section',
+        given: '## D‸ ##',
+        steps: ['x'],
+        expect: '## Dx‸ ##',
+        fails:
+          'the closing sequence has no attribute, so the heading is written anew without it',
       },
       {
         name: 'line that closes a section',
         given: '# A\n\ntext\n\n#\n\nafter',
-        fails: 'read as an empty heading and written without its "#"',
       },
     ],
   },

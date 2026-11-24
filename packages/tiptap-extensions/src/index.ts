@@ -1,33 +1,23 @@
 import { type Editor, Extension, mergeAttributes } from '@tiptap/core';
-import { Blockquote } from '@tiptap/extension-blockquote';
-import { Bold } from '@tiptap/extension-bold';
-import { BulletList } from '@tiptap/extension-bullet-list';
-import { Code } from '@tiptap/extension-code';
-import { Document } from '@tiptap/extension-document';
-import { HardBreak } from '@tiptap/extension-hard-break';
-import { Heading } from '@tiptap/extension-heading';
-import { HorizontalRule } from '@tiptap/extension-horizontal-rule';
 import { Image } from '@tiptap/extension-image';
-import { Italic } from '@tiptap/extension-italic';
-import { Link } from '@tiptap/extension-link';
-import { Paragraph } from '@tiptap/extension-paragraph';
-import { Strike } from '@tiptap/extension-strike';
-import { Text } from '@tiptap/extension-text';
-import { Underline } from '@tiptap/extension-underline';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
 import { join } from 'pathe';
 
 import { BlockFormatting } from './block-format';
 import { ChainSafeClearNodes } from './clear-nodes';
-import { CodeBlockPrism } from './code-block-prism';
 import {
   CustomDragHandler,
   type CustomDragPayload,
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
-import { Frontmatter } from './frontmatter';
-import { PubListItem, PubListKeymap, PubOrderedList } from './list';
-import { PubMarkdown } from './markdown';
+import {
+  commonMarkNotations,
+  gfmNotations,
+  htmlMarkNotations,
+  type NotationDefinition,
+  PubMarkdown,
+  rawNotation,
+} from './markdown';
 
 export { type BlockFormat, getBlockFormat } from './block-format';
 export {
@@ -42,6 +32,12 @@ export {
   parseCustomDragPayload,
   serializeCustomDragPayload,
 } from './custom-drag-handler';
+export {
+  getMarkdown,
+  type NotationDefinition,
+  parseMarkdown,
+  setMarkdownBaseline,
+} from './markdown';
 
 export const IMAGE_MIME_TYPES = [
   'image/png',
@@ -62,6 +58,10 @@ export interface PubExtensionConfig {
   onFileDrop?: (editor: Editor, files: File[], pos: number) => void;
   onFilePaste?: (editor: Editor, files: File[]) => void;
   onDrop?: (editor: Editor, payload: CustomDragPayload, pos: number) => void;
+  /** Called after markdown has replaced the whole document. */
+  onSetMarkdown?: (editor: Editor) => void;
+  /** Syntax added on top of CommonMark and GFM. */
+  notations?: NotationDefinition[];
 }
 
 declare module '@tiptap/core' {
@@ -94,65 +94,48 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
   addExtensions() {
     const { basePath, onFileDrop, onFilePaste, onDrop } = this.options;
 
+    const image = Image.extend({
+      addStorage() {
+        return { basePath };
+      },
+      renderHTML({ HTMLAttributes }) {
+        const { src, ...rest } = HTMLAttributes;
+        let resolvedSrc = src;
+        if (src && !ABSOLUTE_URL_RE.test(src)) {
+          resolvedSrc = join('/vivliostyle', this.storage.basePath ?? '', src);
+        }
+        return [
+          'img',
+          mergeAttributes(this.options.HTMLAttributes, {
+            ...rest,
+            src: resolvedSrc,
+          }),
+        ];
+      },
+    }).configure({});
+
     return [
-      // Starter kit extensions
-      Bold.configure({}),
-      Blockquote.configure({}),
-      BulletList.configure({}),
-      Code.configure({}),
-      CodeBlockPrism.configure({}),
-      Document.configure({}),
+      // The schema comes from the notation definitions.
+      PubMarkdown.configure({
+        notations: [
+          ...commonMarkNotations({ image }),
+          ...gfmNotations,
+          ...htmlMarkNotations,
+          rawNotation,
+          ...(this.options.notations ?? []),
+        ],
+        onSetMarkdown: this.options.onSetMarkdown,
+      }),
       Dropcursor.configure({}),
       Gapcursor.configure({}),
-      HardBreak.configure({}),
-      Heading.configure({}),
-      // UndoRedo.configure({}),
-      HorizontalRule.configure({}),
-      Italic.configure({}),
-      PubListItem.configure({}),
-      PubListKeymap.configure({}),
-      Link.configure({}),
-      PubOrderedList.configure({}),
-      Paragraph.configure({}),
-      Strike.configure({}),
-      Text.configure({}),
-      Underline.configure({}),
-      // TrailingNode.configure({}),
-
       ChainSafeClearNodes,
       BlockFormatting,
-
       FileMediaHandler.configure({
         allowedMimeTypes: IMAGE_MIME_TYPES,
         onDrop: onFileDrop,
         onPaste: onFilePaste,
       }),
       CustomDragHandler.configure({ onDrop }),
-      Image.extend({
-        addStorage() {
-          return { basePath };
-        },
-        renderHTML({ HTMLAttributes }) {
-          const { src, ...rest } = HTMLAttributes;
-          let resolvedSrc = src;
-          if (src && !ABSOLUTE_URL_RE.test(src)) {
-            resolvedSrc = join(
-              '/vivliostyle',
-              this.storage.basePath ?? '',
-              src,
-            );
-          }
-          return [
-            'img',
-            mergeAttributes(this.options.HTMLAttributes, {
-              ...rest,
-              src: resolvedSrc,
-            }),
-          ];
-        },
-      }).configure({}),
-      PubMarkdown.configure({}),
-      Frontmatter,
     ];
   },
 });

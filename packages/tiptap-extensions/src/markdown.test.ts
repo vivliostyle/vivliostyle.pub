@@ -1,7 +1,7 @@
 import { Editor, type JSONContent } from '@tiptap/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from './index';
+import { getMarkdown, PubExtensions } from './index';
 
 let editor: Editor | undefined;
 
@@ -21,8 +21,8 @@ function createEditor(): Editor {
 
 function roundTrip(markdown: string): string {
   const editor = createEditor();
-  editor.commands.setContent(markdown, { contentType: 'markdown' });
-  return editor.getMarkdown();
+  editor.commands.setMarkdown(markdown);
+  return getMarkdown(editor, { baseline: '' });
 }
 
 function serialize(inline: JSONContent[]): string {
@@ -31,7 +31,7 @@ function serialize(inline: JSONContent[]): string {
     type: 'doc',
     content: [{ type: 'paragraph', content: inline }],
   });
-  return editor.getMarkdown();
+  return getMarkdown(editor);
 }
 
 const url = 'https://example.com';
@@ -74,14 +74,14 @@ describe('bare URL links', () => {
 
 function parse(markdown: string): JSONContent[] {
   const editor = createEditor();
-  editor.commands.setContent(markdown, { contentType: 'markdown' });
+  editor.commands.setMarkdown(markdown);
   return editor.getJSON().content ?? [];
 }
 
 function serializeBlock(block: JSONContent): string {
   const editor = createEditor();
   editor.commands.setContent({ type: 'doc', content: [block] });
-  return editor.getMarkdown();
+  return getMarkdown(editor);
 }
 
 const fenced = (info: string, fence = '```') =>

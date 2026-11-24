@@ -10,7 +10,7 @@ import type { Node } from '@tiptap/pm/model';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { type BlockFormat, getBlockFormat } from './block-format';
-import { PubExtensions } from './index';
+import { getMarkdown, PubExtensions } from './index';
 
 const editors: Editor[] = [];
 
@@ -27,7 +27,7 @@ function createEditor(markdown: string): Editor {
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   });
   editors.push(editor);
-  editor.commands.setContent(markdown, { contentType: 'markdown' });
+  editor.commands.setMarkdown(markdown);
   return editor;
 }
 
@@ -61,7 +61,7 @@ function outline(node: Node): string {
 }
 
 function reparsedOutline(editor: Editor): string {
-  return outline(createEditor(editor.getMarkdown()).state.doc);
+  return outline(createEditor(getMarkdown(editor)).state.doc);
 }
 
 function textPosition(editor: Editor, text: string): number {

@@ -1,17 +1,16 @@
 import type { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
+import { getMarkdown, setMarkdownBaseline } from '../markdown';
+import { CARET } from './selection-marks';
+
 export function loadMarkdown(editor: Editor, markdown: string): void {
-  editor.commands.setContent(markdown, {
-    contentType: 'markdown',
-    emitUpdate: false,
-  });
+  editor.commands.setMarkdown(markdown, { emitUpdate: false });
+  // The file on disk has no selection marks.
+  setMarkdownBaseline(editor, markdown.replaceAll(CARET, ''));
 }
 
+/** Saves the document as the editor would, against the loaded markdown. */
 export function serializeDoc(editor: Editor, doc: ProseMirrorNode): string {
-  const manager = editor.markdown;
-  if (!manager) {
-    throw new Error('The editor has no markdown extension');
-  }
-  return manager.serialize(doc.toJSON());
+  return getMarkdown(editor, { doc });
 }
