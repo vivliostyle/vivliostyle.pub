@@ -1,6 +1,29 @@
+import type { Editor, JSONContent } from '@tiptap/core';
+
+import { press, run } from '../testing/steps';
 import type { CaseSuite } from '../testing/vitest';
 
 const PLAIN_TEXT = 'kept as plain text';
+
+// What ProseMirror dispatches for pasted text, which the node driver cannot
+// paste: paste rules look for the meta.
+const paste = (text: string) =>
+  run(`paste ${JSON.stringify(text)} as text`, (editor: Editor) => {
+    editor.view.dispatch(
+      editor.state.tr.insertText(text).setMeta('uiEvent', 'paste'),
+    );
+  });
+
+const insert = (label: string, content: JSONContent) =>
+  run(label, (editor: Editor) => {
+    editor.commands.insertContent(content);
+  });
+
+const text = (value: string, marks?: JSONContent['marks']): JSONContent => ({
+  type: 'text',
+  text: value,
+  ...(marks && { marks }),
+});
 
 export const vfmSuites: CaseSuite[] = [
   {
@@ -11,15 +34,167 @@ export const vfmSuites: CaseSuite[] = [
         name: 'ruby is a node',
         given: '{漢字|かんじ}を読む',
         doc: 'doc(paragraph(ruby("漢字"), "を読む"))',
-        fails: PLAIN_TEXT,
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'ruby', attrs: { rubyText: 'かんじ' } },
+              text('を読む'),
+            ],
+          },
+        ],
       },
       {
         name: 'escaped pipe in the base text',
         given: 'a {a\\|b|c} b',
+        doc: 'doc(paragraph("a ", ruby("a|b"), " b"))',
       },
       {
         name: 'escaped brace is not ruby',
         given: '\\{a|b}',
+        doc: 'doc(paragraph("{a|b}"))',
+      },
+      {
+        name: 'markdown in the base',
+        given: '{**漢**字|かんじ}',
+        doc: 'doc(paragraph(ruby(bold("漢"), "字")))',
+      },
+      {
+        name: 'ruby text is literal',
+        given: '{a|*b* &amp;}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'ruby', attrs: { rubyText: '*b* &amp;' } }],
+          },
+        ],
+      },
+      {
+        name: 'later pipes belong to the ruby text',
+        given: '{a|b|c}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'ruby', attrs: { rubyText: 'b|c' } }],
+          },
+        ],
+      },
+      {
+        name: 'not in inline code',
+        given: '`{a|b}`',
+        doc: 'doc(paragraph(code("{a|b}")))',
+      },
+      {
+        name: 'in a link',
+        given: '[{a|b}](u)',
+        doc: 'doc(paragraph(link(ruby("a"))))',
+      },
+      {
+        name: 'in bold',
+        given: '**{漢字|かんじ}**',
+        doc: 'doc(paragraph(bold(ruby("漢字"))))',
+      },
+      {
+        name: 'braces do not pair',
+        given: '{{a|b}|c}',
+        doc: 'doc(paragraph(ruby("{a"), "|c}"))',
+      },
+      {
+        name: 'the base cannot span lines',
+        given: '{a\nb|c}',
+        doc: 'doc(paragraph("{a\\nb|c}"))',
+      },
+      {
+        name: 'the base and the ruby text cannot be empty',
+        given: '{|b} {a|}',
+        doc: 'doc(paragraph("{|b} {a|}"))',
+      },
+      {
+        name: 'between full-width characters',
+        given: '漢{字|じ}かな、{振|ふ}り',
+        doc: 'doc(paragraph("漢", ruby("字"), "かな、", ruby("振"), "り"))',
+      },
+      { name: 'in a heading', given: '## {見出し|みだし}' },
+      {
+        name: 'in a table cell, kept as written',
+        given: '| a | b |\n| - | - |\n| {x|y} |',
+        doc: 'doc(rawBlock("| a | b |\\n| - | - |\\n| {x|y} |"))',
+      },
+      {
+        name: 'editing next to ruby',
+        given: '{漢字|かんじ}を‸',
+        steps: ['読む'],
+        expect: '{漢字|かんじ}を読む‸',
+      },
+      {
+        name: 'editing the base',
+        given: '{漢‸|かんじ}',
+        steps: ['字'],
+        expect: '{漢字‸|かんじ}',
+      },
+      {
+        name: 'a pipe typed into the base is escaped',
+        given: '{a‸b|c}',
+        steps: ['|'],
+        expect: '{a\\|‸b|c}',
+      },
+      {
+        name: 'a pipe that ends the base is written as a reference',
+        given: 'x‸',
+        steps: [
+          insert('insert a ruby whose base ends with a pipe', {
+            type: 'ruby',
+            attrs: { rubyText: 'b' },
+            content: [text('a|')],
+          }),
+        ],
+        expect: 'x{a&#x7C;|b}‸',
+      },
+      {
+        name: 'braces typed next to ruby are escaped',
+        given: '{a|b}‸',
+        steps: [' {c|d', press('ArrowRight')],
+        expect: '{a|b} \\{c\\|d‸',
+        only: 'browser',
+      },
+      {
+        name: 'changing the ruby text',
+        given: '{漢字|かんじ}‸',
+        steps: [
+          press('ArrowLeft'),
+          run('set the ruby text', (editor) => {
+            editor.commands.setRuby('カンジ');
+          }),
+        ],
+        expect: '{漢字|カンジ}',
+        only: 'browser',
+      },
+      {
+        name: 'making a ruby of the selection',
+        given: 'a ‸漢字‸ b',
+        steps: [
+          run('make a ruby', (editor) => {
+            editor.commands.setRuby('かんじ');
+          }),
+        ],
+        expect: 'a {漢字|かんじ} b',
+        doc: 'doc(paragraph("a ", ruby("漢字"), " b"))',
+      },
+      {
+        name: 'removing a ruby keeps its base',
+        given: '**{漢‸字|かんじ}**',
+        steps: [
+          run('remove the ruby', (editor) => {
+            editor.commands.unsetRuby();
+          }),
+        ],
+        expect: '**漢‸字**',
+      },
+      {
+        name: 'a ruby without a base goes away',
+        given: '{a‸|b}c',
+        steps: [press('Backspace')],
+        expect: '‸c',
       },
     ],
   },
@@ -32,13 +207,130 @@ export const vfmSuites: CaseSuite[] = [
         name: 'inline math is a node',
         given: '$x^2$ と',
         doc: 'doc(paragraph(math, " と"))',
-        fails: PLAIN_TEXT,
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'math', attrs: { latex: 'x^2', display: false } },
+              text(' と'),
+            ],
+          },
+        ],
+      },
+      {
+        name: 'display math is a node',
+        given: '$$\ny=1\n$$',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'math', attrs: { latex: '\ny=1\n', display: true } },
+            ],
+          },
+        ],
       },
       {
         name: 'editing next to inline math keeps the escapes in it',
         given: 'a $\\{x\\}$ b‸',
         steps: ['c'],
         expect: 'a $\\{x\\}$ bc‸',
+      },
+      {
+        name: 'not math: space after the opening, before the closing, digit after it',
+        given: '$ x$ and $x $ and $x$1',
+        doc: 'doc(paragraph("$ x$ and $x $ and $x$1"))',
+      },
+      {
+        name: 'escaped dollar is not math',
+        given: '\\$x$',
+        doc: 'doc(paragraph("$x$"))',
+      },
+      {
+        name: 'closes at the first dollar that can close it',
+        given: '$a$b$ and $x$$y$',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'math', attrs: { latex: 'a' } },
+              text('b$ and '),
+              { type: 'math', attrs: { latex: 'x$$y' } },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'spans lines of a paragraph',
+        given: '> $a\n> b$ c',
+        json: [
+          {
+            type: 'blockquote',
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  { type: 'math', attrs: { latex: 'a\nb' } },
+                  text(' c'),
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'not in inline code',
+        given: '`$x$`',
+        doc: 'doc(paragraph(code("$x$")))',
+      },
+      {
+        name: 'between full-width characters',
+        given: '式$x$です',
+        doc: 'doc(paragraph("式", math, "です"))',
+      },
+      { name: 'prices are not math', given: '$5 と $10' },
+      {
+        name: 'a digit typed after math is written as a reference',
+        given: '$x$‸',
+        steps: ['1'],
+        expect: '$x$&#x31;‸',
+      },
+      {
+        name: 'a dollar typed next to math is escaped',
+        given: '$x$ a‸',
+        steps: [
+          run('insert dollars without input rules', (editor) => {
+            editor.view.dispatch(editor.state.tr.insertText('$y$'));
+          }),
+        ],
+        expect: '$x$ a\\$y\\$‸',
+      },
+      {
+        name: 'a dollar typed into raw HTML before math',
+        given: 'a <span class="x">t</span> b $y$‸',
+        steps: [
+          run('type a dollar into the tag', (editor) => {
+            let at = -1;
+            editor.state.doc.descendants((node, pos) => {
+              if (at === -1 && node.isText && node.text?.includes('cla')) {
+                at = pos + node.text.indexOf('cla') + 3;
+              }
+            });
+            editor.view.dispatch(editor.state.tr.insertText('$', at));
+          }),
+        ],
+        expect: 'a <span cla$ss="x">t</span> b $y$',
+        fails:
+          'raw markdown is written as it is, and edited into the opening of math it reads the text after it as math, so the document cannot be saved',
+      },
+      {
+        name: 'inserting math',
+        given: 'a‸',
+        steps: [
+          run('insert math', (editor) => {
+            editor.commands.setMath({ latex: 'E=mc^2', display: false });
+          }),
+        ],
+        expect: 'a$E=mc^2$‸',
       },
     ],
   },
@@ -61,8 +353,145 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'image attributes',
         given: '![cap](a.png){width=100}',
+        json: [
+          {
+            type: 'image',
+            attrs: { src: 'a.png', attributes: { width: '100' } },
+          },
+        ],
       },
-      { name: 'inline attributes', given: '**s**{.x}' },
+      {
+        name: 'inline attributes',
+        given: '**s**{.x}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('s', [
+                { type: 'bold', attrs: { attributes: { class: 'x' } } },
+              ]),
+            ],
+          },
+        ],
+      },
+      {
+        name: 'on inline code, strikethrough and links',
+        given: '`c`{.y} ~~d~~{.z} [l](u){target=_blank}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('c', [
+                { type: 'code', attrs: { attributes: { class: 'y' } } },
+              ]),
+              text(' '),
+              text('d', [
+                { type: 'strike', attrs: { attributes: { class: 'z' } } },
+              ]),
+              text(' '),
+              text('l', [
+                {
+                  type: 'link',
+                  attrs: { href: 'u', attributes: { target: '_blank' } },
+                },
+              ]),
+            ],
+          },
+        ],
+      },
+      {
+        name: 'ids, classes and quoted values',
+        given: '*e*{#i .a .b k="v w" flag}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('e', [
+                {
+                  type: 'italic',
+                  attrs: {
+                    attributes: { id: 'i', class: 'a b', k: 'v w', flag: '' },
+                  },
+                },
+              ]),
+            ],
+          },
+        ],
+      },
+      {
+        name: 'not after a space',
+        given: '**s** {.x}',
+        doc: 'doc(paragraph(bold("s"), " {.x}"))',
+      },
+      {
+        name: 'not on a paragraph',
+        given: 'para {.x}',
+        doc: 'doc(paragraph("para {.x}"))',
+      },
+      {
+        name: 'not when the braces do not hold attributes',
+        given: '**s**{k=v=w}',
+        doc: 'doc(paragraph(bold("s"), "{k=v=w}"))',
+      },
+      {
+        name: 'braces after a character that ends no element are ruby',
+        given: 'x*{a|b}',
+        doc: 'doc(paragraph("x*", ruby("a")))',
+      },
+      {
+        name: 'braces after an element are attributes, not ruby',
+        given: '**s**{a|b}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('s', [
+                { type: 'bold', attrs: { attributes: { 'a|b': '' } } },
+              ]),
+            ],
+          },
+        ],
+      },
+      {
+        name: 'on the outer of two elements that end together',
+        given: '***a***{.x}',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('a', [
+                { type: 'italic', attrs: { attributes: { class: 'x' } } },
+                { type: 'bold', attrs: { attributes: null } },
+              ]),
+            ],
+          },
+        ],
+      },
+      { name: 'empty attributes', given: '**s**{}' },
+      {
+        name: 'editing inside an element with attributes',
+        given: '**a‸b**{.x}',
+        steps: ['c'],
+        expect: '**ac‸b**{.x}',
+      },
+      {
+        name: 'attributes of an element without a definition are kept',
+        given: '[r][d]{.x} a‸\n\n[d]: u',
+        steps: ['b'],
+        expect: '[r][d]{.x} ab‸\n\n[d]: u',
+      },
+      {
+        name: 'braces typed after an element are escaped',
+        given: '`c`‸',
+        steps: [
+          run('insert braces without input rules', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr.setStoredMarks([]).insertText('{.x}'),
+            );
+          }),
+        ],
+        expect: '`c`\\{.x}‸',
+      },
     ],
   },
   {
@@ -70,8 +499,111 @@ export const vfmSuites: CaseSuite[] = [
     cases: [
       { name: 'inline footnote', given: 'inline^[脚注] text' },
       {
+        name: 'inline footnote is a node',
+        given: 'inline^[脚注 *md*] text',
+        doc: 'doc(paragraph("inline", inlineFootnote("脚注 ", italic("md")), " text"))',
+      },
+      {
+        name: 'brackets in a note pair',
+        given: 'x^[a [b] c] d',
+        doc: 'doc(paragraph("x", inlineFootnote("a [b] c"), " d"))',
+      },
+      {
+        name: 'a bracket in code does not end a note',
+        given: 'x^[a `]` b]',
+        doc: 'doc(paragraph("x", inlineFootnote("a ", code("]"), " b")))',
+      },
+      {
+        name: 'a note spans lines of a paragraph',
+        given: '- x^[a\n  *b*] c',
+        doc: 'doc(bulletList(listItem(paragraph("x", inlineFootnote("a\\n", italic("b")), " c"))))',
+      },
+      {
+        name: 'escaped caret is not a note',
+        given: 'x\\^[a]',
+        doc: 'doc(paragraph("x^[a]"))',
+      },
+      {
+        name: 'empty note',
+        given: 'x^[]',
+        doc: 'doc(paragraph("x", inlineFootnote))',
+      },
+      {
+        name: 'ruby and math in a note',
+        given: 'x^[{a|b} $y$]',
+        doc: 'doc(paragraph("x", inlineFootnote(ruby("a"), " ", math)))',
+      },
+      {
         name: 'footnote reference and definition',
         given: '脚注[^1]です。\n\n[^1]: 本文',
+        doc: 'doc(paragraph("脚注", footnoteReference, "です。"), rawBlock("[^1]: 本文"))',
+      },
+      {
+        name: 'a reference without a definition',
+        given: 'a[^note] b',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('a'),
+              { type: 'footnoteReference', attrs: { label: 'note' } },
+              text(' b'),
+            ],
+          },
+        ],
+      },
+      {
+        name: 'a reference followed by a resource is a link',
+        given: 'a[^1](u)',
+        doc: 'doc(paragraph("a", link("^1")))',
+      },
+      {
+        name: 'a label cannot hold spaces',
+        given: 'a[^x y]',
+        doc: 'doc(paragraph("a[^x y]"))',
+      },
+      {
+        name: 'attributes do not apply to a reference',
+        given: 'a[^1]{.x}',
+        doc: 'doc(paragraph("a", footnoteReference, "{.x}"))',
+      },
+      {
+        name: 'editing a note',
+        given: 'x^[a‸] y',
+        steps: ['b'],
+        expect: 'x^[ab‸] y',
+      },
+      {
+        name: 'a bracket typed into a note is escaped',
+        given: 'x^[a‸] y',
+        steps: [']'],
+        expect: 'x^[a\\]‸] y',
+      },
+      {
+        name: 'a parenthesis typed after a reference is escaped',
+        given: 'a[^1]‸',
+        steps: ['(b)'],
+        expect: 'a[^1]&#x28;b)‸',
+      },
+      {
+        name: 'making a note of the selection',
+        given: 'a ‸note‸ b',
+        steps: [
+          run('make a note', (editor) => {
+            editor.commands.setInlineFootnote();
+          }),
+        ],
+        expect: 'a ^[note] b',
+      },
+      {
+        name: 'inserting a reference',
+        given: 'a‸',
+        steps: [
+          run('insert a reference', (editor) => {
+            editor.commands.setFootnoteReference('2');
+          }),
+        ],
+        expect: 'a[^2]‸',
       },
     ],
   },
@@ -97,6 +629,88 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'line that closes a section',
         given: '# A\n\ntext\n\n#\n\nafter',
+      },
+    ],
+  },
+  {
+    title: 'typing VFM',
+    cases: [
+      {
+        name: 'ruby',
+        given: '‸',
+        steps: ['{漢字|かんじ}'],
+        expect: '{漢字|かんじ}‸',
+        doc: 'doc(paragraph(ruby("漢字")))',
+      },
+      {
+        name: 'ruby after text',
+        given: 'これは‸',
+        steps: ['{漢字|かんじ}です'],
+        expect: 'これは{漢字|かんじ}です‸',
+        doc: 'doc(paragraph("これは", ruby("漢字"), "です"))',
+      },
+      {
+        name: 'an escaped brace stays text',
+        given: '‸',
+        steps: ['\\{a|b}'],
+        doc: 'doc(paragraph("\\\\{a|b}"))',
+        expect: '&#x5C;\\{a\\|b}‸',
+      },
+      {
+        name: 'inline math',
+        given: '‸',
+        steps: ['式 $x^2$ です'],
+        expect: '式 $x^2$ です‸',
+        doc: 'doc(paragraph("式 ", math, " です"))',
+      },
+      {
+        name: 'display math',
+        given: '‸',
+        steps: ['$$x$$'],
+        expect: '$$x$$‸',
+        json: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'math', attrs: { latex: 'x', display: true } }],
+          },
+        ],
+      },
+      {
+        name: 'a price is not math',
+        given: '‸',
+        steps: ['$5 and $'],
+        expect: '$5 and $‸',
+        doc: 'doc(paragraph("$5 and $"))',
+      },
+      {
+        name: 'inline footnote',
+        given: '本文‸',
+        steps: ['^[注]'],
+        expect: '本文^[注]‸',
+        doc: 'doc(paragraph("本文", inlineFootnote("注")))',
+      },
+      {
+        name: 'footnote reference',
+        given: '本文‸',
+        steps: ['[^1]'],
+        expect: '本文[^1]‸',
+        doc: 'doc(paragraph("本文", footnoteReference))',
+      },
+      {
+        name: 'nothing while composing',
+        given: '‸',
+        steps: [
+          { kind: 'compose', updates: ['{a|b', '{a|b}'], commit: '{a|b}' },
+        ],
+        expect: '{a|b}‸',
+        doc: 'doc(paragraph(ruby("a")))',
+      },
+      {
+        name: 'pasted ruby, math and notes',
+        given: '‸',
+        steps: [paste('{漢字|かんじ}と$x$と^[注]と[^1]')],
+        expect: '{漢字|かんじ}と$x$と^[注]と[^1]‸',
+        doc: 'doc(paragraph(ruby("漢字"), "と", math, "と", inlineFootnote("注"), "と", footnoteReference))',
       },
     ],
   },

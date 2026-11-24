@@ -15,8 +15,9 @@ import {
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
+  upgradeDocumentNotations,
 } from './extension';
-import { declareNotation, defineNotation } from './notation';
+import { declareNotation } from './notation';
 import { MarkdownWriteError } from './write';
 
 let editor: Editor | undefined;
@@ -325,8 +326,7 @@ describe('saving keeps what the document means', () => {
   });
 
   it.each([
-    ['\\{a|b} c', 'c', '\\{a|b} cZ'],
-    ['a $\\{x\\}$ and $a \\\\ b$ c', 'c', 'a $\\{x\\}$ and $a \\\\ b$ cZ'],
+    ['a \\} b c', 'c', 'a \\} b cZ'],
     ['a \\*b\\* c', 'c', 'a \\*b\\* cZ'],
   ])('keeps escapes no definition reads in %j', (md, needle, expected) => {
     const editor = load(md);
@@ -334,40 +334,55 @@ describe('saving keeps what the document means', () => {
     expect(getMarkdown(editor)).toBe(expected);
   });
 
+  it('keeps math as written when the text next to it changes', () => {
+    const editor = load('a $\\{x\\}$ and $a \\\\ b$ c');
+    appendTo(editor, 'c', 'Z');
+    expect(getMarkdown(editor)).toBe('a $\\{x\\}$ and $a \\\\ b$ cZ');
+  });
+
   it('writes a document with the definitions it was made with', () => {
-    // Stands for syntax added later, like VFM ruby: text with braces is
-    // read as something else, so plain braces have to be escaped.
-    const braces = defineNotation({
-      name: 'braces',
-      fromMarkdown: {
-        text: (node, context) =>
-          /(?:^|[^\\])\{/.test(context.source(node))
-            ? context.raw(node)
-            : undefined,
-      },
-      escapes: [{ pattern: /\{/g }],
-    });
-    editor = new Editor({
-      element: null,
-      extensions: [PubExtensions.configure({ notations: [braces] })],
-      content: { type: 'doc', content: [{ type: 'paragraph' }] },
-    });
+    // Before VFM syntax had definitions, `{b|c}` was text and its braces
+    // were not escaped.
+    const beforeVfm =
+      'document@1 paragraph@1 heading@1 thematicBreak@1 blockquote@1 list@1 codeBlock@1 hardBreak@1 image@1 emphasis@1 strong@1 inlineCode@1 link@1 gfm@1 strikethrough@1 underline@1 raw@1';
+    const editor = load('');
     const { schema } = editor.state;
     const doc = schema.topNodeType.create(null, [
-      schema.nodes.paragraph.create(null, schema.text('a {b|c} d')),
+      schema.nodes.paragraph.create(null, schema.text('a {b|c} $x$ d')),
     ]);
     editor.commands.setContent(doc.toJSON());
-    setMarkdownBaseline(editor, 'a {b|c} d\n');
-    const withoutBraces = currentNotations(editor)
-      .split(' ')
-      .filter((entry) => !entry.startsWith('braces@'))
-      .join(' ');
-    setDocumentNotations(editor, withoutBraces);
-    expect(getMarkdown(editor)).toBe('a {b|c} d\n');
+    setMarkdownBaseline(editor, 'a {b|c} $x$ d\n');
+    setDocumentNotations(editor, beforeVfm);
+    expect(getMarkdown(editor)).toBe('a {b|c} $x$ d\n');
     appendTo(editor, 'd', 'Z');
-    expect(getMarkdown(editor)).toBe('a {b|c} dZ\n');
+    expect(getMarkdown(editor)).toBe('a {b|c} $x$ dZ\n');
     setDocumentNotations(editor, null);
-    expect(getMarkdown(editor)).toBe('a \\{b\\|c} dZ\n');
+    expect(getMarkdown(editor)).toBe('a \\{b\\|c} \\$x\\$ dZ\n');
+  });
+
+  it('reads such a document with the current definitions when it is upgraded', () => {
+    const editor = load('');
+    const { schema } = editor.state;
+    editor.commands.setContent(
+      schema.topNodeType
+        .create(null, [
+          schema.nodes.paragraph.create(null, schema.text('a {b|c} d')),
+        ])
+        .toJSON(),
+    );
+    setMarkdownBaseline(editor, 'a {b|c} d\n');
+    setDocumentNotations(
+      editor,
+      currentNotations(editor)
+        .split(' ')
+        .filter((entry) => !entry.startsWith('ruby@'))
+        .join(' '),
+    );
+    expect(upgradeDocumentNotations(editor)).toBe(true);
+    expect(editor.state.doc.toString()).toBe(
+      'doc(paragraph("a ", ruby("b"), " d"))',
+    );
+    expect(getMarkdown(editor)).toBe('a {b|c} d\n');
   });
 
   it('keeps the line ending of every line it keeps', () => {

@@ -47,6 +47,17 @@ export {
 export { commonMarkNotations } from './notations/commonmark';
 export { gfmNotations, htmlMarkNotations } from './notations/gfm';
 export { RawBlock, RawInline, rawNotation } from './notations/raw';
+export {
+  formatAttributes,
+  type InlineAttributes,
+  isWritableFootnoteLabel,
+  isWritableMath,
+  isWritableRubyText,
+  parseAttributes,
+  VFM_2_SYNTAX,
+  type VfmSyntax,
+  vfmNotations,
+} from './notations/vfm';
 export { RAW_BLOCK, RAW_INLINE } from './parse';
 export {
   type BaselineReader,

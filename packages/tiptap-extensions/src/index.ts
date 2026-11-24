@@ -17,6 +17,9 @@ import {
   type NotationDefinition,
   PubMarkdown,
   rawNotation,
+  VFM_2_SYNTAX,
+  type VfmSyntax,
+  vfmNotations,
 } from './markdown';
 
 export { type BlockFormat, getBlockFormat } from './block-format';
@@ -34,14 +37,22 @@ export {
 } from './custom-drag-handler';
 export {
   currentNotations,
+  formatAttributes,
   getMarkdown,
+  type InlineAttributes,
+  isWritableFootnoteLabel,
+  isWritableMath,
+  isWritableRubyText,
   MARKED_NOTATIONS,
   MarkdownWriteError,
   type NotationDefinition,
+  parseAttributes,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
   upgradeDocumentNotations,
+  VFM_2_SYNTAX,
+  type VfmSyntax,
 } from './markdown';
 
 export const IMAGE_MIME_TYPES = [
@@ -65,7 +76,9 @@ export interface PubExtensionConfig {
   onDrop?: (editor: Editor, payload: CustomDragPayload, pos: number) => void;
   /** Called after markdown has replaced the whole document. */
   onSetMarkdown?: (editor: Editor) => void;
-  /** Syntax added on top of CommonMark and GFM. */
+  /** How the VFM version the project is built with reads markdown. */
+  vfm?: VfmSyntax | undefined;
+  /** Syntax added on top of CommonMark, GFM and VFM. */
   notations?: NotationDefinition[];
 }
 
@@ -81,9 +94,6 @@ declare module '@tiptap/core' {
   }
 }
 
-// Matches absolute URLs that should bypass the in-app /vivliostyle/* prefix:
-// any explicit scheme (http:, https:, blob:, data:, file:, ...) or a
-// protocol-relative URL.
 // The definitions in use when the editor moved from marked to remark. Kept
 // as a fixed list: documents made with marked are written with these.
 const MARKED_ERA_NOTATIONS = [
@@ -106,6 +116,9 @@ const MARKED_ERA_NOTATIONS = [
   'raw',
 ];
 
+// Matches absolute URLs that should bypass the in-app /vivliostyle/* prefix:
+// any explicit scheme (http:, https:, blob:, data:, file:, ...) or a
+// protocol-relative URL.
 const ABSOLUTE_URL_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 
 export const PubExtensions = Extension.create<PubExtensionConfig>({
@@ -120,6 +133,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
 
   addExtensions() {
     const { basePath, onFileDrop, onFilePaste, onDrop } = this.options;
+    const vfm = this.options.vfm ?? VFM_2_SYNTAX;
 
     const image = Image.extend({
       addStorage() {
@@ -146,8 +160,9 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       PubMarkdown.configure({
         notations: [
           ...commonMarkNotations({ image }),
-          ...gfmNotations,
+          ...gfmNotations({ singleTilde: vfm.singleTildeStrikethrough }),
           ...htmlMarkNotations,
+          ...vfmNotations(vfm),
           rawNotation,
           ...(this.options.notations ?? []),
         ],

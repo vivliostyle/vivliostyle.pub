@@ -163,23 +163,4 @@ export const inputSuites: CaseSuite[] = [
       },
     ],
   },
-  {
-    title: 'typing VFM',
-    cases: [
-      {
-        name: 'ruby',
-        given: '‸',
-        steps: ['{漢字|かんじ}'],
-        expect: '{漢字|かんじ}‸',
-      },
-      {
-        name: 'ruby becomes a node as it is closed',
-        given: '‸',
-        steps: ['{漢字|かんじ}'],
-        expect: '{漢字|かんじ}‸',
-        doc: 'doc(paragraph(ruby("漢字")))',
-        fails: 'there is no ruby node',
-      },
-    ],
-  },
 ];
