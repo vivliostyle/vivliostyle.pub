@@ -16,7 +16,7 @@ import {
   type TokenizeContext,
   tokenType,
 } from '../../micromark';
-import { defineNotation, TEXT_EDGE } from '../../notation';
+import { defineNotation } from '../../notation';
 import { findSelectedInline, insertInline } from './commands';
 import { inlineSourceRules } from './input-rules';
 
@@ -433,6 +433,6 @@ export const mathNotation = defineNotation({
   escapes: [
     { pattern: /\$/g },
     // A digit right after inline math would keep it from closing.
-    { pattern: new RegExp(`(?<=${TEXT_EDGE})\\d`, 'g'), entity: true },
+    { pattern: /(?<=\$)\d/g, entity: true },
   ],
 });

@@ -319,8 +319,6 @@ export const vfmSuites: CaseSuite[] = [
           }),
         ],
         expect: 'a <span cla$ss="x">t</span> b $y$',
-        fails:
-          'raw markdown is written as it is, and edited into the opening of math it reads the text after it as math, so the document cannot be saved',
       },
       {
         name: 'inserting math',
@@ -654,7 +652,7 @@ export const vfmSuites: CaseSuite[] = [
         given: '‸',
         steps: ['\\{a|b}'],
         doc: 'doc(paragraph("\\\\{a|b}"))',
-        expect: '&#x5C;\\{a\\|b}‸',
+        expect: '\\\\\\{a\\|b}‸',
       },
       {
         name: 'inline math',

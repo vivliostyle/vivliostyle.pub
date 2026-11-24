@@ -15,11 +15,7 @@ import {
   type TokenizeContext,
   tokenType,
 } from '../../micromark';
-import {
-  defineNotation,
-  type NotationDefinition,
-  TEXT_EDGE,
-} from '../../notation';
+import { defineNotation, type NotationDefinition } from '../../notation';
 import {
   findSelectedInline,
   insertInline,
@@ -491,9 +487,9 @@ export function footnoteNotations({
       escapes: [
         // `(` right after a reference would make it a link. A backslash
         // would be kept as raw markdown, since `(` means nothing elsewhere.
-        { pattern: new RegExp(`(?<=${TEXT_EDGE})\\(`, 'g'), entity: true },
+        { pattern: /(?<=\])\(/g, entity: true },
         // `[^label]:` starting a line would define the note.
-        { pattern: new RegExp(`(?<=${TEXT_EDGE}):`, 'g'), entity: true },
+        { pattern: /(?<=\]):/g, entity: true },
       ],
     }),
     defineNotation({
@@ -526,7 +522,8 @@ export function footnoteNotations({
       },
       escapes: [
         // A `^` before a link would open a note with it.
-        { pattern: new RegExp(`\\^(?=\\[|${TEXT_EDGE})`, 'g') },
+        // The writer stands for a delimiter after the text with `!`.
+        { pattern: /\^(?=[[!])/g },
       ],
     }),
   ];

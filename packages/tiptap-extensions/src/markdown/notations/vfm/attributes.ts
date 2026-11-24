@@ -399,14 +399,15 @@ function delimiter(
   value: MarkToMarkdown['close'],
   mark: Mark,
   context: WriteContext,
+  text: string,
 ): string {
-  return typeof value === 'function' ? value(mark, context) : value;
+  return typeof value === 'function' ? value(mark, context, text) : value;
 }
 
 const decorate: MarkDecorator = (previous) => ({
   ...previous,
-  close: (mark, context) =>
-    delimiter(previous.close, mark, context) + written(mark),
+  close: (mark, context, text) =>
+    delimiter(previous.close, mark, context, text) + written(mark),
   ...(previous.run && {
     run: (text, mark) => (previous.run?.(text, mark) ?? text) + written(mark),
   }),

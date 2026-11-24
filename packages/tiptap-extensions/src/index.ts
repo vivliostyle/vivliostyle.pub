@@ -16,6 +16,7 @@ import {
   htmlMarkNotations,
   type NotationDefinition,
   PubMarkdown,
+  type PubMarkdownOptions,
   rawNotation,
   VFM_2_SYNTAX,
   type VfmSyntax,
@@ -37,6 +38,7 @@ export {
 } from './custom-drag-handler';
 export {
   currentNotations,
+  type DocumentRecord,
   type FoundNode,
   findSelectedInline,
   formatAttributes,
@@ -78,6 +80,8 @@ export interface PubExtensionConfig {
   onDrop?: (editor: Editor, payload: CustomDragPayload, pos: number) => void;
   /** Called after markdown has replaced the whole document. */
   onSetMarkdown?: (editor: Editor) => void;
+  /** See `PubMarkdownOptions.documentRecord`. */
+  documentRecord?: PubMarkdownOptions['documentRecord'];
   /** How the VFM version the project is built with reads markdown. */
   vfm?: VfmSyntax | undefined;
   /** Syntax added on top of CommonMark, GFM and VFM. */
@@ -169,6 +173,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           ...(this.options.notations ?? []),
         ],
         markedEraNotations: MARKED_ERA_NOTATIONS,
+        documentRecord: this.options.documentRecord,
         onSetMarkdown: this.options.onSetMarkdown,
       }),
       Dropcursor.configure({}),

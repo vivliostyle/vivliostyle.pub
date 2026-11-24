@@ -1,6 +1,6 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
-import type { ParsedBody } from './parse';
+import type { InlineSource, ParsedBody } from './parse';
 import { stripPrefixes } from './source';
 
 /**
@@ -14,6 +14,11 @@ export interface BaseNode {
   text: string | null;
   /** The source of the node's children, or `null` when it is not known. */
   content(): BaseContent | null;
+  /**
+   * Where a textblock's content was written, piece by piece, when the parser
+   * that read it knows. Otherwise the writer finds the pieces in `text`.
+   */
+  inline?(): InlineSource | null;
 }
 
 export interface BaseContent {
@@ -52,6 +57,7 @@ function baseNodeOf(
       ...range.prefixes,
     ]),
     content: () => contentOf(parsed, node),
+    inline: () => parsed.inlines.get(node) ?? null,
   };
 }
 

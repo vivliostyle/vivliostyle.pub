@@ -34,6 +34,13 @@ export interface SerializeOptions {
   baselineReader?: BaselineReader | null;
   /** Frontmatter written instead of the baseline's. */
   frontmatter?: string;
+  /**
+   * The document was read with definitions that are not quite these, e.g.
+   * other versions of them. Reading the output back cannot prove it right,
+   * so as with `baselineReader`, only blocks written anew are checked and
+   * text that was not edited stays as written.
+   */
+  approximate?: boolean;
 }
 
 /** Names and versions of the definitions a document was read with. */
@@ -101,19 +108,36 @@ export class MarkdownPipeline {
     const parsed = this.parseBody(source.body);
     const reader = options.baselineReader;
     const base = reader ? reader.read(source.body) : baseDocumentOf(parsed);
+    // A file of frontmatter alone may end at its closing fence.
+    const head = (body: string) =>
+      frontmatter && body && !frontmatter.endsWith('\n')
+        ? `${frontmatter}\n`
+        : frontmatter;
+    const join = (body: string) => head(body) + body;
     const result = this.writer.writeBody(doc, base, parsed.styles, {
       bareStart: !frontmatter,
       // The whole file is read back, so a body that would start frontmatter
       // of its own is caught too. An unchanged body is parsed already.
-      check: reader
-        ? null
-        : (body) =>
-            this.writer.difference(this.parse(frontmatter + body).doc, doc),
+      check:
+        reader || options.approximate
+          ? null
+          : (body, layout) => {
+              const read = splitSource(join(body));
+              const readBody = this.parseBody(read.body);
+              if (read.body !== body) {
+                const first = this.writer.difference(readBody.doc, doc);
+                return new Set(first === -1 ? [] : [first]);
+              }
+              return this.writer.differences(readBody, doc, layout);
+            },
       readBlock: reader?.readDocument?.bind(reader),
     });
     return {
       ...result,
-      markdown: joinSource({ ...source, frontmatter }, result.markdown),
+      markdown: joinSource(
+        { ...source, frontmatter: head(result.markdown) },
+        result.markdown,
+      ),
     };
   }
 }

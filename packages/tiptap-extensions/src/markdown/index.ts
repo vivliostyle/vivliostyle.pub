@@ -1,6 +1,7 @@
 export type { BaseContent, BaseDocument, BaseNode } from './base';
 export {
   currentNotations,
+  type DocumentRecord,
   type GetMarkdownOptions,
   getMarkdown,
   getMarkdownWithResult,
@@ -41,7 +42,6 @@ export {
   type NotationDefinition,
   type ParseContext,
   type StyleSpec,
-  TEXT_EDGE,
   type WriteContext,
 } from './notation';
 export { commonMarkNotations } from './notations/commonmark';

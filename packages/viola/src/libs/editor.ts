@@ -8,12 +8,12 @@ import * as Y from 'yjs';
 import type { SyncProvider } from '@v/sync-client';
 import {
   currentNotations,
+  type DocumentRecord,
   getMarkdown,
   MARKED_NOTATIONS,
   MarkdownWriteError,
   PubExtensions,
   parseMarkdown,
-  setDocumentNotations,
   setMarkdownBaseline,
 } from '@v/tiptap-extensions';
 import type { ProjectId } from '../stores/proxies/project';
@@ -56,6 +56,7 @@ export async function setupEditor({
   initialFile,
   sync,
   onSave,
+  onSaveError,
   writeFile,
 }: {
   projectId: ProjectId;
@@ -64,6 +65,8 @@ export async function setupEditor({
   initialFile?: SandboxFile;
   sync?: EditorSyncContext;
   onSave: (content: { markdown: string; summary: string }) => void;
+  /** Called when saving starts failing, and when it works again. */
+  onSaveError?: (failing: boolean) => void;
   writeFile: (path: string, file: SandboxFile) => void;
 }) {
   const fileDir = filename ? dirname(filename) : '';
@@ -86,27 +89,28 @@ export async function setupEditor({
       }
       if (markdown !== undefined) {
         const { frontmatter } = parseMarkdown(editor, markdown);
-        if (meta.get(FRONTMATTER_KEY) !== frontmatter) {
+        // An empty record removes the file's frontmatter, so it is only
+        // made by removing recorded frontmatter, not by a file without any.
+        const recorded = meta.get(FRONTMATTER_KEY);
+        if (recorded !== frontmatter && (frontmatter || recorded)) {
           meta.set(FRONTMATTER_KEY, frontmatter);
         }
       }
     });
   };
-  // Read when saving: IndexedDB, the server and other clients can change the
-  // record at any time.
-  const readRecord = (editor: Editor) => {
+  // Read on every write, by the extension: IndexedDB, the server and other
+  // clients can change the record at any time.
+  const documentRecord = (): DocumentRecord => {
     const notations = meta.get(NOTATIONS_KEY);
-    setDocumentNotations(
-      editor,
-      notations === undefined
-        ? hasContent()
-          ? MARKED_NOTATIONS
-          : null
-        : notations === currentNotations(editor)
-          ? null
+    return {
+      notations:
+        notations === undefined
+          ? hasContent()
+            ? MARKED_NOTATIONS
+            : null
           : notations,
-    );
-    return meta.get(FRONTMATTER_KEY);
+      frontmatter: meta.get(FRONTMATTER_KEY),
+    };
   };
   // Editor state is persisted to IndexedDB keyed by a stable project + file
   // path. contentId is regenerated on every load, so it cannot serve as the
@@ -115,23 +119,28 @@ export async function setupEditor({
     ? new IndexeddbPersistence(editorPersistenceKey(projectId, filename), doc)
     : undefined;
 
+  let failed = false;
   const saveContent = debounce(
     (editor: Editor) => {
-      const frontmatter = readRecord(editor);
       let markdown: string;
       try {
-        markdown = getMarkdown(
-          editor,
-          frontmatter === undefined ? {} : { frontmatter },
-        );
+        markdown = getMarkdown(editor);
       } catch (error) {
         // Saving it would change what the file means; the file keeps its
         // last good state, and the next edit tries again.
         if (error instanceof MarkdownWriteError) {
-          console.error(error);
+          if (!failed) {
+            failed = true;
+            console.error(error);
+            onSaveError?.(true);
+          }
           return;
         }
         throw error;
+      }
+      if (failed) {
+        failed = false;
+        onSaveError?.(false);
       }
       setMarkdownBaseline(editor, markdown);
       onSave({ markdown, summary: getEditorSummary(editor) });
@@ -153,6 +162,7 @@ export async function setupEditor({
       },
       onSetMarkdown: (editor) =>
         recordMarkdown(editor, editor.storage.pubMarkdown.baseline),
+      documentRecord,
       onDrop: (editor, payload, pos) => {
         switch (payload.type) {
           case 'asset':
