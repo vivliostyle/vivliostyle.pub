@@ -26,11 +26,41 @@ export interface SourceRange {
   prefixes: readonly LinePrefix[];
 }
 
+/**
+ * A piece of a textblock's content and where it was written: `from` and `to`
+ * are offsets in the textblock's content, `start` and `end` in the source.
+ */
+export interface InlineUnit {
+  from: number;
+  to: number;
+  start: number;
+  end: number;
+  /**
+   * Each character of the piece was written as itself, at the same distance
+   * from `start`, so any part of it can be reused on its own.
+   */
+  splittable: boolean;
+}
+
+/**
+ * Where the content of a textblock was written. Source between two units,
+ * such as the prefixes of a quote's lines, belongs to neither.
+ */
+export interface InlineSource {
+  /** The text the units' `start` and `end` point into. */
+  text: string;
+  /** The prefixes of the containers around the textblock. */
+  prefixes: readonly LinePrefix[];
+  units: readonly InlineUnit[];
+}
+
 export interface ParsedBody {
   body: string;
   doc: ProseMirrorNode;
   /** Source ranges of the nodes made from exactly one mdast node. */
   ranges: WeakMap<ProseMirrorNode, SourceRange>;
+  /** Where the content of the textblocks in `ranges` was written. */
+  inlines: WeakMap<ProseMirrorNode, InlineSource>;
   styles: ReadonlyMap<string, string>;
 }
 
@@ -134,11 +164,55 @@ function separateSiblings(node: UnknownMdastNode, body: string): void {
   }
 }
 
+function textOf(node: UnknownMdastNode): string {
+  return node.value ?? childrenOf(node).map(textOf).join('');
+}
+
+/**
+ * Gives phrasing that a transform made after reading, such as the text and
+ * links of GFM autolinks, the position of its text in the source, which it
+ * is written as there.
+ */
+function placeTransformed(node: UnknownMdastNode, body: string): void {
+  const children = childrenOf(node);
+  let cursor = node.position?.start.offset;
+  children.forEach((child, index) => {
+    if (cursor !== undefined && !child.position) {
+      const next = children.slice(index + 1).find((it) => it.position)?.position
+        ?.start.offset;
+      const text = textOf(child);
+      const at = cursor;
+      if (
+        text &&
+        body.startsWith(text, at) &&
+        (next === undefined || at + text.length <= next)
+      ) {
+        child.position = {
+          start: { line: 0, column: 0, offset: at },
+          end: { line: 0, column: 0, offset: at + text.length },
+        };
+      }
+    }
+    cursor = child.position?.end.offset ?? undefined;
+    placeTransformed(child, body);
+  });
+}
+
 class Converter {
   private prefixes: LinePrefix[] = [];
   private marks: readonly Mark[] = [];
   readonly ranges = new WeakMap<ProseMirrorNode, SourceRange>();
+  readonly inlineSources = new WeakMap<ProseMirrorNode, InlineSource>();
   private readonly context: ParseContext;
+  /** How deep the phrasing being converted is; 1 is a textblock's own. */
+  private inlineDepth = 0;
+  /** Units `literal` found in the text node being converted at depth 1. */
+  private textUnits: InlineUnit[] | null = null;
+  private lastInlines: {
+    parent: UnknownMdastNode | undefined;
+    units: InlineUnit[];
+    size: number;
+  } | null = null;
 
   constructor(
     private readonly schema: Schema,
@@ -158,8 +232,10 @@ class Converter {
       blocks: (parent) => this.blocks(parent),
       inlines: (parent, marks) =>
         marks
-          ? this.withMarks(marks, () => this.inlines(childrenOf(parent)))
-          : this.inlines(childrenOf(parent)),
+          ? this.withMarks(marks, () =>
+              this.inlines(childrenOf(parent), parent),
+            )
+          : this.inlines(childrenOf(parent), parent),
       text: (value, marks) => this.text(value, marks ?? this.marks),
       literal: (node) => this.literal(node),
       raw: (node) =>
@@ -250,7 +326,21 @@ class Converter {
             index = element.close;
           }
         } else {
+          this.lastInlines = null;
           nodes = this.block(child);
+          const inlines = this.lastInlines as Converter['lastInlines'];
+          if (
+            nodes.length === 1 &&
+            nodes[0].isTextblock &&
+            inlines?.parent === child &&
+            inlines.size === nodes[0].content.size
+          ) {
+            this.inlineSources.set(nodes[0], {
+              text: this.body,
+              prefixes: [...this.prefixes],
+              units: inlines.units,
+            });
+          }
         }
         if (nodes.length === 1) {
           let { start } = rangeOf(child);
@@ -291,30 +381,72 @@ class Converter {
     return nodes;
   }
 
-  private inlines(children: readonly UnknownMdastNode[]): ProseMirrorNode[] {
+  private inlines(
+    children: readonly UnknownMdastNode[],
+    parent?: UnknownMdastNode,
+  ): ProseMirrorNode[] {
     const wasInline = this.inInline;
+    const depth = this.inlineDepth;
     this.inInline = true;
+    this.inlineDepth = wasInline ? depth + 1 : 1;
+    const own = this.inlineDepth === 1;
+    let units: InlineUnit[] | null = [];
+    let size = 0;
     try {
       const nodes: ProseMirrorNode[] = [];
       for (let index = 0; index < children.length; index++) {
         const child = children[index];
+        const first = index;
         const element = this.htmlElementAt(children, index, 'mark');
         const type = element && this.schema.marks[element.spec.type];
+        let converted: readonly ProseMirrorNode[];
+        this.textUnits = null;
         if (element && type) {
-          nodes.push(
-            ...this.withMarks(
-              type.create(element.attrs).addToSet(this.marks),
-              () => this.inlines(children.slice(index + 1, element.close)),
-            ),
+          converted = this.withMarks(
+            type.create(element.attrs).addToSet(this.marks),
+            () => this.inlines(children.slice(index + 1, element.close)),
           );
           index = element.close;
-          continue;
+        } else {
+          converted = this.inline(child);
         }
-        nodes.push(...this.inline(child));
+        nodes.push(...converted);
+        if (own && units) {
+          const length = converted.reduce((sum, it) => sum + it.nodeSize, 0);
+          const found = this.textUnits as InlineUnit[] | null;
+          const start = children[first].position?.start.offset;
+          const end = children[index].position?.end.offset;
+          if (found && found.at(-1)?.to === length) {
+            units.push(
+              ...found.map((unit) => ({
+                ...unit,
+                from: unit.from + size,
+                to: unit.to + size,
+              })),
+            );
+          } else if (start === undefined || end === undefined) {
+            // Made by a transform rather than read, such as a GFM autolink.
+            units = null;
+          } else if (length > 0) {
+            units.push({
+              from: size,
+              to: size + length,
+              start,
+              end,
+              splittable: false,
+            });
+          }
+          size += length;
+        }
+      }
+      if (own && units) {
+        this.lastInlines = { parent, units, size };
       }
       return nodes;
     } finally {
       this.inInline = wasInline;
+      this.inlineDepth = depth;
+      this.textUnits = null;
     }
   }
 
@@ -388,9 +520,8 @@ class Converter {
   /**
    * A text node's value, keeping backslash escapes as raw markdown where no
    * definition gives the escaped character meaning: they still mean
-   * something to syntax read elsewhere, such as VFM ruby or math, and
-   * markdown has already read them away. An escaped backslash is kept too,
-   * since math reads it as written.
+   * something to syntax read elsewhere, such as VFM ruby, and markdown has
+   * already read them away.
    */
   private literal(node: UnknownMdastNode): ProseMirrorNode[] {
     const value = node.value ?? '';
@@ -401,30 +532,52 @@ class Converter {
         ? ''
         : this.body.slice(start, end);
     const raw = this.schema.marks[RAW_INLINE];
-    if (!raw || !source.includes('\\')) {
-      return this.text(value, this.marks);
-    }
-    const rawMarks = raw.create().addToSet(this.marks);
+    const rawMarks = raw?.create().addToSet(this.marks);
     const nodes: ProseMirrorNode[] = [];
+    const units: InlineUnit[] = [];
     let plain = '';
+    let size = 0;
     let i = 0;
     let j = 0;
     const flush = () => {
       nodes.push(...this.text(plain, this.marks));
       plain = '';
     };
+    const unit = (length: number, written: number, splittable: boolean) => {
+      const last = units.at(-1);
+      const at = (start ?? 0) + i;
+      if (splittable && last?.splittable && last.end === at) {
+        last.to += length;
+        last.end += written;
+      } else {
+        units.push({
+          from: size,
+          to: size + length,
+          start: at,
+          end: at + written,
+          splittable,
+        });
+      }
+      size += length;
+    };
+    const asIs = () => {
+      this.textUnits = null;
+      return this.text(value, this.marks);
+    };
     while (i < source.length) {
       const char = source[i];
       const next = source[i + 1];
       if (char === '\\' && next && ASCII_PUNCTUATION.includes(next)) {
         if (value[j] !== next) {
-          return this.text(value, this.marks);
+          return asIs();
         }
-        if (next === '\\' || !this.meaningful.has(next)) {
+        if (next !== '\\' && rawMarks && !this.meaningful.has(next)) {
           flush();
           nodes.push(...this.text(char + next, rawMarks));
+          unit(2, 2, true);
         } else {
           plain += next;
+          unit(1, 2, false);
         }
         i += 2;
         j += 1;
@@ -435,6 +588,7 @@ class Converter {
         const decoded = decodeString(reference);
         if (value.startsWith(decoded, j)) {
           plain += decoded;
+          unit(decoded.length, reference.length, false);
           i += reference.length;
           j += decoded.length;
           continue;
@@ -442,6 +596,7 @@ class Converter {
       }
       if (char === value[j]) {
         plain += char;
+        unit(1, 1, true);
         i++;
         j++;
         continue;
@@ -454,12 +609,20 @@ class Converter {
         i++;
         continue;
       }
-      return this.text(value, this.marks);
+      // Spaces at the end of a line, which markdown leaves out too.
+      if (/[ \t]/.test(char) && /^[ \t]*\n/.test(source.slice(i))) {
+        i++;
+        continue;
+      }
+      return asIs();
     }
     if (j !== value.length) {
-      return this.text(value, this.marks);
+      return asIs();
     }
     flush();
+    if (this.inlineDepth === 1) {
+      this.textUnits = units;
+    }
     return nodes;
   }
 
@@ -567,6 +730,7 @@ export class MarkdownParser {
       this.processor.parse(body),
     );
     separateSiblings(root, body);
+    placeTransformed(root, body);
     const converter = new Converter(
       this.schema,
       body,
@@ -578,6 +742,7 @@ export class MarkdownParser {
       body,
       doc: converter.root(root),
       ranges: converter.ranges,
+      inlines: converter.inlineSources,
       styles: tallyStyles(root, body, this.styleSpecs),
     };
   }

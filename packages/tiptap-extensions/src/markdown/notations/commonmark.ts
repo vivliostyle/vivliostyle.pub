@@ -74,9 +74,8 @@ const documentNotation = defineNotation({
   },
   escapes: [
     { pattern: /[`*_[\]<]/g },
-    // `\\` would read as a backslash kept as raw markdown, see
-    // `ParseContext.literal`.
-    { pattern: /\\/g, entity: true },
+    // A backslash only escapes punctuation, or breaks the line it ends.
+    { pattern: /\\(?=[!-/:-@[-`{-~\n])/g },
     { pattern: /&(?=#?[a-zA-Z0-9]+;)/g },
     // Whitespace would be stripped at the start and end of a line, and two
     // spaces before a line break would make it a hard break.
@@ -487,7 +486,12 @@ const hardBreakNotation = defineNotation({
   },
   nodes: {
     hardBreak: (_, context) =>
-      context.data.singleLine ? '<br>' : context.style('break'),
+      context.data.singleLine
+        ? '<br>'
+        : // A backslash can be read into the text before it, e.g. a URL.
+          context.escaping === 'safe'
+          ? '  \n'
+          : context.style('break'),
   },
   styles: {
     break: {
@@ -538,11 +542,13 @@ const emphasisNotation = defineNotation({
       return marks && context.inlines(node, marks);
     },
   },
+  htmlElements: [{ kind: 'mark', type: 'italic', tag: 'em' }],
   marks: {
     italic: {
       open: (_, context) => delimiter(context, 'emphasis', '*'),
       close: (_, context) => delimiter(context, 'emphasis', '*'),
       flanking: true,
+      html: 'em',
     },
   },
   styles: {
@@ -562,11 +568,13 @@ const strongNotation = defineNotation({
       return marks && context.inlines(node, marks);
     },
   },
+  htmlElements: [{ kind: 'mark', type: 'bold', tag: 'strong' }],
   marks: {
     bold: {
       open: (_, context) => delimiter(context, 'strong', '**'),
       close: (_, context) => delimiter(context, 'strong', '**'),
       flanking: true,
+      html: 'strong',
     },
   },
   styles: {
@@ -645,11 +653,25 @@ const linkNotation = defineNotation({
   marks: {
     link: {
       open: '[',
-      close: (mark) =>
-        `](${linkDestination(String(mark.attrs.href ?? ''))}${linkTitle(mark.attrs.title)})`,
+      close: (mark, context, text) => {
+        // A link read from a reference stays one, e.g. a footnote reference
+        // that an old parser read as a link.
+        const definition = context.definition(text);
+        if (
+          definition &&
+          definition.url === mark.attrs.href &&
+          definition.title === (mark.attrs.title || null)
+        ) {
+          return ']';
+        }
+        return `](${linkDestination(String(mark.attrs.href ?? ''))}${linkTitle(mark.attrs.title)})`;
+      },
       implied: isBareUrlLink,
     },
   },
+  // Text after brackets, raw markdown ones included, can be read as a
+  // destination.
+  escapes: [{ pattern: /[()]/g }],
 });
 
 /** CommonMark, as definitions of the editor's standard nodes and marks. */

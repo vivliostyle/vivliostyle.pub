@@ -9,6 +9,11 @@ interface Run {
   atom?: string;
   marks: string;
   raw: boolean;
+  /**
+   * The link mark, among `marks`, that GFM would have made of the text by
+   * itself: a URL, `www.` or an email address written bare.
+   */
+  autolink?: string;
 }
 
 /** A node as markdown can hold it. */
@@ -32,6 +37,7 @@ interface Char {
   lineBreak?: boolean;
   marks: string[];
   raw: boolean;
+  autolink?: string;
 }
 
 export interface WrittenFormOptions {
@@ -47,79 +53,108 @@ export interface WrittenFormOptions {
   readRaw?: (text: string) => ProseMirrorNode[] | null;
   /** The attributes as the markdown holds them, see `NodeWriter`. */
   attrsOf?: (node: ProseMirrorNode) => Record<string, unknown>;
-  /** The markdown of a textblock's content. */
-  writeInline?: (node: ProseMirrorNode) => string;
+  /**
+   * A top-level block as markdown with every character that could mean
+   * something escaped, so that only its raw markdown means anything.
+   */
+  writeSafe?: (node: ProseMirrorNode) => string;
+}
+
+/** The text GFM autolinks to `href` when written bare, see `isBareUrlLink`. */
+function isAutolinkLiteral(text: string, href: unknown): boolean {
+  if (typeof href !== 'string' || /\s/.test(text)) {
+    return false;
+  }
+  return (
+    (href === text && /^(?:https?|ftp):\/\//i.test(text)) ||
+    (href === `http://${text}` && /^www/i.test(text)) ||
+    (href === `mailto:${text}` && /^[^@]+@[^@]+$/.test(text))
+  );
 }
 
 /**
  * Reduces documents to what their markdown holds, so a document and the one
  * read back from its markdown can be compared: empty paragraphs, line breaks
  * at the ends of a textblock and whitespace at the edges of emphasis have no
- * markdown, and raw markdown means whatever it reads as.
+ * markdown.
+ *
+ * Raw markdown reads back as the same text, as long as it is not edited
+ * into other syntax. Where a block with raw markdown does not read back the
+ * same, it means what it reads as once every character but the raw markdown
+ * is escaped, which can be other blocks.
  */
 export class WrittenForm {
   constructor(private readonly options: WrittenFormOptions) {}
 
-  blocks(doc: ProseMirrorNode, expandRaw: boolean): WrittenBlock[] {
+  blocks(doc: ProseMirrorNode, read: boolean): WrittenBlock[] {
     const blocks: WrittenBlock[] = [];
     let origin = 0;
     doc.forEach((child) => {
       if (this.options.isUnwritten(child)) {
         return;
       }
-      for (const node of expandRaw ? this.expand(child) : [child]) {
-        blocks.push({ node: this.form(node, expandRaw), origin });
-      }
+      blocks.push({ node: this.form(child, read), origin });
       origin++;
     });
     return blocks;
   }
 
-  // A raw block, a textblock holding nothing but raw markdown, or one that
-  // starts with raw markdown of block syntax means what its text reads as,
-  // which can be other blocks once it was edited.
-  private expand(node: ProseMirrorNode): ProseMirrorNode[] {
-    const { rawBlockName, readRaw, rawInline, writeInline } = this.options;
-    if (!readRaw) {
-      return [node];
-    }
-    const isRaw = (child: ProseMirrorNode | null) =>
-      Boolean(child?.isText && rawInline?.isInSet(child.marks));
-    let text: string | undefined;
-    if (node.type.name === rawBlockName) {
-      text = node.textContent;
-    } else if (
-      node.isTextblock &&
-      node.childCount > 0 &&
-      isRaw(node.firstChild)
-    ) {
-      if (node.content.content.every(isRaw)) {
-        text = node.textContent;
-      } else if (writeInline) {
-        const start = readRaw(node.firstChild?.text ?? '');
-        if (start && !(start.length === 1 && start[0].type === node.type)) {
-          text = writeInline(node);
-        }
-      }
-    }
-    if (text === undefined) {
-      return [node];
-    }
-    const read = readRaw(text);
-    if (
-      !read ||
-      read.length === 0 ||
-      (read.length === 1 && read[0].type === node.type)
-    ) {
-      return [node];
-    }
-    return read;
+  /**
+   * Whether `actual`, read back from markdown, holds the top-level block
+   * `node` of a document.
+   */
+  holds(node: ProseMirrorNode, actual: readonly ProseMirrorNode[]): boolean {
+    const got = actual.filter((child) => !this.options.isUnwritten(child));
+    return this.consume(node, got, 0) === got.length;
   }
 
-  private form(node: ProseMirrorNode, expandRaw: boolean): WrittenNode {
+  /**
+   * How many of the blocks read back from `start` on hold the top-level
+   * block `node` of a document, or -1 when they do not.
+   */
+  consume(
+    node: ProseMirrorNode,
+    actual: readonly ProseMirrorNode[],
+    start: number,
+  ): number {
+    const same = (want: readonly WrittenNode[]) =>
+      start + want.length <= actual.length &&
+      want.every((it, i) => nodesMatch(it, this.form(actual[start + i], true)));
+    if (same([this.form(node, false)])) {
+      return 1;
+    }
+    const meaning = this.rawMeaning(node);
+    return meaning !== null && same(meaning) ? meaning.length : -1;
+  }
+
+  /** What a block with raw markdown means, see the class. */
+  private rawMeaning(node: ProseMirrorNode): WrittenNode[] | null {
+    const { readRaw, writeSafe, rawInline, rawBlockName } = this.options;
+    if (!readRaw || !writeSafe) {
+      return null;
+    }
+    let raw = node.type.name === rawBlockName;
+    node.descendants((child) => {
+      raw ||=
+        child.type.name === rawBlockName ||
+        Boolean(child.isText && rawInline?.isInSet(child.marks));
+      return !raw;
+    });
+    if (!raw) {
+      return null;
+    }
+    const read = readRaw(writeSafe(node));
+    return (
+      read
+        ?.filter((child) => !this.options.isUnwritten(child))
+        .map((child) => this.form(child, true)) ?? null
+    );
+  }
+
+  private form(node: ProseMirrorNode, read: boolean): WrittenNode {
     const attrs = JSON.stringify(this.options.attrsOf?.(node) ?? node.attrs);
     if (node.isTextblock) {
-      return { type: node.type.name, attrs, runs: this.runs(node) };
+      return { type: node.type.name, attrs, runs: this.runs(node, read) };
     }
     if (node.isLeaf) {
       return { type: node.type.name, attrs };
@@ -131,29 +166,25 @@ export class WrittenForm {
     const written = children.filter(
       (child) => !this.options.isUnwritten(child),
     );
+    // Markdown keeps an empty paragraph only where the container needs one,
+    // such as the first in a list item.
+    const required = children[0] && [
+      children[0],
+      ...written.filter((child) => child !== children[0]),
+    ];
     const kept = node.type.validContent(Fragment.from(written))
       ? written
-      : children;
-    let expanded = kept.flatMap((child) =>
-      expandRaw ? this.expand(child) : [child],
-    );
-    if (expanded !== kept && !node.type.validContent(Fragment.from(expanded))) {
-      // Raw markdown that now reads as other blocks still gets what the
-      // container requires before it, as reading does, e.g. a list item's
-      // first paragraph.
-      const before = node.type.contentMatch.fillBefore(Fragment.from(expanded));
-      if (before) {
-        expanded = [...before.content, ...expanded];
-      }
-    }
+      : required && node.type.validContent(Fragment.from(required))
+        ? required
+        : children;
     return {
       type: node.type.name,
       attrs,
-      children: expanded.map((it) => this.form(it, expandRaw)),
+      children: kept.map((it) => this.form(it, read)),
     };
   }
 
-  private runs(textblock: ProseMirrorNode): Run[] {
+  private runs(textblock: ProseMirrorNode, read: boolean): Run[] {
     const { rawInline } = this.options;
     const chars: Char[] = [];
     textblock.forEach((child) => {
@@ -162,11 +193,15 @@ export class WrittenForm {
         .filter((mark) => mark.type !== rawInline)
         .map((mark) => JSON.stringify(mark.toJSON()));
       if (!child.isText) {
+        const lineBreak = child.type.spec.linebreakReplacement === true;
+        // Markdown has no marks for a line break, e.g. code cannot hold one.
         chars.push({
-          atom: JSON.stringify(child.toJSON()),
-          lineBreak: child.type.spec.linebreakReplacement === true,
-          marks,
-          raw,
+          atom: JSON.stringify(
+            lineBreak ? child.mark([]).toJSON() : child.toJSON(),
+          ),
+          lineBreak,
+          marks: lineBreak ? [] : marks,
+          raw: lineBreak ? false : raw,
         });
         return;
       }
@@ -174,6 +209,9 @@ export class WrittenForm {
         chars.push({ char, marks: [...marks], raw });
       }
     });
+    if (read) {
+      this.findAutolinks(textblock, chars);
+    }
     const isBreak = (it: Char | undefined) =>
       it?.char === '\n' || Boolean(it?.lineBreak);
     // Raw markdown at the edges of a textblock may start or end with
@@ -212,14 +250,56 @@ export class WrittenForm {
       } else if (
         last?.text !== undefined &&
         last.marks === marks &&
-        last.raw === char.raw
+        last.raw === char.raw &&
+        last.autolink === char.autolink
       ) {
         last.text += char.char;
       } else {
-        runs.push({ text: char.char, marks, raw: char.raw });
+        runs.push({
+          text: char.char,
+          marks,
+          raw: char.raw,
+          ...(char.autolink && { autolink: char.autolink }),
+        });
       }
     }
     return runs;
+  }
+
+  /** Flags the characters of links that GFM made of bare text. */
+  private findAutolinks(textblock: ProseMirrorNode, chars: Char[]): void {
+    let offset = 0;
+    const spans: { from: number; to: number; key: string; text: string }[] = [];
+    textblock.forEach((child) => {
+      const link = child.marks.find((mark) => mark.type.name === 'link');
+      const size = child.isText ? [...(child.text ?? '')].length : 1;
+      if (child.isText && link) {
+        const key = JSON.stringify(link.toJSON());
+        const last = spans.at(-1);
+        if (last && last.key === key && last.to === offset) {
+          last.to += size;
+          last.text += child.text ?? '';
+        } else {
+          spans.push({
+            from: offset,
+            to: offset + size,
+            key,
+            text: child.text ?? '',
+          });
+        }
+      }
+      offset += size;
+    });
+    for (const span of spans) {
+      const href = (JSON.parse(span.key) as { attrs?: { href?: unknown } })
+        .attrs?.href;
+      if (!isAutolinkLiteral(span.text, href)) {
+        continue;
+      }
+      for (let i = span.from; i < span.to && i < chars.length; i++) {
+        chars[i].autolink = span.key;
+      }
+    }
   }
 
   // Whitespace at the edges of a flanking mark's range is written outside
@@ -260,56 +340,54 @@ export class WrittenForm {
   }
 }
 
+interface FlatChar {
+  value: string;
+  marks: string;
+  raw: boolean;
+  autolink?: string;
+}
+
+function flatten(runs: readonly Run[]): FlatChar[] {
+  return runs.flatMap((run) =>
+    run.atom !== undefined
+      ? [{ value: `\u0000${run.atom}`, marks: run.marks, raw: run.raw }]
+      : [...(run.text ?? '')].map((value) => ({
+          value,
+          marks: run.marks,
+          raw: run.raw,
+          ...(run.autolink && { autolink: run.autolink }),
+        })),
+  );
+}
+
+function withoutMark(marks: string, mark: string): string {
+  return JSON.stringify(
+    (JSON.parse(marks) as string[]).filter((it) => it !== mark),
+  );
+}
+
+/**
+ * Raw markdown reads back as the same text, as raw markdown again or as
+ * plain text; other text reads back as text with the same marks, or with a
+ * link GFM made of a bare URL in it.
+ */
 function runsMatch(expected: readonly Run[], actual: readonly Run[]): boolean {
-  const expectsRaw = expected.some((run) => run.raw);
-  if (!expectsRaw) {
-    return (
-      expected.length === actual.length &&
-      expected.every(
-        (run, index) =>
-          !actual[index].raw &&
-          run.text === actual[index].text &&
-          run.atom === actual[index].atom &&
-          run.marks === actual[index].marks,
-      )
-    );
-  }
-  // Raw markdown reads as whatever it reads as, but the text around it has
-  // to come back as it was, in order, as text and with its marks.
-  let index = 0;
-  let offset = 0;
-  for (const run of expected) {
-    if (run.raw) {
-      continue;
-    }
-    let found = false;
-    while (!found && index < actual.length) {
-      const candidate = actual[index];
-      if (!candidate.raw && candidate.marks === run.marks) {
-        if (run.atom !== undefined && candidate.atom === run.atom) {
-          index++;
-          offset = 0;
-          found = true;
-          continue;
-        }
-        const at =
-          run.text !== undefined && candidate.text !== undefined
-            ? candidate.text.indexOf(run.text, offset)
-            : -1;
-        if (at !== -1) {
-          offset = at + (run.text?.length ?? 0);
-          found = true;
-          continue;
-        }
+  const a = flatten(expected);
+  const b = flatten(actual);
+  return (
+    a.length === b.length &&
+    a.every((char, index) => {
+      const other = b[index];
+      if (char.value !== other.value || (other.raw && !char.raw)) {
+        return false;
       }
-      index++;
-      offset = 0;
-    }
-    if (!found) {
-      return false;
-    }
-  }
-  return true;
+      return (
+        char.marks === other.marks ||
+        (other.autolink !== undefined &&
+          withoutMark(other.marks, other.autolink) === char.marks)
+      );
+    })
+  );
 }
 
 function nodesMatch(expected: WrittenNode, actual: WrittenNode): boolean {
@@ -326,7 +404,10 @@ function nodesMatch(expected: WrittenNode, actual: WrittenNode): boolean {
   );
 }
 
-/** The index of the first block of `doc` that `read` does not hold, or -1. */
+/**
+ * The index of the first block of `doc` that `read` does not hold, or -1,
+ * comparing block by block.
+ */
 export function firstDifference(
   doc: readonly WrittenBlock[],
   read: readonly WrittenBlock[],

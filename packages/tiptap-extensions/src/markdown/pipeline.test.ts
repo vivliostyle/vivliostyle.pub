@@ -54,6 +54,21 @@ function appendTo(editor: Editor, needle: string, text: string): void {
   editor.view.dispatch(editor.state.tr.insertText(text, end));
 }
 
+/** Inserts text after the first occurrence of `needle` in the text. */
+function appendAfter(editor: Editor, needle: string, text: string): void {
+  let at: number | undefined;
+  editor.state.doc.descendants((node, pos) => {
+    const index = node.isText ? (node.text ?? '').indexOf(needle) : -1;
+    if (at === undefined && index !== -1) {
+      at = pos + index + needle.length;
+    }
+  });
+  if (at === undefined) {
+    throw new Error(`No text holds ${needle}`);
+  }
+  editor.view.dispatch(editor.state.tr.insertText(text, at));
+}
+
 function topLevel(doc: ProseMirrorNode): ProseMirrorNode[] {
   const children: ProseMirrorNode[] = [];
   doc.forEach((child) => {
@@ -243,6 +258,45 @@ describe('documents made by the old parser', () => {
     expect(getMarkdown(editor)).toBe(markdown.replace('a\n', 'a!\n'));
   });
 
+  it('keeps the HTML of a paragraph the old parser made of it', () => {
+    const markdown = 'a\n\n<div class="x">\n<b>html</b>\n</div>\n\nb\n';
+    const editor = loadMarked(markdown);
+    const html = editor.state.doc.child(1);
+    expect(html.textContent).toContain('<b>html</b>');
+    let end = 0;
+    editor.state.doc.forEach((node, offset, index) => {
+      if (index === 1) {
+        end = offset + node.nodeSize - 1;
+      }
+    });
+    editor.view.dispatch(editor.state.tr.insertText('X', end));
+    // The old parser kept the blank line after the HTML in the paragraph.
+    expect(getMarkdown(editor)).toBe(
+      'a\n\n<div class="x">\n<b>html</b>\n</div>\n\nX\n\nb\n',
+    );
+  });
+
+  it.each([
+    ['本文', '注[^1]の本文X\n\n[^1]: note\n'],
+    ['注', '注X[^1]の本文\n\n[^1]: note\n'],
+  ])('keeps a footnote reference the old parser read as a link, after %j', (needle, expected) => {
+    const editor = loadMarked('注[^1]の本文\n\n[^1]: note\n');
+    expect(editor.state.doc.toString()).toBe(
+      'doc(paragraph("注", link("^1"), "の本文"))',
+    );
+    appendAfter(editor, needle, 'X');
+    expect(getMarkdown(editor)).toBe(expected);
+  });
+
+  it('keeps the escapes the old parser read away', () => {
+    const markdown = '{漢字|かんじ}と\\{x\\}とa\\\\bと\\*c\\*\n';
+    const editor = loadMarked(markdown);
+    appendAfter(editor, '{漢字|かんじ}', 'X');
+    expect(getMarkdown(editor)).toBe(
+      '{漢字|かんじ}Xと\\{x\\}とa\\\\bと\\*c\\*\n',
+    );
+  });
+
   it('writes text with the definitions of the time', () => {
     const editor = loadMarked('a ~~b~~ c\n\nd\n');
     expect(currentNotations(editor)).not.toBe(MARKED_NOTATIONS);
@@ -367,7 +421,7 @@ describe('saving keeps what the document means', () => {
     appendTo(editor, 'd', 'Z');
     expect(getMarkdown(editor)).toBe('a {b|c} dZ\n');
     setDocumentNotations(editor, null);
-    expect(getMarkdown(editor)).toBe('a \\{b\\|c} dZ\n');
+    expect(getMarkdown(editor)).toBe('a \\{b|c} dZ\n');
   });
 
   it('keeps the line ending of every line it keeps', () => {
@@ -422,6 +476,120 @@ describe('saving keeps what the document means', () => {
     const { schema } = editor.state;
     const doc = schema.topNodeType.create(null, schema.text('a'));
     expect(() => getMarkdown(editor, { doc })).toThrow(MarkdownWriteError);
+  });
+
+  it('keeps the source of the other blocks in what it could not write', () => {
+    const editor = load('_x_ y\n\n* z\n');
+    const { schema } = editor.state;
+    const doc = schema.topNodeType.create(null, [
+      ...topLevel(editor.state.doc),
+      schema.text('a'),
+    ]);
+    let error: unknown;
+    try {
+      getMarkdown(editor, { doc });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(MarkdownWriteError);
+    expect((error as MarkdownWriteError).markdown).toMatch(/^_x_ y\n\n\* z/);
+  });
+
+  it('does not try the same failing document twice', () => {
+    const editor = load('');
+    const { schema } = editor.state;
+    const doc = schema.topNodeType.create(null, schema.text('a'));
+    const errorOf = (it: ProseMirrorNode) => {
+      try {
+        getMarkdown(editor, { doc: it });
+      } catch (error) {
+        return error;
+      }
+    };
+    const first = errorOf(doc);
+    expect(errorOf(doc)).toBe(first);
+    expect(errorOf(schema.topNodeType.create(null, schema.text('b')))).not.toBe(
+      first,
+    );
+  });
+
+  it('starts the body on a line of its own after frontmatter alone', () => {
+    const editor = load('---\ntitle: x\n---');
+    editor.view.dispatch(editor.state.tr.insertText('hello', 1));
+    expect(getMarkdown(editor)).toBe('---\ntitle: x\n---\nhello');
+  });
+});
+
+describe('what the document records', () => {
+  // Stands for syntax that reads text with braces as something else.
+  const braces = (version: number, escapes: boolean) =>
+    defineNotation({
+      name: 'braces',
+      version,
+      ...(escapes && {
+        fromMarkdown: {
+          text: (node, context) =>
+            /(?:^|[^\\])\{/.test(context.source(node))
+              ? context.raw(node)
+              : undefined,
+        },
+        escapes: [{ pattern: /\{/g }],
+      }),
+    });
+
+  function withRecord(record: { notations: string | null }): Editor {
+    editor = new Editor({
+      element: null,
+      extensions: [
+        PubExtensions.configure({
+          notations: [{ ...braces(2, true), earlier: [braces(1, false)] }],
+          documentRecord: () => record,
+        }),
+      ],
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    const { schema } = editor.state;
+    editor.commands.setContent(
+      schema.topNodeType
+        .create(null, [
+          schema.nodes.paragraph.create(null, schema.text('a {b|c} d')),
+        ])
+        .toJSON(),
+    );
+    setMarkdownBaseline(editor, 'a {b|c} d\n');
+    return editor;
+  }
+
+  const signature = (editor: Editor, version: number) =>
+    currentNotations(editor).replace('braces@2', `braces@${version}`);
+
+  it('is read every time the document is written', () => {
+    const record: { notations: string | null } = { notations: null };
+    const editor = withRecord(record);
+    appendTo(editor, 'd', 'Z');
+    record.notations = signature(editor, 1);
+    expect(getMarkdown(editor)).toBe('a {b|c} dZ\n');
+    record.notations = null;
+    expect(getMarkdown(editor)).toBe('a \\{b|c} dZ\n');
+  });
+
+  it('writes with the version of a definition the document was made with', () => {
+    const record: { notations: string | null } = { notations: null };
+    const editor = withRecord(record);
+    record.notations = signature(editor, 1);
+    appendTo(editor, 'd', 'Z');
+    expect(getMarkdown(editor)).toBe('a {b|c} dZ\n');
+  });
+
+  it('keeps unedited text when the version is not there any more', () => {
+    const record: { notations: string | null } = { notations: null };
+    const editor = withRecord(record);
+    record.notations = signature(editor, 7);
+    appendTo(editor, 'd', 'Z');
+    expect(getMarkdownWithResult(editor)).toEqual({
+      markdown: 'a {b|c} dZ\n',
+      strategy: 'reused',
+    });
   });
 });
 

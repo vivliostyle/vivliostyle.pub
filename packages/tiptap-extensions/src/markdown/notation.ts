@@ -58,9 +58,10 @@ export interface WriteContext {
   /** The writing style the source uses most for `key`, see `StyleSpec`. */
   style(key: string): string;
   /**
-   * `minimal` writes text as is. The output is read back, and if it does not
-   * come back as the same document it is written again `safe`, escaping every
-   * character that could mean something.
+   * `minimal` writes text with only the escapes the writer chose: where the
+   * output read back differently, it escapes the characters that made the
+   * difference. `safe` is the last resort, escaping every character that
+   * could mean something.
    */
   readonly escaping: 'minimal' | 'safe';
   /** Data the container passes to the child being written. */
@@ -79,6 +80,8 @@ export interface WriteContext {
   children(node: ProseMirrorNode, options?: ChildrenOptions): string;
   /** Escapes text that has to be read back as text, as `safe` does. */
   escape(text: string): string;
+  /** The link reference definition of `label` in the document, if any. */
+  definition(label: string): { url: string; title: string | null } | undefined;
 }
 
 export interface ChildrenOptions {
@@ -118,9 +121,16 @@ export interface NodeWriter {
 
 export interface MarkToMarkdown {
   open: string | ((mark: Mark, context: WriteContext) => string);
-  close: string | ((mark: Mark, context: WriteContext) => string);
+  /** `text` is the text under the mark, as it is in the document. */
+  close: string | ((mark: Mark, context: WriteContext, text: string) => string);
   /** Delimiters that cannot have whitespace just inside them, like `*`. */
   flanking?: boolean;
+  /**
+   * The HTML element the mark is written as where its delimiters could not
+   * open or close it, as next to `「` in Japanese. The definition has to read
+   * the element as the mark too.
+   */
+  html?: string;
   /** The text under the mark is written as is. */
   verbatim?: boolean;
   /** Writes a whole run of text under the mark, delimiters included. */
@@ -218,6 +228,12 @@ export interface NotationDefinition {
    * documents record which definitions made them.
    */
   version?: number;
+  /**
+   * The definition as it was at earlier versions, for documents made with
+   * them. They are only used to read and write such documents, so they
+   * bring no extensions of their own.
+   */
+  earlier?: readonly NotationDefinition[];
   extensions?: Extensions;
   /** remark plugins, e.g. ones adding micromark and mdast extensions. */
   remarkPlugins?: Pluggable[];
@@ -243,6 +259,8 @@ export interface DelimitedMarkDeclaration {
   /** The mdast node type the parser makes of the syntax. */
   mdastType: string;
   delimiter: string;
+  /** The HTML element read as the mark too, see `MarkToMarkdown.html`. */
+  tag?: string;
 }
 
 /** A mark written as an inline HTML element, like `<span class="tcy">`. */
@@ -307,7 +325,7 @@ export function declareNotation(
 ): NotationDefinition {
   switch (declaration.kind) {
     case 'delimitedMark': {
-      const { name, mark, mdastType, delimiter } = declaration;
+      const { name, mark, mdastType, delimiter, tag } = declaration;
       return {
         name,
         extensions: extensions ?? [
@@ -325,8 +343,16 @@ export function declareNotation(
               : undefined;
           },
         },
+        ...(tag && {
+          htmlElements: [{ kind: 'mark' as const, type: mark, tag }],
+        }),
         marks: {
-          [mark]: { open: delimiter, close: delimiter, flanking: true },
+          [mark]: {
+            open: delimiter,
+            close: delimiter,
+            flanking: true,
+            ...(tag && { html: tag }),
+          },
         },
         escapes: [
           { pattern: new RegExp(escapeRegExp(delimiter.charAt(0)), 'g') },

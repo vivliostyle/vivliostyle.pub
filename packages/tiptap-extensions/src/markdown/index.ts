@@ -1,6 +1,7 @@
 export type { BaseContent, BaseDocument, BaseNode } from './base';
 export {
   currentNotations,
+  type DocumentRecord,
   type GetMarkdownOptions,
   getMarkdown,
   getMarkdownWithResult,

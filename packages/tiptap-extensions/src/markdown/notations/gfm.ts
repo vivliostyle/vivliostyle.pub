@@ -16,13 +16,9 @@ export const gfmNotations: NotationDefinition[] = [
   defineNotation({
     name: 'gfm',
     remarkPlugins: [remarkGfm],
-    escapes: [
-      // A row of cells needs pipes, and text would otherwise autolink.
-      { pattern: /\|/g },
-      { pattern: /(?<=\b(?:https?|ftp)):(?=\/\/)/gi },
-      { pattern: /(?<=\bwww)\./gi },
-      { pattern: /@/g },
-    ],
+    // A row of cells needs pipes. Text that GFM autolinks cannot be escaped
+    // out of it: the links are found in the text after escapes are read.
+    escapes: [{ pattern: /\|/g }],
   }),
   declareNotation(
     {
@@ -31,6 +27,7 @@ export const gfmNotations: NotationDefinition[] = [
       mark: 'strike',
       mdastType: 'delete',
       delimiter: '~~',
+      tag: 'del',
     },
     [Strike],
   ),

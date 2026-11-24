@@ -16,6 +16,7 @@ import {
   htmlMarkNotations,
   type NotationDefinition,
   PubMarkdown,
+  type PubMarkdownOptions,
   rawNotation,
 } from './markdown';
 
@@ -34,6 +35,7 @@ export {
 } from './custom-drag-handler';
 export {
   currentNotations,
+  type DocumentRecord,
   getMarkdown,
   MARKED_NOTATIONS,
   MarkdownWriteError,
@@ -65,6 +67,8 @@ export interface PubExtensionConfig {
   onDrop?: (editor: Editor, payload: CustomDragPayload, pos: number) => void;
   /** Called after markdown has replaced the whole document. */
   onSetMarkdown?: (editor: Editor) => void;
+  /** See `PubMarkdownOptions.documentRecord`. */
+  documentRecord?: PubMarkdownOptions['documentRecord'];
   /** Syntax added on top of CommonMark and GFM. */
   notations?: NotationDefinition[];
 }
@@ -81,9 +85,6 @@ declare module '@tiptap/core' {
   }
 }
 
-// Matches absolute URLs that should bypass the in-app /vivliostyle/* prefix:
-// any explicit scheme (http:, https:, blob:, data:, file:, ...) or a
-// protocol-relative URL.
 // The definitions in use when the editor moved from marked to remark. Kept
 // as a fixed list: documents made with marked are written with these.
 const MARKED_ERA_NOTATIONS = [
@@ -106,6 +107,9 @@ const MARKED_ERA_NOTATIONS = [
   'raw',
 ];
 
+// Matches absolute URLs that should bypass the in-app /vivliostyle/* prefix:
+// any explicit scheme (http:, https:, blob:, data:, file:, ...) or a
+// protocol-relative URL.
 const ABSOLUTE_URL_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 
 export const PubExtensions = Extension.create<PubExtensionConfig>({
@@ -152,6 +156,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           ...(this.options.notations ?? []),
         ],
         markedEraNotations: MARKED_ERA_NOTATIONS,
+        documentRecord: this.options.documentRecord,
         onSetMarkdown: this.options.onSetMarkdown,
       }),
       Dropcursor.configure({}),

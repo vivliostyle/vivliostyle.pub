@@ -148,12 +148,21 @@ export function createLegacyBaselineReader(
       return null;
     }
   };
+  // Of the baseline last read: a block written anew is read with them too.
+  let definitions = '';
 
   return {
     readDocument(body) {
       try {
         // The old editor trimmed the file before reading it.
-        return schema.nodeFromJSON(manager.parse(body.trim()));
+        const trimmed = body.trim();
+        return schema.nodeFromJSON(
+          manager.parse(
+            definitions && trimmed.includes('[')
+              ? `${trimmed}\n\n${definitions}`
+              : trimmed,
+          ),
+        );
       } catch {
         return null;
       }
@@ -166,7 +175,7 @@ export function createLegacyBaselineReader(
       }
       // Link reference definitions are read with every block, as the whole
       // document was.
-      const definitions = tokens
+      definitions = tokens
         .filter((token) => token.type === 'def')
         .map((token) => token.raw.trim())
         .join('\n');
