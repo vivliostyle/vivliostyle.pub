@@ -1,6 +1,8 @@
 import type { CaseSuite } from '../testing/vitest';
 
 const PLAIN_TEXT = 'kept as plain text';
+const DROPPED_ESCAPE =
+  'the backslash is dropped together with the character it escapes';
 
 export const vfmSuites: CaseSuite[] = [
   {
@@ -16,12 +18,12 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'escaped pipe in the base text',
         given: 'a {a\\|b|c} b',
-        fails: 'the backslash is dropped',
+        fails: DROPPED_ESCAPE,
       },
       {
         name: 'escaped brace is not ruby',
         given: '\\{a|b}',
-        fails: 'the backslash is dropped',
+        fails: DROPPED_ESCAPE,
       },
     ],
   },
@@ -45,7 +47,13 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'heading attributes are attributes',
         given: '# 見出し {#id .cls}',
-        doc: 'doc(heading("見出し"))',
+        json: [
+          {
+            type: 'heading',
+            attrs: { level: 1, id: 'id', class: 'cls' },
+            content: [{ type: 'text', text: '見出し' }],
+          },
+        ],
         fails: PLAIN_TEXT,
       },
       {
@@ -64,7 +72,7 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'footnote reference and definition',
         given: '脚注[^1]です。\n\n[^1]: 本文',
-        fails: 'the reference becomes a link and the definition is dropped',
+        fails: 'the definition becomes the URL of a link on the reference',
       },
     ],
   },

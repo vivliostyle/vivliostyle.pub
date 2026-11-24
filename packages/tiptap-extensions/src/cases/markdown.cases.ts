@@ -1,6 +1,10 @@
 import type { CaseSuite } from '../testing/vitest';
 
 const ESCAPED_HTML = 'raw HTML is written back escaped';
+const ESCAPED_HTML_BLOCK =
+  'raw HTML is written back escaped, and the blank line after it becomes three';
+const DROPPED_ESCAPE =
+  'the backslash is dropped together with the character it escapes';
 
 export const markdownSuites: CaseSuite[] = [
   {
@@ -58,12 +62,12 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'escaped punctuation',
         given: '1\\. not a list',
-        fails: 'the backslash is dropped',
+        fails: DROPPED_ESCAPE,
       },
       {
         name: 'escaped emphasis',
         given: 'a \\*b\\* c',
-        fails: 'the backslash is dropped',
+        fails: DROPPED_ESCAPE,
       },
     ],
   },
@@ -86,7 +90,7 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'footnote',
         given: 'text[^1]\n\n[^1]: note',
-        fails: 'the reference becomes a link and the definition is dropped',
+        fails: 'the definition becomes the URL of a link on the reference',
       },
     ],
   },
@@ -107,12 +111,12 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'block element around markdown',
         given: '<div class="note">\n\n**md** inside\n\n</div>',
-        fails: ESCAPED_HTML,
+        fails: ESCAPED_HTML_BLOCK,
       },
       {
         name: 'comment',
         given: '<!-- comment -->\n\ntext',
-        fails: ESCAPED_HTML,
+        fails: ESCAPED_HTML_BLOCK,
       },
     ],
   },
