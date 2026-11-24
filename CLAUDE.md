@@ -131,7 +131,11 @@ All responses set COEP `require-corp` + COOP `same-origin` + CORP `cross-origin`
 
 - **`packages/theme-registry/`** (`@v/theme-registry`) — in-browser npm theme fetcher: hits `registry.npmjs.org`, untars `.tgz`s with `@andrewbranch/untar.js`, and bundles theme CSS using `lightningcss-wasm`.
 
-- **`packages/tiptap-extensions/`** (`@v/tiptap-extensions`) — custom TipTap nodes/marks. Owns markdown ⇄ prosemirror conversion via `@handlewithcare/remark-prosemirror`.
+- **`packages/tiptap-extensions/`** (`@v/tiptap-extensions`) — custom TipTap nodes/marks, and markdown ⇄ ProseMirror conversion on remark (unified + micromark, the parser VFM builds on), under `src/markdown/`.
+  - Syntax is described by **notation definitions**. One definition carries everything about one piece of syntax: the TipTap extensions for its schema, remark plugins (where micromark and mdast extensions plug in), handlers from mdast to ProseMirror, writers back to markdown, the writing styles it can vary between, and the characters that need escaping so text is not read as it. CommonMark and GFM are written as definitions too, and the editor's schema comes from the set it is given. Add syntax as a definition, not as a special case in the parser or writer. A definition can also be declared as plain data for syntax that needs no code.
+  - Syntax no definition handles is kept as **raw markdown**: a raw block node or a raw inline mark holding the source as written, shown and edited as text, written back unchanged.
+  - Saving diffs the document against a **baseline**, the markdown it was last read from or written as. Unchanged blocks keep their source (top-level blocks, and the children of edited lists and quotes); only the rest is written anew, in the styles the baseline uses most, and escaped only when reading it back would otherwise give another document. Frontmatter, line endings and the trailing newline stay outside the document and come from the baseline. Nothing about the source is stored in the document, which is shared through Yjs.
+  - Documents made before the move to remark hold content as marked read it. They are not rewritten; their baseline is read the old way instead, so their unchanged blocks keep their source. The Y.Doc records which parser made a document.
 
 - **`packages/ui/`** (`@v/ui`) — Radix UI primitives wrapped in a shadcn-style component layer. Tailwind v4.
 
@@ -168,7 +172,8 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 - A case gives the markdown the document is loaded from, the steps applied to it (typed text, key presses, editor commands) and the markdown it is saved as. A caret mark in the markdown stands for the selection, so a case reads like what the user sees. Add a case there instead of a one-off test that builds an editor by hand.
 - The cases run in `pnpm test` against a headless editor in Node. Its driver calls the hooks a view would call, so it covers keymaps and input rules. A case whose steps it cannot perform, such as paste, IME composition or caret movement, is skipped.
 - Write a behaviour the editor lacks as the case it should be, with the reason it fails. Such a case is required to differ from what it expects, so once a change makes it pass, remove the reason. A mistake in the case itself fails it all the same. Never bend the expected markdown to match what the editor does now.
-- The framework loads and saves markdown through a single module, so swapping the markdown conversion layer means changing that module, not the cases.
+- The framework loads and saves markdown through a single module, so swapping the markdown conversion layer means changing that module, not the cases. A case's `given` is also the baseline it is saved against.
+- Every case's markdown, and the template manuscripts in `@v/viola`, are also checked for the guarantees of saving: an unedited document saves byte for byte, editing or deleting one block changes only that block's lines, and what is saved reads back as the same document.
 
 ## Internationalization (i18n)
 
