@@ -5,6 +5,7 @@ export {
   type PubMarkdownOptions,
   type PubMarkdownStorage,
   parseMarkdown,
+  setLegacyMarkdown,
   setMarkdownBaseline,
 } from './extension';
 export type {

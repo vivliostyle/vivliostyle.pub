@@ -3,7 +3,12 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { PubExtensions } from '../index';
-import { getMarkdown, parseMarkdown, setMarkdownBaseline } from './extension';
+import {
+  getMarkdown,
+  parseMarkdown,
+  setLegacyMarkdown,
+  setMarkdownBaseline,
+} from './extension';
 import { createLegacyBaselineReader } from './legacy';
 
 let editor: Editor | undefined;
@@ -218,7 +223,8 @@ describe('documents made by the old parser', () => {
       'paragraph("text", link("^1"), " <span class=\\"x\\">y</span>")',
     );
     editor.commands.setContent(legacyDoc.toJSON());
-    setMarkdownBaseline(editor, markdown, { legacy: true });
+    setMarkdownBaseline(editor, markdown);
+    setLegacyMarkdown(editor, true);
     appendTo(editor, 'edit me', '!');
     expect(getMarkdown(editor)).toBe(markdown.replace('edit me', 'edit me!'));
   });

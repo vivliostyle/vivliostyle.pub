@@ -36,6 +36,7 @@ export {
   getMarkdown,
   type NotationDefinition,
   parseMarkdown,
+  setLegacyMarkdown,
   setMarkdownBaseline,
 } from './markdown';
 

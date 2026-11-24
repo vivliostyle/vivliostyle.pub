@@ -9,6 +9,7 @@ import type { SyncProvider } from '@v/sync-client';
 import {
   getMarkdown,
   PubExtensions,
+  setLegacyMarkdown,
   setMarkdownBaseline,
 } from '@v/tiptap-extensions';
 import type { ProjectId } from '../stores/proxies/project';
@@ -67,6 +68,9 @@ export async function setupEditor({
     basePath = undefined;
   }
 
+  // The file on disk is what saving compares the document with, also when
+  // the document comes from IndexedDB or the server instead of the file.
+  const markdown = (await initialFile?.text()) ?? '';
   const doc = new Y.Doc();
   const meta = doc.getMap<string>(MARKDOWN_META);
   const markCurrentParser = () => {
@@ -132,6 +136,14 @@ export async function setupEditor({
     },
   });
 
+  setMarkdownBaseline(editor, markdown);
+  const hasContent = () => doc.getXmlFragment('default').length > 0;
+  const detectParser = () => {
+    if (hasContent()) {
+      setLegacyMarkdown(editor, meta.get(PARSER_KEY) !== CURRENT_PARSER);
+    }
+  };
+
   let syncProvider: SyncProvider | undefined;
   editor.on('destroy', () => {
     saveContent.cancel();
@@ -146,6 +158,7 @@ export async function setupEditor({
   // second tab from re-seeding an empty Y.Doc on top of the server's state.
   if (persistence) {
     await persistence.whenSynced;
+    detectParser();
   }
   if (sync && filename) {
     syncProvider = await startEditorSync({
@@ -155,17 +168,11 @@ export async function setupEditor({
       filename,
     });
   }
-  // The file on disk is what saving compares the document with, also when
-  // the document comes from IndexedDB or the server instead of the file.
-  const markdown = (await initialFile?.text()) ?? '';
-  if (doc.getXmlFragment('default').length > 0) {
-    setMarkdownBaseline(editor, markdown, {
-      legacy: meta.get(PARSER_KEY) !== CURRENT_PARSER,
-    });
+  if (hasContent()) {
+    detectParser();
   } else if (markdown.trim()) {
     editor.commands.setMarkdown(markdown, { emitUpdate: false });
   } else {
-    setMarkdownBaseline(editor, markdown, { legacy: false });
     markCurrentParser();
   }
 

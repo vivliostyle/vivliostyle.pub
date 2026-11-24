@@ -142,17 +142,13 @@ export function getMarkdown(
 /**
  * Sets what the document is compared with when it is saved: what was just
  * written, or the file as it is on disk when the document was restored from
- * elsewhere rather than read from it. `legacy` marks a document made before
- * the editor moved to remark.
+ * elsewhere rather than read from it.
  */
-export function setMarkdownBaseline(
-  editor: Editor,
-  markdown: string,
-  options: { legacy?: boolean } = {},
-): void {
-  const storage = storageOf(editor);
-  storage.baseline = markdown;
-  if (options.legacy !== undefined) {
-    storage.legacy = options.legacy;
-  }
+export function setMarkdownBaseline(editor: Editor, markdown: string): void {
+  storageOf(editor).baseline = markdown;
+}
+
+/** Marks whether the document was made before the editor moved to remark. */
+export function setLegacyMarkdown(editor: Editor, legacy: boolean): void {
+  storageOf(editor).legacy = legacy;
 }
