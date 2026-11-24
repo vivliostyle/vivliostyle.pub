@@ -264,12 +264,17 @@ export class MarkdownWriter {
     }
   }
 
-  /** Empty paragraphs have no markdown, so they are left out. */
+  /**
+   * Empty paragraphs have no markdown, so they are left out, and so are
+   * paragraphs of nothing but line breaks, which markdown drops at the ends.
+   */
   private isUnwritten(node: ProseMirrorNode): boolean {
     return (
       node.isTextblock &&
-      node.childCount === 0 &&
-      node.type === this.schema.topNodeType.contentMatch.defaultType
+      node.type === this.schema.topNodeType.contentMatch.defaultType &&
+      node.content.content.every(
+        (child) => child.isText && /^\n*$/.test(child.text ?? ''),
+      )
     );
   }
 

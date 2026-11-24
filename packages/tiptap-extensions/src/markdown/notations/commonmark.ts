@@ -68,6 +68,7 @@ export function linkTitle(title: unknown): string {
 
 const documentNotation = defineNotation({
   name: 'document',
+  version: 2,
   extensions: [Document, Text],
   fromMarkdown: {
     text: (node, context) => context.literal(node),
@@ -82,6 +83,8 @@ const documentNotation = defineNotation({
     // spaces before a line break would make it a hard break.
     { pattern: /(?<=\n)[ \t]/g, entity: true },
     { pattern: /[ \t](?=\n)/g, entity: true },
+    // A blank line would end the paragraph.
+    { pattern: /(?<=\n)\n/g, entity: true },
   ],
 });
 

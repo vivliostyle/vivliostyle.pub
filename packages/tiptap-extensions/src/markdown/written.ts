@@ -75,28 +75,39 @@ export class WrittenForm {
     return blocks;
   }
 
-  // A raw block, a textblock holding nothing but raw markdown, or one that
+  // A raw block, a paragraph holding nothing but raw markdown, or one that
   // starts with raw markdown of block syntax means what its text reads as,
-  // which can be other blocks once it was edited.
+  // which can be other blocks once it was edited. Line breaks before the raw
+  // markdown are not written. A heading keeps its raw content as its own.
   private expand(node: ProseMirrorNode): ProseMirrorNode[] {
     const { rawBlockName, readRaw, rawInline, writeInline } = this.options;
     if (!readRaw) {
       return [node];
     }
-    const isRaw = (child: ProseMirrorNode | null) =>
+    const isRaw = (child: ProseMirrorNode | null | undefined) =>
       Boolean(child?.isText && rawInline?.isInSet(child.marks));
+    const written = node.content.content.filter(
+      (child, index, all) =>
+        !(
+          child.isText &&
+          /^\n+$/.test(child.text ?? '') &&
+          all
+            .slice(0, index)
+            .every((it) => it.isText && /^\n+$/.test(it.text ?? ''))
+        ),
+    );
     let text: string | undefined;
     if (node.type.name === rawBlockName) {
       text = node.textContent;
     } else if (
       node.isTextblock &&
-      node.childCount > 0 &&
-      isRaw(node.firstChild)
+      node.type === node.type.schema.topNodeType.contentMatch.defaultType &&
+      isRaw(written[0])
     ) {
-      if (node.content.content.every(isRaw)) {
-        text = node.textContent;
+      if (written.every(isRaw)) {
+        text = written.map((child) => child.text ?? '').join('');
       } else if (writeInline) {
-        const start = readRaw(node.firstChild?.text ?? '');
+        const start = readRaw(written[0]?.text ?? '');
         if (start && !(start.length === 1 && start[0].type === node.type)) {
           text = writeInline(node);
         }
