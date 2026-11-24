@@ -297,14 +297,15 @@ export const FootnoteReference = Node.create({
     return {
       label: {
         default: '',
-        parseHTML: (element) => element.getAttribute('data-label') ?? '',
+        parseHTML: (element) => element.textContent ?? '',
         renderHTML: () => ({}),
       },
     };
   },
 
   parseHTML() {
-    return [{ tag: 'a.footnote-ref[data-label]' }];
+    // Before links, which an `a` with an `href` is otherwise.
+    return [{ tag: 'a.footnote-ref', priority: 60 }];
   },
 
   // As VFM's default footnote mode renders a reference, but with the label in
@@ -319,7 +320,6 @@ export const FootnoteReference = Node.create({
         href: `#fn${label}`,
         class: 'footnote-ref',
         role: 'doc-noteref',
-        'data-label': label,
       },
       ['sup', label],
     ];
