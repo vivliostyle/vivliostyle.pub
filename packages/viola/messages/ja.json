@@ -118,7 +118,7 @@
   "ruby_panel_apply_aria": "ルビを適用",
   "ruby_panel_base_aria": "親文字",
   "ruby_panel_base_placeholder": "ルビを振る文字",
-  "ruby_panel_invalid_text": "ルビは1行で書き、「}」は先頭にしか置けません。",
+  "ruby_panel_invalid_text": "ルビは1行で書き、「\\}」は先頭にしか置けません。",
   "ruby_panel_remove_aria": "ルビを解除",
   "ruby_panel_text_aria": "ルビ",
   "ruby_panel_text_placeholder": "読み",

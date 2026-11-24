@@ -118,7 +118,7 @@
   "ruby_panel_apply_aria": "Apply ruby",
   "ruby_panel_base_aria": "Base text",
   "ruby_panel_base_placeholder": "Text to annotate",
-  "ruby_panel_invalid_text": "Ruby text has to be on one line, and “}” can only be its first character.",
+  "ruby_panel_invalid_text": "Ruby text has to be on one line, and “\\}” can only be its first character.",
   "ruby_panel_remove_aria": "Remove ruby",
   "ruby_panel_text_aria": "Ruby text",
   "ruby_panel_text_placeholder": "Reading",
