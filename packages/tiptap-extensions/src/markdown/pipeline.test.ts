@@ -198,7 +198,7 @@ describe('documents made by the old parser', () => {
   it('keeps the source of blocks the old parser read differently', () => {
     const editor = load('');
     const markdown =
-      'text[^1] <span class="x">y</span>\n\n[^1]: note\n\n| a |\n| - |\n\nedit me\n';
+      'text[^1] <span class="x">y</span>\n\n[^1]: note\n\n| a |\n| - |\n\n1. a\n\n   ```js title=x\n   b\n   ```\n- > c\n\nedit me\n';
     const reader = createLegacyBaselineReader(
       editor.schema,
       editor.extensionManager.extensions,
@@ -210,9 +210,14 @@ describe('documents made by the old parser', () => {
     if (!blocks) {
       throw new Error('The old parser did not read the markdown');
     }
-    editor.commands.setContent(
-      editor.schema.topNodeType.create(null, blocks).toJSON(),
+    const legacyDoc = editor.schema.topNodeType.create(null, blocks);
+    expect(legacyDoc.toString()).toContain(
+      'orderedList(listItem(paragraph("a"), codeBlock("b"))), bulletList(listItem(paragraph, blockquote(paragraph("c"))))',
     );
+    expect(legacyDoc.toString()).toContain(
+      'paragraph("text", link("^1"), " <span class=\\"x\\">y</span>")',
+    );
+    editor.commands.setContent(legacyDoc.toJSON());
     setMarkdownBaseline(editor, markdown, { legacy: true });
     appendTo(editor, 'edit me', '!');
     expect(getMarkdown(editor)).toBe(markdown.replace('edit me', 'edit me!'));

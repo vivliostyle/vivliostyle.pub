@@ -86,11 +86,14 @@ export function createLegacyBaselineReader(
   schema: Schema,
   extensions: readonly AnyExtension[],
 ): BaselineReader {
+  // Extensions that only bundle others would be expanded a second time.
   const manager = new MarkdownManager({
-    extensions: extensions.map((extension) => {
-      const hooks = legacyParseHooks[extension.name];
-      return hooks ? extension.extend(hooks) : extension;
-    }),
+    extensions: extensions
+      .filter((extension) => extension.type !== 'extension')
+      .map((extension) => {
+        const hooks = legacyParseHooks[extension.name];
+        return hooks ? extension.extend(hooks) : extension;
+      }),
   });
 
   const toNodes = (markdown: string): ProseMirrorNode[] | null => {
