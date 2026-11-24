@@ -75,6 +75,18 @@ export const inputSuites: CaseSuite[] = [
         steps: [press('Mod-b')],
         expect: 'a ‸**b**‸ c',
       },
+      {
+        name: 'Mod-Shift-s toggles strikethrough',
+        given: 'a ‸b‸ c',
+        steps: [press('Mod-Shift-s')],
+        expect: 'a ‸~~b~~‸ c',
+      },
+      {
+        name: 'Mod-Shift-b wraps a blockquote',
+        given: 'a‸',
+        steps: [press('Mod-Shift-b')],
+        expect: '> a‸',
+      },
     ],
   },
   {
