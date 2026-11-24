@@ -13,6 +13,8 @@ export interface FileContent {
   filename: string;
   summary: string;
   editor: Editor;
+  /** The document cannot be saved as it is now; the file keeps its last save. */
+  saveFailed?: boolean;
 }
 
 export type HierarchicalReadingOrder = [
