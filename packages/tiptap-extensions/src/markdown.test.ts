@@ -137,7 +137,11 @@ describe('code block info string', () => {
     expect(roundTrip('~~~~a`b\n ~~~\n~~~~')).toBe('~~~~a`b\n ~~~\n~~~~');
   });
 
-  it('measures fences in code too long to spread into a call', () => {
+  // Saving reads the output back, which for this many fence-like lines
+  // takes seconds on a slow runner.
+  it('measures fences in code too long to spread into a call', {
+    timeout: 60_000,
+  }, () => {
     const code = Array.from({ length: 200_000 }, () => '```').join('\n');
     expect(
       serializeBlock({

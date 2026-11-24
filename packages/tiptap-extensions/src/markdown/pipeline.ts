@@ -79,6 +79,7 @@ export class MarkdownPipeline {
       // checked.
       checkWhole: !options.baselineReader,
       bareStart: !source.frontmatter,
+      baseline: source.body,
     });
     return joinSource(source, body);
   }

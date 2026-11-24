@@ -84,6 +84,8 @@ interface WriteState {
   reuse: boolean;
   /** Whether no frontmatter precedes the body being written. */
   bareStart: boolean;
+  /** Whether each top-level block written anew is read back on its own. */
+  checkBlocks: boolean;
 }
 
 interface ChildPlan {
@@ -113,6 +115,8 @@ export interface WriteBodyOptions {
    */
   checkWhole: boolean;
   bareStart: boolean;
+  /** The body of the baseline, which needs no check when nothing changed. */
+  baseline: string;
 }
 
 export class MarkdownWriter {
@@ -151,16 +155,30 @@ export class MarkdownWriter {
     styles: ReadonlyMap<string, string>,
     options: WriteBodyOptions,
   ): string {
-    const attempt = (escaping: WriteState['escaping'], reuse: boolean) =>
+    const attempt = (
+      escaping: WriteState['escaping'],
+      reuse: boolean,
+      checkBlocks = true,
+    ) =>
       this.writeDocument(doc, reuse ? base : null, {
         styles,
         escaping,
         reuse,
         bareStart: options.bareStart,
+        checkBlocks,
       });
-    const first = attempt('minimal', true);
-    if (!options.checkWhole || this.reads(first, doc, true)) {
-      return first;
+    if (!options.checkWhole) {
+      return attempt('minimal', true);
+    }
+    // Reading the whole output back also checks every block in it, so the
+    // blocks are only checked one by one when that fails.
+    const quick = attempt('minimal', true, false);
+    if (quick === options.baseline || this.reads(quick, doc, true)) {
+      return quick;
+    }
+    const checked = attempt('minimal', true);
+    if (this.reads(checked, doc, true)) {
+      return checked;
     }
     // Each block came back the same on its own, so the output only changes
     // meaning in context, e.g. text that a reference definition elsewhere
@@ -170,7 +188,7 @@ export class MarkdownWriter {
       return safe;
     }
     const generated = attempt('safe', false);
-    return this.reads(generated, doc, true) ? generated : first;
+    return this.reads(generated, doc, true) ? generated : checked;
   }
 
   private writeDocument(
@@ -379,6 +397,9 @@ export class MarkdownWriter {
     avoid: ReadonlySet<string>,
     state: WriteState,
   ): string {
+    if (!state.checkBlocks) {
+      return this.generate(plan.node, plan.base, data, avoid, state);
+    }
     const attempts: Pick<WriteState, 'escaping' | 'reuse'>[] =
       state.escaping === 'safe'
         ? [
