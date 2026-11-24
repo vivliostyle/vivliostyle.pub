@@ -1,7 +1,8 @@
+import type { Editor } from '@tiptap/core';
 import { invariant } from 'outvariant';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { getMarkdown } from '@v/tiptap-extensions';
+import { getMarkdown, MarkdownWriteError } from '@v/tiptap-extensions';
 import { m } from '../../generated/paraglide/messages';
 import { debounce } from '../../libs/debounce';
 import { $project } from '../../stores/accessors';
@@ -39,6 +40,19 @@ function deriveSummaryFromMarkdown(markdown: string): string {
   return '';
 }
 
+// Markdown that does not read back as the document is still the closest
+// text to it, which the source view lets the user fix.
+function sourceOf(editor: Editor): string {
+  try {
+    return getMarkdown(editor);
+  } catch (error) {
+    if (error instanceof MarkdownWriteError) {
+      return error.markdown;
+    }
+    throw error;
+  }
+}
+
 export default function SourceEditor({ contentId }: { contentId: ContentId }) {
   const project = $project.valueOrThrow();
   const file = project.content.files.get(contentId);
@@ -47,7 +61,7 @@ export default function SourceEditor({ contentId }: { contentId: ContentId }) {
 
   // The collaborative XmlFragment stays the source of truth; the source view
   // is seeded once from its current markdown and never re-reads it while open.
-  const latestCode = useRef(getMarkdown(editor));
+  const latestCode = useRef(sourceOf(editor));
   const initialCode = useRef(latestCode.current).current;
 
   const saveToSandbox = useMemo(

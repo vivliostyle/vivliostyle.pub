@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import { suites } from '../cases';
 import { PubExtensions } from '../index';
-import { checkMarkdownProperties } from '../testing/markdown-properties';
+import {
+  checkMarkdownProperties,
+  type PropertyViolation,
+} from '../testing/markdown-properties';
 import { removeSelectionMarks } from '../testing/selection-marks';
 
 const createEditor = () =>
@@ -13,15 +16,19 @@ const createEditor = () =>
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   });
 
-// Raw markdown is kept as written, but what it means can depend on other
-// blocks.
-const KNOWN_VIOLATIONS: Record<string, string> = {
-  'text[^1]\n\n[^1]: note':
-    'a footnote reference reads as text once its definition is deleted',
-  'a[^1] b\n\n[^1]: note':
-    'a footnote reference reads as text once its definition is deleted',
-  '脚注[^1]です。\n\n[^1]: 本文':
-    'a footnote reference reads as text once its definition is deleted',
+// Violations a case's markdown cannot avoid, with why.
+const KNOWN_VIOLATIONS: Record<
+  string,
+  {
+    violations: Pick<PropertyViolation, 'property' | 'detail'>[];
+    reason: string;
+  }
+> = {
+  'a\n\n---\n\nb': {
+    violations: [{ property: 'locality', detail: 'deleting block 0' }],
+    reason:
+      'a `---` that comes to open the file would start frontmatter, so it is written as `***`',
+  },
 };
 
 describe('markdown of every case', () => {
@@ -31,11 +38,9 @@ describe('markdown of every case', () => {
     ),
   );
   it.each([...givens])('%j keeps its guarantees', (markdown) => {
-    const violations = checkMarkdownProperties(createEditor, markdown);
-    if (KNOWN_VIOLATIONS[markdown]) {
-      expect(violations).not.toEqual([]);
-    } else {
-      expect(violations).toEqual([]);
-    }
+    const violations = checkMarkdownProperties(createEditor, markdown).map(
+      ({ property, detail }) => ({ property, detail }),
+    );
+    expect(violations).toEqual(KNOWN_VIOLATIONS[markdown]?.violations ?? []);
   });
 });

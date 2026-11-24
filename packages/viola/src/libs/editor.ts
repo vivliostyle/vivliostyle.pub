@@ -7,9 +7,13 @@ import * as Y from 'yjs';
 
 import type { SyncProvider } from '@v/sync-client';
 import {
+  currentNotations,
   getMarkdown,
+  MARKED_NOTATIONS,
+  MarkdownWriteError,
   PubExtensions,
-  setLegacyMarkdown,
+  parseMarkdown,
+  setDocumentNotations,
   setMarkdownBaseline,
 } from '@v/tiptap-extensions';
 import type { ProjectId } from '../stores/proxies/project';
@@ -24,12 +28,12 @@ import type { SandboxFile } from './sandbox/file';
 
 export type { EditorSyncContext } from './editor-sync';
 
-// Documents made while the editor parsed with marked hold content as marked
-// read it. Rewriting a shared document from several clients would duplicate
-// it, so they are kept and saved against the file as marked reads it.
+// Shared with the document, outside it: the definitions its content was read
+// with and the frontmatter. Without the record it was made with marked, and
+// is saved against the file as marked reads it rather than rewritten.
 const MARKDOWN_META = 'markdown';
-const PARSER_KEY = 'parser';
-const CURRENT_PARSER = 'remark';
+const NOTATIONS_KEY = 'notations';
+const FRONTMATTER_KEY = 'frontmatter';
 
 function editorPersistenceKey(projectId: ProjectId, filename: string): string {
   return `viola:editor:${projectId}:${filename}`;
@@ -73,10 +77,36 @@ export async function setupEditor({
   const markdown = (await initialFile?.text()) ?? '';
   const doc = new Y.Doc();
   const meta = doc.getMap<string>(MARKDOWN_META);
-  const markCurrentParser = () => {
-    if (meta.get(PARSER_KEY) !== CURRENT_PARSER) {
-      meta.set(PARSER_KEY, CURRENT_PARSER);
-    }
+  const hasContent = () => doc.getXmlFragment('default').length > 0;
+  const recordMarkdown = (editor: Editor, markdown?: string) => {
+    doc.transact(() => {
+      const notations = currentNotations(editor);
+      if (meta.get(NOTATIONS_KEY) !== notations) {
+        meta.set(NOTATIONS_KEY, notations);
+      }
+      if (markdown !== undefined) {
+        const { frontmatter } = parseMarkdown(editor, markdown);
+        if (meta.get(FRONTMATTER_KEY) !== frontmatter) {
+          meta.set(FRONTMATTER_KEY, frontmatter);
+        }
+      }
+    });
+  };
+  // Read when saving: IndexedDB, the server and other clients can change the
+  // record at any time.
+  const readRecord = (editor: Editor) => {
+    const notations = meta.get(NOTATIONS_KEY);
+    setDocumentNotations(
+      editor,
+      notations === undefined
+        ? hasContent()
+          ? MARKED_NOTATIONS
+          : null
+        : notations === currentNotations(editor)
+          ? null
+          : notations,
+    );
+    return meta.get(FRONTMATTER_KEY);
   };
   // Editor state is persisted to IndexedDB keyed by a stable project + file
   // path. contentId is regenerated on every load, so it cannot serve as the
@@ -87,7 +117,22 @@ export async function setupEditor({
 
   const saveContent = debounce(
     (editor: Editor) => {
-      const markdown = getMarkdown(editor);
+      const frontmatter = readRecord(editor);
+      let markdown: string;
+      try {
+        markdown = getMarkdown(
+          editor,
+          frontmatter === undefined ? {} : { frontmatter },
+        );
+      } catch (error) {
+        // Saving it would change what the file means; the file keeps its
+        // last good state, and the next edit tries again.
+        if (error instanceof MarkdownWriteError) {
+          console.error(error);
+          return;
+        }
+        throw error;
+      }
       setMarkdownBaseline(editor, markdown);
       onSave({ markdown, summary: getEditorSummary(editor) });
     },
@@ -106,7 +151,8 @@ export async function setupEditor({
       onFilePaste: (editor, files) => {
         insertImageFiles({ editor, files });
       },
-      onSetMarkdown: markCurrentParser,
+      onSetMarkdown: (editor) =>
+        recordMarkdown(editor, editor.storage.pubMarkdown.baseline),
       onDrop: (editor, payload, pos) => {
         switch (payload.type) {
           case 'asset':
@@ -137,12 +183,6 @@ export async function setupEditor({
   });
 
   setMarkdownBaseline(editor, markdown);
-  const hasContent = () => doc.getXmlFragment('default').length > 0;
-  const detectParser = () => {
-    if (hasContent()) {
-      setLegacyMarkdown(editor, meta.get(PARSER_KEY) !== CURRENT_PARSER);
-    }
-  };
 
   let syncProvider: SyncProvider | undefined;
   editor.on('destroy', () => {
@@ -158,7 +198,6 @@ export async function setupEditor({
   // second tab from re-seeding an empty Y.Doc on top of the server's state.
   if (persistence) {
     await persistence.whenSynced;
-    detectParser();
   }
   if (sync && filename) {
     syncProvider = await startEditorSync({
@@ -168,12 +207,12 @@ export async function setupEditor({
       filename,
     });
   }
-  if (hasContent()) {
-    detectParser();
-  } else if (markdown.trim()) {
-    editor.commands.setMarkdown(markdown, { emitUpdate: false });
-  } else {
-    markCurrentParser();
+  if (!hasContent()) {
+    if (markdown.trim()) {
+      editor.commands.setMarkdown(markdown, { emitUpdate: false });
+    } else {
+      recordMarkdown(editor, markdown);
+    }
   }
 
   return editor;

@@ -101,9 +101,13 @@ export function RichEditorPane() {
       });
     },
     onUpdate: useCallback(() => {
-      const markdown = getMarkdown(editor);
-      setMarkdownBaseline(editor, markdown);
-      setContentInEditor(markdown);
+      try {
+        const markdown = getMarkdown(editor);
+        setMarkdownBaseline(editor, markdown);
+        setContentInEditor(markdown);
+      } catch (error) {
+        console.error(error);
+      }
     }, []),
   });
 

@@ -63,7 +63,7 @@ describe('bare URL links', () => {
       `[${url}](${url})を参照`,
     );
     expect(serialize([{ type: 'text', text: '詳細は' }, link(url)])).toBe(
-      `詳細は[${url}](${url})`,
+      `詳細は${url}`,
     );
     expect(serialize([link(`${url}/a.`)])).toBe(`[${url}/a.](${url}/a.)`);
     expect(serialize([link('./chapter.md')])).toBe(

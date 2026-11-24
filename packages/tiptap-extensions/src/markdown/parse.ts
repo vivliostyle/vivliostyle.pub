@@ -1,14 +1,17 @@
 import type { Mark, Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
+import { decodeString } from 'micromark-util-decode-string';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 
 import { childrenOf, type UnknownMdastNode } from './mdast';
-import type {
-  FromMarkdownHandler,
-  HtmlMarkSpec,
-  NotationDefinition,
-  ParseContext,
-  StyleSpec,
+import {
+  type EscapeRule,
+  type FromMarkdownHandler,
+  type HtmlElementSpec,
+  type NotationDefinition,
+  type ParseContext,
+  readTagAttributes,
+  type StyleSpec,
 } from './notation';
 import { type LinePrefix, stripPrefixes } from './source';
 
@@ -40,11 +43,95 @@ function rangeOf(node: UnknownMdastNode): { start: number; end: number } {
   return { start, end };
 }
 
-function isOpeningTag(value: string, spec: HtmlMarkSpec): boolean {
-  return (
-    value ===
-    (spec.attributes ? `<${spec.tag} ${spec.attributes}>` : `<${spec.tag}>`)
+/** The attributes an opening tag gives the spec's mark or node, or null. */
+function matchOpeningTag(
+  value: string,
+  spec: HtmlElementSpec,
+): Record<string, unknown> | null {
+  const tag = value.trim().match(/^<([A-Za-z][\w-]*)(\s[^>]*)?>$/);
+  if (!tag || tag[1].toLowerCase() !== spec.tag.toLowerCase()) {
+    return null;
+  }
+  const attributes = readTagAttributes(tag[2] ?? '');
+  for (const [name, expected] of Object.entries(spec.match ?? {})) {
+    if (attributes[name] !== expected) {
+      return null;
+    }
+  }
+  const known = new Set([
+    ...Object.keys(spec.match ?? {}),
+    ...(spec.capture ?? []),
+  ]);
+  if (Object.keys(attributes).some((name) => !known.has(name))) {
+    return null;
+  }
+  return Object.fromEntries(
+    (spec.capture ?? []).map((name) => [name, attributes[name] ?? null]),
   );
+}
+
+function isClosingTag(value: string | undefined, spec: HtmlElementSpec) {
+  return value?.trim().toLowerCase() === `</${spec.tag.toLowerCase()}>`;
+}
+
+const ASCII_PUNCTUATION = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~';
+
+/**
+ * The punctuation some definition gives meaning, i.e. that one of the
+ * escape rules escapes somewhere.
+ */
+function meaningfulPunctuation(rules: readonly EscapeRule[]): Set<string> {
+  const meaningful = new Set<string>();
+  for (const char of ASCII_PUNCTUATION) {
+    const probes = [
+      `\n${char}\n`,
+      `a${char}a`,
+      ` ${char} `,
+      `\n1${char} `,
+      `${char}[`,
+      `www${char}`,
+      `http${char}//`,
+      `a${char}\n`,
+    ];
+    const found = probes.some((probe) =>
+      rules.some((rule) =>
+        [...probe.matchAll(rule.pattern)].some(
+          (match) => probe[match.index] === char,
+        ),
+      ),
+    );
+    if (found) {
+      meaningful.add(char);
+    }
+  }
+  return meaningful;
+}
+
+/**
+ * Moves nodes that micromark lets overlap the previous sibling, such as a
+ * setext heading right after a link reference definition, to the line after
+ * it.
+ */
+function separateSiblings(node: UnknownMdastNode, body: string): void {
+  let previousEnd = -1;
+  for (const child of childrenOf(node)) {
+    const position = child.position;
+    if (position && position.start.offset !== undefined) {
+      if (previousEnd > position.start.offset) {
+        let start = previousEnd;
+        if (body[start] === '\n') {
+          start++;
+        }
+        position.start = {
+          line: position.start.line,
+          column: start - body.lastIndexOf('\n', start - 1),
+          offset: start,
+        };
+      }
+      previousEnd = position.end.offset ?? previousEnd;
+    }
+    separateSiblings(child, body);
+  }
 }
 
 class Converter {
@@ -57,7 +144,8 @@ class Converter {
     private readonly schema: Schema,
     private readonly body: string,
     private readonly handlers: ReadonlyMap<string, FromMarkdownHandler[]>,
-    private readonly htmlMarks: readonly HtmlMarkSpec[],
+    private readonly htmlElements: readonly HtmlElementSpec[],
+    private readonly meaningful: ReadonlySet<string>,
   ) {
     const converter = this;
     this.context = {
@@ -73,6 +161,7 @@ class Converter {
           ? this.withMarks(marks, () => this.inlines(childrenOf(parent)))
           : this.inlines(childrenOf(parent)),
       text: (value, marks) => this.text(value, marks ?? this.marks),
+      literal: (node) => this.literal(node),
       raw: (node) =>
         this.inInline ? this.rawInline(node) : this.rawBlock(node),
       within: (prefix, convert) => {
@@ -132,13 +221,40 @@ class Converter {
     parent: UnknownMdastNode,
     topLevel = false,
   ): ProseMirrorNode[] {
+    return this.blockList(childrenOf(parent), topLevel);
+  }
+
+  private blockList(
+    children: readonly UnknownMdastNode[],
+    topLevel: boolean,
+  ): ProseMirrorNode[] {
     const wasInline = this.inInline;
     this.inInline = false;
     try {
-      return childrenOf(parent).flatMap((child) => {
-        const nodes = this.block(child);
+      const result: ProseMirrorNode[] = [];
+      for (let index = 0; index < children.length; index++) {
+        const child = children[index];
+        const element = this.htmlElementAt(children, index, 'block');
+        let nodes: readonly ProseMirrorNode[];
+        let last = child;
+        if (element) {
+          const type = this.schema.nodes[element.spec.type];
+          const content = this.blockList(
+            children.slice(index + 1, element.close),
+            false,
+          );
+          const node = type?.createAndFill(element.attrs, content);
+          nodes = node ? [node] : this.block(child);
+          if (node) {
+            last = children[element.close];
+            index = element.close;
+          }
+        } else {
+          nodes = this.block(child);
+        }
         if (nodes.length === 1) {
-          let { start, end } = rangeOf(child);
+          let { start } = rangeOf(child);
+          const { end } = rangeOf(last);
           // Indentation before a top-level block belongs to it, so reusing
           // its source keeps an indented fence as written.
           if (topLevel) {
@@ -153,8 +269,9 @@ class Converter {
             prefixes: [...this.prefixes],
           });
         }
-        return nodes;
-      });
+        result.push(...nodes);
+      }
+      return result;
     } finally {
       this.inInline = wasInline;
     }
@@ -181,16 +298,16 @@ class Converter {
       const nodes: ProseMirrorNode[] = [];
       for (let index = 0; index < children.length; index++) {
         const child = children[index];
-        const htmlMark = this.htmlMarkAt(children, index);
-        if (htmlMark) {
-          const { spec, close } = htmlMark;
-          const type = this.schema.marks[spec.mark];
+        const element = this.htmlElementAt(children, index, 'mark');
+        const type = element && this.schema.marks[element.spec.type];
+        if (element && type) {
           nodes.push(
-            ...this.withMarks(type.create().addToSet(this.marks), () =>
-              this.inlines(children.slice(index + 1, close)),
+            ...this.withMarks(
+              type.create(element.attrs).addToSet(this.marks),
+              () => this.inlines(children.slice(index + 1, element.close)),
             ),
           );
-          index = close;
+          index = element.close;
           continue;
         }
         nodes.push(...this.inline(child));
@@ -201,34 +318,43 @@ class Converter {
     }
   }
 
-  private htmlMarkAt(
+  private htmlElementAt(
     children: readonly UnknownMdastNode[],
     index: number,
-  ): { spec: HtmlMarkSpec; close: number } | undefined {
+    kind: HtmlElementSpec['kind'],
+  ):
+    | { spec: HtmlElementSpec; attrs: Record<string, unknown>; close: number }
+    | undefined {
     const child = children[index];
     if (child.type !== 'html' || child.value === undefined) {
       return undefined;
     }
     const value = child.value;
-    const spec = this.htmlMarks.find(
-      (it) => this.schema.marks[it.mark] && isOpeningTag(value, it),
-    );
-    if (!spec) {
-      return undefined;
-    }
-    let depth = 0;
-    for (let close = index + 1; close < children.length; close++) {
-      const candidate = children[close];
-      if (candidate.type !== 'html') {
+    for (const spec of this.htmlElements) {
+      if (spec.kind !== kind) {
         continue;
       }
-      if (candidate.value === `</${spec.tag}>`) {
-        if (depth === 0) {
-          return { spec, close };
+      const attrs = matchOpeningTag(value, spec);
+      if (!attrs) {
+        continue;
+      }
+      let depth = 0;
+      for (let close = index + 1; close < children.length; close++) {
+        const candidate = children[close];
+        if (candidate.type !== 'html') {
+          continue;
         }
-        depth--;
-      } else if (candidate.value && isOpeningTag(candidate.value, spec)) {
-        depth++;
+        if (isClosingTag(candidate.value, spec)) {
+          if (depth === 0) {
+            return { spec, attrs, close };
+          }
+          depth--;
+        } else if (
+          candidate.value &&
+          matchOpeningTag(candidate.value, { ...spec, match: {}, capture: [] })
+        ) {
+          depth++;
+        }
       }
     }
     return undefined;
@@ -257,6 +383,84 @@ class Converter {
     const type =
       this.schema.nodes[RAW_BLOCK] ?? this.schema.nodes.paragraph ?? null;
     return type ? [type.create(null, this.text(source, []))] : [];
+  }
+
+  /**
+   * A text node's value, keeping backslash escapes as raw markdown where no
+   * definition gives the escaped character meaning: they still mean
+   * something to syntax read elsewhere, such as VFM ruby or math, and
+   * markdown has already read them away. An escaped backslash is kept too,
+   * since math reads it as written.
+   */
+  private literal(node: UnknownMdastNode): ProseMirrorNode[] {
+    const value = node.value ?? '';
+    const start = node.position?.start.offset;
+    const end = node.position?.end.offset;
+    const source =
+      start === undefined || end === undefined
+        ? ''
+        : this.body.slice(start, end);
+    const raw = this.schema.marks[RAW_INLINE];
+    if (!raw || !source.includes('\\')) {
+      return this.text(value, this.marks);
+    }
+    const rawMarks = raw.create().addToSet(this.marks);
+    const nodes: ProseMirrorNode[] = [];
+    let plain = '';
+    let i = 0;
+    let j = 0;
+    const flush = () => {
+      nodes.push(...this.text(plain, this.marks));
+      plain = '';
+    };
+    while (i < source.length) {
+      const char = source[i];
+      const next = source[i + 1];
+      if (char === '\\' && next && ASCII_PUNCTUATION.includes(next)) {
+        if (value[j] !== next) {
+          return this.text(value, this.marks);
+        }
+        if (next === '\\' || !this.meaningful.has(next)) {
+          flush();
+          nodes.push(...this.text(char + next, rawMarks));
+        } else {
+          plain += next;
+        }
+        i += 2;
+        j += 1;
+        continue;
+      }
+      const reference = char === '&' && source.slice(i).match(/^&#?\w+;/)?.[0];
+      if (reference) {
+        const decoded = decodeString(reference);
+        if (value.startsWith(decoded, j)) {
+          plain += decoded;
+          i += reference.length;
+          j += decoded.length;
+          continue;
+        }
+      }
+      if (char === value[j]) {
+        plain += char;
+        i++;
+        j++;
+        continue;
+      }
+      // Line prefixes and indentation that markdown leaves out of the text.
+      if (
+        /[ \t>]/.test(char) &&
+        (source[i - 1] === undefined || /[\n \t>]/.test(source[i - 1]))
+      ) {
+        i++;
+        continue;
+      }
+      return this.text(value, this.marks);
+    }
+    if (j !== value.length) {
+      return this.text(value, this.marks);
+    }
+    flush();
+    return nodes;
   }
 
   private rawInline(node: UnknownMdastNode): ProseMirrorNode[] {
@@ -311,7 +515,8 @@ function tallyStyles(
 
 export class MarkdownParser {
   private readonly handlers = new Map<string, FromMarkdownHandler[]>();
-  private readonly htmlMarks: HtmlMarkSpec[];
+  private readonly htmlElements: HtmlElementSpec[];
+  private readonly meaningful: ReadonlySet<string>;
   private readonly styleSpecs = new Map<string, StyleSpec>();
   private readonly processor;
 
@@ -333,7 +538,12 @@ export class MarkdownParser {
         }
       }
     }
-    this.htmlMarks = notations.flatMap((notation) => notation.htmlMarks ?? []);
+    this.htmlElements = notations.flatMap(
+      (notation) => notation.htmlElements ?? [],
+    );
+    this.meaningful = meaningfulPunctuation(
+      notations.flatMap((notation) => notation.escapes ?? []),
+    );
     for (const notation of notations) {
       for (const [key, spec] of Object.entries(notation.styles ?? {})) {
         this.styleSpecs.set(key, spec);
@@ -356,11 +566,13 @@ export class MarkdownParser {
     const root: UnknownMdastNode = this.processor.runSync(
       this.processor.parse(body),
     );
+    separateSiblings(root, body);
     const converter = new Converter(
       this.schema,
       body,
       this.handlers,
-      this.htmlMarks,
+      this.htmlElements,
+      this.meaningful,
     );
     return {
       body,

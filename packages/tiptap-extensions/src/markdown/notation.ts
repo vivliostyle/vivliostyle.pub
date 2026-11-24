@@ -1,4 +1,8 @@
-import { type Extensions, Mark as MarkExtension } from '@tiptap/core';
+import {
+  type Extensions,
+  Mark as MarkExtension,
+  Node as NodeExtension,
+} from '@tiptap/core';
 import type { Mark, Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
 import type { Pluggable } from 'unified';
 
@@ -28,6 +32,11 @@ export interface ParseContext {
   blocks(parent: UnknownMdastNode): ProseMirrorNode[];
   inlines(parent: UnknownMdastNode, marks?: readonly Mark[]): ProseMirrorNode[];
   text(value: string, marks?: readonly Mark[]): ProseMirrorNode[];
+  /**
+   * A text node as text, keeping backslash escapes of characters no
+   * definition gives meaning as raw markdown.
+   */
+  literal(node: UnknownMdastNode): ProseMirrorNode[];
   /** Keeps the node's source as written, as the raw fallback does. */
   raw(node: UnknownMdastNode): ProseMirrorNode[];
   /** Converts the content of a container whose lines carry `prefix`. */
@@ -60,8 +69,8 @@ export interface WriteContext {
   readonly avoidMarkers: ReadonlySet<string>;
   /** The node's source before it changed, when it had one. */
   readonly base: BaseNode | null;
-  /** The markdown of a textblock's content. */
-  inline(node: ProseMirrorNode): string;
+  /** The markdown of a textblock's content, with `data` for its writers. */
+  inline(node: ProseMirrorNode, data?: Record<string, unknown>): string;
   /**
    * The markdown of a container's children, reusing the source of those that
    * did not change. Prefixes for the container's lines are added by the
@@ -83,13 +92,23 @@ export interface ChildrenOptions {
   skip?: (child: ProseMirrorNode, index: number) => boolean;
 }
 
+/**
+ * `next` writes the node as the definition registered before this one would,
+ * so a definition can decorate another's output instead of replacing it.
+ */
 export type NodeToMarkdown = (
   node: ProseMirrorNode,
   context: WriteContext,
+  next: () => string,
 ) => string;
 
 export interface NodeWriter {
   write: NodeToMarkdown;
+  /**
+   * The attributes as markdown holds them, when the writer normalises them:
+   * a document and the one read back from its markdown are compared by these.
+   */
+  writtenAttrs?: (attrs: Record<string, unknown>) => Record<string, unknown>;
   /**
    * The marker of a list written as `source`. Two adjacent lists of one type
    * with the same marker would be read as a single list.
@@ -142,12 +161,49 @@ export interface EscapeRule {
   entity?: boolean;
 }
 
-/** An inline HTML element whose tags around phrasing are read as a mark. */
-export interface HtmlMarkSpec {
-  mark: string;
+/**
+ * An HTML element read as a mark when its tags are around phrasing, or as a
+ * node when its tags are HTML blocks around other blocks (with blank lines
+ * between).
+ */
+export interface HtmlElementSpec {
+  kind: 'mark' | 'block';
+  /** The mark or node type. */
+  type: string;
   tag: string;
-  /** The attributes as written in the opening tag, e.g. `class="tcy"`. */
-  attributes?: string;
+  /** Attributes the opening tag must have, with these values. */
+  match?: Record<string, string>;
+  /** Attributes the opening tag may have, kept as the type's attributes. */
+  capture?: string[];
+}
+
+/** The attributes of an opening tag, from the text after its name. */
+export function readTagAttributes(text: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  for (const match of text.matchAll(
+    /([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g,
+  )) {
+    attributes[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? '';
+  }
+  return attributes;
+}
+
+function escapeAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/** The opening tag of an element with fixed and captured attributes. */
+export function openingTag(
+  spec: Pick<HtmlElementSpec, 'tag' | 'match' | 'capture'>,
+  attrs: Readonly<Record<string, unknown>>,
+): string {
+  const parts = [
+    ...Object.entries(spec.match ?? {}),
+    ...(spec.capture ?? []).flatMap((name) =>
+      typeof attrs[name] === 'string' ? [[name, attrs[name] as string]] : [],
+    ),
+  ].map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`);
+  return `<${spec.tag}${parts.join('')}>`;
 }
 
 /**
@@ -157,11 +213,16 @@ export interface HtmlMarkSpec {
  */
 export interface NotationDefinition {
   name: string;
+  /**
+   * Bumped when the definition reads or writes something differently, so
+   * documents record which definitions made them.
+   */
+  version?: number;
   extensions?: Extensions;
   /** remark plugins, e.g. ones adding micromark and mdast extensions. */
   remarkPlugins?: Pluggable[];
   fromMarkdown?: FromMarkdownHandlers;
-  htmlMarks?: HtmlMarkSpec[];
+  htmlElements?: HtmlElementSpec[];
   nodes?: Record<string, NodeToMarkdown | NodeWriter>;
   marks?: Record<string, MarkToMarkdown>;
   styles?: Record<string, StyleSpec>;
@@ -184,18 +245,52 @@ export interface DelimitedMarkDeclaration {
   delimiter: string;
 }
 
-/** A mark written as an inline HTML element, like `<u>`. */
+/** A mark written as an inline HTML element, like `<span class="tcy">`. */
 export interface HtmlMarkDeclaration {
   kind: 'htmlMark';
   name: string;
   mark: string;
   tag: string;
-  attributes?: string;
+  match?: Record<string, string>;
+  capture?: string[];
+}
+
+/**
+ * A block written as an HTML element around markdown, like
+ * `<aside class="sidenote">`, a blank line, the content, a blank line and
+ * `</aside>`.
+ */
+export interface HtmlBlockDeclaration {
+  kind: 'htmlBlock';
+  name: string;
+  node: string;
+  tag: string;
+  match?: Record<string, string>;
+  capture?: string[];
 }
 
 export type NotationDeclaration =
   | DelimitedMarkDeclaration
-  | HtmlMarkDeclaration;
+  | HtmlMarkDeclaration
+  | HtmlBlockDeclaration;
+
+function selectorOf(spec: Pick<HtmlElementSpec, 'tag' | 'match'>): string {
+  return `${spec.tag}${Object.entries(spec.match ?? {})
+    .map(([name, value]) => `[${name}="${value.replace(/"/g, '\\"')}"]`)
+    .join('')}`;
+}
+
+function attributesOf(capture: readonly string[] = []) {
+  return Object.fromEntries(
+    capture.map((name) => [
+      name,
+      {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute(name),
+      },
+    ]),
+  );
+}
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -239,19 +334,56 @@ export function declareNotation(
       };
     }
     case 'htmlMark': {
-      const { name, mark, tag, attributes } = declaration;
-      const openTag = attributes ? `<${tag} ${attributes}>` : `<${tag}>`;
+      const { name, mark, tag, match, capture } = declaration;
+      const spec = { tag, match, capture };
       return {
         name,
         extensions: extensions ?? [
           MarkExtension.create({
             name: mark,
-            parseHTML: () => [{ tag }],
-            renderHTML: () => [tag, 0],
+            addAttributes: () => attributesOf(capture),
+            parseHTML: () => [{ tag: selectorOf(spec) }],
+            renderHTML: ({ HTMLAttributes }) => [
+              tag,
+              { ...match, ...HTMLAttributes },
+              0,
+            ],
           }),
         ],
-        htmlMarks: [{ mark, tag, ...(attributes && { attributes }) }],
-        marks: { [mark]: { open: openTag, close: `</${tag}>` } },
+        htmlElements: [{ kind: 'mark', type: mark, ...spec }],
+        marks: {
+          [mark]: {
+            open: (it) => openingTag(spec, it.attrs),
+            close: `</${tag}>`,
+          },
+        },
+      };
+    }
+    case 'htmlBlock': {
+      const { name, node, tag, match, capture } = declaration;
+      const spec = { tag, match, capture };
+      return {
+        name,
+        extensions: extensions ?? [
+          NodeExtension.create({
+            name: node,
+            group: 'block',
+            content: 'block+',
+            defining: true,
+            addAttributes: () => attributesOf(capture),
+            parseHTML: () => [{ tag: selectorOf(spec) }],
+            renderHTML: ({ HTMLAttributes }) => [
+              tag,
+              { ...match, ...HTMLAttributes },
+              0,
+            ],
+          }),
+        ],
+        htmlElements: [{ kind: 'block', type: node, ...spec }],
+        nodes: {
+          [node]: (it, context) =>
+            `${openingTag(spec, it.attrs)}\n\n${context.children(it)}\n\n</${tag}>`,
+        },
       };
     }
   }

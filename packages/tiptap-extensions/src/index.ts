@@ -33,11 +33,15 @@ export {
   serializeCustomDragPayload,
 } from './custom-drag-handler';
 export {
+  currentNotations,
   getMarkdown,
+  MARKED_NOTATIONS,
+  MarkdownWriteError,
   type NotationDefinition,
   parseMarkdown,
-  setLegacyMarkdown,
+  setDocumentNotations,
   setMarkdownBaseline,
+  upgradeDocumentNotations,
 } from './markdown';
 
 export const IMAGE_MIME_TYPES = [
@@ -80,6 +84,28 @@ declare module '@tiptap/core' {
 // Matches absolute URLs that should bypass the in-app /vivliostyle/* prefix:
 // any explicit scheme (http:, https:, blob:, data:, file:, ...) or a
 // protocol-relative URL.
+// The definitions in use when the editor moved from marked to remark. Kept
+// as a fixed list: documents made with marked are written with these.
+const MARKED_ERA_NOTATIONS = [
+  'document',
+  'paragraph',
+  'heading',
+  'thematicBreak',
+  'blockquote',
+  'list',
+  'codeBlock',
+  'hardBreak',
+  'image',
+  'emphasis',
+  'strong',
+  'inlineCode',
+  'link',
+  'gfm',
+  'strikethrough',
+  'underline',
+  'raw',
+];
+
 const ABSOLUTE_URL_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 
 export const PubExtensions = Extension.create<PubExtensionConfig>({
@@ -125,6 +151,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           rawNotation,
           ...(this.options.notations ?? []),
         ],
+        markedEraNotations: MARKED_ERA_NOTATIONS,
         onSetMarkdown: this.options.onSetMarkdown,
       }),
       Dropcursor.configure({}),

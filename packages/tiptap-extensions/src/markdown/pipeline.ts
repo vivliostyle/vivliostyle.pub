@@ -4,7 +4,7 @@ import { type BaseDocument, baseDocumentOf } from './base';
 import type { NotationDefinition } from './notation';
 import { MarkdownParser, type ParsedBody } from './parse';
 import { joinSource, splitSource } from './source';
-import { MarkdownWriter } from './write';
+import { MarkdownWriter, type WriteResult } from './write';
 
 export interface ParsedMarkdown {
   doc: ProseMirrorNode;
@@ -15,6 +15,8 @@ export interface ParsedMarkdown {
 /** Reads the baseline the way the document was read when it was made. */
 export interface BaselineReader {
   read(body: string): BaseDocument | null;
+  /** A block's markdown as the same parser reads it. */
+  readDocument?(body: string): ProseMirrorNode | null;
 }
 
 export interface SerializeOptions {
@@ -24,8 +26,23 @@ export interface SerializeOptions {
    * newline come from it.
    */
   baseline?: string;
-  /** Reads the baseline instead of the pipeline's own parser. */
+  /**
+   * Reads the baseline instead of the pipeline's own parser. Its blocks may
+   * mean something else to this parser, so the output is not read back as a
+   * whole; only blocks written anew are checked.
+   */
   baselineReader?: BaselineReader | null;
+  /** Frontmatter written instead of the baseline's. */
+  frontmatter?: string;
+}
+
+/** Names and versions of the definitions a document was read with. */
+export function notationSignature(
+  notations: readonly NotationDefinition[],
+): string {
+  return notations
+    .map((notation) => `${notation.name}@${notation.version ?? 1}`)
+    .join(' ');
 }
 
 const CACHE_SIZE = 4;
@@ -34,13 +51,13 @@ const CACHE_SIZE = 4;
 export class MarkdownPipeline {
   readonly parser: MarkdownParser;
   readonly writer: MarkdownWriter;
+  readonly signature: string;
   private readonly cache = new Map<string, ParsedBody>();
 
   constructor(schema: Schema, notations: readonly NotationDefinition[]) {
     this.parser = new MarkdownParser(schema, notations);
-    this.writer = new MarkdownWriter(this.parser, notations, (body) =>
-      this.parseBody(body),
-    );
+    this.writer = new MarkdownWriter(this.parser, notations);
+    this.signature = notationSignature(notations);
   }
 
   /** Bodies are parsed once: a save reads back what the next save diffs. */
@@ -67,20 +84,36 @@ export class MarkdownPipeline {
     return { doc: this.parseBody(body).doc, frontmatter };
   }
 
+  /**
+   * Writes the document as markdown that reads back as it. Throws
+   * `MarkdownWriteError` when no markdown the writer can make does.
+   */
   serialize(doc: ProseMirrorNode, options: SerializeOptions = {}): string {
+    return this.serializeWithResult(doc, options).markdown;
+  }
+
+  serializeWithResult(
+    doc: ProseMirrorNode,
+    options: SerializeOptions = {},
+  ): WriteResult {
     const source = splitSource(options.baseline ?? '');
+    const frontmatter = options.frontmatter ?? source.frontmatter;
     const parsed = this.parseBody(source.body);
-    const base = options.baselineReader
-      ? options.baselineReader.read(source.body)
-      : baseDocumentOf(parsed);
-    const body = this.writer.writeBody(doc, base, parsed.styles, {
-      // Blocks reused from a baseline read the old way can mean something
-      // else to the current parser, so only the blocks written anew are
-      // checked.
-      checkWhole: !options.baselineReader,
-      bareStart: !source.frontmatter,
-      baseline: source.body,
+    const reader = options.baselineReader;
+    const base = reader ? reader.read(source.body) : baseDocumentOf(parsed);
+    const result = this.writer.writeBody(doc, base, parsed.styles, {
+      bareStart: !frontmatter,
+      // The whole file is read back, so a body that would start frontmatter
+      // of its own is caught too. An unchanged body is parsed already.
+      check: reader
+        ? null
+        : (body) =>
+            this.writer.difference(this.parse(frontmatter + body).doc, doc),
+      readBlock: reader?.readDocument?.bind(reader),
     });
-    return joinSource(source, body);
+    return {
+      ...result,
+      markdown: joinSource({ ...source, frontmatter }, result.markdown),
+    };
   }
 }

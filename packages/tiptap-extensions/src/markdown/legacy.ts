@@ -3,7 +3,7 @@ import { ListItem } from '@tiptap/extension-list';
 import { MarkdownManager } from '@tiptap/markdown';
 import type { Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
 
-import type { BaseDocument, BaseNode } from './base';
+import type { BaseContent, BaseDocument, BaseNode } from './base';
 import type { BaselineReader } from './pipeline';
 
 // The parse hooks the editor used with `@tiptap/markdown` before it moved to
@@ -72,6 +72,44 @@ const legacyParseHooks: Record<string, Record<string, unknown>> = {
   },
 };
 
+interface LexedToken {
+  type: string;
+  raw: string;
+  items?: { raw: string }[];
+}
+
+// The items of a list as marked read them, so an edited list keeps the
+// source of the items that did not change.
+function listContent(
+  body: string,
+  token: LexedToken,
+  node: ProseMirrorNode,
+  start: number,
+): BaseContent | null {
+  if (token.type !== 'list' || token.items?.length !== node.childCount) {
+    return null;
+  }
+  const starts: number[] = [];
+  const ends: number[] = [];
+  let offset = start;
+  for (const item of token.items) {
+    if (body.slice(offset, offset + item.raw.length) !== item.raw) {
+      return null;
+    }
+    starts.push(offset);
+    ends.push(offset + item.raw.replace(/\n+$/, '').length);
+    offset += item.raw.length;
+  }
+  return {
+    children: token.items.map((_, index) => ({
+      node: node.child(index),
+      text: body.slice(starts[index], ends[index]),
+      content: () => null,
+    })),
+    separator: (index) => body.slice(ends[index], starts[index + 1]),
+  };
+}
+
 function isEmptyParagraph(node: JSONContent): boolean {
   return node.type === 'paragraph' && !node.content?.length;
 }
@@ -82,10 +120,15 @@ function isEmptyParagraph(node: JSONContent): boolean {
  * parser, e.g. raw HTML became text and footnote references became links, so
  * only this reading lets unchanged blocks keep their source.
  */
+export interface LegacyBaselineReader extends BaselineReader {
+  /** The document the old editor made of `body`. */
+  readDocument(body: string): ProseMirrorNode | null;
+}
+
 export function createLegacyBaselineReader(
   schema: Schema,
   extensions: readonly AnyExtension[],
-): BaselineReader {
+): LegacyBaselineReader {
   // Extensions that only bundle others would be expanded a second time.
   const manager = new MarkdownManager({
     extensions: extensions
@@ -107,6 +150,14 @@ export function createLegacyBaselineReader(
   };
 
   return {
+    readDocument(body) {
+      try {
+        // The old editor trimmed the file before reading it.
+        return schema.nodeFromJSON(manager.parse(body.trim()));
+      } catch {
+        return null;
+      }
+    },
     read(body) {
       const tokens: { raw: string; type: string }[] =
         new manager.instance.Lexer().lex(body);
@@ -124,10 +175,12 @@ export function createLegacyBaselineReader(
         text: string;
         start: number;
         end: number;
+        token: LexedToken;
         nodes: ProseMirrorNode[] | null;
       }
       const segments: Segment[] = [];
       let offset = 0;
+      const blockTokens = tokens.filter((token) => token.type !== 'space');
       for (const token of tokens) {
         const start = offset;
         offset += token.raw.length;
@@ -135,11 +188,31 @@ export function createLegacyBaselineReader(
           continue;
         }
         const text = token.raw.replace(/\n+$/, '');
+        // The token is read with the newlines it had in the document: marked
+        // keeps them in the text of an HTML block. The old editor trimmed the
+        // whole file, so the last block had none.
+        let raw = token.raw;
+        if (token === blockTokens.at(-1)) {
+          raw = raw.trimEnd();
+        }
+        if (token === blockTokens[0]) {
+          raw = raw.trimStart();
+        }
+        const separator = raw.endsWith('\n\n')
+          ? ''
+          : raw.endsWith('\n')
+            ? '\n'
+            : '\n\n';
         segments.push({
           text,
           start,
           end: start + text.length,
-          nodes: toNodes(definitions ? `${text}\n\n${definitions}` : text),
+          token,
+          nodes: toNodes(
+            definitions && raw.includes('[')
+              ? `${raw}${separator}${definitions}`
+              : raw,
+          ),
         });
       }
 
@@ -177,7 +250,8 @@ export function createLegacyBaselineReader(
           children.push({
             node,
             text: single ? body.slice(start, segment.end) : null,
-            content: () => null,
+            content: () =>
+              single ? listContent(body, segment.token, node, start) : null,
           });
           starts.push(index === 0 ? start : segment.end);
           ends.push(segment.end);

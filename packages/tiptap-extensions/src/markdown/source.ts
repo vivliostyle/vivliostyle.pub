@@ -1,3 +1,5 @@
+import { matchSequences } from './match';
+
 // Mirrors VFM (remark-frontmatter): blank lines before the opening fence are
 // allowed, the opening fence must be exactly `---` on its own line, and the
 // closing fence is the first subsequent line starting with `---` (anything
@@ -5,34 +7,69 @@
 const FRONTMATTER_RE =
   /^(?:[ \t]*\n)*---\n(?:[\s\S]*?\n)?---(?:(?:[ \t]*\n)+|[ \t]*$)?/;
 
+const BOM = '\uFEFF';
+
 export interface SplitSource {
   /** The frontmatter with its fences and the blank lines after it. */
   frontmatter: string;
   body: string;
-  /** The line ending the source was written with. */
+  /** The line ending the source uses most. */
   eol: '\n' | '\r\n';
+  bom: boolean;
+  /** The source as it was given, for the line endings of its lines. */
+  original: string;
 }
 
 /** Splits markdown into frontmatter and body, with line endings as `\n`. */
 export function splitSource(markdown: string): SplitSource {
-  const crlf = markdown.match(/\r\n/g)?.length ?? 0;
-  const lf = markdown.match(/\n/g)?.length ?? 0;
+  const bom = markdown.startsWith(BOM);
+  const text = bom ? markdown.slice(1) : markdown;
+  const crlf = text.match(/\r\n/g)?.length ?? 0;
+  const lf = text.match(/\n/g)?.length ?? 0;
   const eol = crlf > 0 && crlf * 2 >= lf ? '\r\n' : '\n';
-  const normalized = markdown.replace(/\r\n?/g, '\n');
+  const normalized = text.replace(/\r\n?/g, '\n');
   const frontmatter = normalized.match(FRONTMATTER_RE)?.[0] ?? '';
-  return { frontmatter, body: normalized.slice(frontmatter.length), eol };
+  return {
+    frontmatter,
+    body: normalized.slice(frontmatter.length),
+    eol,
+    bom,
+    original: text,
+  };
 }
 
+/**
+ * Joins frontmatter and body, giving each line that was already in the
+ * source the line ending it had there and new lines the one used most.
+ */
 export function joinSource(
-  { frontmatter, eol }: Omit<SplitSource, 'body'>,
+  { frontmatter, eol, bom, original }: Omit<SplitSource, 'body'>,
   body: string,
 ): string {
   const markdown = frontmatter + body;
-  return eol === '\n' ? markdown : markdown.replaceAll('\n', eol);
-}
-
-export function startsWithFrontmatterFence(markdown: string): boolean {
-  return FRONTMATTER_RE.test(markdown);
+  const lines = markdown.split('\n');
+  let joined: string;
+  if (!original.includes('\r')) {
+    joined = eol === '\n' ? markdown : lines.join(eol);
+  } else {
+    const originalLines = [...original.matchAll(/([^\r\n]*)(\r\n|\n|\r|$)/g)]
+      .filter((match) => match[0] !== '' || match.index < original.length)
+      .map((match) => ({ text: match[1], ending: match[2] }));
+    const matches = matchSequences(
+      lines,
+      originalLines.map((line) => line.text),
+    );
+    joined = lines
+      .map((line, index) => {
+        if (index === lines.length - 1) {
+          return line;
+        }
+        const ending = originalLines[matches[index]]?.ending;
+        return line + (ending || eol);
+      })
+      .join('');
+  }
+  return bom ? BOM + joined : joined;
 }
 
 /**

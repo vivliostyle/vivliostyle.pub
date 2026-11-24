@@ -39,8 +39,6 @@ export const vfmSuites: CaseSuite[] = [
         given: 'a $\\{x\\}$ b‸',
         steps: ['c'],
         expect: 'a $\\{x\\}$ bc‸',
-        fails:
-          'the math is text, so the paragraph is written anew without the backslashes markdown read away',
       },
     ],
   },
@@ -95,8 +93,6 @@ export const vfmSuites: CaseSuite[] = [
         given: '## D‸ ##',
         steps: ['x'],
         expect: '## Dx‸ ##',
-        fails:
-          'the closing sequence has no attribute, so the heading is written anew without it',
       },
       {
         name: 'line that closes a section',

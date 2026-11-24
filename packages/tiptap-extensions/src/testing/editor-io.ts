@@ -1,7 +1,11 @@
 import type { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
-import { getMarkdown, setMarkdownBaseline } from '../markdown';
+import {
+  getMarkdown,
+  MarkdownWriteError,
+  setMarkdownBaseline,
+} from '../markdown';
 import { CARET } from './selection-marks';
 
 export function loadMarkdown(editor: Editor, markdown: string): void {
@@ -12,5 +16,13 @@ export function loadMarkdown(editor: Editor, markdown: string): void {
 
 /** Saves the document as the editor would, against the loaded markdown. */
 export function serializeDoc(editor: Editor, doc: ProseMirrorNode): string {
-  return getMarkdown(editor, { doc });
+  try {
+    return getMarkdown(editor, { doc });
+  } catch (error) {
+    // The editor would refuse to save it, which a case compares as output.
+    if (error instanceof MarkdownWriteError) {
+      return `[${error.message}]\n${error.markdown}`;
+    }
+    throw error;
+  }
 }

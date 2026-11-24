@@ -1,12 +1,18 @@
 export type { BaseContent, BaseDocument, BaseNode } from './base';
 export {
+  currentNotations,
+  type GetMarkdownOptions,
   getMarkdown,
+  getMarkdownWithResult,
+  MARKED_NOTATIONS,
+  markdownPipeline,
   PubMarkdown,
   type PubMarkdownOptions,
   type PubMarkdownStorage,
   parseMarkdown,
-  setLegacyMarkdown,
+  setDocumentNotations,
   setMarkdownBaseline,
+  upgradeDocumentNotations,
 } from './extension';
 export type {
   MdastNode,
@@ -23,8 +29,9 @@ export {
   type FromMarkdownHandler,
   type FromMarkdownHandlers,
   type FromMarkdownResult,
+  type HtmlBlockDeclaration,
+  type HtmlElementSpec,
   type HtmlMarkDeclaration,
-  type HtmlMarkSpec,
   type InlineRun,
   type MarkToMarkdown,
   type NodeToMarkdown,
@@ -42,7 +49,14 @@ export { RAW_BLOCK, RAW_INLINE } from './parse';
 export {
   type BaselineReader,
   MarkdownPipeline,
+  notationSignature,
   type ParsedMarkdown,
   type SerializeOptions,
 } from './pipeline';
 export { itemPrefix, type LinePrefix, quotePrefix } from './source';
+export {
+  MarkdownWriteError,
+  type WriteResult,
+  type WriteStrategy,
+} from './write';
+export { firstDifference, WrittenForm } from './written';

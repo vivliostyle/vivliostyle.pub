@@ -70,10 +70,13 @@ const documentNotation = defineNotation({
   name: 'document',
   extensions: [Document, Text],
   fromMarkdown: {
-    text: (node, context) => context.text(node.value),
+    text: (node, context) => context.literal(node),
   },
   escapes: [
-    { pattern: /[\\`*_[\]<]/g },
+    { pattern: /[`*_[\]<]/g },
+    // `\\` would read as a backslash kept as raw markdown, see
+    // `ParseContext.literal`.
+    { pattern: /\\/g, entity: true },
     { pattern: /&(?=#?[a-zA-Z0-9]+;)/g },
     // Whitespace would be stripped at the start and end of a line, and two
     // spaces before a line break would make it a hard break.
@@ -94,29 +97,58 @@ const paragraphNotation = defineNotation({
   },
 });
 
+// The closing sequence of an ATX heading means something to VFM: the heading
+// opens no section.
+const PubHeading = Heading.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      closingSequence: {
+        default: null,
+        parseHTML: () => null,
+        renderHTML: () => ({}),
+      },
+    };
+  },
+});
+
 const headingNotation = defineNotation({
   name: 'heading',
-  extensions: [Heading],
+  extensions: [PubHeading],
   fromMarkdown: {
-    heading: (node, context) =>
-      context.schema.nodes.heading?.create(
-        { level: node.depth },
+    heading: (node, context) => {
+      const source = context.source(node);
+      const closing = source.includes('\n')
+        ? null
+        : (source.match(/[ \t]+#+[ \t]*$/)?.[0] ?? null);
+      return context.schema.nodes.heading?.create(
+        { level: node.depth, closingSequence: closing },
         context.inlines(node),
-      ),
+      );
+    },
   },
   nodes: {
     heading: (node, context) => {
       const level = Number(node.attrs.level) || 1;
       const content = context.inline(node);
-      // An ATX heading has one line, so text with line breaks needs setext.
-      const setext =
-        content.includes('\n') || context.style('heading') === 'setext';
-      if (setext && level <= 2 && content) {
+      const closing =
+        typeof node.attrs.closingSequence === 'string'
+          ? node.attrs.closingSequence
+          : '';
+      if (
+        level <= 2 &&
+        content &&
+        !closing &&
+        (content.includes('\n') || context.style('heading') === 'setext')
+      ) {
         const width = Math.max(3, content.split('\n').at(-1)?.length ?? 0);
         return `${content}\n${(level === 1 ? '=' : '-').repeat(width)}`;
       }
-      const marker = '#'.repeat(level);
-      return content ? `${marker} ${content.replaceAll('\n', ' ')}` : marker;
+      // An ATX heading is one line.
+      const line = context
+        .inline(node, { singleLine: true })
+        .replaceAll('\n', '&#10;');
+      return `${'#'.repeat(level)}${line ? ` ${line}` : ''}${closing}`;
     },
   },
   styles: {
@@ -408,18 +440,25 @@ const codeBlockNotation = defineNotation({
     },
   },
   nodes: {
-    codeBlock: (node, context) => {
-      // Also covers values that arrive without setCodeBlockInfo, e.g. over
-      // Yjs.
-      const info = toInfoString(node.attrs.language) ?? '';
-      const code = node.textContent;
-      // A backtick fence cannot carry backticks in its info string.
-      const char = info.includes('`') ? '~' : context.style('fence');
-      const fence = codeFence(char, code);
-      // Leading tildes would lengthen a tilde fence instead of starting the
-      // info string; markdown ignores the space.
-      const separator = info.startsWith(fence.charAt(0)) ? ' ' : '';
-      return `${fence}${separator}${info}\n${code}${code ? '\n' : ''}${fence}`;
+    codeBlock: {
+      // Markdown trims the info string and has no line breaks in it.
+      writtenAttrs: (attrs) => ({
+        ...attrs,
+        language: toInfoString(attrs.language as string | null)?.trim() || null,
+      }),
+      write: (node, context) => {
+        // Also covers values that arrive without setCodeBlockInfo, e.g. over
+        // Yjs.
+        const info = toInfoString(node.attrs.language) ?? '';
+        const code = node.textContent;
+        // A backtick fence cannot carry backticks in its info string.
+        const char = info.includes('`') ? '~' : context.style('fence');
+        const fence = codeFence(char, code);
+        // Leading tildes would lengthen a tilde fence instead of starting the
+        // info string; markdown ignores the space.
+        const separator = info.startsWith(fence.charAt(0)) ? ' ' : '';
+        return `${fence}${separator}${info}\n${code}${code ? '\n' : ''}${fence}`;
+      },
     },
   },
   styles: {
@@ -432,21 +471,30 @@ const codeBlockNotation = defineNotation({
   },
 });
 
+const BREAK_TAG_RE = /^<br\s*\/?>$/i;
+
 const hardBreakNotation = defineNotation({
   name: 'hardBreak',
   extensions: [HardBreak],
   fromMarkdown: {
     break: (_, context) =>
       context.schema.nodes.hardBreak?.create(null, null, context.marks),
+    // The only way to write a line break into an ATX heading.
+    html: (node, context) =>
+      node.value && BREAK_TAG_RE.test(node.value)
+        ? context.schema.nodes.hardBreak?.create(null, null, context.marks)
+        : undefined,
   },
   nodes: {
-    hardBreak: (_, context) => context.style('break'),
+    hardBreak: (_, context) =>
+      context.data.singleLine ? '<br>' : context.style('break'),
   },
   styles: {
     break: {
       default: '  \n',
       detect: {
         break: (_, source) => (source.startsWith('\\') ? '\\\n' : '  \n'),
+        html: (_, source) => (BREAK_TAG_RE.test(source) ? '<br>' : undefined),
       },
     },
   },
@@ -557,65 +605,25 @@ const inlineCodeNotation = defineNotation({
   },
 });
 
-// Conservative subset of what both marked and VFM (remark-parse with `gfm`)
-// autolink: no characters they treat specially at the edges or inside.
-const BARE_URL_RE = /^https?:\/\/[^\s<>&"'`\\()[\]{}]+$/i;
-const TRIMMED_TRAILING_RE = /[.,:;!?*_~]$/;
-
-function isPlainText(node: ProseMirrorNode | undefined): boolean {
-  return Boolean(node?.isText && node.marks.length === 0);
-}
-
-function isBoundaryBefore(previous: ProseMirrorNode | undefined): boolean {
-  if (!previous || previous.type.name === 'hardBreak') {
-    return true;
-  }
-  return isPlainText(previous) && /\s$/.test(previous.text ?? '');
-}
-
-function isBoundaryAfter(
-  next: ProseMirrorNode | undefined,
-  afterNext: ProseMirrorNode | undefined,
-): boolean {
-  if (!next || next.type.name === 'hardBreak') {
-    return true;
-  }
-  if (!isPlainText(next)) {
-    return false;
-  }
-  const text = next.text ?? '';
-  if (/^\s/.test(text)) {
-    return true;
-  }
-  // Parsers drop one sentence mark from the end of a URL, so "url." still
-  // links only "url" as long as nothing else is glued on after the mark.
-  if (/^[.,:;!?]\s/.test(text)) {
-    return true;
-  }
-  return (
-    /^[.,:;!?]$/.test(text) &&
-    (!afterNext || afterNext.type.name === 'hardBreak')
-  );
-}
-
 /**
- * A link whose text is its URL, where the bare URL autolinks back to the
- * same link, so it is written as `https://…` instead of `[https://…](…)`.
+ * A link written as its own text where markdown autolinks that text to the
+ * same link: a URL, `www.` and an email address. The writer keeps the
+ * brackets wherever the bare text does not read back as the link.
  */
-export function isBareUrlLink({ node, previous, next, afterNext }: InlineRun) {
+export function isBareUrlLink({ node }: InlineRun): boolean {
   if (!node.isText || node.marks.length !== 1) {
     return false;
   }
   const [mark] = node.marks;
   const text = node.text ?? '';
+  const href = mark.attrs.href;
+  if (mark.type.name !== 'link' || mark.attrs.title || /\s/.test(text)) {
+    return false;
+  }
   return (
-    mark.type.name === 'link' &&
-    !mark.attrs.title &&
-    mark.attrs.href === text &&
-    BARE_URL_RE.test(text) &&
-    !TRIMMED_TRAILING_RE.test(text) &&
-    isBoundaryBefore(previous) &&
-    isBoundaryAfter(next, afterNext)
+    (href === text && /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) ||
+    (href === `http://${text}` && /^www\./i.test(text)) ||
+    (href === `mailto:${text}` && /^[^@]+@[^@]+$/.test(text))
   );
 }
 
