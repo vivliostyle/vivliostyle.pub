@@ -25,6 +25,12 @@
     color: var(--muted-foreground);
   }
 
+  /* A note is edited where it is written, which a theme's footnote rules do
+     not set apart on screen. */
+  & span.footnote {
+    text-decoration: underline dotted var(--muted-foreground);
+  }
+
   &:not(.ProseMirror-focused) .is-editor-empty:first-child::before {
     color: var(--muted-foreground);
     content: attr(data-placeholder);

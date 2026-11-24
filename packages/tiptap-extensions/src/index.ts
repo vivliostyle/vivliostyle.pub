@@ -37,6 +37,8 @@ export {
 } from './custom-drag-handler';
 export {
   currentNotations,
+  type FoundNode,
+  findSelectedInline,
   formatAttributes,
   getMarkdown,
   type InlineAttributes,

@@ -48,6 +48,8 @@ export { commonMarkNotations } from './notations/commonmark';
 export { gfmNotations, htmlMarkNotations } from './notations/gfm';
 export { RawBlock, RawInline, rawNotation } from './notations/raw';
 export {
+  type FoundNode,
+  findSelectedInline,
   formatAttributes,
   type InlineAttributes,
   isWritableFootnoteLabel,

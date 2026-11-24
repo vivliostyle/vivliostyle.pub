@@ -40,6 +40,7 @@ export {
   type InlineAttributes,
   parseAttributes,
 } from './attributes';
+export { type FoundNode, findSelectedInline } from './commands';
 export { isWritableFootnoteLabel } from './footnotes';
 export { isWritableMath } from './math';
 export { isWritableRubyText } from './ruby';

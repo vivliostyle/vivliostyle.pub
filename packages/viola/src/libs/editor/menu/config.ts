@@ -37,6 +37,11 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
       'format.code',
       { type: 'separator' },
       'format.link',
+      'format.ruby',
+      'format.footnote',
+      'format.attributes',
+      'math.edit',
+      'footnote-reference.edit',
     ],
   },
   triggers: [
@@ -67,7 +72,15 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
         {
           type: 'group',
           id: 'insert',
-          items: ['block.code-block', 'insert.horizontal-rule', 'insert.image'],
+          items: [
+            'block.code-block',
+            'insert.horizontal-rule',
+            'insert.image',
+            'insert.ruby',
+            'insert.math',
+            'insert.footnote',
+            'insert.footnote-reference',
+          ],
         },
       ],
     },
