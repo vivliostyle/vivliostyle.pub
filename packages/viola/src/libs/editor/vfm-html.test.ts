@@ -53,7 +53,9 @@ function canonical(nodes: readonly DomNode[], container: boolean): string {
       };
       const attributes = Object.entries(attribs)
         // The editor's own, which VFM never writes.
-        .filter(([key]) => key !== 'contenteditable')
+        .filter(
+          ([key]) => key !== 'contenteditable' && key !== 'data-pub-element',
+        )
         .map(([key, value]) => [
           key,
           key === 'class'
