@@ -50,6 +50,7 @@ export {
   formatAttributes,
   type InlineAttributes,
   isAttributeName,
+  isRenderedAttribute,
   parseAttributes,
   writableAttributes,
 } from './markdown/notations/vfm/attributes';

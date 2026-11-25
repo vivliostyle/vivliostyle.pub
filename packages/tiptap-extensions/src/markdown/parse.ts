@@ -136,10 +136,12 @@ function meaningfulPunctuation(rules: readonly EscapeRule[]): Set<string> {
       `a${char}\n`,
     ];
     const found = probes.some((probe) =>
-      rules.some((rule) =>
-        [...probe.matchAll(rule.pattern)].some(
-          (match) => probe[match.index] === char,
-        ),
+      rules.some(
+        (rule) =>
+          !rule.enclose &&
+          [...probe.matchAll(rule.pattern)].some(
+            (match) => probe[match.index] === char,
+          ),
       ),
     );
     if (found) {

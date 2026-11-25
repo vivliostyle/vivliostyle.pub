@@ -42,12 +42,13 @@ const CLOSERS = new Map<number, readonly string[]>([
   [126, ['strikethroughSequenceTemporary']],
   [96, ['codeText']],
   [41, ['link', 'image']],
-  [93, ['link', 'image']],
+  [93, ['link', 'image', 'vfmFootnoteCall']],
   [62, ['autolink']],
 ]);
 
-// mdast types of the elements VFM puts attributes on. References are among
-// them so that their attributes stay in their source when they are raw.
+// mdast types of the elements VFM puts attributes on. Link references are
+// among them so that their attributes stay in their source when they are
+// raw.
 const ATTRIBUTABLE = new Set([
   'strong',
   'emphasis',
@@ -57,6 +58,7 @@ const ATTRIBUTABLE = new Set([
   'image',
   'linkReference',
   'imageReference',
+  'footnoteReference',
 ]);
 
 type ScanResult = 'continue' | 'close' | 'fail';
@@ -284,29 +286,48 @@ export function isAttributeName(name: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name);
 }
 
-// Event handlers run script, the editor's own rendering depends on the
-// others, and the data attributes and classes would make pasted HTML read
-// as the editor's other nodes. VFM itself leaves out only some handlers.
-const UNRENDERED =
-  /^(?:on.*|href|src|srcset|srcdoc|style|ping|action|formaction|contenteditable|draggable|xmlns.*|data-(?:pm|raw|math).*)$/i;
+// What a theme can select an element by, and what does not change how the
+// editor behaves. The data attributes and classes of the editor's own
+// rendering would make pasted HTML read as its other nodes.
+const RENDERED = /^(?:id|class|lang|dir|title|role|hidden|aria-[a-z-]+)$/;
+const OWN_DATA = /^data-(?:pm|raw|math|mark|type|language)/;
 const OWN_CLASSES = new Set(['footnote-ref', 'footnote', 'math']);
+const RENDERED_BY_ELEMENT: Record<string, ReadonlySet<string>> = {
+  img: new Set(['width', 'height']),
+};
 
 /**
- * The attributes the editor puts on its own element: the document keeps the
- * others, which are written back to markdown.
+ * Whether the editor puts an attribute from markdown on its element, an
+ * `element` of the tag name. VFM puts on almost every one.
+ */
+export function isRenderedAttribute(name: string, element?: string): boolean {
+  const key = name.toLowerCase();
+  return (
+    RENDERED.test(key) ||
+    (/^data-[a-z0-9_.-]+$/.test(key) && !OWN_DATA.test(key)) ||
+    Boolean(element && RENDERED_BY_ELEMENT[element]?.has(key))
+  );
+}
+
+/**
+ * The attributes the editor puts on its own element, see
+ * `isRenderedAttribute`: the document keeps the others, which are written
+ * back to markdown.
  */
 export function renderedAttributes(
   attributes: unknown,
+  element?: string,
 ): Record<string, string> {
   if (!attributes || typeof attributes !== 'object') {
     return {};
   }
   const rendered: Record<string, string> = {};
   for (const [key, value] of Object.entries(attributes as InlineAttributes)) {
-    if (typeof value !== 'string' || !isAttributeName(key)) {
-      continue;
-    }
-    if (UNRENDERED.test(key)) {
+    if (
+      typeof value !== 'string' ||
+      !isAttributeName(key) ||
+      !isRenderedAttribute(key, element)
+    ) {
       continue;
     }
     if (key.toLowerCase() === 'class') {
@@ -400,7 +421,10 @@ const attributesFromMarkdown: FromMarkdownExtension = {
         ATTRIBUTABLE.has(target.type) &&
         target.position.end.offset === token.start.offset
       ) {
-        target.attributes = attributes;
+        // `{}` gives none, and keeps braces after it apart from the element.
+        if (Object.keys(attributes).length > 0) {
+          target.attributes = attributes;
+        }
         // The element's source holds its attributes, so they are kept with
         // it where it is kept as written.
         target.position.end = {
@@ -423,7 +447,36 @@ const ATTRIBUTED_MARKS: Record<string, string> = {
   link: 'link',
 };
 
-const ATTRIBUTED_TYPES = [...Object.values(ATTRIBUTED_MARKS), 'image'];
+const ATTRIBUTED_NODES = ['image', 'footnoteReference'];
+
+const ATTRIBUTED_TYPES = [
+  ...Object.values(ATTRIBUTED_MARKS),
+  ...ATTRIBUTED_NODES,
+];
+
+/**
+ * Whether `{` written right after `before`, the markdown before an inline
+ * node, would be read as the attributes of what `adjacent` says ends there.
+ * `{}` then gives that element no attributes and keeps the braces apart.
+ */
+export function takesAttributes(
+  before: string | undefined,
+  adjacent: WriteContext['adjacent'],
+): boolean {
+  const last = before?.slice(-1);
+  if (!adjacent || !last || !/[)\]`*_~]/.test(last)) {
+    return false;
+  }
+  const { node, endingMarks } = adjacent;
+  return (
+    (ATTRIBUTED_NODES.includes(node.type.name) && !written(node)) ||
+    endingMarks.some(
+      (mark) =>
+        Object.values(ATTRIBUTED_MARKS).includes(mark.type.name) &&
+        !written(mark),
+    )
+  );
+}
 
 function mapNodes(
   result: FromMarkdownResult,
@@ -502,17 +555,20 @@ export const InlineAttributesExtension = Extension.create({
   name: 'inlineAttributes',
 
   addGlobalAttributes() {
+    const attributes = (element?: string) => ({
+      attributes: {
+        default: null,
+        parseHTML: () => null,
+        renderHTML: (attrs: Record<string, unknown>) =>
+          renderedAttributes(attrs.attributes, element),
+      },
+    });
     return [
       {
-        types: ATTRIBUTED_TYPES,
-        attributes: {
-          attributes: {
-            default: null,
-            parseHTML: () => null,
-            renderHTML: (attrs) => renderedAttributes(attrs.attributes),
-          },
-        },
+        types: ATTRIBUTED_TYPES.filter((type) => type !== 'image'),
+        attributes: attributes(),
       },
+      { types: ['image'], attributes: attributes('img') },
     ];
   },
 });
@@ -556,9 +612,18 @@ export const inlineAttributesNotation = defineNotation({
       const image = result as ProseMirrorNode;
       return image.type.create({ ...image.attrs, attributes });
     },
+    footnoteReference: (node, _, next) => {
+      const { attributes } = node as AttributedMdast;
+      return attributes
+        ? mapNodes(next(), (it) =>
+            it.type.create({ ...it.attrs, attributes }, null, it.marks),
+          )
+        : next();
+    },
   },
   nodes: {
     image: (node, _, next) => next() + written(node),
+    footnoteReference: (node, _, next) => next() + written(node),
   },
   marks: Object.fromEntries(
     Object.values(ATTRIBUTED_MARKS).map((name) => [name, decorate]),
@@ -570,4 +635,5 @@ export const inlineAttributesNotation = defineNotation({
     { kind: 'mark', type: 'strike', tag: 'del', rest: 'attributes' },
   ],
   escapes: [{ pattern: /\{/g }],
+  attributes: ['attributes'],
 });

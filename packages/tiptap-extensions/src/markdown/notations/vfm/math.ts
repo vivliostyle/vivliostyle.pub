@@ -3,18 +3,16 @@ import { Node } from '@tiptap/core';
 import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
-  type Code,
   type Construct,
   codes,
   currentNode,
   type Effects,
-  endsOpen,
   enterNode,
   type FromMarkdownExtension,
   isDigit,
   isJsWhitespace,
   isLineEnding,
-  openBefore,
+  OpenDelimiters,
   type Resolver,
   type State,
   syntaxPlugin,
@@ -96,8 +94,7 @@ function mathTokenizer(display: boolean) {
     ok: State,
     nok: State,
   ): State {
-    const open = openBefore(this);
-    let previous: Code = null;
+    const open = new OpenDelimiters(this);
     let inValue = false;
     // What the value ends with decides whether a `$` can close it.
     let backslashes = 0;
@@ -116,7 +113,9 @@ function mathTokenizer(display: boolean) {
         return nok(code);
       }
       if (isLineEnding(code)) {
-        previous = code;
+        if (open.ends(code)) {
+          return nok(code);
+        }
         closeValue();
         effects.enter(types.lineEnding);
         effects.consume(code);
@@ -144,10 +143,9 @@ function mathTokenizer(display: boolean) {
     };
 
     const content: State = (code) => {
-      if (endsOpen(open, code, previous)) {
+      if (open.ends(code)) {
         return nok(code);
       }
-      previous = code;
       if (!inValue) {
         effects.enter(types.value);
         inValue = true;
@@ -166,6 +164,9 @@ function mathTokenizer(display: boolean) {
     };
 
     const closing: State = (code) => {
+      if (open.endsBefore(code)) {
+        return nok(code);
+      }
       closeValue();
       effects.enter(types.marker);
       effects.consume(code);

@@ -268,7 +268,16 @@ const comparisons: Record<string, Comparison[]> = {
     },
   ],
   'VFM attributes': [
-    { markdown: '**s**{.x} *e*{#i .a k="v w"}' },
+    {
+      markdown: '**s**{.x} *e*{#i .a k="v w"}',
+      differs: {
+        vfm: '<p><strong class="x">s</strong> <em class="a" id="i" k="v w">e</em></p>',
+        editor:
+          '<p><strong class="x">s</strong> <em class="a" id="i">e</em></p>',
+        reason:
+          'The editor puts on its elements only the attributes a theme can select them by and that do not change how the editor behaves; the document keeps the others.',
+      },
+    },
     { markdown: '`c`{.y} ~~d~~{.z}' },
     { markdown: '**s** {.x} and para {.x}' },
     { markdown: '**s**{onclick=alert(1)}' },
@@ -324,6 +333,38 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
     {
+      markdown: '本文^[注\\\n\\\n]です。',
+      options: { footnote: 'gcpm' },
+      differs: {
+        vfm: '<p>本文<span class="footnote" id="fn-1" role="doc-footnote">注<br>\n<br>\n</span>です。</p>',
+        editor:
+          '<p>本文<span class="footnote" role="doc-footnote">注<br><br></span>です。</p>',
+        reason:
+          'VFM numbers notes in the order of the book, and the line ending after a hard break is part of the break.',
+      },
+    },
+    // VFM reads braces after a reference as its attributes, which ruby is not.
+    { markdown: 'a[^1]{漢|かん}' },
+    {
+      markdown: 'a[^1]{.x}',
+      differs: {
+        vfm: '<p>a<sup id="fnref-1"><a class="x" href="#fn-1">1</a></sup></p>',
+        editor:
+          '<p>a<a class="footnote-ref x" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>',
+        reason:
+          'VFM renders a reference with attributes as a link in a sup with them, unlike one without; the editor keeps its element and adds the classes.',
+      },
+    },
+    {
+      markdown: 'a[^1]{}{漢|かん} [l](u){}{漢|かん} `c`{}{漢|かん}',
+      differs: {
+        vfm: '<p>a<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a><ruby>漢<rt>かん</rt></ruby> <a href="u">l</a><ruby>漢<rt>かん</rt></ruby> <code>c</code><ruby>漢<rt>かん</rt></ruby></p>',
+        editor:
+          '<p>a<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a><ruby><span>漢</span><rt>かん</rt></ruby> <a href="u" rel="noopener noreferrer nofollow" target="_blank">l</a><ruby><span>漢</span><rt>かん</rt></ruby> <code>c</code><ruby><span>漢</span><rt>かん</rt></ruby></p>',
+        reason: RUBY_BASE,
+      },
+    },
+    {
       markdown: 'a^[注 *md*] b',
       options: { footnote: 'gcpm' },
       differs: {
@@ -340,6 +381,16 @@ const comparisons: Record<string, Comparison[]> = {
     { markdown: '**a** $b*c$ と [x] $a]b$' },
     { markdown: 'Wow![^1]' },
     { markdown: 'a[^1](b' },
+    {
+      markdown: '[^9\\]](u) と [^9\\]x',
+      differs: {
+        vfm: '<p><a href="u">^9]</a> と <a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a>x</p>',
+        editor:
+          '<p><a href="u" rel="noopener noreferrer nofollow" target="_blank">^9]</a> と <a class="footnote-ref" href="#fn9\\" id="fnref9\\" role="doc-noteref"><sup>9\\</sup></a>x</p>',
+        reason:
+          'VFM numbers references in the order of the book; the editor shows their labels.',
+      },
+    },
     {
       markdown: '<strong>重要</strong>{漢字|かんじ}',
       differs: {
@@ -367,6 +418,55 @@ const comparisons: Record<string, Comparison[]> = {
         editor:
           '<p><a href="u" rel="noopener noreferrer nofollow" target="_blank">a $b</a> c$ と <a href="u" rel="noopener noreferrer nofollow" target="_blank">a {b</a>|c}</p>',
         reason: LINK_TARGET,
+      },
+    },
+  ],
+  // VFM 2 ends emphasis where its delimiters next come, as many of them as
+  // it opened with, whatever is between: a construct that would hold the end
+  // is not read.
+  'VFM inside emphasis': [
+    ...[
+      '**$a*b$** **$x^*$** ~~$a~b$~~ ~~a $b~c$ d~~',
+      '_a $x_1$ b_ _$x_i$_ __重要 $x_1$__',
+      '*強調* と $x$ **a** $b*c$ snake_case と $x_1$',
+      '*a $b* c$',
+      '[a $b]c$](u) [a {b|c]d}](u) ![a $b]$](i.png)',
+      '*a [^b*c] d*',
+      '**a [^b**c] d**',
+      '_a [^b_] d_',
+      '**a $b**c$ d**',
+      '*a $b**c$ d*',
+      '_a $b_ c$ d_',
+      '_a $b_c$ d_',
+      '~~a $b~~c$ d~~',
+      '~~a $b ~~c$ d~~',
+      '__a $b_c$ d__',
+      '*a $b\\*c$ d* **a $b\\**c$ d**',
+      '*a $b*$ c*',
+      '_a $b_$ c_',
+      '*a {b|c*}*',
+      '~~a {b|c~~d} e~~',
+      '~~a ^[b~~] c~~',
+      '**a {b**|c} d**',
+    ].map((markdown) => ({ markdown })),
+    {
+      markdown:
+        '_a {b|c_d} e_ **a {b|c*d}** *a* {b|c*d} _a_ {b|c_d} **重要**な{漢字|かんじ} {漢字|かんじ}*強調*',
+      differs: {
+        vfm: '<p><em>a <ruby>b<rt>c_d</rt></ruby> e</em> <strong>a <ruby>b<rt>c*d</rt></ruby></strong> <em>a</em> <ruby>b<rt>c*d</rt></ruby> <em>a</em> <ruby>b<rt>c_d</rt></ruby> <strong>重要</strong>な<ruby>漢字<rt>かんじ</rt></ruby> <ruby>漢字<rt>かんじ</rt></ruby><em>強調</em></p>',
+        editor:
+          '<p><em>a <ruby><span>b</span><rt>c_d</rt></ruby> e</em> <strong>a <ruby><span>b</span><rt>c*d</rt></ruby></strong> <em>a</em> <ruby><span>b</span><rt>c*d</rt></ruby> <em>a</em> <ruby><span>b</span><rt>c_d</rt></ruby> <strong>重要</strong>な<ruby><span>漢字</span><rt>かんじ</rt></ruby> <ruby><span>漢字</span><rt>かんじ</rt></ruby><em>強調</em></p>',
+        reason: RUBY_BASE,
+      },
+    },
+    {
+      markdown: '**a ^[b*c] d** **x ^[n*] y**',
+      options: { footnote: 'gcpm' },
+      differs: {
+        vfm: '<p><strong>a <span class="footnote" id="fn-1" role="doc-footnote">b*c</span> d</strong> <strong>x <span class="footnote" id="fn-2" role="doc-footnote">n*</span> y</strong></p>',
+        editor:
+          '<p><strong>a <span class="footnote" role="doc-footnote">b*c</span> d</strong> <strong>x <span class="footnote" role="doc-footnote">n*</span> y</strong></p>',
+        reason: 'VFM numbers notes in the order of the book.',
       },
     },
   ],

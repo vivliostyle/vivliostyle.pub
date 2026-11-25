@@ -20,6 +20,7 @@ import type { MdastNodeOf } from '../mdast';
 import {
   defineNotation,
   type InlineRun,
+  isEmptyTextblock,
   type NotationDefinition,
   type ParseContext,
   type WriteContext,
@@ -76,11 +77,15 @@ const documentNotation = defineNotation({
     { pattern: /[`*_[\]<]/g },
     // A backslash only escapes punctuation, or breaks the line it ends.
     { pattern: /\\(?=[!-/:-@[-`{-~\n])/g },
-    { pattern: /&(?=#?[a-zA-Z0-9]+;)/g },
+    // A backslash before `&` would be kept as raw markdown, since no
+    // definition gives `&` alone a meaning.
+    { pattern: /&(?=#?[a-zA-Z0-9]+;)/g, entity: true },
     // Whitespace would be stripped at the start and end of a line, and two
     // spaces before a line break would make it a hard break.
     { pattern: /(?<=\n)[ \t]/g, entity: true },
     { pattern: /[ \t](?=\n)/g, entity: true },
+    // A blank line would end the paragraph.
+    { pattern: /\n(?=\n)/g, entity: true },
   ],
 });
 
@@ -226,7 +231,7 @@ function pick(
 }
 
 function isEmptyParagraph(node: ProseMirrorNode | undefined): boolean {
-  return node?.type.name === 'paragraph' && node.childCount === 0;
+  return node?.type.name === 'paragraph' && isEmptyTextblock(node);
 }
 
 // CommonMark only lets a list interrupt a paragraph when its first item has
@@ -485,13 +490,17 @@ const hardBreakNotation = defineNotation({
         : undefined,
   },
   nodes: {
-    hardBreak: (_, context) =>
-      context.data.singleLine
-        ? '<br>'
-        : // A backslash can be read into the text before it, e.g. a URL.
-          context.escaping === 'safe'
-          ? '  \n'
-          : context.style('break'),
+    hardBreak: (_, context) => {
+      if (context.data.singleLine) {
+        return '<br>';
+      }
+      // Spaces alone on a line would make it blank and end the paragraph.
+      if (context.lineBefore !== undefined && !/\S/.test(context.lineBefore)) {
+        return '\\\n';
+      }
+      // A backslash can be read into the text before it, e.g. a URL.
+      return context.escaping === 'safe' ? '  \n' : context.style('break');
+    },
   },
   styles: {
     break: {

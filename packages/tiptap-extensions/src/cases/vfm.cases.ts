@@ -562,15 +562,77 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a[^x y]"))',
       },
       {
-        name: 'attributes do not apply to a reference',
+        name: 'attributes of a reference',
         given: 'a[^1]{.x}',
-        doc: 'doc(paragraph("a", footnoteReference, "{.x}"))',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('a'),
+              {
+                type: 'footnoteReference',
+                attrs: { label: '1', attributes: { class: 'x' } },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'a link whose text looks like a reference with a bracket',
+        given: 'x‸',
+        steps: [
+          insert(
+            'insert a link',
+            text('^9]', [{ type: 'link', attrs: { href: 'u' } }]),
+          ),
+        ],
+        expect: 'x[^9\\]](u)‸',
+      },
+      {
+        name: 'a reference whose label ends with a backslash',
+        given: '[^9\\]x',
+        doc: 'doc(paragraph(footnoteReference, "x"))',
+      },
+      {
+        name: 'braces typed after a reference are escaped',
+        given: 'a[^1]‸',
+        steps: [
+          run('insert braces as text', (editor) => {
+            editor.view.dispatch(editor.state.tr.insertText('{漢字|かんじ}'));
+          }),
+        ],
+        expect: 'a[^1]\\{漢字|かんじ}‸',
+        doc: 'doc(paragraph("a", footnoteReference, "{漢字|かんじ}"))',
+      },
+      {
+        name: 'ruby right after a reference',
+        given: 'a[^1]‸',
+        steps: [
+          insert('insert a ruby', {
+            type: 'ruby',
+            attrs: { rubyText: 'かんじ' },
+            content: [text('漢字')],
+          }),
+        ],
+        expect: 'a[^1]{}{漢字|かんじ}‸',
       },
       {
         name: 'editing a note',
         given: 'x^[a‸] y',
         steps: ['b'],
         expect: 'x^[ab‸] y',
+      },
+      {
+        name: 'line breaks at the end of a note',
+        given: '本文^[注‸]です。',
+        steps: [press('Shift-Enter'), press('Shift-Enter')],
+        expect: '本文^[注  \n\\\n]です。',
+        doc: 'doc(paragraph("本文", inlineFootnote("注", hardBreak, hardBreak), "です。"))',
+      },
+      {
+        name: 'line breaks at the edges of a note as written',
+        given: '本文^[\\\n注\\\n\\\n]です。',
+        doc: 'doc(paragraph("本文", inlineFootnote(hardBreak, "注", hardBreak, hardBreak), "です。"))',
       },
       {
         name: 'a bracket typed into a note is escaped',
@@ -645,6 +707,42 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph(bold("a"), " ", math))',
       },
       {
+        name: 'a single delimiter does not end strong emphasis',
+        given: '**$a*b$** ~~$a~b$~~ __重要 $x_1$__',
+        doc: 'doc(paragraph(bold(math), " ", strike(math), " ", bold("重要 "), bold(math)))',
+      },
+      {
+        name: 'an underscore before a letter does not end emphasis',
+        given: '_a $x_1$ b_ _a {b|c_d} e_',
+        doc: 'doc(paragraph(italic("a "), italic(math), italic(" b"), " ", italic("a "), italic(ruby("b")), italic(" e")))',
+      },
+      {
+        name: 'a pair does not end emphasis',
+        given: '*a $b**c$ d*',
+        doc: 'doc(paragraph(italic("a "), italic(math), italic(" d")))',
+      },
+      {
+        name: 'emphasis around the label of a reference',
+        given: '*a [^b*c] d*',
+        doc: 'doc(paragraph(italic("a [^b"), "c] d*"))',
+      },
+      {
+        name: 'taking strong emphasis off math keeps the math',
+        given: '__重要 $x_1$__ です。‸',
+        steps: [
+          run('take the strong emphasis off', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr.removeMark(
+                0,
+                editor.state.doc.content.size,
+                editor.schema.marks.bold,
+              ),
+            );
+          }),
+        ],
+        expect: '重要 $x_1$ です。‸',
+      },
+      {
         name: 'no math in the text of a link',
         given: '[$x$](u) $y$',
         doc: 'doc(paragraph(link("$x$"), " ", math))',
@@ -709,7 +807,7 @@ export const vfmSuites: CaseSuite[] = [
             content: [text('漢字')],
           }),
         ],
-        expect: '<strong>重要</strong>{漢字|かんじ}‸',
+        expect: '**重要**{}{漢字|かんじ}‸',
       },
       {
         name: 'strong emphasis with attributes where its delimiters cannot close',
@@ -724,7 +822,7 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'これは<strong class="x">「強調」</strong>‸です',
       },
       {
-        name: 'no ruby typed right after a link',
+        name: 'ruby typed right after a link',
         given: '[リンク](u)‸',
         steps: [
           run('type outside the link', (editor) => {
@@ -732,8 +830,27 @@ export const vfmSuites: CaseSuite[] = [
           }),
           '{漢字|かんじ}',
         ],
-        expect: '[リンク](u)\\{漢字|かんじ}‸',
-        doc: 'doc(paragraph(link("リンク"), "{漢字|かんじ}"))',
+        expect: '[リンク](u){}{漢字|かんじ}‸',
+        doc: 'doc(paragraph(link("リンク"), ruby("漢字")))',
+      },
+      {
+        name: 'ruby that comes right after code as a space goes',
+        given: '`c` ‸{漢字|かんじ}',
+        steps: [press('Backspace')],
+        // The selection's mark would come between them.
+        expect: '`c`{}{漢字|かんじ}',
+      },
+      {
+        name: 'ruby whose base ends with a backslash',
+        given: 'a‸',
+        steps: [
+          insert('insert a ruby', {
+            type: 'ruby',
+            attrs: { rubyText: 'c' },
+            content: [text('b\\')],
+          }),
+        ],
+        expect: 'a{b&#92;|c}‸',
       },
       {
         name: 'no ruby of a selection over a line break',
@@ -776,6 +893,16 @@ export const vfmSuites: CaseSuite[] = [
           }),
         ],
         expect: 'a‸',
+      },
+      {
+        name: 'a note in the text of a link',
+        given: '[x ^[n]](u) です。',
+        doc: 'doc(paragraph(link("x "), link(inlineFootnote("n")), " です。"))',
+      },
+      {
+        name: 'a line break in the base of a ruby',
+        given: '{a<br>b|c} {a&#10;b|c}',
+        doc: 'doc(paragraph(ruby("a", hardBreak, "b"), " ", ruby("a\\nb")))',
       },
       {
         name: 'a note made in a link leaves the link out',
@@ -844,6 +971,30 @@ export const vfmSuites: CaseSuite[] = [
         ],
         expect: 'a{漢字|かんじ}と$x$ と^[注]‸',
         doc: 'doc(paragraph("a{漢字|かんじ}と$x$ と^[注]"))',
+      },
+      {
+        name: 'pasted syntax becomes what the document can hold',
+        given: 'a‸b',
+        steps: [
+          run('record the document as made with marked', (editor) => {
+            setDocumentNotations(editor, MARKED_NOTATIONS);
+          }),
+          insert('insert what pasted HTML makes', [
+            {
+              type: 'ruby',
+              attrs: { rubyText: 'かんじ' },
+              content: [text('漢字')],
+            },
+            { type: 'math', attrs: { latex: 'x', display: false } },
+            { type: 'footnoteReference', attrs: { label: '1' } },
+            { type: 'inlineFootnote', content: [text('注')] },
+            text('強調', [
+              { type: 'bold', attrs: { attributes: { class: 'x' } } },
+            ]),
+          ]),
+        ],
+        expect: 'a漢字$x$[^1]注**強調**‸b',
+        doc: 'doc(paragraph("a漢字$x$[^1]注", bold("強調"), "b"))',
       },
       {
         name: 'commands do nothing',

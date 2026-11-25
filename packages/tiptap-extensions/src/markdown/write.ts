@@ -10,6 +10,7 @@ import { keyOf, matchSequences } from './match';
 import {
   type ChildrenOptions,
   type EscapeRule,
+  isEmptyTextblock,
   type MarkToMarkdown,
   type NodeWriter,
   type NotationDefinition,
@@ -71,6 +72,15 @@ function childrenOf(node: ProseMirrorNode): ProseMirrorNode[] {
     children.push(child);
   });
   return children;
+}
+
+/**
+ * A character reference written after `before`, whose backslash at its end
+ * would otherwise escape the `&`.
+ */
+function referenceAfter(before: string, reference: string): string {
+  const backslashes = before.match(/\\*$/)?.[0].length ?? 0;
+  return backslashes % 2 === 1 ? `\\${reference}` : reference;
 }
 
 function codePoint(char: string): string {
@@ -403,6 +413,16 @@ export class MarkdownWriter {
     );
   }
 
+  /** Whether a definition writes nodes of the type. */
+  writesNode(name: string): boolean {
+    return this.nodeWriters.has(name);
+  }
+
+  /** Whether a definition writes marks of the type. */
+  writesMark(name: string): boolean {
+    return this.markWriters.has(name);
+  }
+
   /**
    * The first top-level block holding an inline node or a mark that no
    * definition writes, as when a document's definitions lack the syntax the
@@ -601,9 +621,8 @@ export class MarkdownWriter {
   /** Empty paragraphs have no markdown, so they are left out. */
   private isUnwritten(node: ProseMirrorNode): boolean {
     return (
-      node.isTextblock &&
-      node.childCount === 0 &&
-      node.type === this.schema.topNodeType.contentMatch.defaultType
+      node.type === this.schema.topNodeType.contentMatch.defaultType &&
+      isEmptyTextblock(node)
     );
   }
 
@@ -995,38 +1014,64 @@ export class MarkdownWriter {
    * escape rule matches is one candidate, counted in `state.counter` in the
    * order they are met, so a selection names the same characters each time
    * the block is written. `before` and `after` are what surrounds the text,
-   * with `\n` for a line break or the edges of the block.
+   * with `\n` for a line break or the edges of the block. A match of a rule
+   * that encloses is one candidate too, counted before the characters in it,
+   * which are counted whether or not it is enclosed.
    */
   private escapeText(
     text: string,
     state: WriteState,
     before: string,
     after: string,
+    marks: readonly Mark[] = [],
   ): string {
     const subject = `${before}${text}${after}`;
     const actions = new Map<number, 'backslash' | 'entity'>();
+    const enclosures = new Map<number, { end: number; written: string }>();
     for (const rule of this.escapes) {
       for (const match of subject.matchAll(rule.pattern)) {
         const index = match.index - before.length;
         if (index < 0 || index >= text.length) {
           continue;
         }
-        if (rule.entity) {
+        if (rule.enclose) {
+          const end = Math.min(text.length, index + match[0].length);
+          const written = rule.enclose(text.slice(index, end), marks);
+          const overlaps = [...enclosures].some(
+            ([start, it]) => start < end && index < it.end,
+          );
+          if (written !== null && !overlaps) {
+            enclosures.set(index, { end, written });
+          }
+        } else if (rule.entity) {
           actions.set(index, 'entity');
         } else if (!actions.has(index)) {
           actions.set(index, 'backslash');
         }
       }
     }
-    if (actions.size === 0) {
+    if (actions.size === 0 && enclosures.size === 0) {
       return text;
     }
     let output = '';
+    let enclosed = -1;
     for (let index = 0; index < text.length; index++) {
+      const enclosure = enclosures.get(index);
+      if (enclosure && this.selects(state)) {
+        output += enclosure.written;
+        enclosed = enclosure.end;
+      }
       const action = actions.get(index);
       const char = text[index];
-      if (action && this.selects(state)) {
-        output += action === 'entity' ? codePoint(char) : `\\${char}`;
+      const selected = action !== undefined && this.selects(state);
+      if (index < enclosed) {
+        continue;
+      }
+      if (selected) {
+        output +=
+          action === 'entity'
+            ? referenceAfter(output || before, codePoint(char))
+            : `\\${char}`;
       } else {
         output += char;
       }
@@ -1278,6 +1323,61 @@ export class MarkdownWriter {
     return failing;
   }
 
+  /**
+   * Whitespace at the edge of a flanking mark's range is written outside its
+   * delimiters. Where the whitespace has other marks too, such as a link, it
+   * is split off without the flanking marks, so it is written inside those.
+   */
+  private splitExpelled(children: ProseMirrorNode[]): ProseMirrorNode[] {
+    const flanking = (mark: Mark) => this.markWriter(mark)?.flanking === true;
+    const kept = (mark: Mark) => {
+      const writer = this.markWriter(mark);
+      return !writer?.flanking && !writer?.verbatim && !writer?.run;
+    };
+    const result: ProseMirrorNode[] = [];
+    children.forEach((child, index) => {
+      const text = child.text;
+      if (!child.isText || !text || !child.marks.some(kept)) {
+        result.push(child);
+        return;
+      }
+      if (child.marks.some((mark) => !flanking(mark) && !kept(mark))) {
+        result.push(child);
+        return;
+      }
+      const opening = child.marks.filter(
+        (mark) =>
+          flanking(mark) && !mark.isInSet(children[index - 1]?.marks ?? []),
+      );
+      const ending = child.marks.filter(
+        (mark) =>
+          flanking(mark) && !mark.isInSet(children[index + 1]?.marks ?? []),
+      );
+      const leading = opening.length > 0 ? (text.match(/^\s*/)?.[0] ?? '') : '';
+      const rest = text.slice(leading.length);
+      const trailing = ending.length > 0 ? (rest.match(/\s*$/)?.[0] ?? '') : '';
+      const core = rest.slice(0, rest.length - trailing.length);
+      const without = (marks: readonly Mark[]) =>
+        child.marks.filter((mark) => !mark.isInSet(marks));
+      const { schema } = this;
+      if (leading) {
+        result.push(
+          schema.text(
+            leading,
+            core ? without(opening) : without([...opening, ...ending]),
+          ),
+        );
+      }
+      if (core) {
+        result.push(schema.text(core, child.marks));
+      }
+      if (trailing) {
+        result.push(schema.text(trailing, without(ending)));
+      }
+    });
+    return result;
+  }
+
   private inlinePass(
     textblock: ProseMirrorNode,
     context: WriteContext,
@@ -1286,7 +1386,7 @@ export class MarkdownWriter {
     edges: InlineEdges,
     forms: ReadonlyMap<number, DelimiterForm>,
   ): { text: string; implied: number; occurrences: MarkOccurrence[] } {
-    const children = childrenOf(textblock);
+    const children = this.splitExpelled(childrenOf(textblock));
     const active: { mark: Mark; occurrence: MarkOccurrence }[] = [];
     const occurrences: MarkOccurrence[] = [];
     let output = '';
@@ -1421,11 +1521,12 @@ export class MarkdownWriter {
       const last = index === children.length - 1 && edges.end;
       if (child.isText) {
         let text = child.text ?? '';
-        // A line break can neither start nor end a textblock in markdown.
-        if (first) {
+        // A line break can neither start nor end a textblock in markdown;
+        // the content of an inline node can have one at its edges.
+        if (first && !textblock.isInline) {
           text = text.replace(/^\n+/, '');
         }
-        if (last) {
+        if (last && !textblock.isInline) {
           text = text.replace(/\n+$/, '');
         }
         const runMark = child.marks.find((mark) => this.markWriter(mark)?.run);
@@ -1474,14 +1575,40 @@ export class MarkdownWriter {
             state,
             lineBefore(leading + opens.map((it) => it.text).join('')),
             after,
+            child.marks,
           );
         }
-      } else if (child.type.spec.linebreakReplacement && (first || last)) {
+      } else if (
+        child.type.spec.linebreakReplacement &&
+        (first || last) &&
+        !textblock.isInline
+      ) {
         // A line break can neither start nor end a textblock in markdown.
         content = '';
       } else {
         const writer = this.nodeWriters.get(child.type.name);
-        content = writer?.write(child, context, () => '') ?? '';
+        const preceding = `${edges.before}${output}${opens.map((it) => it.text).join('')}`;
+        const newline = preceding.lastIndexOf('\n');
+        const line =
+          newline !== -1 || edges.start
+            ? preceding.slice(newline + 1)
+            : `\u0000${preceding}`;
+        const previous = children[index - 1];
+        const adjacent =
+          previous && opens.length === 0
+            ? {
+                node: previous,
+                endingMarks: previous.marks.filter(
+                  (mark) => !mark.isInSet(child.marks),
+                ),
+              }
+            : null;
+        content =
+          writer?.write(
+            child,
+            { ...context, lineBefore: line, adjacent },
+            () => '',
+          ) ?? '';
       }
 
       // Whitespace that markdown would strip at the start or end of a line.
@@ -1512,7 +1639,9 @@ export class MarkdownWriter {
           }
         }
         closeTo(depth);
-        output += trailing;
+        output += trailing.startsWith('&')
+          ? referenceAfter(output, trailing)
+          : trailing;
       }
     });
     closeTo(0);
