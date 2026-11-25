@@ -1,6 +1,8 @@
 import { type Editor, Extension } from '@tiptap/core';
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Plugin, type Transaction } from '@tiptap/pm/state';
 
+import { changedNodes, isRemote } from './changes';
 import {
   createLegacyBaselineReader,
   type LegacyBaselineReader,
@@ -230,6 +232,132 @@ function documentPipeline(
   };
 }
 
+/**
+ * What the document's definitions can write, when they are not all the
+ * editor has: node and mark types, and the attributes of the definitions
+ * they lack.
+ */
+function documentWrites(editor: Editor): {
+  writer: MarkdownPipeline['writer'];
+  lostAttributes: ReadonlySet<string>;
+} | null {
+  const storage = storageOf(editor);
+  const record = optionsOf(editor).documentRecord?.(editor);
+  const signature = record ? record.notations : storage.documentNotations;
+  if (signature === null || signature === currentNotations(editor)) {
+    return null;
+  }
+  const { pipeline } = documentPipeline(editor, signature);
+  const kept = new Set(pipeline.notations.map((it) => it.name));
+  const lostAttributes = new Set(
+    optionsOf(editor)
+      .notations.filter((it) => !kept.has(it.name))
+      .flatMap((it) => it.attributes ?? []),
+  );
+  return { writer: pipeline.writer, lostAttributes };
+}
+
+/**
+ * Turns what the document's definitions cannot write into what they can,
+ * wherever this client changed the document, as by pasting HTML: an inline
+ * node becomes its content or its text, a mark is taken off, and an
+ * attribute of a definition the document lacks is cleared.
+ */
+function dissolveUnwritable(editor: Editor): Plugin {
+  return new Plugin({
+    appendTransaction: (transactions, _, state) => {
+      if (!transactions.some((tr) => tr.docChanged && !isRemote(tr))) {
+        return null;
+      }
+      const writes = documentWrites(editor);
+      if (!writes) {
+        return null;
+      }
+      const { writer, lostAttributes } = writes;
+      const lost = (attrs: Record<string, unknown>) =>
+        [...lostAttributes].filter((name) => attrs[name] != null);
+      const cleared = (attrs: Record<string, unknown>) => ({
+        ...attrs,
+        ...Object.fromEntries(lost(attrs).map((name) => [name, null])),
+      });
+      const { tr } = state;
+      const found = changedNodes(
+        state.doc,
+        transactions,
+        (node) => !node.isBlock,
+      );
+      for (const { pos } of found) {
+        const node = tr.doc.nodeAt(pos);
+        if (!node) {
+          continue;
+        }
+        for (const mark of node.marks) {
+          if (!writer.writesMark(mark.type.name)) {
+            removeMark(tr, pos, node, mark);
+          } else if (lost(mark.attrs).length > 0) {
+            removeMark(tr, pos, node, mark);
+            addMark(tr, pos, node, mark.type.create(cleared(mark.attrs)));
+          }
+        }
+        const current = tr.doc.nodeAt(pos) ?? node;
+        if (!current.isText && !writer.writesNode(current.type.name)) {
+          tr.replaceWith(pos, pos + current.nodeSize, contentOf(current));
+        } else if (!current.isText && lost(current.attrs).length > 0) {
+          tr.setNodeMarkup(pos, undefined, cleared(current.attrs));
+        }
+      }
+      return tr.docChanged ? tr : null;
+    },
+  });
+}
+
+function removeMark(
+  tr: Transaction,
+  pos: number,
+  node: ProseMirrorNode,
+  mark: Mark,
+): void {
+  if (node.isText) {
+    tr.removeMark(pos, pos + node.nodeSize, mark);
+  } else {
+    tr.removeNodeMark(pos, mark);
+  }
+}
+
+function addMark(
+  tr: Transaction,
+  pos: number,
+  node: ProseMirrorNode,
+  mark: Mark,
+): void {
+  if (node.isText) {
+    tr.addMark(pos, pos + node.nodeSize, mark);
+  } else {
+    tr.addNodeMark(pos, mark);
+  }
+}
+
+/** An inline node as the content it holds, or as its text. */
+function contentOf(node: ProseMirrorNode): ProseMirrorNode[] {
+  const { schema } = node.type;
+  if (node.inlineContent) {
+    const children: ProseMirrorNode[] = [];
+    node.forEach((child) => {
+      children.push(
+        child.mark(
+          node.marks.reduce((set, mark) => mark.addToSet(set), child.marks),
+        ),
+      );
+    });
+    return children;
+  }
+  const toText = node.type.spec.toText as
+    | ((props: { node: ProseMirrorNode }) => string)
+    | undefined;
+  const text = toText?.({ node }) ?? '';
+  return text ? [schema.text(text, node.marks)] : [];
+}
+
 export const PubMarkdown = Extension.create<
   PubMarkdownOptions,
   PubMarkdownStorage
@@ -259,6 +387,10 @@ export const PubMarkdown = Extension.create<
     return this.options.notations.flatMap(
       (notation) => notation.extensions ?? [],
     );
+  },
+
+  addProseMirrorPlugins() {
+    return [dissolveUnwritable(this.editor)];
   },
 
   addCommands() {

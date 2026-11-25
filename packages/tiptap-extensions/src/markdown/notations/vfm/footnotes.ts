@@ -8,11 +8,10 @@ import {
   codes,
   currentNode,
   type Effects,
-  endsOpen,
   enterNode,
   type FromMarkdownExtension,
   isLineEnding,
-  openBefore,
+  OpenDelimiters,
   type State,
   syntaxPlugin,
   type Token,
@@ -89,6 +88,44 @@ const resourceAhead: Construct = {
   },
 };
 
+/**
+ * After a `]` that a backslash escapes, the `]` and resource of a link
+ * further on the line: VFM 2 reads the brackets as a link then, and as a
+ * reference whose label ends with the backslash otherwise.
+ */
+const linkAhead: Construct = {
+  partial: true,
+  tokenize(effects, ok, nok) {
+    let depth = 0;
+    let escaping = false;
+    const inside: State = (code) => {
+      if (code === null || isLineEnding(code)) {
+        return nok(code);
+      }
+      if (!escaping && code === codes.rightSquareBracket && depth === 0) {
+        effects.consume(code);
+        return (next) =>
+          next === codes.leftParenthesis
+            ? effects.attempt(resourceAhead, ok, nok)(next)
+            : nok(next);
+      }
+      if (!escaping && code === codes.leftSquareBracket) {
+        depth++;
+      } else if (!escaping && code === codes.rightSquareBracket) {
+        depth--;
+      }
+      escaping = !escaping && code === codes.backslash;
+      effects.consume(code);
+      return inside;
+    };
+    return (code) => {
+      effects.enter(types.callMarker);
+      effects.consume(code);
+      return inside;
+    };
+  },
+};
+
 /** `![^label]`: VFM 2 reads the `!` as text before the reference. */
 const callAfterBang: Construct = {
   name: 'vfmFootnoteCallAfterBang',
@@ -120,17 +157,31 @@ function tokenizeCall(
   ok: State,
   nok: State,
 ): State {
+  // A link's label is not ended by the reference's own bracket.
+  const open = new OpenDelimiters(this, { label: false });
+  let escaping = false;
+
+  const close: State = (code) => {
+    effects.exit(types.callLabel);
+    effects.enter(types.callMarker);
+    effects.consume(code);
+    effects.exit(types.callMarker);
+    return after;
+  };
+
   const label: State = (code) => {
+    if (open.ends(code)) {
+      return nok(code);
+    }
     if (code === codes.rightSquareBracket) {
-      effects.exit(types.callLabel);
-      effects.enter(types.callMarker);
-      effects.consume(code);
-      effects.exit(types.callMarker);
-      return after;
+      return escaping
+        ? effects.check(linkAhead, nok, close)(code)
+        : close(code);
     }
     if (!isLabelCode(code)) {
       return nok(code);
     }
+    escaping = !escaping && code === codes.backslash;
     effects.consume(code);
     return label;
   };
@@ -182,8 +233,7 @@ function inlineFootnoteTokenizer(allowEmpty: boolean) {
     nok: State,
   ): State {
     // A link's label is not ended by brackets the note balances.
-    const open = { ...openBefore(this), label: false };
-    let last: Code = null;
+    const open = new OpenDelimiters(this, { label: false });
     let balance = 0;
     let escaped = false;
     let run = 0;
@@ -219,10 +269,9 @@ function inlineFootnoteTokenizer(allowEmpty: boolean) {
     };
 
     const content: State = (code) => {
-      if (code === null || endsOpen(open, code, last)) {
+      if (code === null || open.ends(code)) {
         return nok(code);
       }
-      last = code;
       if (code === codes.graveAccent && !escaped) {
         run++;
         openChunk();
@@ -374,7 +423,7 @@ export const FootnoteReference = Node.create({
         ...HTMLAttributes,
         id: `fnref${label}`,
         href: `#fn${label}`,
-        class: 'footnote-ref',
+        class: ['footnote-ref', HTMLAttributes.class].filter(Boolean).join(' '),
         role: 'doc-noteref',
       },
       ['sup', label],
@@ -517,9 +566,15 @@ export const InlineFootnote = Node.create({
     };
   },
 
-  // A note in a link would hold the link's end, and code cannot hold one.
+  // Code cannot hold a note. A link can, as VFM reads one in its text, but
+  // not one whose content has a link too.
   addProseMirrorPlugins() {
-    return [inlineNodeRules(this.name, { marks: ['code', 'link'] })];
+    return [
+      inlineNodeRules(this.name, {
+        marks: ['code'],
+        unlessInContent: ['link'],
+      }),
+    ];
   },
 
   addInputRules() {

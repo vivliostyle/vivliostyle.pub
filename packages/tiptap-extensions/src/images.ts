@@ -5,6 +5,7 @@ import { Plugin } from '@tiptap/pm/state';
 import { join } from 'pathe';
 
 import { hasDocumentNotation } from './markdown';
+import { changedNodes, isRemote } from './markdown/changes';
 import { renderedAttributes } from './markdown/notations/vfm/attributes';
 import { inlineSourceRules } from './markdown/notations/vfm/input-rules';
 import { inlineNodeRules } from './markdown/notations/vfm/normalize';
@@ -36,7 +37,7 @@ function imageAttributes(
   // the ones its attributes give.
   return mergeAttributes(options, {
     ...rest,
-    ...renderedAttributes(node.attrs.attributes),
+    ...renderedAttributes(node.attrs.attributes, 'img'),
     ...(typeof explicitAlt === 'string' && { alt: explicitAlt }),
     src: resolveSource(src, basePath),
   });
@@ -73,30 +74,28 @@ function loneChild(textblock: ProseMirrorNode): ProseMirrorNode | null {
 function loneImageRule(blockName: string, inlineName: string): Plugin {
   return new Plugin({
     appendTransaction: (transactions, _, state) => {
-      if (!transactions.some((tr) => tr.docChanged)) {
-        return null;
-      }
       const block = state.schema.nodes[blockName];
-      if (!block) {
+      if (
+        !block ||
+        !transactions.some((tr) => tr.docChanged && !isRemote(tr))
+      ) {
         return null;
       }
-      const found: {
-        pos: number;
-        node: ProseMirrorNode;
-        image: ProseMirrorNode;
-      }[] = [];
-      state.doc.descendants((node, pos) => {
-        const only = node.type.name === 'paragraph' && loneChild(node);
-        if (only && only.type.name === inlineName && only.marks.length === 0) {
-          found.push({ pos, node, image: only });
-        }
-        return !node.isTextblock;
-      });
       const { tr } = state;
-      for (const { pos, node, image } of found.sort((a, b) => b.pos - a.pos)) {
+      const found = changedNodes(
+        state.doc,
+        transactions,
+        (node) => node.type.name === 'paragraph',
+      );
+      for (const { pos, node } of found) {
+        const image = loneChild(node);
         const $pos = tr.doc.resolve(pos);
         const index = $pos.index();
-        if ($pos.parent.canReplaceWith(index, index + 1, block)) {
+        if (
+          image?.type.name === inlineName &&
+          image.marks.length === 0 &&
+          $pos.parent.canReplaceWith(index, index + 1, block)
+        ) {
           tr.replaceWith(pos, pos + node.nodeSize, block.create(image.attrs));
         }
       }

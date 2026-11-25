@@ -63,6 +63,7 @@ export {
   type InlineAttributes,
   imageLabel,
   isAttributeName,
+  isRenderedAttribute,
   isWritableFootnoteLabel,
   isWritableMath,
   isWritableRubyText,

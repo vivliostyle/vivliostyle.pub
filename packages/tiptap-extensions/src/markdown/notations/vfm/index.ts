@@ -56,6 +56,7 @@ export {
   formatAttributes,
   type InlineAttributes,
   isAttributeName,
+  isRenderedAttribute,
   parseAttributes,
   renderedAttributes,
   writableAttributes,

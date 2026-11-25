@@ -78,6 +78,16 @@ export interface WriteContext {
   readonly avoidMarkers: ReadonlySet<string>;
   /** The node's source before it changed, when it had one. */
   readonly base: BaseNode | null;
+  /** For an inline node, what is written on its line before it. */
+  readonly lineBefore?: string;
+  /**
+   * For an inline node written right after other content, with no delimiter
+   * or whitespace between: that content, and its marks that end there.
+   */
+  readonly adjacent?: {
+    node: ProseMirrorNode;
+    endingMarks: readonly Mark[];
+  } | null;
   /** The markdown of a textblock's content, with `data` for its writers. */
   inline(node: ProseMirrorNode, data?: Record<string, unknown>): string;
   /**
@@ -184,7 +194,8 @@ export interface StyleSpec {
 
 /**
  * Characters that `safe` escaping has to escape in text. Each match of
- * `pattern` (which must be global) is one character. A text starts after a
+ * `pattern` (which must be global) is one character, unless the rule
+ * encloses. A text starts after a
  * `\n` when it starts a line, and ends before one when it ends a block, so
  * patterns can look around for `\n`.
  */
@@ -192,6 +203,13 @@ export interface EscapeRule {
   pattern: RegExp;
   /** Writes a character reference, for characters a backslash cannot escape. */
   entity?: boolean;
+  /**
+   * Writes the whole match in a form that reads back as it, instead of
+   * escaping its first character, or null where there is none for text
+   * under `marks`. The match is then not escaped within: an enclosure is for
+   * text that markdown reads into syntax whatever is escaped in it.
+   */
+  enclose?: (match: string, marks: readonly Mark[]) => string | null;
 }
 
 /**
@@ -213,6 +231,23 @@ export interface HtmlElementSpec {
    * name. Without it, a tag with other attributes is not the element.
    */
   rest?: string;
+}
+
+/**
+ * Whether a textblock holds nothing markdown can: line breaks alone, which
+ * cannot start or end one, leave it empty.
+ */
+export function isEmptyTextblock(node: ProseMirrorNode): boolean {
+  if (!node.isTextblock) {
+    return false;
+  }
+  let empty = true;
+  node.forEach((child) => {
+    empty &&= child.isText
+      ? /^\n*$/.test(child.text ?? '')
+      : child.type.spec.linebreakReplacement === true;
+  });
+  return empty;
 }
 
 /** The attributes of an opening tag, from the text after its name. */
@@ -273,6 +308,11 @@ export interface NotationDefinition {
   marks?: Record<string, MarkToMarkdown | MarkDecorator>;
   styles?: Record<string, StyleSpec>;
   escapes?: EscapeRule[];
+  /**
+   * The attributes this definition writes on the nodes and marks of others,
+   * which a document whose definitions lack it cannot keep.
+   */
+  attributes?: readonly string[];
 }
 
 export function defineNotation(

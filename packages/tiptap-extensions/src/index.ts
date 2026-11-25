@@ -53,6 +53,7 @@ export {
   headingText,
   type InlineAttributes,
   isAttributeName,
+  isRenderedAttribute,
   isWritableFootnoteLabel,
   isWritableMath,
   isWritableRubyText,
