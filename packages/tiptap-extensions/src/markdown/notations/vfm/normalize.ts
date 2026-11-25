@@ -1,8 +1,6 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, type Transaction } from '@tiptap/pm/state';
 
-import { unwrap } from './commands';
-
 /**
  * Where the transactions changed the document they end with. Steps that
  * change marks move nothing, so they are found by the range they cover.
@@ -42,12 +40,10 @@ function changedRanges(
   return ranges;
 }
 
-function hasLineBreak(node: ProseMirrorNode): boolean {
+function contentHas(node: ProseMirrorNode, name: string): boolean {
   let found = false;
   node.descendants((child) => {
-    found ||=
-      Boolean(child.type.spec.linebreakReplacement) ||
-      Boolean(child.isText && child.text?.includes('\n'));
+    found ||= child.marks.some((mark) => mark.type.name === name);
     return !found;
   });
   return found;
@@ -63,13 +59,13 @@ export function inlineNodeRules(
   name: string,
   {
     marks = [],
+    unlessInContent = [],
     needsContent = false,
-    oneLine = false,
   }: {
     marks?: readonly string[];
+    /** Marks the node cannot have where its content has them too. */
+    unlessInContent?: readonly string[];
     needsContent?: boolean;
-    /** A node whose content takes a line break is left as its content. */
-    oneLine?: boolean;
   },
 ): Plugin {
   return new Plugin({
@@ -101,12 +97,12 @@ export function inlineNodeRules(
           tr.delete(pos, pos + node.nodeSize);
           continue;
         }
-        if (oneLine && hasLineBreak(node)) {
-          unwrap(tr, { pos, node });
-          continue;
-        }
         for (const mark of node.marks) {
-          if (marks.includes(mark.type.name)) {
+          if (
+            marks.includes(mark.type.name) ||
+            (unlessInContent.includes(mark.type.name) &&
+              contentHas(node, mark.type.name))
+          ) {
             tr.removeNodeMark(pos, mark);
           }
         }

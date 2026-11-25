@@ -552,9 +552,15 @@ export const InlineFootnote = Node.create({
     };
   },
 
-  // A note in a link would hold the link's end, and code cannot hold one.
+  // Code cannot hold a note. A link can, as VFM reads one in its text, but
+  // not one whose content has a link too.
   addProseMirrorPlugins() {
-    return [inlineNodeRules(this.name, { marks: ['code', 'link'] })];
+    return [
+      inlineNodeRules(this.name, {
+        marks: ['code'],
+        unlessInContent: ['link'],
+      }),
+    ];
   },
 
   addInputRules() {

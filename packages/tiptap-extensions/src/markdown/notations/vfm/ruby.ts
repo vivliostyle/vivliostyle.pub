@@ -329,14 +329,12 @@ export const Ruby = Node.create({
   },
 
   // A ruby without a base has no markdown, so it goes with its last
-  // character; one whose base takes a line break is left as its base; and
-  // code cannot hold a ruby.
+  // character, and code cannot hold a ruby.
   addProseMirrorPlugins() {
     return [
       inlineNodeRules(this.name, {
         marks: ['code'],
         needsContent: true,
-        oneLine: true,
       }),
       new Plugin({ props: { transformPastedHTML: splitRubies } }),
     ];
@@ -374,11 +372,12 @@ function unescapePipes(fragment: Fragment): Fragment {
 }
 
 /**
- * The base as `{base|…}` holds it: a backslash right before `|`, escaped
- * or not, would keep the `|` from ending the base, and a character
- * reference does not.
+ * The base as `{base|…}` holds it, with character references where it would
+ * end: it has to be on one line, and a backslash right before `|`, escaped
+ * or not, would keep the `|` from ending it.
  */
-function baseOf(markdown: string): string {
+function baseOf(written: string): string {
+  const markdown = written.replaceAll('\n', '&#10;');
   const backslashes = markdown.match(/\\+$/)?.[0].length ?? 0;
   if (backslashes === 0) {
     return markdown;

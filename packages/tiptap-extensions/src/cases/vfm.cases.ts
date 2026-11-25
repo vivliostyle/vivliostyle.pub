@@ -895,6 +895,16 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'a‸',
       },
       {
+        name: 'a note in the text of a link',
+        given: '[x ^[n]](u) です。',
+        doc: 'doc(paragraph(link("x "), link(inlineFootnote("n")), " です。"))',
+      },
+      {
+        name: 'a line break in the base of a ruby',
+        given: '{a<br>b|c} {a&#10;b|c}',
+        doc: 'doc(paragraph(ruby("a", hardBreak, "b"), " ", ruby("a\\nb")))',
+      },
+      {
         name: 'a note made in a link leaves the link out',
         given: '[a ‸b‸ c](u)',
         steps: [
