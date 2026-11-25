@@ -1,9 +1,6 @@
-import {
-  type Extensions,
-  Mark as MarkExtension,
-  Node as NodeExtension,
-} from '@tiptap/core';
+import type { Extensions } from '@tiptap/core';
 import type { Mark, Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
+import { decodeString } from 'micromark-util-decode-string';
 import type { Pluggable } from 'unified';
 
 import type { BaseNode } from './base';
@@ -218,22 +215,33 @@ export interface EscapeRule {
 }
 
 /**
- * An HTML element read as a mark when its tags are around phrasing, or as a
- * node when its tags are HTML blocks around other blocks (with blank lines
- * between).
+ * An HTML element read as one of the definition's marks or nodes, by `kind`:
+ *
+ * - `mark`: tags around phrasing, as a mark on it.
+ * - `inline`: tags around phrasing, as an inline node holding it.
+ * - `atom`: an opening tag right before its closing tag, as an inline node.
+ * - `block`: tags that are HTML blocks of their own around other blocks,
+ *   with blank lines between, as a node holding them.
+ * - `textblock`: one HTML block of the element holding text alone, as a
+ *   textblock. Markdown does not read what is inside an HTML block.
  */
 export interface HtmlElementSpec {
-  kind: 'mark' | 'block';
+  kind: 'mark' | 'inline' | 'atom' | 'block' | 'textblock';
   /** The mark or node type. */
   type: string;
   tag: string;
+  /** Classes the element must have. It may have others too. */
+  classes?: readonly string[];
   /** Attributes the opening tag must have, with these values. */
-  match?: Record<string, string>;
+  match?: Readonly<Record<string, string>>;
   /** Attributes the opening tag may have, kept as the type's attributes. */
-  capture?: string[];
+  capture?: readonly string[];
+  /** Of the attributes in `capture`, those the opening tag must have. */
+  require?: readonly string[];
   /**
    * The attribute of the type that keeps the tag's other attributes, by
-   * name. Without it, a tag with other attributes is not the element.
+   * name, with the classes not in `classes` as `class`. Without it, a tag
+   * with other attributes is not the element.
    */
   rest?: string;
 }
@@ -266,22 +274,120 @@ export function readTagAttributes(text: string): Record<string, string> {
   return attributes;
 }
 
+/**
+ * HTML text with its character references read. A backslash is a character
+ * of its own there, so it escapes nothing.
+ */
+export function decodeHtml(text: string): string {
+  return text.includes('&')
+    ? text.split('\\').map(decodeString).join('\\')
+    : text;
+}
+
+/** HTML text that reads back as `text`, where tags could start. */
+export function encodeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+}
+
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
-/** The opening tag of an element with fixed and captured attributes. */
+/** The name and attributes of HTML that is one opening tag. */
+export function readOpeningTag(
+  value: string,
+): { name: string; attributes: Record<string, string> } | null {
+  const tag = value.trim().match(/^<([A-Za-z][\w-]*)(\s[^>]*)?>$/);
+  if (!tag) {
+    return null;
+  }
+  const attributes = readTagAttributes(tag[2] ?? '');
+  for (const [name, written] of Object.entries(attributes)) {
+    attributes[name] = decodeHtml(written);
+  }
+  return { name: tag[1].toLowerCase(), attributes };
+}
+
+function classesOf(value: string | undefined): string[] {
+  return value?.split(/[ \t\n\f\r]+/).filter(Boolean) ?? [];
+}
+
+/**
+ * The attributes an element with `attributes` gives the spec's mark or
+ * node, or null when it is not the spec's element.
+ */
+export function matchAttributes(
+  attributes: Readonly<Record<string, string>>,
+  spec: Pick<
+    HtmlElementSpec,
+    'classes' | 'match' | 'capture' | 'require' | 'rest'
+  >,
+): Record<string, unknown> | null {
+  for (const [name, expected] of Object.entries(spec.match ?? {})) {
+    if (attributes[name] !== expected) {
+      return null;
+    }
+  }
+  if ((spec.require ?? []).some((name) => attributes[name] === undefined)) {
+    return null;
+  }
+  const required = spec.classes ?? [];
+  const classes = classesOf(attributes.class);
+  if (required.some((name) => !classes.includes(name))) {
+    return null;
+  }
+  const known = new Set([
+    ...Object.keys(spec.match ?? {}),
+    ...(spec.capture ?? []),
+  ]);
+  const others = Object.entries(attributes).filter(
+    ([name]) => !known.has(name) && !(name === 'class' && required.length > 0),
+  );
+  const otherClasses = classes.filter((name) => !required.includes(name));
+  if (required.length > 0 && otherClasses.length > 0 && !known.has('class')) {
+    others.unshift(['class', otherClasses.join(' ')]);
+  }
+  if (others.length > 0 && !spec.rest) {
+    return null;
+  }
+  return {
+    ...Object.fromEntries(
+      (spec.capture ?? []).map((name) => [name, attributes[name] ?? null]),
+    ),
+    ...(spec.rest && {
+      [spec.rest]: others.length > 0 ? Object.fromEntries(others) : null,
+    }),
+  };
+}
+
+/** The attributes an opening tag gives the spec's mark or node, or null. */
+export function matchOpeningTag(
+  value: string,
+  spec: HtmlElementSpec,
+): Record<string, unknown> | null {
+  const tag = readOpeningTag(value);
+  return tag && tag.name === spec.tag.toLowerCase()
+    ? matchAttributes(tag.attributes, spec)
+    : null;
+}
+
+/**
+ * The opening tag of an element with fixed and captured attributes, and
+ * `others`, whose `class` is added to the fixed classes.
+ */
 export function openingTag(
-  spec: Pick<HtmlElementSpec, 'tag' | 'match' | 'capture'>,
+  spec: Pick<HtmlElementSpec, 'tag' | 'classes' | 'match' | 'capture'>,
   attrs: Readonly<Record<string, unknown>>,
   others: Readonly<Record<string, string>> = {},
 ): string {
+  const classes = [...(spec.classes ?? []), ...classesOf(others.class)];
   const parts = [
+    ...(classes.length > 0 ? [['class', classes.join(' ')]] : []),
     ...Object.entries(spec.match ?? {}),
     ...(spec.capture ?? []).flatMap((name) =>
       typeof attrs[name] === 'string' ? [[name, attrs[name] as string]] : [],
     ),
-    ...Object.entries(others),
+    ...Object.entries(others).filter(([name]) => name !== 'class'),
   ].map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`);
   return `<${spec.tag}${parts.join('')}>`;
 }
@@ -319,174 +425,16 @@ export interface NotationDefinition {
    * `type:name` where other definitions write the name on other types.
    */
   attributes?: readonly string[];
+  /**
+   * What a node of the definition becomes in a document whose definitions
+   * lack it, by node type, so its content and markup are not lost: e.g. its
+   * tags as raw markdown around its content.
+   */
+  dissolve?: Record<string, (node: ProseMirrorNode) => ProseMirrorNode[]>;
 }
 
 export function defineNotation(
   definition: NotationDefinition,
 ): NotationDefinition {
   return definition;
-}
-
-/** A mark written between two copies of a delimiter, like `~~`. */
-export interface DelimitedMarkDeclaration {
-  kind: 'delimitedMark';
-  name: string;
-  mark: string;
-  /** The mdast node type the parser makes of the syntax. */
-  mdastType: string;
-  delimiter: string;
-  /** The HTML element read as the mark too, see `MarkToMarkdown.html`. */
-  tag?: string;
-}
-
-/** A mark written as an inline HTML element, like `<span class="tcy">`. */
-export interface HtmlMarkDeclaration {
-  kind: 'htmlMark';
-  name: string;
-  mark: string;
-  tag: string;
-  match?: Record<string, string>;
-  capture?: string[];
-}
-
-/**
- * A block written as an HTML element around markdown, like
- * `<aside class="sidenote">`, a blank line, the content, a blank line and
- * `</aside>`.
- */
-export interface HtmlBlockDeclaration {
-  kind: 'htmlBlock';
-  name: string;
-  node: string;
-  tag: string;
-  match?: Record<string, string>;
-  capture?: string[];
-}
-
-export type NotationDeclaration =
-  | DelimitedMarkDeclaration
-  | HtmlMarkDeclaration
-  | HtmlBlockDeclaration;
-
-function selectorOf(spec: Pick<HtmlElementSpec, 'tag' | 'match'>): string {
-  return `${spec.tag}${Object.entries(spec.match ?? {})
-    .map(([name, value]) => `[${name}="${value.replace(/"/g, '\\"')}"]`)
-    .join('')}`;
-}
-
-function attributesOf(capture: readonly string[] = []) {
-  return Object.fromEntries(
-    capture.map((name) => [
-      name,
-      {
-        default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute(name),
-      },
-    ]),
-  );
-}
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Builds a definition from a plain description, for syntax that needs no
- * code of its own. Without `extensions`, a mark of the declared name is
- * created for the schema.
- */
-export function declareNotation(
-  declaration: NotationDeclaration,
-  extensions?: Extensions,
-): NotationDefinition {
-  switch (declaration.kind) {
-    case 'delimitedMark': {
-      const { name, mark, mdastType, delimiter, tag } = declaration;
-      return {
-        name,
-        extensions: extensions ?? [
-          MarkExtension.create({
-            name: mark,
-            parseHTML: () => [{ tag: `span[data-mark="${mark}"]` }],
-            renderHTML: () => ['span', { 'data-mark': mark }, 0],
-          }),
-        ],
-        fromMarkdown: {
-          [mdastType]: (node: UnknownMdastNode, context: ParseContext) => {
-            const type = context.schema.marks[mark];
-            return type
-              ? context.inlines(node, type.create().addToSet(context.marks))
-              : undefined;
-          },
-        },
-        ...(tag && {
-          htmlElements: [{ kind: 'mark' as const, type: mark, tag }],
-        }),
-        marks: {
-          [mark]: {
-            open: delimiter,
-            close: delimiter,
-            flanking: true,
-            ...(tag && { html: tag }),
-          },
-        },
-        escapes: [
-          { pattern: new RegExp(escapeRegExp(delimiter.charAt(0)), 'g') },
-        ],
-      };
-    }
-    case 'htmlMark': {
-      const { name, mark, tag, match, capture } = declaration;
-      const spec = { tag, match, capture };
-      return {
-        name,
-        extensions: extensions ?? [
-          MarkExtension.create({
-            name: mark,
-            addAttributes: () => attributesOf(capture),
-            parseHTML: () => [{ tag: selectorOf(spec) }],
-            renderHTML: ({ HTMLAttributes }) => [
-              tag,
-              { ...match, ...HTMLAttributes },
-              0,
-            ],
-          }),
-        ],
-        htmlElements: [{ kind: 'mark', type: mark, ...spec }],
-        marks: {
-          [mark]: {
-            open: (it) => openingTag(spec, it.attrs),
-            close: `</${tag}>`,
-          },
-        },
-      };
-    }
-    case 'htmlBlock': {
-      const { name, node, tag, match, capture } = declaration;
-      const spec = { tag, match, capture };
-      return {
-        name,
-        extensions: extensions ?? [
-          NodeExtension.create({
-            name: node,
-            group: 'block',
-            content: 'block+',
-            defining: true,
-            addAttributes: () => attributesOf(capture),
-            parseHTML: () => [{ tag: selectorOf(spec) }],
-            renderHTML: ({ HTMLAttributes }) => [
-              tag,
-              { ...match, ...HTMLAttributes },
-              0,
-            ],
-          }),
-        ],
-        htmlElements: [{ kind: 'block', type: node, ...spec }],
-        nodes: {
-          [node]: (it, context) =>
-            `${openingTag(spec, it.attrs)}\n\n${context.children(it)}\n\n</${tag}>`,
-        },
-      };
-    }
-  }
 }

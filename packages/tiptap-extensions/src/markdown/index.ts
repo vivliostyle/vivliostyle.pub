@@ -1,5 +1,20 @@
 export type { BaseContent, BaseDocument, BaseNode } from './base';
 export {
+  type DeclaredElement,
+  type DelimitedMarkDeclaration,
+  declaredElementOf,
+  declareNotation,
+  type HtmlAtomDeclaration,
+  type HtmlBlockDeclaration,
+  HtmlElementCommands,
+  type HtmlElementPattern,
+  type HtmlInlineDeclaration,
+  type HtmlMarkDeclaration,
+  type HtmlTextblockDeclaration,
+  type NotationDeclaration,
+  OTHER_ATTRIBUTES,
+} from './declare';
+export {
   currentNotations,
   type DocumentRecord,
   type GetMarkdownOptions,
@@ -24,22 +39,17 @@ export type {
 } from './mdast';
 export {
   type ChildrenOptions,
-  type DelimitedMarkDeclaration,
-  declareNotation,
   defineNotation,
   type EscapeRule,
   type FromMarkdownHandler,
   type FromMarkdownHandlers,
   type FromMarkdownResult,
-  type HtmlBlockDeclaration,
   type HtmlElementSpec,
-  type HtmlMarkDeclaration,
   type InlineRun,
   type MarkDecorator,
   type MarkToMarkdown,
   type NodeToMarkdown,
   type NodeWriter,
-  type NotationDeclaration,
   type NotationDefinition,
   type ParseContext,
   type StyleSpec,

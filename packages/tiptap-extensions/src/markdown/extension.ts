@@ -264,8 +264,9 @@ function documentWrites(editor: Editor): {
 /**
  * Turns what the document's definitions cannot write into what they can,
  * wherever this client changed the document, as by pasting HTML: a node
- * becomes its content or its text, a mark is taken off, and an attribute of
- * a definition the document lacks is cleared.
+ * becomes what its definition dissolves it into, or else its content or its
+ * text, a mark is taken off, and an attribute of a definition the document
+ * lacks is cleared.
  */
 function dissolveUnwritable(editor: Editor): Plugin {
   return new Plugin({
@@ -315,9 +316,14 @@ function dissolveUnwritable(editor: Editor): Plugin {
         const current = tr.doc.nodeAt(pos) ?? node;
         const type = current.type.name;
         if (!current.isText && !writer.writesNode(type)) {
-          const content = current.isBlock
-            ? blockContentOf(current)
-            : contentOf(current);
+          const dissolve = optionsOf(editor).notations.find(
+            (it) => it.dissolve?.[type],
+          )?.dissolve?.[type];
+          const content = dissolve
+            ? dissolve(current)
+            : current.isBlock
+              ? blockContentOf(current)
+              : contentOf(current);
           const $pos = tr.doc.resolve(pos);
           const index = $pos.index();
           if (
