@@ -9,6 +9,7 @@ import {
   withCodeBlockCaption,
 } from '../../../code-block-prism';
 import { PubExtensions } from '../../../index';
+import { documentHtml } from '../../../testing/html';
 import {
   currentNotations,
   getMarkdown,
@@ -224,6 +225,63 @@ describe('a document recorded before the block syntax', () => {
         editor.can().setHeadingAttributes({ id: 'x' }),
       ].some(Boolean),
     ).toBe(false);
+  });
+});
+
+describe('HTML on the clipboard', () => {
+  // Enough of an element for the parse rules, which tests have no DOM for.
+  const element = (attributes: Record<string, string>, checkbox?: boolean) =>
+    ({
+      getAttribute: (name: string) => attributes[name] ?? null,
+      hasAttribute: (name: string) => name in attributes,
+      classList: {
+        contains: (name: string) =>
+          (attributes.class ?? '').split(' ').includes(name),
+      },
+      querySelector: () =>
+        checkbox === undefined ? null : { checked: checkbox },
+    }) as unknown as HTMLElement;
+
+  it('keeps whether a task is checked without its checkbox', () => {
+    const editor = createEditor();
+    const { doc } = parseMarkdown(editor, '- [x] a\n- [ ] b');
+    expect(documentHtml(doc)).toBe(
+      '<ul><li class="task-list-item" data-checked="true"><p>a</p></li><li class="task-list-item" data-checked="false"><p>b</p></li></ul>',
+    );
+    const [rule] = editor.schema.nodes.listItem.spec.parseDOM ?? [];
+    const checked = (it: HTMLElement) => rule?.getAttrs?.(it);
+    expect([
+      checked(element({ class: 'task-list-item', 'data-checked': 'true' })),
+      checked(element({ class: 'task-list-item' }, true)),
+      checked(element({ class: 'task-list-item' }, false)),
+      checked(element({})),
+    ]).toEqual([
+      expect.objectContaining({ checked: true }),
+      expect.objectContaining({ checked: true }),
+      expect.objectContaining({ checked: false }),
+      {},
+    ]);
+  });
+
+  it('reads an image as one in text where the document has them', () => {
+    const editor = createEditor();
+    editor.commands.setMarkdown('a');
+    const rules = editor.schema.nodes.inlineImage.spec.parseDOM ?? [];
+    const [rule] = rules;
+    expect(rule?.tag).toBe('img[src]');
+    expect(rule?.priority).toBeGreaterThan(50);
+    const img = element({ src: 'a.png', alt: 'a' });
+    expect(rule?.getAttrs?.(img)).toEqual(
+      expect.objectContaining({ src: 'a.png', alt: 'a' }),
+    );
+    setDocumentNotations(
+      editor,
+      currentNotations(editor)
+        .split(' ')
+        .filter((entry) => !entry.startsWith('inlineImage@'))
+        .join(' '),
+    );
+    expect(rule?.getAttrs?.(img)).toBe(false);
   });
 });
 

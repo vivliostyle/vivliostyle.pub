@@ -125,7 +125,7 @@ const DEFINITION_IN_PLACE =
 const CODE_DECORATIONS =
   'The editor highlights code with decorations rather than spans in its content, and keeps the info string as written on the element.';
 const TASK_DECORATIONS =
-  'The checkbox and the class of the list are decorations, which follow the items, and a list item always holds a paragraph in the editor.';
+  'The checkbox and the class of the list are decorations, which follow the items, so an item says whether it is checked for the clipboard, and a list item always holds a paragraph in the editor.';
 const LINK_TARGET =
   "TipTap's link mark opens links in a new tab, with a rel that keeps the page it opens from the editor.";
 
@@ -649,7 +649,7 @@ const comparisons: Record<string, Comparison[]> = {
       differs: {
         vfm: '<ul class="contains-task-list"><li class="task-list-item"><input disabled="" type="checkbox"> task</li><li class="task-list-item"><input checked="" disabled="" type="checkbox"> done</li></ul>',
         editor:
-          '<ul><li class="task-list-item"><p>task</p></li><li class="task-list-item"><p>done</p></li></ul>',
+          '<ul><li class="task-list-item" data-checked="false"><p>task</p></li><li class="task-list-item" data-checked="true"><p>done</p></li></ul>',
         reason: TASK_DECORATIONS,
       },
     },
@@ -657,7 +657,8 @@ const comparisons: Record<string, Comparison[]> = {
       markdown: '- [ ] a\n\n  para',
       differs: {
         vfm: '<ul class="contains-task-list"><li class="task-list-item"><p><input disabled="" type="checkbox"> a</p><p>para</p></li></ul>',
-        editor: '<ul><li class="task-list-item"><p>a</p><p>para</p></li></ul>',
+        editor:
+          '<ul><li class="task-list-item" data-checked="false"><p>a</p><p>para</p></li></ul>',
         reason: TASK_DECORATIONS,
       },
     },

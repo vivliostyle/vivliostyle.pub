@@ -224,8 +224,17 @@ export function imageExtensions(basePath: string | undefined) {
       return { basePath };
     },
 
+    // An image in text is read as one, where the document has them: the
+    // image's rule would split the paragraph around it into a figure.
     parseHTML() {
-      return [];
+      return [
+        {
+          tag: 'img[src]',
+          priority: 60,
+          getAttrs: () =>
+            hasDocumentNotation(this.editor, this.name) ? null : false,
+        },
+      ];
     },
 
     renderHTML({ node, HTMLAttributes }) {

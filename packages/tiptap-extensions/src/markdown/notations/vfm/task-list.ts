@@ -152,16 +152,28 @@ const TaskList = Extension.create({
         attributes: {
           checked: {
             default: null,
-            parseHTML: (element) =>
-              element.classList.contains('task-list-item')
-                ? Boolean(
+            // The checkbox is a decoration, which copying leaves out, so the
+            // item says itself whether it is checked; VFM's HTML has the box.
+            parseHTML: (element) => {
+              if (!element.classList.contains('task-list-item')) {
+                return null;
+              }
+              const own = element.getAttribute('data-checked');
+              return own !== null
+                ? own === 'true'
+                : Boolean(
                     element.querySelector<HTMLInputElement>(
                       'input[type="checkbox"]',
                     )?.checked,
-                  )
-                : null,
+                  );
+            },
             renderHTML: (attrs) =>
-              attrs.checked == null ? {} : { class: 'task-list-item' },
+              attrs.checked == null
+                ? {}
+                : {
+                    class: 'task-list-item',
+                    'data-checked': String(Boolean(attrs.checked)),
+                  },
           },
         },
       },
