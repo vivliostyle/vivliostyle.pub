@@ -1,12 +1,12 @@
 import { Editor } from '@tiptap/core';
 import { type StringifyMarkdownOptions, stringify } from '@vivliostyle/vfm';
-import { htmlToDOM } from 'html-react-parser';
+import { parseDocument } from 'htmlparser2';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { PubExtensions, parseMarkdown } from '@v/tiptap-extensions';
-import { documentHtml } from '@v/tiptap-extensions/testing/html';
+import { PubExtensions, parseMarkdown } from '../src/index';
+import { documentHtml } from '../testing/html';
 
-type DomNode = ReturnType<typeof htmlToDOM>[number];
+type DomNode = ReturnType<typeof parseDocument>['children'][number];
 
 const VOID = new Set(['br', 'hr', 'img', 'input', 'wbr']);
 // Whitespace between the children of these is not rendered.
@@ -69,7 +69,7 @@ function canonical(nodes: readonly DomNode[], container: boolean): string {
 
 /** HTML with attributes and classes sorted and unrendered whitespace left out. */
 function normalize(html: string): string {
-  return canonical(htmlToDOM(html), true);
+  return canonical(parseDocument(html).children, true);
 }
 
 const editor = new Editor({

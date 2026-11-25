@@ -804,6 +804,9 @@ importers:
       '@vivliostyle/vfm':
         specifier: 'catalog:'
         version: 2.7.2(typescript@6.0.3)
+      htmlparser2:
+        specifier: 12.0.0
+        version: 12.0.0
       pathe:
         specifier: 'catalog:'
         version: 2.0.3
