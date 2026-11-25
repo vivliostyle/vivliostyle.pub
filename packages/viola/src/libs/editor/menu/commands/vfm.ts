@@ -1,14 +1,27 @@
 import type { Editor } from '@tiptap/core';
 
-import { findSelectedInline, hasDocumentNotation } from '@v/tiptap-extensions';
 import {
+  codeBlockCaption,
+  findSelectedCodeBlock,
+  findSelectedInline,
+  hasDocumentNotation,
+} from '@v/tiptap-extensions';
+import {
+  CaptionsIcon,
   LanguagesIcon,
+  ListTodoIcon,
+  SeparatorHorizontalIcon,
   SigmaIcon,
   StickyNoteIcon,
   SuperscriptIcon,
+  TableOfContentsIcon,
   TagIcon,
 } from '@v/ui/icon';
-import { AttributesPanel } from '../../../../components/content-editor/panels/attributes-panel';
+import {
+  AttributesPanel,
+  HeadingAttributesPanel,
+} from '../../../../components/content-editor/panels/attributes-panel';
+import { CodeCaptionPanel } from '../../../../components/content-editor/panels/code-caption-panel';
 import {
   FootnotePanel,
   FootnoteReferencePanel,
@@ -16,7 +29,14 @@ import {
 import { MathPanel } from '../../../../components/content-editor/panels/math-panel';
 import { RubyPanel } from '../../../../components/content-editor/panels/ruby-panel';
 import { m } from '../../../../generated/paraglide/messages';
-import { attributedMarkOf, selectedNodeOf, selectedRuby } from '../../vfm';
+import {
+  attributedMarkOf,
+  sectionLevelAt,
+  selectedHeading,
+  selectedListItem,
+  selectedNodeOf,
+  selectedRuby,
+} from '../../vfm';
 import { registerEditorMenuCommand } from '../registry';
 import { isInCodeBlock, splitKeywords } from './utils';
 
@@ -149,4 +169,82 @@ registerEditorMenuCommand({
   value: (editor) =>
     `[^${String(selectedNodeOf(editor.state, 'footnoteReference')?.attrs.label ?? '')}]`,
   panel: FootnoteReferencePanel,
+});
+
+registerEditorMenuCommand({
+  id: 'insert.toc',
+  surfaces: ['trigger'],
+  label: m.editor_command_insert_toc,
+  keywords: () => [
+    ...splitKeywords(m.editor_command_insert_toc_keywords()),
+    'toc',
+  ],
+  icon: TableOfContentsIcon,
+  isEnabled: (editor) => editor.can().insertTableOfContents(),
+  run: ({ editor }) => {
+    editor.chain().focus().insertTableOfContents().run();
+  },
+});
+
+registerEditorMenuCommand({
+  id: 'insert.section-end',
+  surfaces: ['trigger'],
+  label: m.editor_command_insert_section_end,
+  keywords: () => [
+    ...splitKeywords(m.editor_command_insert_section_end_keywords()),
+    'section',
+    '#',
+  ],
+  icon: SeparatorHorizontalIcon,
+  isEnabled: (editor) =>
+    editor.can().insertSectionEnd(sectionLevelAt(editor.state)),
+  run: ({ editor }) => {
+    editor.chain().focus().insertSectionEnd(sectionLevelAt(editor.state)).run();
+  },
+});
+
+registerEditorMenuCommand({
+  id: 'heading.attributes',
+  surfaces: ['selection'],
+  label: m.editor_command_heading_attributes,
+  icon: TagIcon,
+  isActive: (editor) =>
+    Boolean(selectedHeading(editor.state)?.attrs.attributes),
+  isEnabled: (editor) =>
+    hasDocumentNotation(editor, 'headingAttributes') &&
+    (selectedHeading(editor.state)?.content.size ?? 0) > 0,
+  isVisible: (editor) => selectedHeading(editor.state) !== null,
+  panel: HeadingAttributesPanel,
+});
+
+registerEditorMenuCommand({
+  id: 'code-block.caption',
+  surfaces: ['selection'],
+  label: m.editor_command_code_block_caption,
+  icon: CaptionsIcon,
+  isVisible: isInCodeBlock,
+  value: (editor) =>
+    codeBlockCaption(
+      findSelectedCodeBlock(editor.state)?.node.attrs.language,
+    ) ?? m.editor_command_code_block_caption_none(),
+  panel: CodeCaptionPanel,
+});
+
+registerEditorMenuCommand({
+  id: 'list.task',
+  surfaces: ['selection'],
+  label: m.editor_command_task,
+  icon: ListTodoIcon,
+  isActive: (editor) => selectedListItem(editor.state)?.attrs.checked != null,
+  isEnabled: (editor) => editor.can().setTaskItem(false),
+  isVisible: (editor) =>
+    !isInCodeBlock(editor) && selectedListItem(editor.state) !== null,
+  run: ({ editor }) => {
+    const task = selectedListItem(editor.state)?.attrs.checked != null;
+    editor
+      .chain()
+      .focus()
+      .setTaskItem(task ? null : false)
+      .run();
+  },
 });

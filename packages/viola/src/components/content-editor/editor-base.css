@@ -31,6 +31,63 @@
     text-decoration: underline dotted var(--muted-foreground);
   }
 
+  /* Syntax VFM writes nothing visible for, shown with what it does. Its
+     labels come from the app, in custom properties. */
+  & [data-section-end],
+  & [data-toc] {
+    border-block: 1px dashed var(--border);
+    color: var(--muted-foreground);
+    font-size: 0.8em;
+    margin-block: 1em;
+    padding: 0.25em 0.5em;
+  }
+
+  & [data-section-end]::before {
+    content: var(--content-editor-section-end) ": " attr(data-ends);
+  }
+
+  & [data-section-end][data-ends-nothing]::before {
+    content: var(--content-editor-section-end-nothing);
+  }
+
+  & [data-toc]::before {
+    content: var(--content-editor-toc);
+  }
+
+  /* VFM collects definitions at the end; one is edited where it is written. */
+  & .footnote-definition {
+    border-inline-start: 2px solid var(--border);
+    padding-inline-start: 0.75em;
+  }
+
+  & .footnote-definition::before {
+    color: var(--muted-foreground);
+    content: "[^" attr(data-label) "]";
+    font-size: 0.8em;
+  }
+
+  & .footnote-definition[data-unreferenced]::before,
+  & .footnote-definition[data-duplicate]::before {
+    content: "[^" attr(data-label) "] "
+      var(--content-editor-footnote-unreferenced);
+  }
+
+  & .footnote-ref[data-undefined] {
+    text-decoration: underline wavy var(--destructive);
+  }
+
+  & .footnote-ref[data-undefined]::after {
+    color: var(--destructive);
+    content: var(--content-editor-footnote-undefined);
+    font-size: 0.7em;
+  }
+
+  /* A hidden heading is still edited. */
+  & :is(h1, h2, h3, h4, h5, h6)[hidden] {
+    display: block;
+    opacity: 0.5;
+  }
+
   &:not(.ProseMirror-focused) .is-editor-empty:first-child::before {
     color: var(--muted-foreground);
     content: attr(data-placeholder);

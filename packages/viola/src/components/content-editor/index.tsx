@@ -5,6 +5,7 @@ import { use, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
+import { m } from '../../generated/paraglide/messages';
 import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
@@ -84,10 +85,37 @@ export function EditorStyleContainer({
   );
 }
 
+function cssString(text: string): string {
+  return `"${text.replace(/["\\]/g, '\\$&').replace(/\n/g, ' ')}"`;
+}
+
+// Read by the editor's CSS, which shows syntax that has no text of its own.
+function labelProperties(): React.CSSProperties {
+  return {
+    '--content-editor-section-end': cssString(m.content_editor_section_end()),
+    '--content-editor-section-end-nothing': cssString(
+      m.content_editor_section_end_nothing(),
+    ),
+    '--content-editor-toc': cssString(m.content_editor_toc()),
+    '--content-editor-footnote-undefined': cssString(
+      m.content_editor_footnote_undefined(),
+    ),
+    '--content-editor-footnote-unreferenced': cssString(
+      m.content_editor_footnote_unreferenced(),
+    ),
+  } as React.CSSProperties;
+}
+
 export function EditArea() {
   const { editor } = useCurrentEditor();
 
-  return <EditorContent {...{ editor }} className="editor-root" />;
+  return (
+    <EditorContent
+      {...{ editor }}
+      className="editor-root"
+      style={labelProperties()}
+    />
+  );
 }
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {

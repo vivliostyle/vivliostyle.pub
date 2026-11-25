@@ -50,7 +50,11 @@ const paragraph = (text: string): JSONContent => ({
 const node =
   (type: string) =>
   (...content: JSONContent[]): JSONContent => ({ type, content });
-const listItem = node('listItem');
+const listItem = (...content: JSONContent[]): JSONContent => ({
+  type: 'listItem',
+  attrs: { checked: null },
+  content,
+});
 const bulletList = node('bulletList');
 const orderedList = node('orderedList');
 const blockquote = node('blockquote');
