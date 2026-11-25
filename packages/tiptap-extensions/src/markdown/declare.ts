@@ -146,6 +146,8 @@ export interface DeclaredElement {
   kind: HtmlElementSpec['kind'];
   /** The definition the type is of. */
   notation: string;
+  /** What the element has to be, see `HtmlElementPattern`. */
+  pattern: HtmlElementPattern;
   /** See `NodeDeclaration.reference`. */
   reference: string | null;
 }
@@ -359,13 +361,21 @@ export function declareNotation(
     return delimitedMark(declaration, extensions);
   }
   const { name, version, tag } = declaration;
-  const pattern: HtmlElementPattern = declaration;
+  const pattern: HtmlElementPattern = {
+    tag,
+    classes: declaration.classes,
+    match: declaration.match,
+    capture: declaration.capture,
+    require: declaration.require,
+    keepOtherAttributes: declaration.keepOtherAttributes,
+  };
   const element = (
     kind: HtmlElementSpec['kind'],
     reference?: string,
   ): DeclaredElement => ({
     kind,
     notation: name,
+    pattern,
     reference: reference ?? null,
   });
   const close = `</${tag}>`;
