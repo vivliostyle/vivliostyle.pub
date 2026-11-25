@@ -37,6 +37,7 @@
     "@tiptap/extension-underline": "catalog:",
     "@tiptap/extensions": "catalog:",
     "@tiptap/pm": "catalog:",
+    "@types/mdast": "4.0.4",
     "@types/refractor": "3.4.1",
     "@v/config": "workspace:*",
     "@vitest/coverage-v8": "catalog:",

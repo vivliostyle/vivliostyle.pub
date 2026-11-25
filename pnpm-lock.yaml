@@ -786,6 +786,9 @@ importers:
       '@tiptap/pm':
         specifier: 'catalog:'
         version: 3.23.4
+      '@types/mdast':
+        specifier: 4.0.4
+        version: 4.0.4
       '@types/refractor':
         specifier: 3.4.1
         version: 3.4.1
