@@ -42,12 +42,13 @@ const CLOSERS = new Map<number, readonly string[]>([
   [126, ['strikethroughSequenceTemporary']],
   [96, ['codeText']],
   [41, ['link', 'image']],
-  [93, ['link', 'image']],
+  [93, ['link', 'image', 'vfmFootnoteCall']],
   [62, ['autolink']],
 ]);
 
-// mdast types of the elements VFM puts attributes on. References are among
-// them so that their attributes stay in their source when they are raw.
+// mdast types of the elements VFM puts attributes on. Link references are
+// among them so that their attributes stay in their source when they are
+// raw.
 const ATTRIBUTABLE = new Set([
   'strong',
   'emphasis',
@@ -57,6 +58,7 @@ const ATTRIBUTABLE = new Set([
   'image',
   'linkReference',
   'imageReference',
+  'footnoteReference',
 ]);
 
 type ScanResult = 'continue' | 'close' | 'fail';
@@ -400,7 +402,10 @@ const attributesFromMarkdown: FromMarkdownExtension = {
         ATTRIBUTABLE.has(target.type) &&
         target.position.end.offset === token.start.offset
       ) {
-        target.attributes = attributes;
+        // `{}` gives none, and keeps braces after it apart from the element.
+        if (Object.keys(attributes).length > 0) {
+          target.attributes = attributes;
+        }
         // The element's source holds its attributes, so they are kept with
         // it where it is kept as written.
         target.position.end = {
@@ -423,7 +428,36 @@ const ATTRIBUTED_MARKS: Record<string, string> = {
   link: 'link',
 };
 
-const ATTRIBUTED_TYPES = [...Object.values(ATTRIBUTED_MARKS), 'image'];
+const ATTRIBUTED_NODES = ['image', 'footnoteReference'];
+
+const ATTRIBUTED_TYPES = [
+  ...Object.values(ATTRIBUTED_MARKS),
+  ...ATTRIBUTED_NODES,
+];
+
+/**
+ * Whether `{` written right after `before`, the markdown before an inline
+ * node, would be read as the attributes of what `adjacent` says ends there.
+ * `{}` then gives that element no attributes and keeps the braces apart.
+ */
+export function takesAttributes(
+  before: string | undefined,
+  adjacent: WriteContext['adjacent'],
+): boolean {
+  const last = before?.slice(-1);
+  if (!adjacent || !last || !/[)\]`*_~]/.test(last)) {
+    return false;
+  }
+  const { node, endingMarks } = adjacent;
+  return (
+    (ATTRIBUTED_NODES.includes(node.type.name) && !written(node)) ||
+    endingMarks.some(
+      (mark) =>
+        Object.values(ATTRIBUTED_MARKS).includes(mark.type.name) &&
+        !written(mark),
+    )
+  );
+}
 
 function mapNodes(
   result: FromMarkdownResult,
@@ -556,9 +590,18 @@ export const inlineAttributesNotation = defineNotation({
       const image = result as ProseMirrorNode;
       return image.type.create({ ...image.attrs, attributes });
     },
+    footnoteReference: (node, _, next) => {
+      const { attributes } = node as AttributedMdast;
+      return attributes
+        ? mapNodes(next(), (it) =>
+            it.type.create({ ...it.attrs, attributes }, null, it.marks),
+          )
+        : next();
+    },
   },
   nodes: {
     image: (node, _, next) => next() + written(node),
+    footnoteReference: (node, _, next) => next() + written(node),
   },
   marks: Object.fromEntries(
     Object.values(ATTRIBUTED_MARKS).map((name) => [name, decorate]),

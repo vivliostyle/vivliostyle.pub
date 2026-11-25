@@ -377,7 +377,7 @@ export const FootnoteReference = Node.create({
         ...HTMLAttributes,
         id: `fnref${label}`,
         href: `#fn${label}`,
-        class: 'footnote-ref',
+        class: ['footnote-ref', HTMLAttributes.class].filter(Boolean).join(' '),
         role: 'doc-noteref',
       },
       ['sup', label],

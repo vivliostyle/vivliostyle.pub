@@ -562,9 +562,43 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a[^x y]"))',
       },
       {
-        name: 'attributes do not apply to a reference',
+        name: 'attributes of a reference',
         given: 'a[^1]{.x}',
-        doc: 'doc(paragraph("a", footnoteReference, "{.x}"))',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              text('a'),
+              {
+                type: 'footnoteReference',
+                attrs: { label: '1', attributes: { class: 'x' } },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'braces typed after a reference are escaped',
+        given: 'a[^1]‸',
+        steps: [
+          run('insert braces as text', (editor) => {
+            editor.view.dispatch(editor.state.tr.insertText('{漢字|かんじ}'));
+          }),
+        ],
+        expect: 'a[^1]\\{漢字|かんじ}‸',
+        doc: 'doc(paragraph("a", footnoteReference, "{漢字|かんじ}"))',
+      },
+      {
+        name: 'ruby right after a reference',
+        given: 'a[^1]‸',
+        steps: [
+          insert('insert a ruby', {
+            type: 'ruby',
+            attrs: { rubyText: 'かんじ' },
+            content: [text('漢字')],
+          }),
+        ],
+        expect: 'a[^1]{}{漢字|かんじ}‸',
       },
       {
         name: 'editing a note',
@@ -745,7 +779,7 @@ export const vfmSuites: CaseSuite[] = [
             content: [text('漢字')],
           }),
         ],
-        expect: '<strong>重要</strong>{漢字|かんじ}‸',
+        expect: '**重要**{}{漢字|かんじ}‸',
       },
       {
         name: 'strong emphasis with attributes where its delimiters cannot close',
@@ -760,7 +794,7 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'これは<strong class="x">「強調」</strong>‸です',
       },
       {
-        name: 'no ruby typed right after a link',
+        name: 'ruby typed right after a link',
         given: '[リンク](u)‸',
         steps: [
           run('type outside the link', (editor) => {
@@ -768,8 +802,27 @@ export const vfmSuites: CaseSuite[] = [
           }),
           '{漢字|かんじ}',
         ],
-        expect: '[リンク](u)\\{漢字|かんじ}‸',
-        doc: 'doc(paragraph(link("リンク"), "{漢字|かんじ}"))',
+        expect: '[リンク](u){}{漢字|かんじ}‸',
+        doc: 'doc(paragraph(link("リンク"), ruby("漢字")))',
+      },
+      {
+        name: 'ruby that comes right after code as a space goes',
+        given: '`c` ‸{漢字|かんじ}',
+        steps: [press('Backspace')],
+        // The selection's mark would come between them.
+        expect: '`c`{}{漢字|かんじ}',
+      },
+      {
+        name: 'ruby whose base ends with a backslash',
+        given: 'a‸',
+        steps: [
+          insert('insert a ruby', {
+            type: 'ruby',
+            attrs: { rubyText: 'c' },
+            content: [text('b\\')],
+          }),
+        ],
+        expect: 'a{b&#92;|c}‸',
       },
       {
         name: 'no ruby of a selection over a line break',

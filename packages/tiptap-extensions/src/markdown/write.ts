@@ -1566,9 +1566,22 @@ export class MarkdownWriter {
           newline !== -1 || edges.start
             ? preceding.slice(newline + 1)
             : `\u0000${preceding}`;
+        const previous = children[index - 1];
+        const adjacent =
+          previous && opens.length === 0
+            ? {
+                node: previous,
+                endingMarks: previous.marks.filter(
+                  (mark) => !mark.isInSet(child.marks),
+                ),
+              }
+            : null;
         content =
-          writer?.write(child, { ...context, lineBefore: line }, () => '') ??
-          '';
+          writer?.write(
+            child,
+            { ...context, lineBefore: line, adjacent },
+            () => '',
+          ) ?? '';
       }
 
       // Whitespace that markdown would strip at the start or end of a line.

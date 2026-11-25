@@ -323,6 +323,27 @@ const comparisons: Record<string, Comparison[]> = {
           "The editor shows a note where it is written, as VFM's gcpm mode puts it, instead of collecting it at the end.",
       },
     },
+    // VFM reads braces after a reference as its attributes, which ruby is not.
+    { markdown: 'a[^1]{漢|かん}' },
+    {
+      markdown: 'a[^1]{.x}',
+      differs: {
+        vfm: '<p>a<sup id="fnref-1"><a class="x" href="#fn-1">1</a></sup></p>',
+        editor:
+          '<p>a<a class="footnote-ref x" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>',
+        reason:
+          'VFM renders a reference with attributes as a link in a sup with them, unlike one without; the editor keeps its element and adds the classes.',
+      },
+    },
+    {
+      markdown: 'a[^1]{}{漢|かん} [l](u){}{漢|かん} `c`{}{漢|かん}',
+      differs: {
+        vfm: '<p>a<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a><ruby>漢<rt>かん</rt></ruby> <a href="u">l</a><ruby>漢<rt>かん</rt></ruby> <code>c</code><ruby>漢<rt>かん</rt></ruby></p>',
+        editor:
+          '<p>a<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a><ruby><span>漢</span><rt>かん</rt></ruby> <a href="u" rel="noopener noreferrer nofollow" target="_blank">l</a><ruby><span>漢</span><rt>かん</rt></ruby> <code>c</code><ruby><span>漢</span><rt>かん</rt></ruby></p>',
+        reason: RUBY_BASE,
+      },
+    },
     {
       markdown: 'a^[注 *md*] b',
       options: { footnote: 'gcpm' },

@@ -80,6 +80,14 @@ export interface WriteContext {
   readonly base: BaseNode | null;
   /** For an inline node, what is written on its line before it. */
   readonly lineBefore?: string;
+  /**
+   * For an inline node written right after other content, with no delimiter
+   * or whitespace between: that content, and its marks that end there.
+   */
+  readonly adjacent?: {
+    node: ProseMirrorNode;
+    endingMarks: readonly Mark[];
+  } | null;
   /** The markdown of a textblock's content, with `data` for its writers. */
   inline(node: ProseMirrorNode, data?: Record<string, unknown>): string;
   /**

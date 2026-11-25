@@ -1,10 +1,6 @@
 import { Node } from '@tiptap/core';
-import {
-  Fragment,
-  type Mark,
-  type Node as ProseMirrorNode,
-} from '@tiptap/pm/model';
-import { type EditorState, Plugin } from '@tiptap/pm/state';
+import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Plugin } from '@tiptap/pm/state';
 
 import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
@@ -23,13 +19,14 @@ import {
   tokenType,
 } from '../../micromark';
 import { defineNotation } from '../../notation';
+import { takesAttributes } from './attributes';
 import {
   findSelectedInline,
   insertInline,
   unwrap,
   wrapSelection,
 } from './commands';
-import { inlineSourceRules, sharedMarks } from './input-rules';
+import { inlineSourceRules } from './input-rules';
 import { inlineNodeRules } from './normalize';
 
 declare module '@tiptap/core' {
@@ -283,18 +280,6 @@ export const Ruby = Node.create({
             );
             return true;
           }
-          if (
-            followsAttributable(
-              state,
-              state.selection.from,
-              sharedMarks(
-                state.doc.slice(state.selection.from, state.selection.to)
-                  .content,
-              ),
-            )
-          ) {
-            return false;
-          }
           return wrapSelection(state, tr, this.type, { rubyText }, !!dispatch, {
             oneLine: true,
             unmarked: ['code'],
@@ -307,12 +292,7 @@ export const Ruby = Node.create({
             !hasDocumentNotation(editor, this.name) ||
             !base ||
             /[\n\r]/.test(base) ||
-            !isWritableRubyText(rubyText) ||
-            followsAttributable(
-              state,
-              state.selection.from,
-              state.selection.$from.marks(),
-            )
+            !isWritableRubyText(rubyText)
           ) {
             return false;
           }
@@ -363,37 +343,13 @@ export const Ruby = Node.create({
   },
 });
 
-/**
- * Whether a link or code span ends right before `pos` without going on into
- * what is put there: VFM reads `{…}` after one as its attributes, and no
- * markdown keeps a ruby apart from it.
- */
-function followsAttributable(
-  state: EditorState,
-  pos: number,
-  marks: readonly Mark[],
-): boolean {
-  const before = state.doc.resolve(pos).nodeBefore;
-  return Boolean(
-    before?.marks.some(
-      (mark) =>
-        (mark.type.name === 'link' || mark.type.name === 'code') &&
-        !mark.isInSet(marks),
-    ),
-  );
-}
-
 const rubyRules = (enabled: () => boolean) =>
   inlineSourceRules({
     enabled,
     find: /(?<!\\)\{((?:[^{}|\n\\]|\\[^\n])*[^{}|\n\\])\|([^{}\n]+)\}$/,
-    build: ({ state, from, match, content }) => {
+    build: ({ state, match, content }) => {
       const [, base, text] = match;
-      if (
-        base === undefined ||
-        text === undefined ||
-        followsAttributable(state, from, state.doc.nodeAt(from)?.marks ?? [])
-      ) {
+      if (base === undefined || text === undefined) {
         return null;
       }
       return (
@@ -415,6 +371,20 @@ function unescapePipes(fragment: Fragment): Fragment {
     );
   });
   return Fragment.from(nodes);
+}
+
+/**
+ * The base as `{base|…}` holds it: a backslash right before `|`, escaped
+ * or not, would keep the `|` from ending the base, and a character
+ * reference does not.
+ */
+function baseOf(markdown: string): string {
+  const backslashes = markdown.match(/\\+$/)?.[0].length ?? 0;
+  if (backslashes === 0) {
+    return markdown;
+  }
+  const kept = backslashes % 2 === 0 ? backslashes - 2 : backslashes - 1;
+  return `${markdown.slice(0, markdown.length - backslashes)}${'\\'.repeat(kept)}&#92;`;
 }
 
 export const rubyNotation = defineNotation({
@@ -440,8 +410,12 @@ export const rubyNotation = defineNotation({
       ),
   },
   nodes: {
-    ruby: (node, context) =>
-      `{${context.inline(node, { singleLine: true })}|${String(node.attrs.rubyText ?? '')}}`,
+    ruby: (node, context) => {
+      const separator = takesAttributes(context.lineBefore, context.adjacent)
+        ? '{}'
+        : '';
+      return `${separator}{${baseOf(context.inline(node, { singleLine: true }))}|${String(node.attrs.rubyText ?? '')}}`;
+    },
   },
   escapes: [
     { pattern: /\{/g },
