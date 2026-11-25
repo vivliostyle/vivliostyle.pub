@@ -419,7 +419,7 @@ function writeText(child: ProseMirrorNode): string | null {
     } else if (TAGS[name]) {
       markdown = `<${TAGS[name]}>${markdown}</${TAGS[name]}>`;
     } else if (name === 'link') {
-      markdown = `[${markdown}](<${String(mark.attrs.href ?? '').replace(/[<>]/g, '\\$&')}>)`;
+      markdown = `[${markdown}](<${String(mark.attrs.href ?? '').replace(/[\\<>]/g, '\\$&')}>)`;
     } else {
       return null;
     }
