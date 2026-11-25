@@ -639,6 +639,38 @@ export const VFM_INSERTS = [
   '![i](i.png)',
 ];
 
+/** The markup of themes, written as HTML, and characters that end it. */
+export const THEME_FRAGMENTS = [
+  '本文<span class="footnote">注の**強調**と[l](u)</span>です',
+  '図<a data-ref="fig" href="#f1"></a>と<a href="#s" data-ref="sec"></a>。',
+  'a<span class="x footnote" id="n">注 <span class="tcy">1</span></span>b',
+  '<div class="note">\n\n**md**\n\n</div>',
+  '<aside class="sidenote" id="sn-1">\n\n傍注 *強調*\n\n</aside>',
+  '<div class="equation" id="eq1">\n\n$$\nx\n$$\n\n</div>',
+  '<div class="theorem">\n\n定理。\n\n二段落目\n\n</div>',
+  '<p class="fig-caption" id="c">図の題 &amp; *x*</p>',
+  '<figure class="tbl" id="t1">\n\n<figcaption>表</figcaption>\n\n| a |\n| - |\n| 1 |\n\n</figure>',
+  '<span class="tcy">12</span>月<span class="sesame">圏点</span>',
+  '> 引用<span class="footnote">注</span>',
+  '- 項目<a data-ref="fig" href="#f"></a>\n- <span class="footnote">注</span>',
+  '<span class="footnote">文頭の注</span>と続き',
+];
+export const THEME_INSERTS = [
+  'X',
+  '<',
+  '>',
+  '&',
+  '"',
+  '*',
+  '#',
+  '\n',
+  '</span>',
+  '<span class="footnote">',
+  '<a data-ref="fig" href="#x"></a>',
+  '&amp;',
+  '[',
+];
+
 /** A seeded pseudo-random number generator, so a failure can be replayed. */
 function random(seed: number): (n: number) => number {
   let state = seed;

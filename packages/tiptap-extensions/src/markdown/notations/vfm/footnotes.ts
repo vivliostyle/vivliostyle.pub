@@ -512,8 +512,9 @@ export const InlineFootnote = Node.create({
   inline: true,
   content: 'inline*',
 
+  // A note without the role is the theme's, written as its element.
   parseHTML() {
-    return [{ tag: 'span.footnote' }];
+    return [{ tag: 'span.footnote[role="doc-footnote"]', priority: 70 }];
   },
 
   // As VFM's gcpm footnote mode renders it: the note stays where it is

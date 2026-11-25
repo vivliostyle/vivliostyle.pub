@@ -5,6 +5,8 @@ import { PubExtensions } from '../index';
 import {
   type FuzzStatistics,
   fuzzMarkdownEdits,
+  THEME_FRAGMENTS,
+  THEME_INSERTS,
   VFM_FRAGMENTS,
   VFM_INSERTS,
 } from '../testing/markdown-properties';
@@ -67,5 +69,27 @@ it.each([
   const refused = violations.filter((it) => it.property === 'error');
   expect(violations.filter((it) => it.property !== 'error')).toEqual([]);
   expect(refused.length).toBeLessThan(statistics.saves / 200);
+  expect(statistics.strategies.get('generated') ?? 0).toBe(0);
+});
+
+it.each([
+  20261125, 7, 8,
+])('saves random edits of the markup of themes as what they mean (seed %i)', {
+  timeout: 240_000,
+}, (seed) => {
+  const statistics: FuzzStatistics = {
+    strategies: new Map(),
+    collateral: 0,
+    saves: 0,
+  };
+  const violations = fuzzMarkdownEdits(createEditor, {
+    seed,
+    documents: 200,
+    edits: 8,
+    statistics,
+    fragments: THEME_FRAGMENTS,
+    inserts: THEME_INSERTS,
+  });
+  expect(violations).toEqual([]);
   expect(statistics.strategies.get('generated') ?? 0).toBe(0);
 });

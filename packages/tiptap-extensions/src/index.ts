@@ -10,6 +10,7 @@ import {
 import { FileMediaHandler } from './file-media-handler';
 import { imageExtensions } from './images';
 import {
+  allThemeNotations,
   commonMarkNotations,
   gfmNotations,
   HtmlElementCommands,
@@ -18,6 +19,7 @@ import {
   PubMarkdown,
   type PubMarkdownOptions,
   rawNotation,
+  themeBaseNotations,
   VFM_2_SYNTAX,
   type VfmSyntax,
   vfmNotations,
@@ -39,6 +41,7 @@ export {
   serializeCustomDragPayload,
 } from './custom-drag-handler';
 export {
+  CROSS_REFERENCE,
   codeBlockAttributes,
   currentNotations,
   type DeclaredElement,
@@ -60,12 +63,14 @@ export {
   isWritableFootnoteLabel,
   isWritableMath,
   isWritableRubyText,
+  knownIds,
   MARKED_NOTATIONS,
   MarkdownWriteError,
   type NotationDefinition,
   OTHER_ATTRIBUTES,
   parseAttributes,
   parseMarkdown,
+  referencedId,
   sectionEnds,
   setDocumentNotations,
   setMarkdownBaseline,
@@ -163,6 +168,8 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           ...gfmNotations({ singleTilde: vfm.singleTildeStrikethrough }),
           ...htmlMarkNotations,
           ...vfmNotations(vfm),
+          ...themeBaseNotations,
+          ...allThemeNotations(),
           rawNotation,
           ...(this.options.notations ?? []),
         ],

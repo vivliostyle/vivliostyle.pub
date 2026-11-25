@@ -59,6 +59,14 @@ export { commonMarkNotations } from './notations/commonmark';
 export { gfmNotations, htmlMarkNotations } from './notations/gfm';
 export { RawBlock, RawInline, rawNotation } from './notations/raw';
 export {
+  allThemeNotations,
+  CROSS_REFERENCE,
+  knownIds,
+  referencedId,
+  themeBaseNotations,
+  themeNotations,
+} from './notations/theme';
+export {
   codeBlockAttributes,
   codeBlockId,
   type DocumentId,
