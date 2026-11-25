@@ -130,11 +130,6 @@ export interface WriteBodyOptions {
    * only the blocks written anew are checked, one by one.
    */
   check: ((body: string, layout: BodyLayout) => ReadonlySet<number>) | null;
-  /**
-   * Reads a block written anew back, when the whole output is not checked:
-   * a baseline read another way is read that way too.
-   */
-  readBlock?: ((markdown: string) => ProseMirrorNode | null) | undefined;
 }
 
 export type WriteStrategy = 'reused' | 'repaired' | 'generated';
@@ -382,7 +377,6 @@ export class MarkdownWriter {
     const { check } = options;
     this.nodeTags = new WeakMap();
     this.markTags = new WeakMap();
-    this.readBlock = options.readBlock;
     this.definitions = this.definitionsOf(doc);
     this.references = readDefinitions([
       ...(this.definitions ? [this.definitions.text] : []),
@@ -593,7 +587,6 @@ export class MarkdownWriter {
     return differing;
   }
 
-  private readBlock: WriteBodyOptions['readBlock'];
   private references: Definitions = new Map();
   /** The document's link reference definitions, which any block can use. */
   private definitions: { text: string; blocks: ProseMirrorNode[] } | null =
@@ -624,14 +617,6 @@ export class MarkdownWriter {
 
   private readsAlone(markdown: string, node: ProseMirrorNode): boolean {
     try {
-      if (this.readBlock) {
-        const read = this.readBlock(markdown);
-        return (
-          read !== null &&
-          this.difference(read, this.schema.topNodeType.create(null, node)) ===
-            -1
-        );
-      }
       // Definitions elsewhere in the document can make text a link.
       const definitions = this.definitions;
       const read = this.parser.parseBody(

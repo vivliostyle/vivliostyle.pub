@@ -1,4 +1,4 @@
-import type { CaseSuite } from '../testing/vitest';
+import type { CaseSuite } from '../../testing/vitest';
 
 export const markdownSuites: CaseSuite[] = [
   {

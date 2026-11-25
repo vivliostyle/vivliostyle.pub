@@ -3,15 +3,14 @@ import { NodeSelection } from '@tiptap/pm/state';
 
 import {
   currentNotations,
-  MARKED_NOTATIONS,
   setDocumentNotations,
-} from '../markdown/extension';
+} from '../../src/markdown/extension';
 import {
   allThemeNotations,
   themeBaseNotations,
-} from '../markdown/notations/theme';
-import { paste, press, run, type Step } from '../testing/steps';
-import type { CaseSuite } from '../testing/vitest';
+} from '../../src/markdown/notations/theme';
+import { paste, press, run, type Step } from '../../testing/steps';
+import type { CaseSuite } from '../../testing/vitest';
 
 const THEME_NOTATIONS = new Set(
   [...themeBaseNotations, ...allThemeNotations()].map((it) => it.name),
@@ -27,13 +26,6 @@ const recordBeforeThemes = run(
         .filter((entry) => !THEME_NOTATIONS.has(entry.split('@')[0] ?? ''))
         .join(' '),
     );
-  },
-);
-
-const recordMarked = run(
-  'record the document as made with marked',
-  (editor) => {
-    setDocumentNotations(editor, MARKED_NOTATIONS);
   },
 );
 
@@ -509,10 +501,10 @@ export const themeSuites: CaseSuite[] = [
         expect: 'a ‸注‸ b',
       },
       {
-        name: 'a block pasted into a document made with marked',
+        name: 'a pasted note block is its tags around its blocks',
         given: 'a‸',
         steps: [
-          recordMarked,
+          recordBeforeThemes,
           insert('insert what pasted HTML makes', {
             type: 'noteBlock',
             content: [{ type: 'paragraph', content: [text('x')] }],

@@ -10,7 +10,6 @@ import {
   currentNotations,
   type DocumentRecord,
   getMarkdown,
-  MARKED_NOTATIONS,
   MarkdownWriteError,
   PubExtensions,
   parseMarkdown,
@@ -29,8 +28,7 @@ import type { SandboxFile } from './sandbox/file';
 export type { EditorSyncContext } from './editor-sync';
 
 // Shared with the document, outside it: the definitions its content was read
-// with and the frontmatter. Without the record it was made with marked, and
-// is saved against the file as marked reads it rather than rewritten.
+// with and the frontmatter.
 const MARKDOWN_META = 'markdown';
 const NOTATIONS_KEY = 'notations';
 const FRONTMATTER_KEY = 'frontmatter';
@@ -100,18 +98,10 @@ export async function setupEditor({
   };
   // Read on every write, by the extension: IndexedDB, the server and other
   // clients can change the record at any time.
-  const documentRecord = (): DocumentRecord => {
-    const notations = meta.get(NOTATIONS_KEY);
-    return {
-      notations:
-        notations === undefined
-          ? hasContent()
-            ? MARKED_NOTATIONS
-            : null
-          : notations,
-      frontmatter: meta.get(FRONTMATTER_KEY),
-    };
-  };
+  const documentRecord = (): DocumentRecord => ({
+    notations: meta.get(NOTATIONS_KEY) ?? null,
+    frontmatter: meta.get(FRONTMATTER_KEY),
+  });
   // Editor state is persisted to IndexedDB keyed by a stable project + file
   // path. contentId is regenerated on every load, so it cannot serve as the
   // persistence key.
@@ -217,8 +207,11 @@ export async function setupEditor({
       filename,
     });
   }
-  if (!hasContent()) {
-    if (markdown.trim()) {
+  // Content without the record was read by an earlier editor and means
+  // nothing certain now, so it is read from the file anew.
+  const unrecorded = hasContent() && meta.get(NOTATIONS_KEY) === undefined;
+  if (!hasContent() || unrecorded) {
+    if (markdown.trim() || unrecorded) {
       editor.commands.setMarkdown(markdown, { emitUpdate: false });
     } else {
       recordMarkdown(editor, markdown);

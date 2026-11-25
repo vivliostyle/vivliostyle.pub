@@ -50,7 +50,6 @@ export {
   type DocumentRecord,
   getMarkdown,
   hasDocumentNotation,
-  MARKED_NOTATIONS,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
@@ -136,28 +135,6 @@ declare module '@tiptap/core' {
   }
 }
 
-// The definitions in use when the editor moved from marked to remark. Kept
-// as a fixed list: documents made with marked are written with these.
-const MARKED_ERA_NOTATIONS = [
-  'document',
-  'paragraph',
-  'heading',
-  'thematicBreak',
-  'blockquote',
-  'list',
-  'codeBlock',
-  'hardBreak',
-  'image',
-  'emphasis',
-  'strong',
-  'inlineCode',
-  'link',
-  'gfm',
-  'strikethrough',
-  'underline',
-  'raw',
-];
-
 export const PubExtensions = Extension.create<PubExtensionConfig>({
   name: 'pubExtensions',
 
@@ -187,7 +164,6 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           rawNotation,
           ...(this.options.notations ?? []),
         ],
-        markedEraNotations: MARKED_ERA_NOTATIONS,
         documentRecord: this.options.documentRecord,
         onSetMarkdown: this.options.onSetMarkdown,
       }),
