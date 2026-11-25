@@ -973,6 +973,30 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a{漢字|かんじ}と$x$ と^[注]"))',
       },
       {
+        name: 'pasted syntax becomes what the document can hold',
+        given: 'a‸b',
+        steps: [
+          run('record the document as made with marked', (editor) => {
+            setDocumentNotations(editor, MARKED_NOTATIONS);
+          }),
+          insert('insert what pasted HTML makes', [
+            {
+              type: 'ruby',
+              attrs: { rubyText: 'かんじ' },
+              content: [text('漢字')],
+            },
+            { type: 'math', attrs: { latex: 'x', display: false } },
+            { type: 'footnoteReference', attrs: { label: '1' } },
+            { type: 'inlineFootnote', content: [text('注')] },
+            text('強調', [
+              { type: 'bold', attrs: { attributes: { class: 'x' } } },
+            ]),
+          ]),
+        ],
+        expect: 'a漢字$x$[^1]注**強調**‸b',
+        doc: 'doc(paragraph("a漢字$x$[^1]注", bold("強調"), "b"))',
+      },
+      {
         name: 'commands do nothing',
         given: 'a ‸漢字‸ b',
         steps: [

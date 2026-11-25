@@ -635,4 +635,5 @@ export const inlineAttributesNotation = defineNotation({
     { kind: 'mark', type: 'strike', tag: 'del', rest: 'attributes' },
   ],
   escapes: [{ pattern: /\{/g }],
+  attributes: ['attributes'],
 });

@@ -413,6 +413,16 @@ export class MarkdownWriter {
     );
   }
 
+  /** Whether a definition writes nodes of the type. */
+  writesNode(name: string): boolean {
+    return this.nodeWriters.has(name);
+  }
+
+  /** Whether a definition writes marks of the type. */
+  writesMark(name: string): boolean {
+    return this.markWriters.has(name);
+  }
+
   /**
    * The first top-level block holding an inline node or a mark that no
    * definition writes, as when a document's definitions lack the syntax the

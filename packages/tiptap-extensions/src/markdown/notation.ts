@@ -301,6 +301,11 @@ export interface NotationDefinition {
   marks?: Record<string, MarkToMarkdown | MarkDecorator>;
   styles?: Record<string, StyleSpec>;
   escapes?: EscapeRule[];
+  /**
+   * The attributes this definition writes on the nodes and marks of others,
+   * which a document whose definitions lack it cannot keep.
+   */
+  attributes?: readonly string[];
 }
 
 export function defineNotation(
