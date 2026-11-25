@@ -61,11 +61,11 @@ it.each([
     fragments: VFM_FRAGMENTS,
     inserts: VFM_INSERTS,
   });
-  // Random marks and line breaks make states no markdown holds, and the save
-  // is refused: a ruby right after a link or code span, code holding `|` in
-  // a ruby's base, a note holding a blank line, and the refusals above.
+  // Random marks make states no markdown holds, and the save is refused:
+  // code holding `|` in a ruby's base, which only its HTML element could
+  // hold, and emphasis that overlaps strikethrough at whitespace.
   const refused = violations.filter((it) => it.property === 'error');
   expect(violations.filter((it) => it.property !== 'error')).toEqual([]);
-  expect(refused.length).toBeLessThan(statistics.saves / 50);
+  expect(refused.length).toBeLessThan(statistics.saves / 200);
   expect(statistics.strategies.get('generated') ?? 0).toBe(0);
 });
