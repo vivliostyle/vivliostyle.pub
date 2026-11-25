@@ -90,9 +90,15 @@ function cssString(text: string): string {
 }
 
 // Read by the editor's CSS, which shows syntax that has no text of its own.
+// The text of the heading a section end ends comes from an attribute, which
+// the CSS puts between the two parts of the message.
 function labelProperties(): React.CSSProperties {
+  const [before = '', after = ''] = m
+    .content_editor_section_end({ heading: '\u0000' })
+    .split('\u0000');
   return {
-    '--content-editor-section-end': cssString(m.content_editor_section_end()),
+    '--content-editor-section-end': cssString(before),
+    '--content-editor-section-end-after': cssString(after),
     '--content-editor-section-end-nothing': cssString(
       m.content_editor_section_end_nothing(),
     ),
@@ -102,6 +108,9 @@ function labelProperties(): React.CSSProperties {
     ),
     '--content-editor-footnote-unreferenced': cssString(
       m.content_editor_footnote_unreferenced(),
+    ),
+    '--content-editor-footnote-duplicate': cssString(
+      m.content_editor_footnote_duplicate(),
     ),
   } as React.CSSProperties;
 }
