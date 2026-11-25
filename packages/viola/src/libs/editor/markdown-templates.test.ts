@@ -3,7 +3,7 @@ import { Editor } from '@tiptap/core';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '@v/tiptap-extensions';
+import { PubExtensions, parseMarkdown } from '@v/tiptap-extensions';
 import {
   checkMarkdownProperties,
   checkMarkedDocumentProperties,
@@ -39,5 +39,25 @@ describe('template manuscripts', () => {
   }, (path) => {
     const markdown = readFileSync(join(templatesDir, path), 'utf8');
     expect(checkMarkedDocumentProperties(createEditor, markdown)).toEqual([]);
+  });
+});
+
+describe('markup of themes in the basic template', () => {
+  // The guarantees above hold for raw HTML too, so this tells that the
+  // manuscripts' notes and boxes are read as the theme's elements.
+  it.each([
+    ['basic/drafts/05_examples.md', 'htmlFootnote', 3],
+    ['basic/drafts/06_styling-guide.md', 'htmlFootnote', 2],
+    ['basic/drafts/06_styling-guide.md', 'noteBlock', 1],
+    ['basic/drafts/06_styling-guide.md', 'warningBlock', 1],
+  ])('%s holds %s %i times', (path, type, count) => {
+    const editor = createEditor();
+    const markdown = readFileSync(join(templatesDir, path), 'utf8');
+    let found = 0;
+    parseMarkdown(editor, markdown).doc.descendants((node) => {
+      found += node.type.name === type ? 1 : 0;
+    });
+    editor.destroy();
+    expect(found).toBe(count);
   });
 });

@@ -126,6 +126,8 @@ const CODE_DECORATIONS =
   'The editor highlights code with decorations rather than spans in its content, and keeps the info string as written on the element.';
 const TASK_DECORATIONS =
   'The checkbox and the class of the list are decorations, which follow the items, and a list item always holds a paragraph in the editor.';
+const ONLY_LISTED =
+  'The editor puts on its elements only the attributes a theme can select them by and that do not change how the editor behaves; the document keeps the others.';
 const LINK_TARGET =
   "TipTap's link mark opens links in a new tab, with a rel that keeps the page it opens from the editor.";
 
@@ -662,6 +664,70 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
   ],
+  'markup of themes': [
+    { markdown: '本文<span class="footnote">注の**内容**</span>です' },
+    {
+      markdown:
+        'a <span class="x footnote" id="n" data-k="v">b <span class="tcy">12</span> c</span> d',
+    },
+    {
+      markdown:
+        'a<span class="footnote" style="color: red" onclick="x()">n</span>',
+      differs: {
+        vfm: '<p>a<span class="footnote" onclick="x()" style="color: red">n</span></p>',
+        editor: '<p>a<span class="footnote">n</span></p>',
+        reason: ONLY_LISTED,
+      },
+    },
+    {
+      markdown:
+        'See <a data-ref="fig" href="#f1"></a> and <a href="#x" data-ref="sec"></a>.',
+    },
+    {
+      markdown: '<a data-ref="fig" href="javascript:alert(1)"></a>',
+      differs: {
+        vfm: '<p><a data-ref="fig" href="javascript:alert(1)"></a></p>',
+        editor: '<p><a data-ref="fig"></a></p>',
+        reason:
+          'The editor puts on a reference only a link that runs no script: to an id, a relative path or the web. The document keeps the link.',
+      },
+    },
+    { markdown: '<div class="equation" id="eq1">\n\n$$\nx=1\n$$\n\n</div>' },
+    { markdown: '<div class="theorem" id="t">\n\n**定理** 本文\n\n</div>' },
+    {
+      markdown:
+        '<aside class="sidenote" id="sn-1">\n\nside **note**\n\n</aside>\n\ntext<a href="#sn-1" data-ref="sidenote"></a>',
+    },
+    {
+      markdown:
+        '<figure class="tbl" id="t1">\n\n<figcaption>Cap</figcaption>\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n</figure>',
+      differs: {
+        vfm: '<figure class="tbl" id="t1"><figcaption>Cap</figcaption><table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table></figure>',
+        editor:
+          '<figure class="tbl" id="t1"><figcaption>Cap</figcaption><pre data-raw-block=""><code>| a | b |\n|---|---|\n| 1 | 2 |</code></pre></figure>',
+        reason:
+          'The editor has no definition of GFM tables yet, and keeps one as written.',
+      },
+    },
+    { markdown: '<p class="fig-caption" id="c1">Caption *em* &amp; x</p>' },
+    {
+      markdown:
+        '<p class="tbl-caption">a\nb</p>\n\n<p class="lst-caption">c</p>',
+    },
+    {
+      markdown: '<div class="note">\n\n# Head\n\ntext\n\n</div>',
+      differs: {
+        vfm: '<div class="note"><section class="level1"><h1 id="head">Head</h1><p>text</p></section></div>',
+        editor: '<div class="note"><h1>Head</h1><p>text</p></div>',
+        reason: SECTION,
+      },
+    },
+    {
+      markdown:
+        '<span class="tcy">12</span>月<span class="sesame">圏</span><span class="upright">A</span>',
+    },
+    { markdown: '<div class="frame">\n\n枠\n\n</div>' },
+  ],
   'VFM options': [
     {
       markdown: 'a\nb',
@@ -725,6 +791,7 @@ const HEADINGS = [
   '# a&amp;b &copy;\n\n# A.B_C-D\n\n# Ⓐ ① ¹',
   '# Über Straße\n\n# CJK　全角スペース\n\n# emoji 🎉 ok',
   '# Heading *test* {#foo}\n\n# *e*{.x} t',
+  '# a <span class="footnote">n</span> b\n\n# x<a data-ref="fig" href="#f"></a>y\n\n# <span class="tcy">12</span>月',
   'Setext\n---\n\n# Setext',
   '# A\n\n#\n\n# B\n\n##\n\n## ',
   '> # quoted\n\n- # listed',
