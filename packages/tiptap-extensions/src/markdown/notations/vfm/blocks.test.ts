@@ -69,6 +69,8 @@ describe('the ids of a document', () => {
     expect(slug('A.B_C-D')).toBe('ab_c-d');
     expect(slug('Ⓐ ① ¹')).toBe('ⓐ--');
     expect(slug('Foo', true)).toBe('Foo');
+    expect(slug('🅰 🄰 ⒜')).toBe('🅰-🄰-');
+    expect(slug('新\u9ffd\u{2a6de}\u{20000}')).toBe('新\u{20000}');
   });
 });
 

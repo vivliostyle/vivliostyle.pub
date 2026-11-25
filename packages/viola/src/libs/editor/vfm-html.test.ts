@@ -844,6 +844,7 @@ const HEADINGS = [
   '# a ![b] {#z}\n\n# a [^1] {#z}\n\n# a [^ x] {#z}\n\n# a {#x title="{"}',
   '# H\n{#id} x\n\n> # H\n> {#q}\n> body\n\n-\n  # H\n  {#z}\n\n- # *H*\n  {#y}',
   '# H1 {.a}\n{#b}\n\n# H #\n{#id}\n\n# a\\*\n{#c}',
+  '# 🅰🅱 🄰 🅐 Ⓐ ⒜\n\n# 新\u9ffd字 \u{2a6de}\u{20000} \u0870ء',
 ];
 
 describe('ids of headings, compared with VFM', () => {
