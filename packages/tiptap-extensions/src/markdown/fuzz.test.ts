@@ -30,10 +30,6 @@ it.each([
     edits: 8,
     statistics,
   });
-  // A bare URL right before other syntax, which GFM reads into the URL
-  // whatever is escaped, cannot always be written: the save is refused.
-  const refused = violations.filter((it) => it.property === 'error');
-  expect(violations.filter((it) => it.property !== 'error')).toEqual([]);
-  expect(refused.length).toBeLessThan(statistics.saves / 200);
+  expect(violations).toEqual([]);
   expect(statistics.strategies.get('generated') ?? 0).toBe(0);
 });
