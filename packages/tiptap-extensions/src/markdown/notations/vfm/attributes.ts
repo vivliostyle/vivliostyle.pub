@@ -204,6 +204,33 @@ function attributesOf(items: readonly Item[]): InlineAttributes {
   };
 }
 
+/**
+ * The attributes of the `{…}` that starts at `start` in `text`, and where it
+ * ends, or null when no attributes start there.
+ */
+export function attributesAt(
+  text: string,
+  start: number,
+): { attributes: InlineAttributes; end: number } | null {
+  if (text[start] !== '{') {
+    return null;
+  }
+  const scanner = new AttributeScanner();
+  for (let index = start + 1; index < text.length; index++) {
+    if (text[index] === '\n') {
+      return null;
+    }
+    const result = scanner.step(text[index]);
+    if (result === 'fail') {
+      return null;
+    }
+    if (result === 'close') {
+      return { attributes: attributesOf(scanner.items), end: index + 1 };
+    }
+  }
+  return null;
+}
+
 /** The attributes `{…}` holds, or null when it is not attributes. */
 export function parseAttributes(source: string): InlineAttributes | null {
   if (!source.startsWith('{')) {
@@ -423,7 +450,11 @@ const ATTRIBUTED_MARKS: Record<string, string> = {
   link: 'link',
 };
 
-const ATTRIBUTED_TYPES = [...Object.values(ATTRIBUTED_MARKS), 'image'];
+const ATTRIBUTED_TYPES = [
+  ...Object.values(ATTRIBUTED_MARKS),
+  'image',
+  'inlineImage',
+];
 
 function mapNodes(
   result: FromMarkdownResult,
@@ -541,6 +572,16 @@ export const inlineAttributesNotation = defineNotation({
         attributedMark(mark),
       ]),
     ),
+    image: (node, _, next) => {
+      const { attributes } = node as AttributedMdast;
+      return attributes
+        ? mapNodes(next(), (it) =>
+            it.type.name === 'inlineImage'
+              ? it.type.create({ ...it.attrs, attributes }, null, it.marks)
+              : it,
+          )
+        : next();
+    },
     paragraph: (node, _, next) => {
       const result = next();
       const [only] = node.children;
@@ -559,6 +600,7 @@ export const inlineAttributesNotation = defineNotation({
   },
   nodes: {
     image: (node, _, next) => next() + written(node),
+    inlineImage: (node, _, next) => next() + written(node),
   },
   marks: Object.fromEntries(
     Object.values(ATTRIBUTED_MARKS).map((name) => [name, decorate]),

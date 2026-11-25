@@ -13,6 +13,9 @@ import { decodeString } from 'micromark-util-decode-string';
 import type { RefractorNode } from 'refractor';
 import refractor from 'refractor';
 
+import { renderedAttributes } from './markdown/notations/vfm/attributes';
+import { codeBlockAttributes } from './markdown/notations/vfm/headings';
+
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     codeBlockInfo: {
@@ -21,6 +24,12 @@ declare module '@tiptap/core' {
        * code block holding the selection.
        */
       setCodeBlockInfo: (infoString: string) => ReturnType;
+      /**
+       * Sets the caption VFM gives the code block holding the selection, or
+       * takes it away with an empty string, keeping the rest of its info
+       * string as written.
+       */
+      setCodeBlockCaption: (caption: string) => ReturnType;
     };
   }
 }
@@ -64,6 +73,92 @@ export function resolveVfmLanguage(
   const language = decodeString(word);
   const match = language.match(/^(.+?):(.+)$/);
   return match ? match[1] : language;
+}
+
+interface MetaTitle {
+  value: string;
+  start: number;
+  end: number;
+}
+
+/** The `title=…` or `title="…"` pairs of an info string's meta. */
+function metaTitles(meta: string): MetaTitle[] {
+  const titles: MetaTitle[] = [];
+  for (const match of meta.matchAll(/([^"\s=]+)=(?:"([^"]*)"|([^"\s]+))/g)) {
+    if (match[1] === 'title') {
+      titles.push({
+        value: match[2] ?? match[3] ?? '',
+        start: match.index,
+        end: match.index + match[0].length,
+      });
+    }
+  }
+  return titles;
+}
+
+function splitInfo(info: string | null | undefined) {
+  const match = (info ?? '').match(/^([ \t]*)([^ \t]*)(?:([ \t]+)(.*))?$/);
+  return {
+    indent: match?.[1] ?? '',
+    word: match?.[2] ?? '',
+    space: match?.[3] ?? '',
+    meta: match?.[4] ?? '',
+  };
+}
+
+/**
+ * The caption VFM puts in a figure around the code block: the title after
+ * `:` in the language (`js:app.js`), or a `title` in the meta, which wins,
+ * or one in its attributes, which wins over both.
+ */
+export function codeBlockCaption(
+  infoString: string | null | undefined,
+  attributes: Record<string, string> | null = null,
+): string | null {
+  const { word, meta } = splitInfo(infoString);
+  if (typeof attributes?.title === 'string') {
+    return attributes.title || null;
+  }
+  const title = metaTitles(meta).at(-1);
+  if (title) {
+    return decodeString(title.value) || null;
+  }
+  return decodeString(word).match(/^.+?:(.+)$/)?.[1] ?? null;
+}
+
+/**
+ * The info string with the caption changed, in the form it is written in,
+ * or null when it cannot be written so.
+ */
+export function withCodeBlockCaption(
+  infoString: string | null | undefined,
+  caption: string,
+  attributes: Record<string, string> | null = null,
+): string | null {
+  if (/["\n\r]/.test(caption) || typeof attributes?.title === 'string') {
+    return null;
+  }
+  const { indent, word, space, meta } = splitInfo(infoString);
+  const titles = metaTitles(meta);
+  const quoted = (value: string) =>
+    /[\s]/.test(value) || !value ? `title="${value}"` : `title=${value}`;
+  if (titles.length > 0) {
+    const last = titles[titles.length - 1];
+    const next = caption
+      ? `${meta.slice(0, last.start)}${quoted(caption)}${meta.slice(last.end)}`
+      : `${meta.slice(0, last.start)}${meta.slice(last.end)}`.trim();
+    return `${indent}${word}${next ? `${space || ' '}${next}` : ''}` || null;
+  }
+  const language = word.match(/^(.+?):(.+)$/)?.[1];
+  if (language !== undefined && (!caption || !/[\s\\&]/.test(caption))) {
+    const replaced = `${language}${caption ? `:${caption}` : ''}`;
+    return `${indent}${replaced}${space}${meta}` || null;
+  }
+  if (!caption) {
+    return infoString ?? null;
+  }
+  const lang = language ?? (word || 'text');
+  return `${indent}${lang}${space || ' '}${meta ? `${meta} ` : ''}${quoted(caption)}`;
 }
 
 /**
@@ -275,19 +370,63 @@ export const CodeBlockPrism = CodeBlock.extend({
           }
           return true;
         },
+      setCodeBlockCaption:
+        (caption) =>
+        ({ state, tr, dispatch }) => {
+          const block = findSelectedCodeBlock(state);
+          if (!block) {
+            return false;
+          }
+          const info = withCodeBlockCaption(
+            block.node.attrs.language,
+            caption,
+            codeBlockAttributes(block.node.attrs.language),
+          );
+          if (info === null && caption) {
+            return false;
+          }
+          if (dispatch && info !== block.node.attrs.language) {
+            tr.setNodeMarkup(block.pos, undefined, {
+              ...block.node.attrs,
+              language: toInfoString(info),
+            });
+          }
+          return true;
+        },
     };
   },
 
+  // As VFM renders it: the attributes go on the code, and a caption makes a
+  // figure around it.
   renderHTML({ node, HTMLAttributes }) {
     const language = resolveVfmLanguage(node.attrs.language) ?? 'text';
     const languageClass = `language-${language}`;
-    return [
+    const attributes = codeBlockAttributes(node.attrs.language);
+    const rendered = renderedAttributes(attributes);
+    delete rendered.title;
+    const pre = [
       'pre',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         class: languageClass,
       }),
-      ['code', { class: languageClass }, 0],
-    ];
+      [
+        'code',
+        {
+          ...rendered,
+          class: [languageClass, rendered.class].filter(Boolean).join(' '),
+        },
+        0,
+      ],
+    ] as const;
+    const caption = codeBlockCaption(node.attrs.language, attributes);
+    return caption
+      ? [
+          'figure',
+          { class: languageClass },
+          ['figcaption', { contenteditable: 'false' }, caption],
+          pre,
+        ]
+      : pre;
   },
 
   addProseMirrorPlugins() {

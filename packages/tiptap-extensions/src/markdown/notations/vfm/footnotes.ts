@@ -417,8 +417,10 @@ export const FootnoteReference = Node.create({
   },
 
   addInputRules() {
+    const enabled = () => hasDocumentNotation(this.editor, this.name);
     return [
-      referenceRules(() => hasDocumentNotation(this.editor, this.name)).input,
+      referenceRules(enabled).input,
+      blockStartReferenceRules(enabled).input,
     ];
   },
 
@@ -434,9 +436,21 @@ const referenceRules = (enabled: () => boolean) =>
     enabled,
     find: /(?<!\\)\[\^([^\s\]]+)\]$/,
     build: ({ state, from, match }) =>
-      // At the start of a block it would begin the note's definition, which
-      // has no node yet.
+      // At the start of a block it may begin the note's definition, which
+      // the `:` after it tells.
       match[1] && state.doc.resolve(from).parentOffset > 0
+        ? (state.schema.nodes.footnoteReference?.create({
+            label: match[1],
+          }) ?? null)
+        : null,
+  });
+
+const blockStartReferenceRules = (enabled: () => boolean) =>
+  inlineSourceRules({
+    enabled,
+    find: /^\[\^([^\s\]]+)\](?<after>[^:])$/,
+    build: ({ state, from, match }) =>
+      match[1] && state.doc.resolve(from).parentOffset === 0
         ? (state.schema.nodes.footnoteReference?.create({
             label: match[1],
           }) ?? null)

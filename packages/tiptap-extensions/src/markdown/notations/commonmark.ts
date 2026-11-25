@@ -273,7 +273,8 @@ const listNotation = defineNotation({
       }
       return context.schema.nodes.bulletList?.create(null, items);
     },
-    listItem: (node, context) => convertListItem(node, context),
+    listItem: (node, context) =>
+      convertListItem(node, context, { checkbox: 'raw' }),
   },
   nodes: {
     bulletList: {
@@ -358,7 +359,15 @@ const listNotation = defineNotation({
   ],
 });
 
-function convertListItem(node: MdastNodeOf<'listItem'>, context: ParseContext) {
+/**
+ * A list item, with the GFM checkbox it starts with kept as raw markdown in
+ * its text, or as its `checked` attribute.
+ */
+export function convertListItem(
+  node: MdastNodeOf<'listItem'>,
+  context: ParseContext,
+  { checkbox }: { checkbox: 'raw' | 'attribute' },
+) {
   const { listItem, paragraph } = context.schema.nodes;
   if (!listItem || !paragraph) {
     return undefined;
@@ -381,6 +390,12 @@ function convertListItem(node: MdastNodeOf<'listItem'>, context: ParseContext) {
   const [first] = children;
   const firstStart = node.children[0]?.position?.start.offset;
   const itemStart = node.position?.start.offset;
+  if (typeof node.checked === 'boolean' && checkbox === 'attribute') {
+    if (first?.type !== paragraph) {
+      children.unshift(paragraph.create());
+    }
+    return listItem.create({ checked: node.checked }, children);
+  }
   if (
     typeof node.checked === 'boolean' &&
     first?.type === paragraph &&
@@ -503,6 +518,39 @@ const hardBreakNotation = defineNotation({
     },
   },
 });
+
+/** An image's markdown, with its alt text written as `alt` gives it. */
+export function imageMarkdown(
+  node: ProseMirrorNode,
+  alt: (text: string) => string,
+): string {
+  return `![${alt(String(node.attrs.alt ?? ''))}](${linkDestination(String(node.attrs.src ?? ''))}${linkTitle(node.attrs.title)})`;
+}
+
+// CommonMark reads the alt text as the plain text of what is written, so
+// anything that could be syntax is escaped.
+function plainAlt(text: string): string {
+  return text.replace(/[!-/:-@[-`{-~]/g, '\\$&').replace(/\n/g, '&#10;');
+}
+
+function inlineImageNotation(inlineImage: AnyExtension): NotationDefinition {
+  return defineNotation({
+    name: 'inlineImage',
+    version: 1,
+    extensions: [inlineImage],
+    fromMarkdown: {
+      image: (node, context) =>
+        context.schema.nodes.inlineImage?.create(
+          { src: node.url, alt: node.alt ?? null, title: node.title ?? null },
+          null,
+          context.marks,
+        ),
+    },
+    nodes: {
+      inlineImage: (node) => imageMarkdown(node, plainAlt),
+    },
+  });
+}
 
 function imageNotation(image: AnyExtension): NotationDefinition {
   return defineNotation({
@@ -677,8 +725,11 @@ const linkNotation = defineNotation({
 /** CommonMark, as definitions of the editor's standard nodes and marks. */
 export function commonMarkNotations({
   image,
+  inlineImage,
 }: {
   image: AnyExtension;
+  /** An image in text; without it, such an image is kept as written. */
+  inlineImage?: AnyExtension;
 }): NotationDefinition[] {
   return [
     documentNotation,
@@ -690,6 +741,7 @@ export function commonMarkNotations({
     codeBlockNotation,
     hardBreakNotation,
     imageNotation(image),
+    ...(inlineImage ? [inlineImageNotation(inlineImage)] : []),
     emphasisNotation,
     strongNotation,
     inlineCodeNotation,

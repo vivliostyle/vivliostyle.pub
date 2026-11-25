@@ -24,6 +24,16 @@ const KNOWN_VIOLATIONS: Record<
     reason: string;
   }
 > = {
+  '[^1]: line1\nlazy': {
+    violations: [
+      {
+        property: 'locality',
+        detail: 'appending plain text to block 0, character by character',
+      },
+    ],
+    reason:
+      'a rewritten paragraph gives its lazy lines the prefix of the container, as in a quote or a list item',
+  },
   'a\n\n---\n\nb': {
     violations: [{ property: 'locality', detail: 'deleting block 0' }],
     reason:
