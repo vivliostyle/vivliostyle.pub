@@ -238,7 +238,7 @@ export const savingSuites: CaseSuite[] = [
     ],
   },
   {
-    title: 'display math with line breaks in a heading',
+    title: 'display math that markdown cannot hold',
     cases: [
       {
         name: 'in a heading that cannot be setext',
@@ -254,6 +254,34 @@ export const savingSuites: CaseSuite[] = [
         expect: '### 見出し$$ y $$',
         fails:
           'An ATX heading is one line, and a line break in math cannot be written as a reference: the save is refused',
+      },
+      {
+        name: 'two side by side',
+        given: 'a$$x$$‸',
+        steps: [
+          run('insert display math right after it', (editor) => {
+            editor.commands.insertContent({
+              type: 'math',
+              attrs: { latex: 'y', display: true },
+            });
+          }),
+        ],
+        expect: 'a$$x$$$$y$$‸',
+        fails:
+          'VFM reads `$$x$$$$y$$` as one math, so no markdown holds two side by side: the save is refused',
+      },
+    ],
+  },
+  {
+    title: 'code that holds a line break',
+    cases: [
+      {
+        name: 'before what would start a block',
+        given: 'a`x‸`c',
+        steps: [insert('\n- y')],
+        expect: 'a`x\n- y‸`c',
+        fails:
+          'The line after the break starts a list, which can interrupt a paragraph, and code has no escapes: the save is refused',
       },
     ],
   },
