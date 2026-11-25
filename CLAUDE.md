@@ -163,7 +163,7 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 
 ## Editor behaviour tests
 
-`@v/tiptap-extensions` pins the editor's behaviour down as data, in `src/cases/`.
+`@v/tiptap-extensions` pins the editor's behaviour down as data, in `tests/cases/`. The framework that runs them is in `testing/`, outside `src/`.
 
 - A case gives the markdown the document is loaded from, the steps applied to it (typed text, key presses, editor commands) and the markdown it is saved as. A caret mark in the markdown stands for the selection, so a case reads like what the user sees. Add a case there instead of a one-off test that builds an editor by hand.
 - The cases run in `pnpm test` against a headless editor in Node. Its driver calls the hooks a view would call, so it covers keymaps and input rules. A case whose steps it cannot perform, such as paste, IME composition or caret movement, is skipped.

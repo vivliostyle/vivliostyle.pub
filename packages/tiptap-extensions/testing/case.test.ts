@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '../index';
+import { PubExtensions } from '../src/index';
 import { type EditorCase, failureReason, runCase } from './case';
 import { createNodeDriver } from './node-driver';
 import { run } from './steps';

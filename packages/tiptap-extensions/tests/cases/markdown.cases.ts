@@ -1,4 +1,4 @@
-import type { CaseSuite } from '../testing/vitest';
+import type { CaseSuite } from '../../testing/vitest';
 
 const ESCAPED_HTML = 'raw HTML is written back escaped';
 const ESCAPED_HTML_BLOCK =

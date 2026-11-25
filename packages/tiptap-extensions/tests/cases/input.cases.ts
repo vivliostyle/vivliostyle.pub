@@ -1,5 +1,5 @@
-import { press } from '../testing/steps';
-import type { CaseSuite } from '../testing/vitest';
+import { press } from '../../testing/steps';
+import type { CaseSuite } from '../../testing/vitest';
 
 export const inputSuites: CaseSuite[] = [
   {
