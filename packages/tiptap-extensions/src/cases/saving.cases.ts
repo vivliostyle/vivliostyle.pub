@@ -216,4 +216,45 @@ export const savingSuites: CaseSuite[] = [
       },
     ],
   },
+  {
+    title: 'what is kept of lines markdown reads lazily',
+    cases: [
+      {
+        name: 'a lazy line of a quote',
+        given: '> a\nlazy‸',
+        steps: ['X'],
+        expect: '> a\nlazyX‸',
+        fails:
+          'A rewritten paragraph gives its lazy lines the prefix of the container',
+      },
+      {
+        name: 'a lazy line of a list item',
+        given: '- a\nlazy‸',
+        steps: ['X'],
+        expect: '- a\nlazyX‸',
+        fails:
+          'A rewritten paragraph gives its lazy lines the prefix of the container',
+      },
+    ],
+  },
+  {
+    title: 'display math with line breaks in a heading',
+    cases: [
+      {
+        name: 'in a heading that cannot be setext',
+        given: '### 見出し‸',
+        steps: [
+          run('insert display math with line breaks', (editor) => {
+            editor.commands.insertContent({
+              type: 'math',
+              attrs: { latex: '\ny\n', display: true },
+            });
+          }),
+        ],
+        expect: '### 見出し$$ y $$',
+        fails:
+          'An ATX heading is one line, and a line break in math cannot be written as a reference: the save is refused',
+      },
+    ],
+  },
 ];
