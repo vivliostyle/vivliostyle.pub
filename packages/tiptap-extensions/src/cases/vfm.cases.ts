@@ -578,6 +578,22 @@ export const vfmSuites: CaseSuite[] = [
         ],
       },
       {
+        name: 'a link whose text looks like a reference with a bracket',
+        given: 'x‸',
+        steps: [
+          insert(
+            'insert a link',
+            text('^9]', [{ type: 'link', attrs: { href: 'u' } }]),
+          ),
+        ],
+        expect: 'x[^9\\]](u)‸',
+      },
+      {
+        name: 'a reference whose label ends with a backslash',
+        given: '[^9\\]x',
+        doc: 'doc(paragraph(footnoteReference, "x"))',
+      },
+      {
         name: 'braces typed after a reference are escaped',
         given: 'a[^1]‸',
         steps: [

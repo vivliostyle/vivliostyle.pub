@@ -362,6 +362,16 @@ const comparisons: Record<string, Comparison[]> = {
     { markdown: 'Wow![^1]' },
     { markdown: 'a[^1](b' },
     {
+      markdown: '[^9\\]](u) と [^9\\]x',
+      differs: {
+        vfm: '<p><a href="u">^9]</a> と <a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a>x</p>',
+        editor:
+          '<p><a href="u" rel="noopener noreferrer nofollow" target="_blank">^9]</a> と <a class="footnote-ref" href="#fn9\\" id="fnref9\\" role="doc-noteref"><sup>9\\</sup></a>x</p>',
+        reason:
+          'VFM numbers references in the order of the book; the editor shows their labels.',
+      },
+    },
+    {
       markdown: '<strong>重要</strong>{漢字|かんじ}',
       differs: {
         vfm: '<p><strong>重要</strong><ruby>漢字<rt>かんじ</rt></ruby></p>',

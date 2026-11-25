@@ -88,6 +88,44 @@ const resourceAhead: Construct = {
   },
 };
 
+/**
+ * After a `]` that a backslash escapes, the `]` and resource of a link
+ * further on the line: VFM 2 reads the brackets as a link then, and as a
+ * reference whose label ends with the backslash otherwise.
+ */
+const linkAhead: Construct = {
+  partial: true,
+  tokenize(effects, ok, nok) {
+    let depth = 0;
+    let escaping = false;
+    const inside: State = (code) => {
+      if (code === null || isLineEnding(code)) {
+        return nok(code);
+      }
+      if (!escaping && code === codes.rightSquareBracket && depth === 0) {
+        effects.consume(code);
+        return (next) =>
+          next === codes.leftParenthesis
+            ? effects.attempt(resourceAhead, ok, nok)(next)
+            : nok(next);
+      }
+      if (!escaping && code === codes.leftSquareBracket) {
+        depth++;
+      } else if (!escaping && code === codes.rightSquareBracket) {
+        depth--;
+      }
+      escaping = !escaping && code === codes.backslash;
+      effects.consume(code);
+      return inside;
+    };
+    return (code) => {
+      effects.enter(types.callMarker);
+      effects.consume(code);
+      return inside;
+    };
+  },
+};
+
 /** `![^label]`: VFM 2 reads the `!` as text before the reference. */
 const callAfterBang: Construct = {
   name: 'vfmFootnoteCallAfterBang',
@@ -121,21 +159,29 @@ function tokenizeCall(
 ): State {
   // A link's label is not ended by the reference's own bracket.
   const open = new OpenDelimiters(this, { label: false });
+  let escaping = false;
+
+  const close: State = (code) => {
+    effects.exit(types.callLabel);
+    effects.enter(types.callMarker);
+    effects.consume(code);
+    effects.exit(types.callMarker);
+    return after;
+  };
 
   const label: State = (code) => {
     if (open.ends(code)) {
       return nok(code);
     }
     if (code === codes.rightSquareBracket) {
-      effects.exit(types.callLabel);
-      effects.enter(types.callMarker);
-      effects.consume(code);
-      effects.exit(types.callMarker);
-      return after;
+      return escaping
+        ? effects.check(linkAhead, nok, close)(code)
+        : close(code);
     }
     if (!isLabelCode(code)) {
       return nok(code);
     }
+    escaping = !escaping && code === codes.backslash;
     effects.consume(code);
     return label;
   };
