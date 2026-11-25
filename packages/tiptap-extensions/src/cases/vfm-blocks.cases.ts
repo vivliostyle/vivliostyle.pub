@@ -661,6 +661,13 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(bulletList(listItem(paragraph, footnoteDefinition(paragraph("oneX")))), footnoteDefinition(paragraph("two")))',
       },
       {
+        name: 'a thematic break right after one',
+        given: 'a[^1]\n\n[^1]: one\n---',
+        doc: 'doc(paragraph("a", footnoteReference), heading("[^1]: one"))',
+        fails:
+          'VFM 2 reads the line of the definition and the break under it as a setext heading, as it tries one before a definition; micromark reads the definition and a thematic break',
+      },
+      {
         name: 'one indented into another is more of its lines',
         given: '[^1]: one\n    [^2]: two',
         doc: 'doc(footnoteDefinition(paragraph("one\\n", rawInline("[^2]: two"))))',
