@@ -232,7 +232,9 @@ export function imageExtensions(basePath: string | undefined) {
           tag: 'img[src]',
           priority: 60,
           getAttrs: () =>
-            hasDocumentNotation(this.editor, this.name) ? null : false,
+            this.editor && hasDocumentNotation(this.editor, this.name)
+              ? null
+              : false,
         },
       ];
     },

@@ -296,7 +296,8 @@ describe('the decorations of the whole document', () => {
       return (plugin?.getState(state) as DecorationSet | undefined)
         ?.find()
         .map((it) => {
-          const { attrs } = it.type as unknown as { attrs?: unknown };
+          const { attrs } = (it as unknown as { type: { attrs?: unknown } })
+            .type;
           return [it.from, it.to, JSON.stringify(attrs ?? it.spec)];
         });
     });
