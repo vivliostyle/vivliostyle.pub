@@ -87,8 +87,8 @@ function refused(label: string, apply: (editor: Editor) => boolean): Step {
   });
 }
 
-const SHORTCODE_TEXT =
-  'VFM 2 reads a shortcode that text follows on its line, and the text as a paragraph after it; the editor only reads one alone on its line';
+const SHORTCODE_LINES =
+  'VFM 2 reads a shortcode up to `]]` on a later line too; the editor only reads one on a line';
 
 export const vfmBlockSuites: CaseSuite[] = [
   {
@@ -745,10 +745,50 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(paragraph("[[toc]]"))',
       },
       {
-        name: 'text after it on its line',
-        given: '[[toc]] text',
-        doc: 'doc(tableOfContents, paragraph(" text"))',
-        fails: SHORTCODE_TEXT,
+        name: 'text after it on its line is a paragraph',
+        given: '[[toc]] text *em*',
+        doc: 'doc(tableOfContents, paragraph("text ", italic("em")))',
+      },
+      {
+        name: 'text after another shortcode, which VFM removes',
+        given: '[[注]] は本文\n\n> [[foo]] x',
+        doc: 'doc(rawBlock("[[注]]"), paragraph("は本文"), blockquote(rawBlock("[[foo]]"), paragraph("x")))',
+      },
+      {
+        name: 'a blank one is text',
+        given: '[[ ]]\n\n[[]]',
+        doc: 'doc(paragraph("[[ ]]"), paragraph("[[]]"))',
+      },
+      {
+        name: 'one that ends on a later line',
+        given: '[[foo\nbar]] c',
+        doc: 'doc(rawBlock("[[foo\\nbar]]"), paragraph("c"))',
+        fails: SHORTCODE_LINES,
+      },
+      {
+        name: 'a link around a reference that starts a paragraph is no shortcode',
+        given: 'a‸[[^1]](u)',
+        steps: [press('Backspace')],
+        expect: '[[^1]{}](u)',
+        doc: 'doc(paragraph(link(footnoteReference)))',
+      },
+      {
+        name: 'editing the text after it',
+        given: '[[toc]] text‸',
+        steps: ['X'],
+        expect: '[[toc]] textX‸',
+      },
+      {
+        name: 'text typed as one with text after it is escaped',
+        given: '‸',
+        steps: [insert('[[toc]] text')],
+        expect: '\\[[toc]\\] text‸',
+      },
+      {
+        name: 'text typed as another with text after it is escaped',
+        given: '‸',
+        steps: [insert('[[注]] は本文')],
+        expect: '\\[[注]\\] は本文‸',
       },
       {
         name: 'typed alone in a paragraph',
