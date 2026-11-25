@@ -1256,6 +1256,61 @@ export class MarkdownWriter {
     return failing;
   }
 
+  /**
+   * Whitespace at the edge of a flanking mark's range is written outside its
+   * delimiters. Where the whitespace has other marks too, such as a link, it
+   * is split off without the flanking marks, so it is written inside those.
+   */
+  private splitExpelled(children: ProseMirrorNode[]): ProseMirrorNode[] {
+    const flanking = (mark: Mark) => this.markWriter(mark)?.flanking === true;
+    const kept = (mark: Mark) => {
+      const writer = this.markWriter(mark);
+      return !writer?.flanking && !writer?.verbatim && !writer?.run;
+    };
+    const result: ProseMirrorNode[] = [];
+    children.forEach((child, index) => {
+      const text = child.text;
+      if (!child.isText || !text || !child.marks.some(kept)) {
+        result.push(child);
+        return;
+      }
+      if (child.marks.some((mark) => !flanking(mark) && !kept(mark))) {
+        result.push(child);
+        return;
+      }
+      const opening = child.marks.filter(
+        (mark) =>
+          flanking(mark) && !mark.isInSet(children[index - 1]?.marks ?? []),
+      );
+      const ending = child.marks.filter(
+        (mark) =>
+          flanking(mark) && !mark.isInSet(children[index + 1]?.marks ?? []),
+      );
+      const leading = opening.length > 0 ? (text.match(/^\s*/)?.[0] ?? '') : '';
+      const rest = text.slice(leading.length);
+      const trailing = ending.length > 0 ? (rest.match(/\s*$/)?.[0] ?? '') : '';
+      const core = rest.slice(0, rest.length - trailing.length);
+      const without = (marks: readonly Mark[]) =>
+        child.marks.filter((mark) => !mark.isInSet(marks));
+      const { schema } = this;
+      if (leading) {
+        result.push(
+          schema.text(
+            leading,
+            core ? without(opening) : without([...opening, ...ending]),
+          ),
+        );
+      }
+      if (core) {
+        result.push(schema.text(core, child.marks));
+      }
+      if (trailing) {
+        result.push(schema.text(trailing, without(ending)));
+      }
+    });
+    return result;
+  }
+
   private inlinePass(
     textblock: ProseMirrorNode,
     context: WriteContext,
@@ -1264,7 +1319,7 @@ export class MarkdownWriter {
     edges: InlineEdges,
     forms: ReadonlyMap<number, DelimiterForm>,
   ): { text: string; implied: number; occurrences: MarkOccurrence[] } {
-    const children = childrenOf(textblock);
+    const children = this.splitExpelled(childrenOf(textblock));
     const active: { mark: Mark; occurrence: MarkOccurrence }[] = [];
     const occurrences: MarkOccurrence[] = [];
     let output = '';

@@ -580,6 +580,21 @@ describe('saving what an edit can leave in a paragraph', () => {
     appendAfter(editor, 'a', text);
     expect(savesAsDocument(editor)).toBe(expected);
   });
+
+  it('keeps a link on whitespace that emphasis leaves out', () => {
+    const editor = load('text\n');
+    const { schema } = editor.state;
+    editor.view.dispatch(
+      editor.state.tr.insert(5, [
+        schema.text('\nSe', [
+          schema.marks.link.create({ href: 'u' }),
+          schema.marks.bold.create(),
+        ]),
+        schema.text('te', [schema.marks.bold.create()]),
+      ]),
+    );
+    expect(savesAsDocument(editor)).toBe('text[\n](u)**[Se](u)te**\n');
+  });
 });
 
 describe('what the document records', () => {
