@@ -8,11 +8,10 @@ import {
   codes,
   currentNode,
   type Effects,
-  endsOpen,
   enterNode,
   type FromMarkdownExtension,
   isLineEnding,
-  openBefore,
+  OpenDelimiters,
   type State,
   syntaxPlugin,
   type Token,
@@ -120,7 +119,13 @@ function tokenizeCall(
   ok: State,
   nok: State,
 ): State {
+  // A link's label is not ended by the reference's own bracket.
+  const open = new OpenDelimiters(this, { label: false });
+
   const label: State = (code) => {
+    if (open.ends(code)) {
+      return nok(code);
+    }
     if (code === codes.rightSquareBracket) {
       effects.exit(types.callLabel);
       effects.enter(types.callMarker);
@@ -182,8 +187,7 @@ function inlineFootnoteTokenizer(allowEmpty: boolean) {
     nok: State,
   ): State {
     // A link's label is not ended by brackets the note balances.
-    const open = { ...openBefore(this), label: false };
-    let last: Code = null;
+    const open = new OpenDelimiters(this, { label: false });
     let balance = 0;
     let escaped = false;
     let run = 0;
@@ -219,10 +223,9 @@ function inlineFootnoteTokenizer(allowEmpty: boolean) {
     };
 
     const content: State = (code) => {
-      if (code === null || endsOpen(open, code, last)) {
+      if (code === null || open.ends(code)) {
         return nok(code);
       }
-      last = code;
       if (code === codes.graveAccent && !escaped) {
         run++;
         openChunk();

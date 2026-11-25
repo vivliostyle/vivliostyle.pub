@@ -13,11 +13,10 @@ import {
   codes,
   currentNode,
   type Effects,
-  endsOpen,
   enterNode,
   type FromMarkdownExtension,
   isLineEnding,
-  openBefore,
+  OpenDelimiters,
   type State,
   syntaxPlugin,
   type TokenizeContext,
@@ -80,18 +79,13 @@ function tokenizeRuby(
   ok: State,
   nok: State,
 ): State {
-  const open = openBefore(this);
+  const open = new OpenDelimiters(this);
   let previous: Code = null;
-  let last: Code = null;
   let size = 0;
 
   // Emphasis or a link opened before would end inside, and VFM 2 reads
   // that first.
-  const ends = (code: Code) => {
-    const before = last;
-    last = code;
-    return endsOpen(open, code, before);
-  };
+  const ends = (code: Code) => open.ends(code);
 
   const start: State = (code) => {
     if (code !== codes.leftCurlyBrace) {

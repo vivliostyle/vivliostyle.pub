@@ -645,6 +645,42 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph(bold("a"), " ", math))',
       },
       {
+        name: 'a single delimiter does not end strong emphasis',
+        given: '**$a*b$** ~~$a~b$~~ __重要 $x_1$__',
+        doc: 'doc(paragraph(bold(math), " ", strike(math), " ", bold("重要 "), bold(math)))',
+      },
+      {
+        name: 'an underscore before a letter does not end emphasis',
+        given: '_a $x_1$ b_ _a {b|c_d} e_',
+        doc: 'doc(paragraph(italic("a "), italic(math), italic(" b"), " ", italic("a "), italic(ruby("b")), italic(" e")))',
+      },
+      {
+        name: 'a pair does not end emphasis',
+        given: '*a $b**c$ d*',
+        doc: 'doc(paragraph(italic("a "), italic(math), italic(" d")))',
+      },
+      {
+        name: 'emphasis around the label of a reference',
+        given: '*a [^b*c] d*',
+        doc: 'doc(paragraph(italic("a [^b"), "c] d*"))',
+      },
+      {
+        name: 'taking strong emphasis off math keeps the math',
+        given: '__重要 $x_1$__ です。‸',
+        steps: [
+          run('take the strong emphasis off', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr.removeMark(
+                0,
+                editor.state.doc.content.size,
+                editor.schema.marks.bold,
+              ),
+            );
+          }),
+        ],
+        expect: '重要 $x_1$ です。‸',
+      },
+      {
         name: 'no math in the text of a link',
         given: '[$x$](u) $y$',
         doc: 'doc(paragraph(link("$x$"), " ", math))',

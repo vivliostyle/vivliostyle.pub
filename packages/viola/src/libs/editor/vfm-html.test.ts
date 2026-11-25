@@ -370,6 +370,55 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
   ],
+  // VFM 2 ends emphasis where its delimiters next come, as many of them as
+  // it opened with, whatever is between: a construct that would hold the end
+  // is not read.
+  'VFM inside emphasis': [
+    ...[
+      '**$a*b$** **$x^*$** ~~$a~b$~~ ~~a $b~c$ d~~',
+      '_a $x_1$ b_ _$x_i$_ __重要 $x_1$__',
+      '*強調* と $x$ **a** $b*c$ snake_case と $x_1$',
+      '*a $b* c$',
+      '[a $b]c$](u) [a {b|c]d}](u) ![a $b]$](i.png)',
+      '*a [^b*c] d*',
+      '**a [^b**c] d**',
+      '_a [^b_] d_',
+      '**a $b**c$ d**',
+      '*a $b**c$ d*',
+      '_a $b_ c$ d_',
+      '_a $b_c$ d_',
+      '~~a $b~~c$ d~~',
+      '~~a $b ~~c$ d~~',
+      '__a $b_c$ d__',
+      '*a $b\\*c$ d* **a $b\\**c$ d**',
+      '*a $b*$ c*',
+      '_a $b_$ c_',
+      '*a {b|c*}*',
+      '~~a {b|c~~d} e~~',
+      '~~a ^[b~~] c~~',
+      '**a {b**|c} d**',
+    ].map((markdown) => ({ markdown })),
+    {
+      markdown:
+        '_a {b|c_d} e_ **a {b|c*d}** *a* {b|c*d} _a_ {b|c_d} **重要**な{漢字|かんじ} {漢字|かんじ}*強調*',
+      differs: {
+        vfm: '<p><em>a <ruby>b<rt>c_d</rt></ruby> e</em> <strong>a <ruby>b<rt>c*d</rt></ruby></strong> <em>a</em> <ruby>b<rt>c*d</rt></ruby> <em>a</em> <ruby>b<rt>c_d</rt></ruby> <strong>重要</strong>な<ruby>漢字<rt>かんじ</rt></ruby> <ruby>漢字<rt>かんじ</rt></ruby><em>強調</em></p>',
+        editor:
+          '<p><em>a <ruby><span>b</span><rt>c_d</rt></ruby> e</em> <strong>a <ruby><span>b</span><rt>c*d</rt></ruby></strong> <em>a</em> <ruby><span>b</span><rt>c*d</rt></ruby> <em>a</em> <ruby><span>b</span><rt>c_d</rt></ruby> <strong>重要</strong>な<ruby><span>漢字</span><rt>かんじ</rt></ruby> <ruby><span>漢字</span><rt>かんじ</rt></ruby><em>強調</em></p>',
+        reason: RUBY_BASE,
+      },
+    },
+    {
+      markdown: '**a ^[b*c] d** **x ^[n*] y**',
+      options: { footnote: 'gcpm' },
+      differs: {
+        vfm: '<p><strong>a <span class="footnote" id="fn-1" role="doc-footnote">b*c</span> d</strong> <strong>x <span class="footnote" id="fn-2" role="doc-footnote">n*</span> y</strong></p>',
+        editor:
+          '<p><strong>a <span class="footnote" role="doc-footnote">b*c</span> d</strong> <strong>x <span class="footnote" role="doc-footnote">n*</span> y</strong></p>',
+        reason: 'VFM numbers notes in the order of the book.',
+      },
+    },
+  ],
   'VFM options': [
     {
       markdown: 'a\nb',
