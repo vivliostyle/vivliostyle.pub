@@ -158,7 +158,10 @@ function normalizeChars(chars: Char[], used: Set<AllowedDifference>): Char[] {
         after >= result.length || !result[after].marks.includes(mark);
       if (startsRange || endsRange) {
         used.add('whitespace at the edge of emphasis');
-        result[i] = { ...char, marks: char.marks.filter((it) => it !== mark) };
+        result[i] = {
+          ...result[i],
+          marks: result[i].marks.filter((it) => it !== mark),
+        };
       }
     }
   }
