@@ -12,6 +12,7 @@ import type { CaseSuite } from '../testing/vitest';
 // The definitions this set of syntax added to those the inline syntax came
 // with: a document recorded without them was made before.
 const BLOCK_NOTATIONS = new Set([
+  'paragraphContinuation',
   'headingAttributes',
   'sectionEnd',
   'tableOfContents',
@@ -91,6 +92,69 @@ const SHORTCODE_LINES =
   'VFM 2 reads a shortcode up to `]]` on a later line too; the editor only reads one on a line';
 
 export const vfmBlockSuites: CaseSuite[] = [
+  {
+    title: 'VFM paragraphs',
+    cases: [
+      {
+        name: 'an ATX heading right after a paragraph is more of its lines',
+        given: 'text\n# H\n{#id} more',
+        doc: 'doc(paragraph("text\\n", rawInline("# H"), "\\n{#id} more"))',
+      },
+      {
+        name: 'after a blank line it is a heading',
+        given: 'text\n\n# H',
+        doc: 'doc(paragraph("text"), heading("H"))',
+      },
+      {
+        name: 'lazily in a quote, a list item or a note',
+        given: '> a\n# H\n\n- b\n#\n\n[^1]: c\n## d',
+        doc: 'doc(blockquote(paragraph("a\\n", rawInline("# H"))), bulletList(listItem(paragraph("b\\n", rawInline("#")))), footnoteDefinition(paragraph("c\\n", rawInline("## d"))))',
+      },
+      {
+        name: 'a setext heading of more lines is a paragraph',
+        given: 'a\nb\n===\nc',
+        doc: 'doc(paragraph("a\\nb\\n", rawInline("==="), "\\nc"))',
+      },
+      {
+        name: 'one with a thematic break under it is a paragraph before it',
+        given: 'a\nb\n---',
+        doc: 'doc(paragraph("a\\nb"), horizontalRule)',
+      },
+      {
+        name: 'display math with a line of an equals sign',
+        given: '$$\na\n=\nb$$',
+        doc: 'doc(paragraph("$$\\na\\n", rawInline("="), "\\nb$$"))',
+      },
+      {
+        name: 'a setext heading of one line stays one',
+        given: 'a\n===',
+        doc: 'doc(heading("a"))',
+      },
+      {
+        name: 'fenced code right after a paragraph',
+        given: 'text\n```\nx\n```',
+        doc: 'doc(paragraph("text\\n", rawInline("```\\nx\\n```")))',
+        fails:
+          'VFM 2 reads fenced code right after a paragraph as more of its lines, where a code span can take it; the editor keeps the code block, as lines of raw markdown in a paragraph would not survive editing',
+      },
+      {
+        name: 'editing the paragraph',
+        given: 'text‸\n# H',
+        steps: ['X'],
+        expect: 'textX‸\n# H',
+      },
+      {
+        name: 'a heading made of lines is written on one',
+        given: 'a\nb‸',
+        steps: [
+          command('make a heading', (editor) =>
+            editor.commands.setNode('heading', { level: 2 }),
+          ),
+        ],
+        expect: '## a<br>b‸',
+      },
+    ],
+  },
   {
     title: 'VFM heading attributes',
     cases: [

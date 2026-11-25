@@ -31,6 +31,7 @@ const createEditor = () =>
   });
 
 const BLOCK_NOTATIONS = new Set([
+  'paragraphContinuation',
   'headingAttributes',
   'sectionEnd',
   'tableOfContents',

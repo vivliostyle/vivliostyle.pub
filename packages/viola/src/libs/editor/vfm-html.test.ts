@@ -602,6 +602,29 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
   ],
+  'VFM paragraphs': [
+    { markdown: 'a\nb\n---' },
+    {
+      markdown: 'text\n# H\n\na\nb\n===',
+      differs: {
+        vfm: '<p>text\n# H</p><p>a\nb\n===</p>',
+        editor:
+          '<p>text\n<code data-raw-inline=""># H</code></p><p>a\nb\n<code data-raw-inline="">===</code></p>',
+        reason:
+          'VFM 2 reads an ATX heading, or the underline of a setext heading of more lines, as more lines of the paragraph before; the editor keeps those lines as written.',
+      },
+    },
+    {
+      markdown: 'text\n```\nx\n```',
+      differs: {
+        vfm: '<p>text\n<code>x</code></p>',
+        editor:
+          '<p>text</p><pre class="language-text"><code class="language-text">x</code></pre>',
+        reason:
+          'VFM 2 reads fenced code right after a paragraph as more of its lines; the editor keeps the code block, as raw lines in a paragraph would not survive editing.',
+      },
+    },
+  ],
   'VFM table of contents': [
     { markdown: 'text [[toc]]' },
     { markdown: '[[ ]]\n\n[[]]\n\ntext\n[[toc]]' },
@@ -855,6 +878,7 @@ const HEADINGS = [
   '# H\n{#id} x\n\n> # H\n> {#q}\n> body\n\n-\n  # H\n  {#z}\n\n- # *H*\n  {#y}',
   '# H1 {.a}\n{#b}\n\n# H #\n{#id}\n\n# a\\*\n{#c}',
   '# 🅰🅱 🄰 🅐 Ⓐ ⒜\n\n# 新\u9ffd字 \u{2a6de}\u{20000} \u0870ء',
+  'text\n# H\n\n> a\n# Q\n\na\nb\n===\n\n$$\na\n=\nb$$\n\n# T\n\nc\n===',
 ];
 
 describe('ids of headings, compared with VFM', () => {
