@@ -62,15 +62,15 @@ export function imageLabel(source: string): string | null {
 // VFM 2 keeps the description as written, with escapes and references read.
 function sourceAlt(node: UnknownMdastNode, context: ParseContext) {
   const label = imageLabel(context.source(node));
-  return label === null ? null : decodeString(label);
+  return label === null ? undefined : decodeString(label) || null;
 }
 
 function withAlt(
   result: FromMarkdownResult,
   name: string,
-  alt: string | null,
+  alt: string | null | undefined,
 ): FromMarkdownResult {
-  if (alt === null || !result || Array.isArray(result)) {
+  if (alt === undefined || !result || Array.isArray(result)) {
     return result;
   }
   const node = result as ProseMirrorNode;
@@ -98,7 +98,7 @@ export const imageAltNotation = defineNotation({
       return withAlt(
         next(),
         'image',
-        only?.type === 'image' ? sourceAlt(only, context) : null,
+        only?.type === 'image' ? sourceAlt(only, context) : undefined,
       );
     },
     image: (node, context, next) =>

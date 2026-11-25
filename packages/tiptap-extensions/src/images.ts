@@ -5,6 +5,7 @@ import { Plugin } from '@tiptap/pm/state';
 import { join } from 'pathe';
 
 import { hasDocumentNotation } from './markdown';
+import { renderedAttributes } from './markdown/notations/vfm/attributes';
 import { inlineSourceRules } from './markdown/notations/vfm/input-rules';
 import { inlineNodeRules } from './markdown/notations/vfm/normalize';
 
@@ -31,8 +32,11 @@ function imageAttributes(
   const { src, ...rest } = HTMLAttributes;
   const explicitAlt = (node.attrs.attributes as Record<string, unknown> | null)
     ?.alt;
+  // The image's own width and height, which markdown never sets, would hide
+  // the ones its attributes give.
   return mergeAttributes(options, {
     ...rest,
+    ...renderedAttributes(node.attrs.attributes),
     ...(typeof explicitAlt === 'string' && { alt: explicitAlt }),
     src: resolveSource(src, basePath),
   });

@@ -462,6 +462,7 @@ export function codeBlockAttributes(info: unknown): InlineAttributes | null {
 export function documentIds(doc: ProseMirrorNode): DocumentId[] {
   const ids: DocumentId[] = [];
   const slugger = new Slugger();
+  const ends = sectionEnds(doc);
   doc.descendants((node, pos) => {
     switch (node.type.name) {
       case 'heading': {
@@ -475,10 +476,15 @@ export function documentIds(doc: ProseMirrorNode): DocumentId[] {
         });
         return false;
       }
-      case 'sectionEnd':
-        // VFM reads the line as an empty heading before it ends a section.
-        slugger.slug('');
+      case 'sectionEnd': {
+        // VFM reads the line as an empty heading before it ends a section,
+        // and it stays one where it ends none.
+        const id = slugger.slug('');
+        if (!ends.get(pos)) {
+          ids.push({ id, kind: 'heading', pos, node, explicit: false });
+        }
         return false;
+      }
       case 'image':
       case 'inlineImage': {
         const own = explicitId(node.attrs.attributes);

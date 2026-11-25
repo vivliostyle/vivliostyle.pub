@@ -24,9 +24,11 @@ import {
 
 export { type BlockFormat, getBlockFormat } from './block-format';
 export {
+  codeBlockCaption,
   findSelectedCodeBlock,
   listHighlightLanguages,
   resolveVfmLanguage,
+  withCodeBlockCaption,
 } from './code-block-prism';
 export {
   type AssetDragPayload,
@@ -36,13 +38,19 @@ export {
   serializeCustomDragPayload,
 } from './custom-drag-handler';
 export {
+  codeBlockAttributes,
   currentNotations,
+  type DocumentId,
   type DocumentRecord,
+  documentIds,
   type FoundNode,
   findSelectedInline,
+  footnoteIdentifier,
+  footnoteStatus,
   formatAttributes,
   getMarkdown,
   hasDocumentNotation,
+  headingText,
   type InlineAttributes,
   isAttributeName,
   isWritableFootnoteLabel,
@@ -53,8 +61,10 @@ export {
   type NotationDefinition,
   parseAttributes,
   parseMarkdown,
+  sectionEnds,
   setDocumentNotations,
   setMarkdownBaseline,
+  slug,
   upgradeDocumentNotations,
   VFM_2_SYNTAX,
   type VfmSyntax,
