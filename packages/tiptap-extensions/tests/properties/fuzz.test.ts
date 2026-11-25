@@ -5,8 +5,8 @@ import { PubExtensions } from '../../src/index';
 import {
   type FuzzStatistics,
   fuzzMarkdownEdits,
-  THEME_FRAGMENTS,
-  THEME_INSERTS,
+  HTML_ELEMENT_FRAGMENTS,
+  HTML_ELEMENT_INSERTS,
   VFM_FRAGMENTS,
   VFM_INSERTS,
 } from '../../testing/markdown-properties';
@@ -87,8 +87,8 @@ it.each([
     documents: 200,
     edits: 8,
     statistics,
-    fragments: THEME_FRAGMENTS,
-    inserts: THEME_INSERTS,
+    fragments: HTML_ELEMENT_FRAGMENTS,
+    inserts: HTML_ELEMENT_INSERTS,
   });
   expect(violations).toEqual([]);
   expect(statistics.strategies.get('generated') ?? 0).toBe(0);

@@ -11,7 +11,7 @@ import {
   selectedReference,
 } from '../../../libs/editor/cross-reference';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
-import { themeReferenceTypes } from '../../../libs/editor/theme-support';
+import { styledReferenceTypes } from '../../../libs/editor/styled-elements';
 import { NativeSelect } from '../../theme-settings/native-select';
 import { dismissPanel, PanelForm } from './panel-form';
 
@@ -39,7 +39,7 @@ export function CrossReferencePanel({ editor, close }: EditorMenuPanelProps) {
   const hrefRef = useRef<HTMLInputElement>(null);
   const [reference] = useState(() => selectedReference(editor));
   const types = useMemo(() => {
-    const supported = [...themeReferenceTypes(editor)];
+    const supported = [...styledReferenceTypes(editor)];
     const own = String(reference?.attrs['data-ref'] ?? '');
     if (own && !supported.includes(own)) {
       supported.push(own);

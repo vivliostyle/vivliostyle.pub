@@ -6,11 +6,11 @@ import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
 import { newId, referenceTargets, referTo } from './cross-reference';
 import { getEditorMenuCommand } from './menu/registry';
 import {
-  setThemeCss,
-  ThemeMarkupExtension,
-  themeReferenceTypes,
-  themeStyles,
-} from './theme-support';
+  isStyled,
+  StyledElementsExtension,
+  setEditorCss,
+  styledReferenceTypes,
+} from './styled-elements';
 
 import './menu/commands';
 
@@ -51,7 +51,7 @@ afterEach(() => {
 function load(markdown: string): Editor {
   editor = new Editor({
     element: null,
-    extensions: [PubExtensions.configure({}), ThemeMarkupExtension],
+    extensions: [PubExtensions.configure({}), StyledElementsExtension],
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   });
   editor.commands.setMarkdown(markdown);
@@ -171,12 +171,12 @@ const FOOTNOTE_CSS = '.footnote { float: footnote }';
 describe('the markup a theme is offered for', () => {
   it('follows the CSS the editor shows the document with', () => {
     const editor = load('a');
-    expect(themeStyles(editor, 'htmlFootnote')).toBe(false);
-    setThemeCss(editor, `${FOOTNOTE_CSS}\na[data-ref='fig']::before {}`);
-    expect(themeStyles(editor, 'htmlFootnote')).toBe(true);
-    expect(themeStyles(editor, 'crossReference')).toBe(true);
-    expect(themeStyles(editor, 'tcy')).toBe(false);
-    expect([...themeReferenceTypes(editor)]).toEqual(['fig']);
+    expect(isStyled(editor, 'htmlFootnote')).toBe(false);
+    setEditorCss(editor, `${FOOTNOTE_CSS}\na[data-ref='fig']::before {}`);
+    expect(isStyled(editor, 'htmlFootnote')).toBe(true);
+    expect(isStyled(editor, 'crossReference')).toBe(true);
+    expect(isStyled(editor, 'tcy')).toBe(false);
+    expect([...styledReferenceTypes(editor)]).toEqual(['fig']);
   });
 
   it('offers VFM’s note always and the theme’s where the theme styles it', () => {
@@ -184,7 +184,7 @@ describe('the markup a theme is offered for', () => {
     selectAll(editor, '本文');
     expect(visible(editor, 'format.footnote')).toBe(true);
     expect(visible(editor, 'format.page-footnote')).toBe(false);
-    setThemeCss(editor, FOOTNOTE_CSS);
+    setEditorCss(editor, FOOTNOTE_CSS);
     expect(visible(editor, 'format.page-footnote')).toBe(true);
     command('format.page-footnote').run?.({ editor, surface: 'selection' });
     expect(getMarkdown(editor)).toBe('<span class="footnote">本文</span>');

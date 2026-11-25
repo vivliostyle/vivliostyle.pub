@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
 import { m } from '../../generated/paraglide/messages';
-import { setThemeCss } from '../../libs/editor/theme-support';
+import { setEditorCss } from '../../libs/editor/styled-elements';
 import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
@@ -145,7 +145,7 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
     themeSnap.stylesheets.map((it) => it.css).join('\n');
 
   useLayoutEffect(() => {
-    setThemeCss(file.editor, `${bundledCss}\n${customCss}`);
+    setEditorCss(file.editor, `${bundledCss}\n${customCss}`);
   }, [file.editor, bundledCss, customCss]);
 
   return (

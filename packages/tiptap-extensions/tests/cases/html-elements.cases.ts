@@ -5,25 +5,27 @@ import {
   currentNotations,
   setDocumentNotations,
 } from '../../src/markdown/extension';
-import {
-  allThemeNotations,
-  themeBaseNotations,
-} from '../../src/markdown/notations/theme';
+import { themeBaseElementNotations } from '../../src/markdown/notations/html-elements/theme-base';
+import { allThemeElementNotations } from '../../src/markdown/notations/html-elements/themes';
 import { paste, press, run, type Step } from '../../testing/steps';
 import type { CaseSuite } from '../../testing/vitest';
 
-const THEME_NOTATIONS = new Set(
-  [...themeBaseNotations, ...allThemeNotations()].map((it) => it.name),
+const HTML_ELEMENT_NOTATIONS = new Set(
+  [...themeBaseElementNotations, ...allThemeElementNotations()].map(
+    (it) => it.name,
+  ),
 );
 
-const recordBeforeThemes = run(
-  'record the document as made before the markup of themes',
+const recordBeforeHtmlElements = run(
+  'record the document as made before the HTML elements',
   (editor: Editor) => {
     setDocumentNotations(
       editor,
       currentNotations(editor)
         .split(' ')
-        .filter((entry) => !THEME_NOTATIONS.has(entry.split('@')[0] ?? ''))
+        .filter(
+          (entry) => !HTML_ELEMENT_NOTATIONS.has(entry.split('@')[0] ?? ''),
+        )
         .join(' '),
     );
   },
@@ -67,7 +69,7 @@ function insert(label: string, content: JSONContent | JSONContent[]): Step {
 
 const text = (value: string): JSONContent => ({ type: 'text', text: value });
 
-export const themeSuites: CaseSuite[] = [
+export const htmlElementSuites: CaseSuite[] = [
   {
     title: 'notes of themes',
     cases: [
@@ -438,7 +440,7 @@ export const themeSuites: CaseSuite[] = [
       {
         name: 'typed HTML stays text',
         given: 'a‸',
-        steps: [recordBeforeThemes, '<span class="footnote">注</span>'],
+        steps: [recordBeforeHtmlElements, '<span class="footnote">注</span>'],
         expect: 'a\\<span class="footnote">注\\</span>‸',
         doc: 'doc(paragraph("a<span class=\\"footnote\\">注</span>"))',
       },
@@ -446,7 +448,7 @@ export const themeSuites: CaseSuite[] = [
         name: 'a pasted note and reference are their markdown, raw',
         given: 'a‸b',
         steps: [
-          recordBeforeThemes,
+          recordBeforeHtmlElements,
           insert('insert what pasted HTML makes', [
             {
               type: 'htmlFootnote',
@@ -469,7 +471,7 @@ export const themeSuites: CaseSuite[] = [
         name: 'a pasted block is its tags around its blocks',
         given: 'a‸',
         steps: [
-          recordBeforeThemes,
+          recordBeforeHtmlElements,
           insert('insert what pasted HTML makes', [
             {
               type: 'equationBlock',
@@ -490,7 +492,7 @@ export const themeSuites: CaseSuite[] = [
         name: 'commands do nothing',
         given: 'a ‸注‸ b',
         steps: [
-          recordBeforeThemes,
+          recordBeforeHtmlElements,
           refused('make it a note', (editor) =>
             editor.commands.setHtmlElement('htmlFootnote'),
           ),
@@ -504,7 +506,7 @@ export const themeSuites: CaseSuite[] = [
         name: 'a pasted note block is its tags around its blocks',
         given: 'a‸',
         steps: [
-          recordBeforeThemes,
+          recordBeforeHtmlElements,
           insert('insert what pasted HTML makes', {
             type: 'noteBlock',
             content: [{ type: 'paragraph', content: [text('x')] }],
@@ -753,7 +755,7 @@ export const themeSuites: CaseSuite[] = [
         name: 'a pasted mark is its tags around its text',
         given: 'a‸',
         steps: [
-          recordBeforeThemes,
+          recordBeforeHtmlElements,
           insert('insert what pasted HTML makes', {
             type: 'text',
             text: '12',

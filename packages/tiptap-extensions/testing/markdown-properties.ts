@@ -533,7 +533,7 @@ export const VFM_INSERTS = [
 ];
 
 /** The markup of themes, written as HTML, and characters that end it. */
-export const THEME_FRAGMENTS = [
+export const HTML_ELEMENT_FRAGMENTS = [
   '本文<span class="footnote">注の**強調**と[l](u)</span>です',
   '図<a data-ref="fig" href="#f1"></a>と<a href="#s" data-ref="sec"></a>。',
   'a<span class="x footnote" id="n">注 <span class="tcy">1</span></span>b',
@@ -550,7 +550,7 @@ export const THEME_FRAGMENTS = [
   '- 項目<a data-ref="fig" href="#f"></a>\n- <span class="footnote">注</span>',
   '<span class="footnote">文頭の注</span>と続き',
 ];
-export const THEME_INSERTS = [
+export const HTML_ELEMENT_INSERTS = [
   'X',
   '<',
   '>',

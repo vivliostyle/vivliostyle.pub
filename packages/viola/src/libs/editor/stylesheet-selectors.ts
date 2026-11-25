@@ -16,8 +16,8 @@ export interface ElementSelector {
   match?: Readonly<Record<string, string>> | undefined;
 }
 
-/** The markup a theme's CSS styles. */
-export interface ThemeMarkup {
+/** The markup a stylesheet styles. */
+export interface StyledMarkup {
   /** Compound selectors of every style rule. */
   compounds: readonly CompoundSelector[];
   /** The types of `a[data-ref]` it styles, such as `fig`. */
@@ -328,15 +328,15 @@ function stylePreludes(css: string): string[] {
 }
 
 /** Reads what the style rules of `css` select elements by. */
-export function readThemeMarkup(css: string): ThemeMarkup {
+export function readStyledMarkup(css: string): StyledMarkup {
   try {
     return markupOf(css);
   } catch {
-    return EMPTY_THEME_MARKUP;
+    return EMPTY_STYLED_MARKUP;
   }
 }
 
-function markupOf(css: string): ThemeMarkup {
+function markupOf(css: string): StyledMarkup {
   const compounds = stylePreludes(css).flatMap((it) => compoundSelectors(it));
   const referenceTypes = new Set<string>();
   for (const compound of compounds) {
@@ -358,7 +358,7 @@ function markupOf(css: string): ThemeMarkup {
  * either, which every theme styles by its tag, is never told apart.
  */
 export function stylesElement(
-  markup: ThemeMarkup,
+  markup: StyledMarkup,
   element: ElementSelector,
 ): boolean {
   const classes = element.classes ?? [];
@@ -379,7 +379,7 @@ export function stylesElement(
   );
 }
 
-export const EMPTY_THEME_MARKUP: ThemeMarkup = {
+export const EMPTY_STYLED_MARKUP: StyledMarkup = {
   compounds: [],
   referenceTypes: new Set(),
 };

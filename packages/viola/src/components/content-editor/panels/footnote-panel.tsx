@@ -4,7 +4,7 @@ import { isWritableFootnoteLabel } from '@v/tiptap-extensions';
 import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
-import { PAGE_FOOTNOTE } from '../../../libs/editor/theme-support';
+import { PAGE_FOOTNOTE } from '../../../libs/editor/styled-elements';
 import {
   hasFootnoteDefinition,
   nextFootnoteLabel,

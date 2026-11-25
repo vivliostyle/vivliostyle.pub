@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   compoundSelectors,
-  readThemeMarkup,
+  readStyledMarkup,
   stylesElement,
-} from './theme-markup';
+} from './stylesheet-selectors';
 
 const themeBase = dirname(
   createRequire(import.meta.url).resolve(
@@ -97,7 +97,7 @@ describe('compound selectors', () => {
 
 describe('the markup a theme styles', () => {
   it('finds rules inside at-rules and nested rules, not in comments', () => {
-    const markup = readThemeMarkup(`
+    const markup = readStyledMarkup(`
       /* .comment {} */
       @media print { @supports (float: footnote) { .footnote { float: footnote } } }
       @layer base { .tcy { text-combine-upright: all } }
@@ -115,12 +115,12 @@ describe('the markup a theme styles', () => {
   });
 
   it('tells nothing of an element without classes or attribute values', () => {
-    const markup = readThemeMarkup('figcaption { color: red }');
+    const markup = readStyledMarkup('figcaption { color: red }');
     expect(stylesElement(markup, { tag: 'figcaption' })).toBe(false);
   });
 
   it('needs the tag to match where the rule names one', () => {
-    const markup = readThemeMarkup('div.note { color: red }');
+    const markup = readStyledMarkup('div.note { color: red }');
     expect(stylesElement(markup, { tag: 'div', classes: ['note'] })).toBe(true);
     expect(stylesElement(markup, { tag: 'span', classes: ['note'] })).toBe(
       false,
@@ -131,21 +131,21 @@ describe('the markup a theme styles', () => {
     const start = Date.now();
     const selectors = `${':is('.repeat(8000)}.a${')'.repeat(8000)} {}`;
     const blocks = `${'.b {'.repeat(5000)}${'}'.repeat(5000)}`;
-    const markup = readThemeMarkup(`${selectors}\n${blocks}\n.c {}`);
+    const markup = readStyledMarkup(`${selectors}\n${blocks}\n.c {}`);
     expect(stylesElement(markup, { tag: 'span', classes: ['b'] })).toBe(true);
     expect(stylesElement(markup, { tag: 'span', classes: ['c'] })).toBe(true);
     expect(Date.now() - start).toBeLessThan(2000);
   });
 
   it('survives broken CSS', () => {
-    const markup = readThemeMarkup('.a { color: red; .b { "unclosed } [x');
+    const markup = readStyledMarkup('.a { color: red; .b { "unclosed } [x');
     expect(stylesElement(markup, { tag: 'span', classes: ['a'] })).toBe(true);
   });
 });
 
 describe('@vivliostyle/theme-base', () => {
   it('styles none of the markup without its modules', () => {
-    const markup = readThemeMarkup(bundle('theme.css'));
+    const markup = readStyledMarkup(bundle('theme.css'));
     expect([...markup.referenceTypes]).toEqual([]);
     for (const name of ['footnote', 'sidenote', 'equation', 'fig-caption']) {
       expect(stylesElement(markup, { tag: 'span', classes: [name] })).toBe(
@@ -178,7 +178,7 @@ describe('@vivliostyle/theme-base', () => {
       theorem: { classes: [['div', 'theorem']], references: ['thm'] },
     };
     for (const [name, { classes, references }] of Object.entries(expected)) {
-      const markup = readThemeMarkup(moduleCss(name));
+      const markup = readStyledMarkup(moduleCss(name));
       expect([...markup.referenceTypes].sort(), name).toEqual(references);
       for (const [tag, className] of classes) {
         expect(
@@ -190,7 +190,7 @@ describe('@vivliostyle/theme-base', () => {
   });
 
   it('styles every reference type with all its modules', () => {
-    const markup = readThemeMarkup(
+    const markup = readStyledMarkup(
       [bundle('theme.css'), ...MODULES.map(moduleCss)].join('\n'),
     );
     expect([...markup.referenceTypes].sort()).toEqual([

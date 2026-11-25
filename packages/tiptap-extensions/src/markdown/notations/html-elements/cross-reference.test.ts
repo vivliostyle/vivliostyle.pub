@@ -2,8 +2,8 @@ import { Editor } from '@tiptap/core';
 import type { DecorationSet } from '@tiptap/pm/view';
 import { describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '../../index';
-import { followsLink } from './theme';
+import { PubExtensions } from '../../../index';
+import { followsLink } from './cross-reference';
 
 // Stand for the DOM, which the tests have none of.
 function element(link: object | null): Element {

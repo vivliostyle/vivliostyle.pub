@@ -7,55 +7,55 @@ import {
   findSelectedInline,
 } from '@v/tiptap-extensions';
 import {
-  EMPTY_THEME_MARKUP,
-  readThemeMarkup,
+  EMPTY_STYLED_MARKUP,
+  readStyledMarkup,
+  type StyledMarkup,
   stylesElement,
-  type ThemeMarkup,
-} from './theme-markup';
+} from './stylesheet-selectors';
 
 /** The theme's note, which it floats to the foot of the page. */
 export const PAGE_FOOTNOTE = 'htmlFootnote';
 
-export interface ThemeMarkupStorage {
+export interface StyledElementsStorage {
   /** What the CSS the editor shows the document with styles. */
-  markup: ThemeMarkup;
-  /** `themeStyles` by type, for `markup`. */
+  markup: StyledMarkup;
+  /** `isStyled` by type, for `markup`. */
   styled: Map<string, boolean>;
 }
 
 declare module '@tiptap/core' {
   interface Storage {
-    themeMarkup: ThemeMarkupStorage;
+    styledElements: StyledElementsStorage;
   }
 }
 
 /**
- * Keeps what the theme styles with the editor, for its menus to offer only
- * the markup the theme has a look for. What the document reads as never
- * depends on it.
+ * Keeps what the editor's CSS, the theme's and the user's, styles, for its
+ * menus to offer only the markup that has a look. What the document reads
+ * as never depends on it.
  */
-export const ThemeMarkupExtension = Extension.create<
+export const StyledElementsExtension = Extension.create<
   Record<string, never>,
-  ThemeMarkupStorage
+  StyledElementsStorage
 >({
-  name: 'themeMarkup',
+  name: 'styledElements',
 
   addStorage() {
-    return { markup: EMPTY_THEME_MARKUP, styled: new Map() };
+    return { markup: EMPTY_STYLED_MARKUP, styled: new Map() };
   },
 });
 
-const read = new Map<string, ThemeMarkup>();
+const read = new Map<string, StyledMarkup>();
 
 /** Sets the CSS the editor shows the document with. */
-export function setThemeCss(editor: Editor, css: string): void {
-  const storage = editor.storage.themeMarkup;
+export function setEditorCss(editor: Editor, css: string): void {
+  const storage = editor.storage.styledElements;
   if (!storage) {
     return;
   }
   let markup = read.get(css);
   if (!markup) {
-    markup = readThemeMarkup(css);
+    markup = readStyledMarkup(css);
     // Every editor of a project shows the same CSS; one is enough to keep.
     read.clear();
     read.set(css, markup);
@@ -66,14 +66,14 @@ export function setThemeCss(editor: Editor, css: string): void {
   }
 }
 
-/** What the theme styles of `a[data-ref]`, see `ThemeMarkup`. */
-export function themeReferenceTypes(editor: Editor): ReadonlySet<string> {
-  return editor.storage.themeMarkup?.markup.referenceTypes ?? new Set();
+/** What the editor's CSS styles of `a[data-ref]`, see `StyledMarkup`. */
+export function styledReferenceTypes(editor: Editor): ReadonlySet<string> {
+  return editor.storage.styledElements?.markup.referenceTypes ?? new Set();
 }
 
-/** Whether the theme styles the element of a declared mark or node type. */
-export function themeStyles(editor: Editor, type: string): boolean {
-  const storage = editor.storage.themeMarkup;
+/** Whether the editor's CSS styles the element of a declared mark or node type. */
+export function isStyled(editor: Editor, type: string): boolean {
+  const storage = editor.storage.styledElements;
   if (!storage) {
     return false;
   }

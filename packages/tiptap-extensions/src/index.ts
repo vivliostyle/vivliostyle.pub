@@ -14,11 +14,9 @@ import { PubMarkdown, type PubMarkdownOptions } from './markdown/extension';
 import type { NotationDefinition } from './markdown/notation';
 import { commonMarkNotations } from './markdown/notations/commonmark';
 import { gfmNotations, htmlMarkNotations } from './markdown/notations/gfm';
+import { themeBaseElementNotations } from './markdown/notations/html-elements/theme-base';
+import { allThemeElementNotations } from './markdown/notations/html-elements/themes';
 import { rawNotation } from './markdown/notations/raw';
-import {
-  allThemeNotations,
-  themeBaseNotations,
-} from './markdown/notations/theme';
 import {
   VFM_2_SYNTAX,
   type VfmSyntax,
@@ -60,7 +58,7 @@ export {
   CROSS_REFERENCE,
   knownIds,
   referencedId,
-} from './markdown/notations/theme';
+} from './markdown/notations/html-elements/cross-reference';
 export {
   formatAttributes,
   type InlineAttributes,
@@ -159,8 +157,8 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           ...gfmNotations({ singleTilde: vfm.singleTildeStrikethrough }),
           ...htmlMarkNotations,
           ...vfmNotations(vfm),
-          ...themeBaseNotations,
-          ...allThemeNotations(),
+          ...themeBaseElementNotations,
+          ...allThemeElementNotations(),
           rawNotation,
           ...(this.options.notations ?? []),
         ],

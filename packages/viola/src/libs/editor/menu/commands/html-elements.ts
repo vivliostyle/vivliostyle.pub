@@ -25,10 +25,10 @@ import { m } from '../../../../generated/paraglide/messages';
 import { selectedReference } from '../../cross-reference';
 import {
   inElement,
+  isStyled,
   PAGE_FOOTNOTE,
   selectedBlockElement,
-  themeStyles,
-} from '../../theme-support';
+} from '../../styled-elements';
 import { registerEditorMenuCommand } from '../registry';
 import { isInCodeBlock, splitKeywords } from './utils';
 
@@ -38,7 +38,7 @@ type Icon = ComponentType<{ className?: string }>;
 // rule for is not offered, unless the selection is in some already, which
 // can then still be taken away.
 const offered = (type: string) => (editor: Editor) =>
-  themeStyles(editor, type) || inElement(editor, type);
+  isStyled(editor, type) || inElement(editor, type);
 
 const isTextSelection = (editor: Editor) =>
   !isInCodeBlock(editor) &&
