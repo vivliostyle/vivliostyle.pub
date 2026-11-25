@@ -794,6 +794,35 @@ describe('declared HTML elements', () => {
     );
   });
 
+  it('does not end an element at the closing tag of one inside it', () => {
+    const editor = withElements();
+    const markdown =
+      'a <span class="footnote" id="n1">x <span class="y">z</span> w</span> b\n';
+    editor.commands.setMarkdown(markdown);
+    const texts: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.isText && node.marks.some((it) => it.type.name === 'note')) {
+        texts.push(node.text ?? '');
+      }
+    });
+    expect(texts.join('')).toBe('x <span class="y">z</span> w');
+    appendTo(editor, 'b', '!');
+    expect(getMarkdown(editor)).toBe(markdown.replace(' b\n', ' b!\n'));
+  });
+
+  it('reads character references in the attributes it keeps', () => {
+    const editor = withElements();
+    editor.commands.setMarkdown(
+      '<span class="footnote" id="a&amp;b">注</span>\n',
+    );
+    expect(editor.state.doc.firstChild?.firstChild?.marks[0]?.attrs).toEqual({
+      id: 'a&b',
+    });
+    expect(getMarkdown(editor, { baseline: '' })).toBe(
+      '<span class="footnote" id="a&amp;b">注</span>',
+    );
+  });
+
   it('reads an element around blocks as a node', () => {
     const editor = withElements();
     const markdown =

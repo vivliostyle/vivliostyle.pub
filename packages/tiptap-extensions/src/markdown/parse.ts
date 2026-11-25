@@ -74,16 +74,31 @@ function rangeOf(node: UnknownMdastNode): { start: number; end: number } {
   return { start, end };
 }
 
+/** The name and attributes of an HTML node that is one opening tag. */
+function readOpeningTag(
+  value: string,
+): { name: string; attributes: Record<string, string> } | null {
+  const tag = value.trim().match(/^<([A-Za-z][\w-]*)(\s[^>]*)?>$/);
+  if (!tag) {
+    return null;
+  }
+  const attributes = readTagAttributes(tag[2] ?? '');
+  for (const [name, written] of Object.entries(attributes)) {
+    attributes[name] = decodeString(written);
+  }
+  return { name: tag[1].toLowerCase(), attributes };
+}
+
 /** The attributes an opening tag gives the spec's mark or node, or null. */
 function matchOpeningTag(
   value: string,
   spec: HtmlElementSpec,
 ): Record<string, unknown> | null {
-  const tag = value.trim().match(/^<([A-Za-z][\w-]*)(\s[^>]*)?>$/);
-  if (!tag || tag[1].toLowerCase() !== spec.tag.toLowerCase()) {
+  const tag = readOpeningTag(value);
+  if (!tag || tag.name !== spec.tag.toLowerCase()) {
     return null;
   }
-  const attributes = readTagAttributes(tag[2] ?? '');
+  const { attributes } = tag;
   for (const [name, expected] of Object.entries(spec.match ?? {})) {
     if (attributes[name] !== expected) {
       return null;
@@ -105,9 +120,7 @@ function matchOpeningTag(
     ),
     ...(spec.rest &&
       others.length > 0 && {
-        [spec.rest]: Object.fromEntries(
-          others.map(([name, value]) => [name, decodeString(value)]),
-        ),
+        [spec.rest]: Object.fromEntries(others),
       }),
   };
 }
@@ -506,7 +519,7 @@ class Converter {
           depth--;
         } else if (
           candidate.value &&
-          matchOpeningTag(candidate.value, { ...spec, match: {}, capture: [] })
+          readOpeningTag(candidate.value)?.name === spec.tag.toLowerCase()
         ) {
           depth++;
         }
