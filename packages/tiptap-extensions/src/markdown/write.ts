@@ -247,6 +247,9 @@ export class MarkdownWriter {
       for (const [name, writer] of Object.entries(notation.nodes ?? {})) {
         const spec = typeof writer === 'function' ? { write: writer } : writer;
         const previous = this.nodeWriters.get(name);
+        if (spec.decorates && !previous) {
+          continue;
+        }
         this.nodeWriters.set(
           name,
           previous

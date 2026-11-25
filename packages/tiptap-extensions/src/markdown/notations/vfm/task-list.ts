@@ -267,6 +267,7 @@ export const taskListNotation = defineNotation({
   name: 'taskList',
   version: 1,
   extensions: [TaskList],
+  attributes: ['listItem:checked'],
   remarkPlugins: [transformPlugin(readEmptyTasks)],
   fromMarkdown: {
     listItem: (node, context, next) =>

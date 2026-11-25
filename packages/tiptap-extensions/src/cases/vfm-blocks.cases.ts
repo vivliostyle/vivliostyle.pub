@@ -1013,6 +1013,99 @@ export const vfmBlockSuites: CaseSuite[] = [
     ],
   },
   {
+    title: 'block VFM pasted into a document recorded before it',
+    cases: [
+      {
+        name: 'a table of contents is its markdown as text',
+        given: 'a‸',
+        steps: [
+          recordInlineEra,
+          run('paste a table of contents', (editor) => {
+            editor.commands.insertContent({ type: 'tableOfContents' });
+          }),
+        ],
+        expect: 'a\n\n[[toc]]',
+        doc: 'doc(paragraph("a"), paragraph("[[toc]]"))',
+      },
+      {
+        name: 'a definition is its content',
+        given: 'a‸',
+        steps: [
+          recordInlineEra,
+          run('paste a definition', (editor) => {
+            editor.commands.insertContent({
+              type: 'footnoteDefinition',
+              attrs: { label: '1' },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: '注' }] },
+              ],
+            });
+          }),
+        ],
+        expect: 'a\n\n注',
+      },
+      {
+        name: 'a line that ends a section is hashes as text',
+        given: 'a‸',
+        steps: [
+          recordInlineEra,
+          run('paste a section end', (editor) => {
+            editor.commands.insertContent({
+              type: 'sectionEnd',
+              attrs: { level: 2 },
+            });
+          }),
+        ],
+        expect: 'a\n\n\\#\\#',
+      },
+      {
+        name: 'a heading loses its attributes',
+        given: 'a‸',
+        steps: [
+          recordInlineEra,
+          run('paste a heading with attributes', (editor) => {
+            editor.commands.insertContent({
+              type: 'heading',
+              attrs: { level: 2, attributes: { id: 'x' } },
+              content: [{ type: 'text', text: 'H' }],
+            });
+          }),
+        ],
+        expect: 'a\n\n## H',
+      },
+      {
+        name: 'a task is an item',
+        given: '- a‸',
+        steps: [
+          recordInlineEra,
+          run('make the item a task without the command', (editor) => {
+            const { $from } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr.setNodeMarkup($from.before(-1), undefined, {
+                checked: true,
+              }),
+            );
+          }),
+        ],
+        expect: '- a',
+      },
+      {
+        name: 'an image in text is its markdown as text',
+        given: 'a ‸b',
+        steps: [
+          recordInlineEra,
+          run('paste an image in text', (editor) => {
+            editor.commands.insertContent({
+              type: 'inlineImage',
+              attrs: { src: 'i.png', alt: 'i' },
+            });
+          }),
+        ],
+        expect: 'a !\\[i](i.png\\)‸b',
+      },
+    ],
+  },
+  {
     title: 'block VFM in a document made with marked',
     cases: [
       {

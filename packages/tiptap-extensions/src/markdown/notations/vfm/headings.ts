@@ -345,6 +345,7 @@ export const headingAttributesNotation = defineNotation({
   name: 'headingAttributes',
   version: 1,
   extensions: [HeadingAttributes],
+  attributes: ['heading:attributes'],
   remarkPlugins: [transformPlugin(readHeadingAttributes)],
   fromMarkdown: {
     heading: (node, context, next) => {
@@ -620,6 +621,10 @@ export const SectionEnd = Node.create({
 
   parseHTML() {
     return [{ tag: 'div[data-section-end]' }];
+  },
+
+  renderText({ node }) {
+    return '#'.repeat(Number(node.attrs.level) || 1);
   },
 
   // VFM writes nothing for the line. What it ends is shown as decorations,

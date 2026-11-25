@@ -670,7 +670,10 @@ export const inlineAttributesNotation = defineNotation({
   },
   nodes: {
     image: (node, _, next) => next() + written(node),
-    inlineImage: (node, _, next) => next() + written(node),
+    inlineImage: {
+      decorates: true,
+      write: (node, _, next) => next() + written(node),
+    },
     footnoteReference: (node, _, next) => next() + written(node),
   },
   marks: Object.fromEntries(

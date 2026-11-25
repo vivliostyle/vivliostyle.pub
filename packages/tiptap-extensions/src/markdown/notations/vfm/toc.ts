@@ -132,6 +132,10 @@ export const TableOfContents = Node.create({
     return [{ tag: 'div[data-toc]' }];
   },
 
+  renderText() {
+    return '[[toc]]';
+  },
+
   // VFM writes an empty element where the table goes; the attribute only
   // lets the editor show it.
   renderHTML() {

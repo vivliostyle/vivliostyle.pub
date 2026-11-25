@@ -228,6 +228,10 @@ export function imageExtensions(basePath: string | undefined) {
       return {};
     },
 
+    renderText({ node }) {
+      return `![${String(node.attrs.alt ?? '')}](${String(node.attrs.src ?? '')})`;
+    },
+
     addInputRules() {
       return [
         imageRules(() => hasDocumentNotation(this.editor, this.name)).input,

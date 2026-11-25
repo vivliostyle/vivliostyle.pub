@@ -1,5 +1,9 @@
 import { type Editor, Extension } from '@tiptap/core';
-import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
+import {
+  Fragment,
+  type Mark,
+  type Node as ProseMirrorNode,
+} from '@tiptap/pm/model';
 import { Plugin, type Transaction } from '@tiptap/pm/state';
 
 import { changedNodes, isRemote } from './changes';
@@ -259,9 +263,9 @@ function documentWrites(editor: Editor): {
 
 /**
  * Turns what the document's definitions cannot write into what they can,
- * wherever this client changed the document, as by pasting HTML: an inline
- * node becomes its content or its text, a mark is taken off, and an
- * attribute of a definition the document lacks is cleared.
+ * wherever this client changed the document, as by pasting HTML: a node
+ * becomes its content or its text, a mark is taken off, and an attribute of
+ * a definition the document lacks is cleared.
  */
 function dissolveUnwritable(editor: Editor): Plugin {
   return new Plugin({
@@ -274,17 +278,21 @@ function dissolveUnwritable(editor: Editor): Plugin {
         return null;
       }
       const { writer, lostAttributes } = writes;
-      const lost = (attrs: Record<string, unknown>) =>
-        [...lostAttributes].filter((name) => attrs[name] != null);
-      const cleared = (attrs: Record<string, unknown>) => ({
+      const lost = (type: string, attrs: Record<string, unknown>) =>
+        Object.keys(attrs).filter(
+          (name) =>
+            attrs[name] != null &&
+            (lostAttributes.has(name) || lostAttributes.has(`${type}:${name}`)),
+        );
+      const cleared = (type: string, attrs: Record<string, unknown>) => ({
         ...attrs,
-        ...Object.fromEntries(lost(attrs).map((name) => [name, null])),
+        ...Object.fromEntries(lost(type, attrs).map((name) => [name, null])),
       });
       const { tr } = state;
       const found = changedNodes(
         state.doc,
         transactions,
-        (node) => !node.isBlock,
+        (node) => node !== state.doc,
       );
       for (const { pos } of found) {
         const node = tr.doc.nodeAt(pos);
@@ -294,16 +302,31 @@ function dissolveUnwritable(editor: Editor): Plugin {
         for (const mark of node.marks) {
           if (!writer.writesMark(mark.type.name)) {
             removeMark(tr, pos, node, mark);
-          } else if (lost(mark.attrs).length > 0) {
+          } else if (lost(mark.type.name, mark.attrs).length > 0) {
             removeMark(tr, pos, node, mark);
-            addMark(tr, pos, node, mark.type.create(cleared(mark.attrs)));
+            addMark(
+              tr,
+              pos,
+              node,
+              mark.type.create(cleared(mark.type.name, mark.attrs)),
+            );
           }
         }
         const current = tr.doc.nodeAt(pos) ?? node;
-        if (!current.isText && !writer.writesNode(current.type.name)) {
-          tr.replaceWith(pos, pos + current.nodeSize, contentOf(current));
-        } else if (!current.isText && lost(current.attrs).length > 0) {
-          tr.setNodeMarkup(pos, undefined, cleared(current.attrs));
+        const type = current.type.name;
+        if (!current.isText && !writer.writesNode(type)) {
+          const content = current.isBlock
+            ? blockContentOf(current)
+            : contentOf(current);
+          const $pos = tr.doc.resolve(pos);
+          const index = $pos.index();
+          if (
+            $pos.parent.canReplace(index, index + 1, Fragment.from(content))
+          ) {
+            tr.replaceWith(pos, pos + current.nodeSize, content);
+          }
+        } else if (!current.isText && lost(type, current.attrs).length > 0) {
+          tr.setNodeMarkup(pos, undefined, cleared(type, current.attrs));
         }
       }
       return tr.docChanged ? tr : null;
@@ -335,6 +358,26 @@ function addMark(
   } else {
     tr.addNodeMark(pos, mark);
   }
+}
+
+/**
+ * A block as the blocks it holds, or as a paragraph of its text: a block
+ * that is markdown of its own, like a table of contents, is that markdown.
+ */
+function blockContentOf(node: ProseMirrorNode): ProseMirrorNode[] {
+  const { paragraph } = node.type.schema.nodes;
+  if (!node.isLeaf && !node.inlineContent) {
+    const children: ProseMirrorNode[] = [];
+    node.forEach((child) => {
+      children.push(child);
+    });
+    return children;
+  }
+  if (node.inlineContent && paragraph) {
+    return [paragraph.create(null, node.content)];
+  }
+  const [text] = contentOf(node);
+  return paragraph ? [paragraph.create(null, text ?? null)] : [];
 }
 
 /** An inline node as the content it holds, or as its text. */
