@@ -74,6 +74,15 @@ function childrenOf(node: ProseMirrorNode): ProseMirrorNode[] {
   return children;
 }
 
+/**
+ * A character reference written after `before`, whose backslash at its end
+ * would otherwise escape the `&`.
+ */
+function referenceAfter(before: string, reference: string): string {
+  const backslashes = before.match(/\\*$/)?.[0].length ?? 0;
+  return backslashes % 2 === 1 ? `\\${reference}` : reference;
+}
+
 function codePoint(char: string): string {
   return `&#x${(char.codePointAt(0) ?? 0).toString(16).toUpperCase()};`;
 }
@@ -1049,7 +1058,10 @@ export class MarkdownWriter {
         continue;
       }
       if (selected) {
-        output += action === 'entity' ? codePoint(char) : `\\${char}`;
+        output +=
+          action === 'entity'
+            ? referenceAfter(output || before, codePoint(char))
+            : `\\${char}`;
       } else {
         output += char;
       }
@@ -1612,7 +1624,9 @@ export class MarkdownWriter {
           }
         }
         closeTo(depth);
-        output += trailing;
+        output += trailing.startsWith('&')
+          ? referenceAfter(output, trailing)
+          : trailing;
       }
     });
     closeTo(0);

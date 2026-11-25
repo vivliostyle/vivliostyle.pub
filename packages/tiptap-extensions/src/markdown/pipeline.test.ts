@@ -587,6 +587,12 @@ describe('saving what an edit can leave in a paragraph', () => {
     expect(savesAsDocument(editor)).toBe('a&#xA;\nb\n');
   });
 
+  it('writes a backslash before a character reference as a backslash', () => {
+    const editor = load('ab\n');
+    appendAfter(editor, 'b', '\\ ');
+    expect(savesAsDocument(editor)).toBe('ab\\\\&#x20;\n');
+  });
+
   it('writes an ampersand that would start a character reference', () => {
     const editor = load('ab\n');
     appendAfter(editor, 'a', '&amp;');
