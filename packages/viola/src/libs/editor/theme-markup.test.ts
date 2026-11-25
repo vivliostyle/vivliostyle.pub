@@ -127,6 +127,16 @@ describe('the markup a theme styles', () => {
     );
   });
 
+  it('reads deeply nested CSS without running out of stack or time', () => {
+    const start = Date.now();
+    const selectors = `${':is('.repeat(8000)}.a${')'.repeat(8000)} {}`;
+    const blocks = `${'.b {'.repeat(5000)}${'}'.repeat(5000)}`;
+    const markup = readThemeMarkup(`${selectors}\n${blocks}\n.c {}`);
+    expect(stylesElement(markup, { tag: 'span', classes: ['b'] })).toBe(true);
+    expect(stylesElement(markup, { tag: 'span', classes: ['c'] })).toBe(true);
+    expect(Date.now() - start).toBeLessThan(2000);
+  });
+
   it('survives broken CSS', () => {
     const markup = readThemeMarkup('.a { color: red; .b { "unclosed } [x');
     expect(stylesElement(markup, { tag: 'span', classes: ['a'] })).toBe(true);

@@ -210,7 +210,10 @@ function isEmpty(compound: CompoundSelector): boolean {
  * count as the element's own, those in `:has()` as other elements', and
  * those in `:not()` and other functions not at all.
  */
-export function compoundSelectors(selectors: string): CompoundSelector[] {
+export function compoundSelectors(
+  selectors: string,
+  depth = 0,
+): CompoundSelector[] {
   const result: CompoundSelector[] = [];
   let current = emptyCompound();
   const flush = () => {
@@ -258,12 +261,12 @@ export function compoundSelectors(selectors: string): CompoundSelector[] {
         const args = selectors.slice(i + 1, close);
         const pseudo = name.toLowerCase();
         if (!element && SAME_ELEMENT.has(pseudo)) {
-          for (const inner of compoundSelectors(args)) {
+          for (const inner of nested(args, depth)) {
             current.classes.push(...inner.classes);
             current.attributes.push(...inner.attributes);
           }
         } else if (!element && pseudo === 'has') {
-          result.push(...compoundSelectors(args));
+          result.push(...nested(args, depth));
         }
         i = close + 1;
       }
@@ -288,29 +291,53 @@ export function compoundSelectors(selectors: string): CompoundSelector[] {
 }
 
 /** The preludes of every style rule, also inside grouping and nested rules. */
+// A theme is CSS of a third party: nesting deeper than any stylesheet
+// needs is not read, so it costs neither the stack nor quadratic time.
+const MAX_NESTING = 32;
+
+function nested(args: string, depth: number): CompoundSelector[] {
+  return depth < MAX_NESTING ? compoundSelectors(args, depth + 1) : [];
+}
+
 function stylePreludes(css: string): string[] {
   const scanner = new CssScanner(css);
   const preludes: string[] = [];
-  const visit = (items: readonly CssBlockItem[]) => {
+  const pending: { items: readonly CssBlockItem[]; depth: number }[] = [
+    { items: scanner.scanStylesheet(), depth: 0 },
+  ];
+  while (pending.length > 0) {
+    const { items, depth } = pending.pop() as (typeof pending)[number];
     for (const item of items) {
       if (item.type !== 'rule' || !item.block) {
         continue;
       }
       if (item.atName === null) {
         preludes.push(item.prelude);
-        visit(scanner.scanBlock(item.block));
-      } else if (GROUPING.has(item.atName)) {
-        visit(scanner.scanBlock(item.block));
+      } else if (!GROUPING.has(item.atName)) {
+        continue;
+      }
+      if (depth < MAX_NESTING) {
+        pending.push({
+          items: scanner.scanBlock(item.block),
+          depth: depth + 1,
+        });
       }
     }
-  };
-  visit(scanner.scanStylesheet());
+  }
   return preludes;
 }
 
 /** Reads what the style rules of `css` select elements by. */
 export function readThemeMarkup(css: string): ThemeMarkup {
-  const compounds = stylePreludes(css).flatMap(compoundSelectors);
+  try {
+    return markupOf(css);
+  } catch {
+    return EMPTY_THEME_MARKUP;
+  }
+}
+
+function markupOf(css: string): ThemeMarkup {
+  const compounds = stylePreludes(css).flatMap((it) => compoundSelectors(it));
   const referenceTypes = new Set<string>();
   for (const compound of compounds) {
     if (compound.tag !== null && compound.tag !== 'a') {
