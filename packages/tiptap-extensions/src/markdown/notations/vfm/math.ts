@@ -1,22 +1,24 @@
 import { Node } from '@tiptap/core';
+import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown';
+import { codes } from 'micromark-util-symbol';
+import type {
+  Construct,
+  Effects,
+  Resolver,
+  State,
+  TokenizeContext,
+} from 'micromark-util-types';
 
 import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
-  type Construct,
-  codes,
   currentNode,
-  type Effects,
   enterNode,
-  type FromMarkdownExtension,
   isDigit,
   isJsWhitespace,
   isLineEnding,
   OpenDelimiters,
-  type Resolver,
-  type State,
   syntaxPlugin,
-  type TokenizeContext,
   tokenType,
 } from '../../micromark';
 import { defineNotation } from '../../notation';

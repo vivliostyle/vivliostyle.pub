@@ -707,6 +707,9 @@ importers:
       micromark-util-decode-string:
         specifier: 2.0.1
         version: 2.0.1
+      micromark-util-symbol:
+        specifier: 2.0.1
+        version: 2.0.1
       prosemirror-model:
         specifier: 1.25.5
         version: 1.25.5
@@ -807,6 +810,12 @@ importers:
       htmlparser2:
         specifier: 12.0.0
         version: 12.0.0
+      mdast-util-from-markdown:
+        specifier: 2.0.2
+        version: 2.0.2
+      micromark-util-types:
+        specifier: 2.0.1
+        version: 2.0.1
       pathe:
         specifier: 'catalog:'
         version: 2.0.3

@@ -1,17 +1,15 @@
 import { Extension } from '@tiptap/core';
 import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown';
+import { codes } from 'micromark-util-symbol';
+import type { Effects, State, TokenizeContext } from 'micromark-util-types';
 
 import type { UnknownMdastNode } from '../../mdast';
 import {
   charOf,
-  codes,
   currentNode,
-  type Effects,
-  type FromMarkdownExtension,
   isLineEnding,
-  type State,
   syntaxPlugin,
-  type TokenizeContext,
   tokenType,
 } from '../../micromark';
 import {

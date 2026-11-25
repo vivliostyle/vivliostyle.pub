@@ -1,35 +1,18 @@
-import type { Data, Processor } from 'unified';
+import type {
+  CompileContext,
+  Extension as FromMarkdownExtension,
+} from 'mdast-util-from-markdown';
+import { codes } from 'micromark-util-symbol';
+import type {
+  Code,
+  Extension as MicromarkExtension,
+  Token,
+  TokenizeContext,
+  TokenType,
+} from 'micromark-util-types';
+import type { Processor } from 'unified';
 
 import type { UnknownMdastNode } from './mdast';
-
-// micromark-util-types and mdast-util-from-markdown are only transitive
-// dependencies, so their types are taken from the processor data that
-// remark-parse declares.
-export type MicromarkExtension = NonNullable<
-  Data['micromarkExtensions']
->[number];
-type ConstructRecord = NonNullable<MicromarkExtension['text']>;
-export type Construct = Exclude<
-  NonNullable<ConstructRecord[keyof ConstructRecord]>,
-  readonly unknown[]
->;
-export type Tokenizer = Construct['tokenize'];
-export type TokenizeContext = ThisParameterType<Tokenizer>;
-export type Effects = Parameters<Tokenizer>[0];
-export type State = Parameters<Tokenizer>[1];
-export type Code = Parameters<State>[0];
-export type Resolver = NonNullable<Construct['resolveAll']>;
-type Event = Parameters<Resolver>[0][number];
-export type Token = Event[1];
-export type TokenType = Token['type'];
-
-export type FromMarkdownExtension = Exclude<
-  NonNullable<Data['fromMarkdownExtensions']>[number],
-  readonly unknown[]
->;
-type Handles = NonNullable<FromMarkdownExtension['enter']>;
-export type Handle = NonNullable<Handles[keyof Handles]>;
-export type CompileContext = ThisParameterType<Handle>;
 
 /** Token types of syntax extensions, which micromark's types do not list. */
 export function tokenType(name: string): TokenType {
@@ -71,34 +54,6 @@ export function syntaxPlugin(
     ];
   };
 }
-
-// Character codes as micromark passes them: line endings and tabs are
-// negative, and the end of the input is null.
-export const codes = {
-  horizontalTab: -2,
-  virtualSpace: -1,
-  space: 32,
-  exclamationMark: 33,
-  quotationMark: 34,
-  numberSign: 35,
-  dollarSign: 36,
-  apostrophe: 39,
-  asterisk: 42,
-  leftParenthesis: 40,
-  rightParenthesis: 41,
-  dot: 46,
-  equalsTo: 61,
-  leftSquareBracket: 91,
-  backslash: 92,
-  rightSquareBracket: 93,
-  caret: 94,
-  underscore: 95,
-  graveAccent: 96,
-  leftCurlyBrace: 123,
-  verticalBar: 124,
-  rightCurlyBrace: 125,
-  tilde: 126,
-} as const;
 
 export function isLineEnding(code: Code): boolean {
   return code !== null && code < codes.horizontalTab;
