@@ -63,19 +63,43 @@ function attributesOf(node: ProseMirrorNode): Record<string, string> {
 }
 
 /**
- * What the document holds that a cross-reference can point at: headings,
- * figures and images, code, and the declared elements a reference names,
- * in the order of the document. Figures and elements without an id are
- * there too, as is a heading whose id is made of its text.
+ * Whether VFM puts the heading in a section of its own, which themes number:
+ * not in a quote, and not with a closing sequence as long as its level.
+ */
+function opensSection(
+  doc: ProseMirrorNode,
+  pos: number,
+  node: ProseMirrorNode,
+) {
+  const $pos = doc.resolve(pos);
+  for (let depth = 1; depth <= $pos.depth; depth++) {
+    if ($pos.node(depth).type.name === 'blockquote') {
+      return false;
+    }
+  }
+  const level = Number(node.attrs.level) || 1;
+  return String(node.attrs.closingSequence ?? '').trim().length < level;
+}
+
+/**
+ * What the document holds that a cross-reference can point at, as themes
+ * built on `@vivliostyle/theme-base` number it: headings VFM makes sections
+ * of, images with a caption (VFM's figures), code with a caption, and the
+ * declared elements a reference names, in the order of the document.
+ * Figures and elements without an id are there too, as is a heading whose
+ * id is made of its text; one made of no text is no id.
  */
 export function referenceTargets(doc: ProseMirrorNode): ReferenceTarget[] {
   const byPos = new Map(documentIds(doc).map((it) => [it.pos, it]));
   const targets: ReferenceTarget[] = [];
   doc.descendants((node, pos) => {
     const found = byPos.get(pos);
-    const id = found?.id ?? null;
+    const id = found?.id || null;
     const name = node.type.name;
     if (name === 'heading') {
+      if (!opensSection(doc, pos, node)) {
+        return false;
+      }
       targets.push({
         type: 'sec',
         id,
@@ -86,13 +110,16 @@ export function referenceTargets(doc: ProseMirrorNode): ReferenceTarget[] {
       });
       return false;
     }
-    // An image in text is in no figure, which themes count.
+    // An image in text, or one without a caption, is in no figure.
     if (name === 'image') {
+      if (!node.attrs.alt) {
+        return false;
+      }
       targets.push({
         type: 'fig',
         id,
         implicit: false,
-        label: shorten(String(node.attrs.alt ?? '') || String(node.attrs.src)),
+        label: shorten(String(node.attrs.alt)),
         pos,
         node,
       });

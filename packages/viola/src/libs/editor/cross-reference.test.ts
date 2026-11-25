@@ -4,14 +4,42 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
 import { newId, referenceTargets, referTo } from './cross-reference';
+import { getEditorMenuCommand } from './menu/registry';
 import {
-  footnoteType,
-  setFootnote,
   setThemeCss,
   ThemeMarkupExtension,
   themeReferenceTypes,
   themeStyles,
 } from './theme-support';
+
+import './menu/commands';
+
+function command(id: string) {
+  const found = getEditorMenuCommand(id);
+  if (!found) {
+    throw new Error(`${id} is not registered`);
+  }
+  return found;
+}
+
+const visible = (editor: Editor, id: string) =>
+  command(id).isVisible?.(editor) ?? true;
+
+/** Selects the text `needle`. */
+function selectAll(editor: Editor, needle: string): void {
+  let from = -1;
+  editor.state.doc.descendants((node, pos) => {
+    const index = node.isText ? (node.text ?? '').indexOf(needle) : -1;
+    if (from === -1 && index !== -1) {
+      from = pos + index;
+    }
+  });
+  editor.view.dispatch(
+    editor.state.tr.setSelection(
+      TextSelection.create(editor.state.doc, from, from + needle.length),
+    ),
+  );
+}
 
 let editor: Editor | undefined;
 
@@ -71,6 +99,31 @@ describe('what a reference can point at', () => {
     ]);
   });
 
+  it('leaves out what VFM makes no section or figure of', () => {
+    const targets = referenceTargets(
+      load('> # 引用\n\n## 閉じる ##\n\n![](a.png)\n\n- # 項目\n\n# 本文').state
+        .doc,
+    ).map(({ type, id }) => ({ type, id }));
+    expect(targets).toEqual([
+      { type: 'sec', id: '項目' },
+      { type: 'sec', id: '本文' },
+    ]);
+  });
+
+  it('gives a heading whose id would be made of no text an id', () => {
+    const editor = load('# 🎉\n\n# ***\n\n本文');
+    const targets = referenceTargets(editor.state.doc);
+    expect(targets.map((it) => it.id)).toEqual([null, '-1']);
+    caretAfter(editor, '本文');
+    const [first] = targets;
+    if (first) {
+      referTo(editor, first);
+    }
+    expect(getMarkdown(editor)).toBe(
+      '# 🎉 {#sec-1}\n\n# ***\n\n本文<a data-ref="sec" href="#sec-1"></a>',
+    );
+  });
+
   it('makes a new id that the document, raw HTML included, has nowhere', () => {
     const { doc } = load(DOCUMENT).state;
     expect(newId(doc, 'eq')).toBe('eq-2');
@@ -126,16 +179,32 @@ describe('the markup a theme is offered for', () => {
     expect([...themeReferenceTypes(editor)]).toEqual(['fig']);
   });
 
-  it('makes the theme’s note where the theme styles one, VFM’s otherwise', () => {
+  it('offers VFM’s note always and the theme’s where the theme styles it', () => {
     const editor = load('本文');
-    caretAfter(editor, '本文');
-    expect(footnoteType(editor)).toBe('inlineFootnote');
-    setFootnote(editor, '注');
+    selectAll(editor, '本文');
+    expect(visible(editor, 'format.footnote')).toBe(true);
+    expect(visible(editor, 'format.page-footnote')).toBe(false);
     setThemeCss(editor, FOOTNOTE_CSS);
-    expect(footnoteType(editor)).toBe('htmlFootnote');
-    setFootnote(editor, '注');
-    expect(getMarkdown(editor)).toBe(
-      '本文^[注]<span class="footnote">注</span>',
+    expect(visible(editor, 'format.page-footnote')).toBe(true);
+    command('format.page-footnote').run?.({ editor, surface: 'selection' });
+    expect(getMarkdown(editor)).toBe('<span class="footnote">本文</span>');
+  });
+
+  it('keeps commands for markup the selection is in, whatever the theme', () => {
+    const editor = load(
+      '<span class="footnote">注</span><span class="tcy">12</span>\n\n<div class="note">\n\n箱\n\n</div>',
     );
+    selectAll(editor, '注');
+    expect(visible(editor, 'format.page-footnote')).toBe(true);
+    command('format.page-footnote').run?.({ editor, surface: 'selection' });
+    selectAll(editor, '12');
+    expect(visible(editor, 'format.tcy')).toBe(true);
+    command('format.tcy').run?.({ editor, surface: 'selection' });
+    caretAfter(editor, '箱');
+    expect(visible(editor, 'block.note')).toBe(true);
+    expect(visible(editor, 'block.theorem')).toBe(false);
+    expect(visible(editor, 'element.unwrap')).toBe(true);
+    command('element.unwrap').run?.({ editor, surface: 'selection' });
+    expect(getMarkdown(editor)).toBe('注12\n\n箱');
   });
 });

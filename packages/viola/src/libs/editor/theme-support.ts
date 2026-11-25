@@ -5,7 +5,6 @@ import {
   declaredElementOf,
   type FoundNode,
   findSelectedInline,
-  hasDocumentNotation,
 } from '@v/tiptap-extensions';
 import {
   EMPTY_THEME_MARKUP,
@@ -13,6 +12,9 @@ import {
   stylesElement,
   type ThemeMarkup,
 } from './theme-markup';
+
+/** The theme's note, which it floats to the foot of the page. */
+export const PAGE_FOOTNOTE = 'htmlFootnote';
 
 export interface ThemeMarkupStorage {
   /** What the CSS the editor shows the document with styles. */
@@ -90,70 +92,49 @@ export function themeStyles(editor: Editor, type: string): boolean {
 }
 
 /**
- * Whether the theme styles the element and the document can hold it, which
- * the menus offer it for.
+ * The declared block or textblock element the selection is in, innermost
+ * first, whatever the theme styles: what is there can always be taken away.
  */
-export function offersElement(editor: Editor, type: string): boolean {
-  const element = declaredElementOf(editor.schema, type);
-  return (
-    element !== null &&
-    themeStyles(editor, type) &&
-    hasDocumentNotation(editor, element.notation)
-  );
-}
-
-const THEME_FOOTNOTE = 'htmlFootnote';
-
-/**
- * The note the editor makes: the theme's element where the theme styles it,
- * which it floats to the foot of the page, and otherwise VFM's `^[…]`, which
- * VFM collects at the end unless the project sets its gcpm mode.
- */
-export function footnoteType(editor: Editor): string {
-  return offersElement(editor, THEME_FOOTNOTE)
-    ? THEME_FOOTNOTE
-    : 'inlineFootnote';
-}
-
-/** The note of either kind the selection is in. */
-export function selectedFootnote(
+export function selectedBlockElement(
   editor: Editor,
 ): { type: string; found: FoundNode } | null {
-  for (const type of [THEME_FOOTNOTE, 'inlineFootnote']) {
-    const found = findSelectedInline(editor.state, type);
-    if (found) {
-      return { type, found };
+  const { $from, $to } = editor.state.selection;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    const node = $from.node(depth);
+    const element = declaredElementOf(editor.schema, node.type.name);
+    if (
+      (element?.kind === 'block' || element?.kind === 'textblock') &&
+      $to.pos <= $from.before(depth) + node.nodeSize
+    ) {
+      return {
+        type: node.type.name,
+        found: { pos: $from.before(depth), node },
+      };
     }
   }
   return null;
 }
 
-/** Makes a note of the selection, or inserts one holding `text`. */
-export function setFootnote(editor: Editor, text?: string): boolean {
-  const chain = editor.chain().focus();
-  return (
-    footnoteType(editor) === THEME_FOOTNOTE
-      ? chain.setHtmlElement(THEME_FOOTNOTE, null, text)
-      : chain.setInlineFootnote(text)
-  ).run();
-}
-
-export function canSetFootnote(editor: Editor, text?: string): boolean {
-  return footnoteType(editor) === THEME_FOOTNOTE
-    ? editor.can().setHtmlElement(THEME_FOOTNOTE, null, text)
-    : editor.can().setInlineFootnote(text);
-}
-
-/** Leaves the content of the note the selection is in as text. */
-export function unsetFootnote(editor: Editor): boolean {
-  const selected = selectedFootnote(editor);
-  if (!selected) {
-    return false;
+/** Whether the selection is in, or is, an element of the declared type. */
+export function inElement(editor: Editor, type: string): boolean {
+  const element = declaredElementOf(editor.schema, type);
+  switch (element?.kind) {
+    case 'mark':
+      return editor.isActive(type);
+    case 'inline':
+    case 'atom':
+      return findSelectedInline(editor.state, type) !== null;
+    case 'block':
+    case 'textblock': {
+      const { $from } = editor.state.selection;
+      for (let depth = $from.depth; depth > 0; depth--) {
+        if ($from.node(depth).type.name === type) {
+          return true;
+        }
+      }
+      return false;
+    }
+    default:
+      return false;
   }
-  const chain = editor.chain().focus();
-  return (
-    selected.type === THEME_FOOTNOTE
-      ? chain.unsetHtmlElement(THEME_FOOTNOTE)
-      : chain.unsetInlineFootnote()
-  ).run();
 }

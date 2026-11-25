@@ -41,6 +41,7 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
       'format.link',
       'format.ruby',
       'format.footnote',
+      'format.page-footnote',
       'format.tcy',
       'format.upright',
       'format.sesame',
@@ -49,6 +50,7 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
       'math.edit',
       'footnote-reference.edit',
       'cross-reference.edit',
+      'element.unwrap',
     ],
   },
   triggers: [
@@ -86,6 +88,7 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
             'insert.ruby',
             'insert.math',
             'insert.footnote',
+            'insert.page-footnote',
             'insert.footnote-reference',
             'insert.cross-reference',
             'insert.toc',

@@ -5,6 +5,7 @@ import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
 import {
   canRefer,
+  type ReferenceTarget,
   referenceTargets,
   referTo,
   selectedReference,
@@ -49,23 +50,27 @@ export function CrossReferencePanel({ editor, close }: EditorMenuPanelProps) {
         (TYPE_ORDER.indexOf(b) + 1 || TYPE_ORDER.length + 1),
     );
   }, [editor, reference]);
-  // A reference of a type the theme has no rule for shows nothing.
-  const targets = useMemo(
-    () =>
-      referenceTargets(editor.state.doc).filter(
-        (target) => types.includes(target.type) && canRefer(editor, target),
-      ),
-    [editor, types],
-  );
+  // A reference of a type the theme has no rule for shows nothing; one to
+  // a page can point at anything.
+  const options = useMemo(() => {
+    const targets = referenceTargets(editor.state.doc).filter((target) =>
+      canRefer(editor, target),
+    );
+    return types.flatMap((group) =>
+      targets
+        .filter((target) => group === 'page' || target.type === group)
+        .map((target) => ({ target, type: group })),
+    );
+  }, [editor, types]);
   const [type, setType] = useState(
     () => String(reference?.attrs['data-ref'] ?? '') || types[0] || 'sec',
   );
   const [href, setHref] = useState(() => String(reference?.attrs.href ?? ''));
-  const [targetIndex, setTargetIndex] = useState(-1);
+  const [optionIndex, setOptionIndex] = useState(-1);
   const [invalid, setInvalid] = useState(false);
 
-  const target = targets[targetIndex];
-  const hrefOf = (it: (typeof targets)[number]) => (it.id ? `#${it.id}` : '');
+  const target = options[optionIndex]?.target;
+  const hrefOf = (it: ReferenceTarget) => (it.id ? `#${it.id}` : '');
 
   const apply = () => {
     if (target && href === hrefOf(target)) {
@@ -110,43 +115,51 @@ export function CrossReferencePanel({ editor, close }: EditorMenuPanelProps) {
       error={invalid && m.cross_reference_panel_invalid()}
     >
       <div className="flex flex-col gap-1">
-        <NativeSelect
-          aria-label={m.cross_reference_panel_target_aria()}
-          value={targetIndex}
-          className="h-7 w-72"
-          onChange={(event) => {
-            const index = Number(event.target.value);
-            const picked = targets[index];
-            setTargetIndex(index);
-            setInvalid(false);
-            if (picked) {
-              setType(picked.type);
-              setHref(hrefOf(picked));
-            }
-          }}
-        >
-          <option value={-1}>
-            {m.cross_reference_panel_target_placeholder()}
-          </option>
-          {types.map((group) => {
-            const options = targets
-              .map((it, index) => ({ it, index }))
-              .filter(({ it }) => it.type === group);
-            return (
-              options.length > 0 && (
-                <optgroup key={group} label={typeLabel(group)}>
-                  {options.map(({ it, index }) => (
-                    <option key={it.pos} value={index}>
-                      {it.id
-                        ? `${it.label} (#${it.id})`
-                        : m.cross_reference_panel_new_id({ label: it.label })}
-                    </option>
-                  ))}
-                </optgroup>
-              )
-            );
-          })}
-        </NativeSelect>
+        {options.length === 0 ? (
+          <p className="w-72 px-1 text-xs text-muted-foreground">
+            {m.cross_reference_panel_no_targets()}
+          </p>
+        ) : (
+          <NativeSelect
+            aria-label={m.cross_reference_panel_target_aria()}
+            value={optionIndex}
+            className="h-7 w-72"
+            onChange={(event) => {
+              const index = Number(event.target.value);
+              const picked = options[index];
+              setOptionIndex(index);
+              setInvalid(false);
+              if (picked) {
+                setType(picked.type);
+                setHref(hrefOf(picked.target));
+              }
+            }}
+          >
+            <option value={-1}>
+              {m.cross_reference_panel_target_placeholder()}
+            </option>
+            {types.map((group) => {
+              const grouped = options
+                .map((it, index) => ({ ...it, index }))
+                .filter((it) => it.type === group);
+              return (
+                grouped.length > 0 && (
+                  <optgroup key={group} label={typeLabel(group)}>
+                    {grouped.map(({ target: it, index }) => (
+                      <option key={`${group}:${it.pos}`} value={index}>
+                        {it.id
+                          ? `${it.label} (#${it.id})`
+                          : m.cross_reference_panel_new_id({
+                              label: it.label,
+                            })}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              );
+            })}
+          </NativeSelect>
+        )}
         <div className="flex gap-1">
           <NativeSelect
             aria-label={m.cross_reference_panel_type_aria()}

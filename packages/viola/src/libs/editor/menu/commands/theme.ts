@@ -11,31 +11,57 @@ import {
   ImageIcon,
   InfoIcon,
   LightbulbIcon,
+  NotebookTextIcon,
   PanelRightIcon,
+  RemoveFormattingIcon,
   SquareSigmaIcon,
   TableIcon,
   TriangleAlertIcon,
   TypeIcon,
 } from '@v/ui/icon';
 import { CrossReferencePanel } from '../../../../components/content-editor/panels/cross-reference-panel';
+import { PageFootnotePanel } from '../../../../components/content-editor/panels/footnote-panel';
 import { m } from '../../../../generated/paraglide/messages';
 import { selectedReference } from '../../cross-reference';
-import { themeStyles } from '../../theme-support';
+import {
+  inElement,
+  PAGE_FOOTNOTE,
+  selectedBlockElement,
+  themeStyles,
+} from '../../theme-support';
 import { registerEditorMenuCommand } from '../registry';
 import { isInCodeBlock, splitKeywords } from './utils';
 
 type Icon = ComponentType<{ className?: string }>;
 
 // The theme's look is the reason to offer the markup, so markup it has no
-// rule for is not offered at all.
-const styled = (type: string) => (editor: Editor) => themeStyles(editor, type);
+// rule for is not offered, unless the selection is in some already, which
+// can then still be taken away.
+const offered = (type: string) => (editor: Editor) =>
+  themeStyles(editor, type) || inElement(editor, type);
 
 const isTextSelection = (editor: Editor) =>
   !isInCodeBlock(editor) &&
   !editor.state.selection.empty &&
   selectedReference(editor) === null;
 
-function registerMarkCommand(
+/** Gives the selection the element, or takes the one it is in away. */
+function toggle(editor: Editor, type: string): void {
+  const chain = editor.chain().focus();
+  if (inElement(editor, type)) {
+    chain.unsetHtmlElement(type);
+  } else {
+    chain.setHtmlElement(type);
+  }
+  chain.run();
+}
+
+const canToggle = (type: string) => (editor: Editor) =>
+  inElement(editor, type)
+    ? editor.can().unsetHtmlElement(type)
+    : editor.can().setHtmlElement(type);
+
+function registerInlineCommand(
   id: string,
   type: string,
   label: () => string,
@@ -46,37 +72,54 @@ function registerMarkCommand(
     surfaces: ['selection'],
     label,
     icon,
-    isActive: (editor) => editor.isActive(type),
-    isEnabled: (editor) =>
-      editor.isActive(type)
-        ? editor.can().unsetHtmlElement(type)
-        : editor.can().setHtmlElement(type),
-    isVisible: (editor) => styled(type)(editor) && isTextSelection(editor),
-    run: ({ editor }) => {
-      const chain = editor.chain().focus();
-      if (editor.isActive(type)) {
-        chain.unsetHtmlElement(type);
-      } else {
-        chain.setHtmlElement(type);
-      }
-      chain.run();
-    },
+    isActive: (editor) => inElement(editor, type),
+    isEnabled: canToggle(type),
+    isVisible: (editor) => offered(type)(editor) && isTextSelection(editor),
+    run: ({ editor }) => toggle(editor, type),
   });
 }
 
-registerMarkCommand('format.tcy', 'tcy', m.editor_command_tcy, ArrowDownUpIcon);
-registerMarkCommand(
+registerInlineCommand(
+  'format.tcy',
+  'tcy',
+  m.editor_command_tcy,
+  ArrowDownUpIcon,
+);
+registerInlineCommand(
   'format.upright',
   'upright',
   m.editor_command_upright,
   TypeIcon,
 );
-registerMarkCommand(
+registerInlineCommand(
   'format.sesame',
   'sesame',
   m.editor_command_sesame,
   CircleDotIcon,
 );
+registerInlineCommand(
+  'format.page-footnote',
+  PAGE_FOOTNOTE,
+  m.editor_command_page_footnote,
+  NotebookTextIcon,
+);
+
+registerEditorMenuCommand({
+  id: 'insert.page-footnote',
+  surfaces: ['trigger'],
+  label: m.editor_command_insert_page_footnote,
+  keywords: () =>
+    splitKeywords(m.editor_command_insert_page_footnote_keywords()),
+  icon: NotebookTextIcon,
+  isEnabled: (editor) => editor.can().setHtmlElement(PAGE_FOOTNOTE, null, '-'),
+  isVisible: offered(PAGE_FOOTNOTE),
+  panel: PageFootnotePanel,
+});
+
+const blockLabels = new Map<string, () => string>([
+  ['tableFigure', m.editor_command_table_figure],
+  ['htmlFigcaption', m.editor_command_table_figure_caption],
+]);
 
 function registerBlockCommand(
   id: string,
@@ -85,17 +128,17 @@ function registerBlockCommand(
   keywords: () => string,
   icon: Icon,
 ) {
+  blockLabels.set(type, label);
   registerEditorMenuCommand({
     id,
     surfaces: ['trigger'],
     label,
     keywords: () => splitKeywords(keywords()),
     icon,
-    isEnabled: (editor) => editor.can().setHtmlElement(type),
-    isVisible: styled(type),
-    run: ({ editor }) => {
-      editor.chain().focus().setHtmlElement(type).run();
-    },
+    isActive: (editor) => inElement(editor, type),
+    isEnabled: canToggle(type),
+    isVisible: offered(type),
+    run: ({ editor }) => toggle(editor, type),
   });
 }
 
@@ -164,6 +207,30 @@ registerBlockCommand(
 );
 
 registerEditorMenuCommand({
+  id: 'element.unwrap',
+  surfaces: ['selection'],
+  label: m.editor_command_unwrap_element,
+  icon: RemoveFormattingIcon,
+  isVisible: (editor) => selectedBlockElement(editor) !== null,
+  isEnabled: (editor) => {
+    const selected = selectedBlockElement(editor);
+    return selected !== null && editor.can().unsetHtmlElement(selected.type);
+  },
+  value: (editor) => {
+    const selected = selectedBlockElement(editor);
+    return selected
+      ? (blockLabels.get(selected.type)?.() ?? selected.type)
+      : '';
+  },
+  run: ({ editor }) => {
+    const selected = selectedBlockElement(editor);
+    if (selected) {
+      editor.chain().focus().unsetHtmlElement(selected.type).run();
+    }
+  },
+});
+
+registerEditorMenuCommand({
   id: 'insert.cross-reference',
   surfaces: ['trigger'],
   label: m.editor_command_insert_cross_reference,
@@ -176,7 +243,7 @@ registerEditorMenuCommand({
     editor
       .can()
       .setHtmlElement(CROSS_REFERENCE, { 'data-ref': 'sec', href: '#x' }),
-  isVisible: styled(CROSS_REFERENCE),
+  isVisible: offered(CROSS_REFERENCE),
   panel: CrossReferencePanel,
 });
 

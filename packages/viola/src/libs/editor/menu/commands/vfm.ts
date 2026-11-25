@@ -4,6 +4,7 @@ import {
   CROSS_REFERENCE,
   codeBlockCaption,
   findSelectedCodeBlock,
+  findSelectedInline,
   hasDocumentNotation,
 } from '@v/tiptap-extensions';
 import {
@@ -29,12 +30,6 @@ import {
 import { MathPanel } from '../../../../components/content-editor/panels/math-panel';
 import { RubyPanel } from '../../../../components/content-editor/panels/ruby-panel';
 import { m } from '../../../../generated/paraglide/messages';
-import {
-  canSetFootnote,
-  selectedFootnote,
-  setFootnote,
-  unsetFootnote,
-} from '../../theme-support';
 import {
   attributedMarkOf,
   sectionLevelAt,
@@ -91,7 +86,7 @@ registerEditorMenuCommand({
     'note',
   ],
   icon: StickyNoteIcon,
-  isEnabled: (editor) => canSetFootnote(editor, '-'),
+  isEnabled: (editor) => editor.can().setInlineFootnote('-'),
   panel: FootnotePanel,
 });
 
@@ -126,14 +121,19 @@ registerEditorMenuCommand({
   surfaces: ['selection'],
   label: m.editor_command_footnote,
   icon: StickyNoteIcon,
-  isActive: (editor) => selectedFootnote(editor) !== null,
+  isActive: (editor) =>
+    findSelectedInline(editor.state, 'inlineFootnote') !== null,
   isEnabled: (editor) =>
-    selectedFootnote(editor) !== null || canSetFootnote(editor),
+    editor.can().unsetInlineFootnote() || editor.can().setInlineFootnote(),
   isVisible: isTextSelection,
   run: ({ editor }) => {
-    if (!unsetFootnote(editor)) {
-      setFootnote(editor);
+    const chain = editor.chain().focus();
+    if (findSelectedInline(editor.state, 'inlineFootnote')) {
+      chain.unsetInlineFootnote();
+    } else {
+      chain.setInlineFootnote();
     }
+    chain.run();
   },
 });
 
