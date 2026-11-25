@@ -1,7 +1,7 @@
 import { Editor } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
 
-import { suites } from '../cases';
+import { suites } from '../cases/suites';
 import { PubExtensions } from '../index';
 import {
   checkMarkdownProperties,

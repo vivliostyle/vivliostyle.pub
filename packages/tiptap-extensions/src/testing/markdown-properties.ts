@@ -5,14 +5,14 @@ import type { Transaction } from '@tiptap/pm/state';
 import {
   getMarkdownWithResult,
   MARKED_NOTATIONS,
-  MarkdownWriteError,
   markdownPipeline,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
-} from '../markdown';
+} from '../markdown/extension';
 import { createLegacyBaselineReader } from '../markdown/legacy';
 import { splitSource } from '../markdown/source';
+import { MarkdownWriteError } from '../markdown/write';
 import { judgeReadBack, rawMeaningOf } from './read-back-judge';
 
 /** A way the markdown conversion breaks one of its guarantees. */

@@ -1,6 +1,6 @@
 import type { Editor, JSONContent } from '@tiptap/core';
 
-import { MARKED_NOTATIONS, setDocumentNotations } from '../markdown';
+import { MARKED_NOTATIONS, setDocumentNotations } from '../markdown/extension';
 import { press, run } from '../testing/steps';
 import type { CaseSuite } from '../testing/vitest';
 

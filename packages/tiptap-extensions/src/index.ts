@@ -10,18 +10,16 @@ import {
   type CustomDragPayload,
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
+import { PubMarkdown, type PubMarkdownOptions } from './markdown/extension';
+import type { NotationDefinition } from './markdown/notation';
+import { commonMarkNotations } from './markdown/notations/commonmark';
+import { gfmNotations, htmlMarkNotations } from './markdown/notations/gfm';
+import { rawNotation } from './markdown/notations/raw';
 import {
-  commonMarkNotations,
-  gfmNotations,
-  htmlMarkNotations,
-  type NotationDefinition,
-  PubMarkdown,
-  type PubMarkdownOptions,
-  rawNotation,
   VFM_2_SYNTAX,
   type VfmSyntax,
   vfmNotations,
-} from './markdown';
+} from './markdown/notations/vfm/notations';
 
 export { type BlockFormat, getBlockFormat } from './block-format';
 export {
@@ -39,28 +37,34 @@ export {
 export {
   currentNotations,
   type DocumentRecord,
-  type FoundNode,
-  findSelectedInline,
-  formatAttributes,
   getMarkdown,
   hasDocumentNotation,
-  type InlineAttributes,
-  isAttributeName,
-  isWritableFootnoteLabel,
-  isWritableMath,
-  isWritableRubyText,
   MARKED_NOTATIONS,
-  MarkdownWriteError,
-  type NotationDefinition,
-  parseAttributes,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
   upgradeDocumentNotations,
+} from './markdown/extension';
+export type { NotationDefinition } from './markdown/notation';
+export {
+  formatAttributes,
+  type InlineAttributes,
+  isAttributeName,
+  parseAttributes,
+  writableAttributes,
+} from './markdown/notations/vfm/attributes';
+export {
+  type FoundNode,
+  findSelectedInline,
+} from './markdown/notations/vfm/commands';
+export { isWritableFootnoteLabel } from './markdown/notations/vfm/footnotes';
+export { isWritableMath } from './markdown/notations/vfm/math';
+export {
   VFM_2_SYNTAX,
   type VfmSyntax,
-  writableAttributes,
-} from './markdown';
+} from './markdown/notations/vfm/notations';
+export { isWritableRubyText } from './markdown/notations/vfm/ruby';
+export { MarkdownWriteError } from './markdown/write';
 
 export const IMAGE_MIME_TYPES = [
   'image/png',
