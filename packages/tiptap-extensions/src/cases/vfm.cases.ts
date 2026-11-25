@@ -970,7 +970,7 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a{漢字|かんじ}と$x$ と^[注]"))',
       },
       {
-        name: 'pasted syntax becomes what the document can hold',
+        name: 'pasted syntax is kept as its markdown, raw',
         given: 'a‸b',
         steps: [
           run('record the document as made with marked', (editor) => {
@@ -990,8 +990,8 @@ export const vfmSuites: CaseSuite[] = [
             ]),
           ]),
         ],
-        expect: 'a漢字$x$[^1]注**強調**‸b',
-        doc: 'doc(paragraph("a漢字$x$[^1]注", bold("強調"), "b"))',
+        expect: 'a{漢字|かんじ}$x$[^1]^[注]**強調**‸b',
+        doc: 'doc(paragraph("a", rawInline("{漢字|かんじ}$x$[^1]^[注]"), bold("強調"), "b"))',
       },
       {
         name: 'commands do nothing',

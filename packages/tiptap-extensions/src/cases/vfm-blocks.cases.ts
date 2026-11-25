@@ -1358,7 +1358,7 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a"), paragraph("[[toc]]"))',
       },
       {
-        name: 'a definition is its content',
+        name: 'a definition is its markdown, raw',
         given: 'a‸',
         steps: [
           recordInlineEra,
@@ -1372,10 +1372,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a\n\n注',
+        expect: 'a\n\n[^1]: 注',
+        doc: 'doc(paragraph("a"), rawBlock("[^1]: 注"))',
       },
       {
-        name: 'a line that ends a section is hashes as text',
+        name: 'a line that ends a section is an empty heading',
         given: 'a‸',
         steps: [
           recordInlineEra,
@@ -1386,10 +1387,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a\n\n\\#\\#',
+        expect: 'a\n\n##',
+        doc: 'doc(paragraph("a"), heading)',
       },
       {
-        name: 'a heading loses its attributes',
+        name: 'a heading keeps its attributes as text',
         given: 'a‸',
         steps: [
           recordInlineEra,
@@ -1401,10 +1403,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a\n\n## H',
+        expect: 'a\n\n## H {#x}',
+        doc: 'doc(paragraph("a"), heading("H {#x}"))',
       },
       {
-        name: 'a task is an item',
+        name: 'a task keeps its checkbox, raw',
         given: '- a‸',
         steps: [
           recordInlineEra,
@@ -1417,10 +1420,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             );
           }),
         ],
-        expect: '- a',
+        expect: '- [x] a',
+        doc: 'doc(bulletList(listItem(paragraph(rawInline("[x] "), "a"))))',
       },
       {
-        name: 'an image in text is its markdown as text',
+        name: 'an image in text is its markdown, raw',
         given: 'a ‸b',
         steps: [
           recordInlineEra,
@@ -1431,7 +1435,8 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a !\\[i](i.png\\)‸b',
+        expect: 'a ![i](i.png)‸b',
+        doc: 'doc(paragraph("a ", rawInline("![i](i.png)"), "b"))',
       },
     ],
   },

@@ -12,6 +12,7 @@ import {
   type LegacyBaselineReader,
 } from './legacy';
 import type { NotationDefinition } from './notation';
+import { RAW_INLINE } from './parse';
 import {
   type BaselineReader,
   MarkdownPipeline,
@@ -242,7 +243,7 @@ function documentPipeline(
  * they lack.
  */
 function documentWrites(editor: Editor): {
-  writer: MarkdownPipeline['writer'];
+  pipeline: MarkdownPipeline;
   lostAttributes: ReadonlySet<string>;
 } | null {
   const storage = storageOf(editor);
@@ -258,14 +259,76 @@ function documentWrites(editor: Editor): {
       .notations.filter((it) => !kept.has(it.name))
       .flatMap((it) => it.attributes ?? []),
   );
-  return { writer: pipeline.writer, lostAttributes };
+  return { pipeline, lostAttributes };
+}
+
+function childrenOfNode(node: ProseMirrorNode): ProseMirrorNode[] {
+  const children: ProseMirrorNode[] = [];
+  node.forEach((child) => {
+    children.push(child);
+  });
+  return children;
+}
+
+/**
+ * What the markdown the editor writes of a node means to the document's
+ * definitions, so that VFM reads it as the node all the same: an inline
+ * node is that markdown kept raw, and a block is what the definitions read
+ * of it, where the syntax they lack is raw or text written back as it is.
+ */
+function asDocumentReads(
+  editor: Editor,
+  documentPipeline: MarkdownPipeline,
+  node: ProseMirrorNode,
+  parent: ProseMirrorNode,
+): ProseMirrorNode[] | null {
+  const { schema } = editor;
+  const { paragraph } = schema.nodes;
+  const raw = schema.marks[RAW_INLINE];
+  const wrapper = node.isInline
+    ? paragraph
+    : schema.topNodeType.contentMatch.matchType(node.type)
+      ? null
+      : parent.type;
+  try {
+    const doc = schema.topNodeType.create(
+      null,
+      wrapper
+        ? wrapper.create(
+            wrapper === parent.type ? parent.attrs : null,
+            node.isInline ? node.mark([]) : node,
+          )
+        : node,
+    );
+    const { markdown } = currentPipeline(editor).serializeWithResult(doc, {
+      baseline: '',
+    });
+    if (node.isInline) {
+      const text = markdown.trim();
+      return raw && text
+        ? [schema.text(text, raw.create().addToSet(node.marks))]
+        : null;
+    }
+    const read = documentPipeline.parse(markdown).doc;
+    if (!wrapper) {
+      return childrenOfNode(read);
+    }
+    const [only, ...rest] = childrenOfNode(read);
+    return only?.type === wrapper && rest.length === 0
+      ? childrenOfNode(only)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Turns what the document's definitions cannot write into what they can,
- * wherever this client changed the document, as by pasting HTML: a node
- * becomes its content or its text, a mark is taken off, and an attribute of
- * a definition the document lacks is cleared.
+ * wherever this client changed the document, as by pasting HTML: a node,
+ * or one with an attribute of a definition the document lacks, becomes
+ * what they read of its markdown, and a mark is taken off or loses the
+ * attribute. Where that does not fit, a node becomes its content or its
+ * text, and the attribute is cleared.
  */
 function dissolveUnwritable(editor: Editor): Plugin {
   return new Plugin({
@@ -277,7 +340,8 @@ function dissolveUnwritable(editor: Editor): Plugin {
       if (!writes) {
         return null;
       }
-      const { writer, lostAttributes } = writes;
+      const { pipeline, lostAttributes } = writes;
+      const { writer } = pipeline;
       const lost = (type: string, attrs: Record<string, unknown>) =>
         Object.keys(attrs).filter(
           (name) =>
@@ -314,18 +378,31 @@ function dissolveUnwritable(editor: Editor): Plugin {
         }
         const current = tr.doc.nodeAt(pos) ?? node;
         const type = current.type.name;
-        if (!current.isText && !writer.writesNode(type)) {
+        const unwritable = !current.isText && !writer.writesNode(type);
+        if (
+          current.isText ||
+          (!unwritable && lost(type, current.attrs).length === 0)
+        ) {
+          continue;
+        }
+        const $pos = tr.doc.resolve(pos);
+        const index = $pos.index();
+        const fits = (content: readonly ProseMirrorNode[] | null) =>
+          content !== null &&
+          $pos.parent.canReplace(index, index + 1, Fragment.from(content));
+        const read = asDocumentReads(editor, pipeline, current, $pos.parent);
+        if (fits(read)) {
+          tr.replaceWith(pos, pos + current.nodeSize, read ?? []);
+          continue;
+        }
+        if (unwritable) {
           const content = current.isBlock
             ? blockContentOf(current)
             : contentOf(current);
-          const $pos = tr.doc.resolve(pos);
-          const index = $pos.index();
-          if (
-            $pos.parent.canReplace(index, index + 1, Fragment.from(content))
-          ) {
+          if (fits(content)) {
             tr.replaceWith(pos, pos + current.nodeSize, content);
           }
-        } else if (!current.isText && lost(type, current.attrs).length > 0) {
+        } else {
           tr.setNodeMarkup(pos, undefined, cleared(type, current.attrs));
         }
       }
