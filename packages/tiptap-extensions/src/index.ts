@@ -10,14 +10,11 @@ import {
   type CustomDragPayload,
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
-import {
-  commonMarkNotations,
-  gfmNotations,
-  htmlMarkNotations,
-  type NotationDefinition,
-  PubMarkdown,
-  rawNotation,
-} from './markdown';
+import { PubMarkdown } from './markdown/extension';
+import type { NotationDefinition } from './markdown/notation';
+import { commonMarkNotations } from './markdown/notations/commonmark';
+import { gfmNotations, htmlMarkNotations } from './markdown/notations/gfm';
+import { rawNotation } from './markdown/notations/raw';
 
 export { type BlockFormat, getBlockFormat } from './block-format';
 export {
@@ -36,13 +33,13 @@ export {
   currentNotations,
   getMarkdown,
   MARKED_NOTATIONS,
-  MarkdownWriteError,
-  type NotationDefinition,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
   upgradeDocumentNotations,
-} from './markdown';
+} from './markdown/extension';
+export type { NotationDefinition } from './markdown/notation';
+export { MarkdownWriteError } from './markdown/write';
 
 export const IMAGE_MIME_TYPES = [
   'image/png',
