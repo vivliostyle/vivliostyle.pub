@@ -1028,6 +1028,93 @@ export const vfmBlockSuites: CaseSuite[] = [
         ],
       },
       {
+        name: 'whitespace around an image keeps it in its paragraph, as in VFM',
+        given: '![a](a.png) \n\n ![b](b.png)\n\n> ![c](c.png) ',
+        doc: 'doc(paragraph(inlineImage), paragraph(inlineImage), blockquote(paragraph(inlineImage)))',
+      },
+      {
+        name: 'a comment after an image',
+        given: '![a](a.png)<!-- c -->',
+        doc: 'doc(image)',
+        fails:
+          'VFM makes a figure of an image with comments alone around it in its paragraph; the editor keeps the paragraph, which holds the comments',
+      },
+      {
+        name: 'an image left alone in its paragraph by another client',
+        given: '前 ‸![a](x.png)',
+        steps: [
+          run('delete the text before it as another client', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr
+                .delete(1, editor.state.selection.from)
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect: '![a](x.png) ',
+        doc: 'doc(paragraph(inlineImage))',
+      },
+      ...(
+        [
+          ['an image in text', 'a ‸![i](i.png)‸ b', 'code', 'a ![i](i.png) b'],
+          ['a reference', 'a ‸[^1]‸ b', 'code', 'a [^1] b'],
+          ['math', 'a ‸$x$‸ b', 'code', 'a $x$ b'],
+          ['math', 'a ‸$x$‸ b', 'link', 'a $x$ b'],
+        ] as const
+      ).map(([what, given, mark, expect]) => ({
+        name: `${what} that another client put ${mark === 'code' ? 'code' : 'a link'} on`,
+        given,
+        steps: [
+          run(`put ${mark} on it as another client`, (editor) => {
+            const { from, to } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr
+                .addMark(
+                  from,
+                  to,
+                  editor.schema.marks[mark].create(
+                    mark === 'link' ? { href: 'u' } : null,
+                  ),
+                )
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect,
+        ...(mark === 'link' && {
+          fails:
+            'VFM reads no math in the text of a link, and the writer does not write the math apart from the link around it, so the save is refused',
+        }),
+      })),
+      {
+        name: 'a ruby whose base another client emptied',
+        given: 'a {‸漢‸|かん} b',
+        steps: [
+          run('empty the base as another client', (editor) => {
+            const { from, to } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr
+                .delete(from, to)
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect: 'a  b',
+        fails:
+          'A ruby without a base has no markdown, and only this client takes one away, so the save is refused',
+      },
+      {
+        name: 'editing an image in a paragraph of its own',
+        given: '![a](a.png) \n\nx‸',
+        steps: [
+          selectNode('inlineImage'),
+          run('change the alt text', (editor) => {
+            editor.commands.updateAttributes('inlineImage', { alt: 'b' });
+          }),
+        ],
+        expect: '![b](a.png) \n\nx',
+      },
+      {
         name: 'an image in a link',
         given: '[![cap](a.png)](u)',
         json: [

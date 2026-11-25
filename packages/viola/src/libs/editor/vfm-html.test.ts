@@ -504,6 +504,26 @@ const comparisons: Record<string, Comparison[]> = {
     { markdown: '![cap](a.png){alt="other"}' },
     { markdown: '> ![cap](a.png)' },
     {
+      markdown: '![a](a.png) \n\n ![b](b.png)',
+      differs: {
+        vfm: '<p><img alt="a" src="a.png"> </p><p> <img alt="b" src="b.png"></p>',
+        editor:
+          '<p><img alt="a" src="a.png"></p><p><img alt="b" src="b.png"></p>',
+        reason:
+          'remark 8 keeps whitespace at the edges of a paragraph as text, which the editor has no place for; an image with it stays in its paragraph in both.',
+      },
+    },
+    {
+      markdown: '![a](a.png)<!-- c -->',
+      differs: {
+        vfm: '<figure><img alt="a" src="a.png"><!-- c --><figcaption aria-hidden="true">a</figcaption></figure>',
+        editor:
+          '<p><img alt="a" src="a.png"><code data-raw-inline="">&lt;!-- c --&gt;</code></p>',
+        reason:
+          'VFM makes a figure of an image with comments alone around it; the editor keeps the paragraph, which holds the comments.',
+      },
+    },
+    {
       markdown: '[![cap](a.png)](u)',
       differs: {
         vfm: '<p><a href="u"><img alt="cap" src="a.png"></a></p>',

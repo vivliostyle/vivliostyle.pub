@@ -16,7 +16,8 @@ import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 import { CodeBlockPrism, toInfoString } from '../../code-block-prism';
 import { PubListKeymap } from '../../list';
-import type { MdastNodeOf } from '../mdast';
+import type { MdastNodeOf, UnknownMdastNode } from '../mdast';
+import { transformPlugin } from '../micromark';
 import {
   defineNotation,
   type InlineRun,
@@ -578,11 +579,63 @@ function plainAlt(text: string): string {
   return text.replace(/[!-/:-@[-`{-~]/g, '\\$&').replace(/\n/g, '&#10;');
 }
 
+interface SpacedMdast extends UnknownMdastNode {
+  /** Whitespace is written around the paragraph on its lines. */
+  spaced?: boolean;
+}
+
+// remark 8, which VFM 2 reads with, keeps whitespace at the edges of a
+// paragraph as text, so an image with whitespace around it is no figure.
+function findSpacedParagraphs(tree: UnknownMdastNode, source: string): void {
+  const visit = (node: UnknownMdastNode, topLevel: boolean) => {
+    const start = node.position?.start.offset;
+    const end = node.position?.end.offset;
+    const [only, ...rest] = node.children ?? [];
+    if (
+      node.type === 'paragraph' &&
+      only?.type === 'image' &&
+      rest.length === 0 &&
+      start !== undefined &&
+      end !== undefined
+    ) {
+      const lineStart = source.lastIndexOf('\n', start - 1) + 1;
+      const after = source.slice(end).match(/^[^\n]*/)?.[0] ?? '';
+      (node as SpacedMdast).spaced =
+        /[ \t]$/.test(source.slice(start, end) + after) ||
+        (topLevel && /^[ \t]+$/.test(source.slice(lineStart, start)));
+      return;
+    }
+    for (const child of node.children ?? []) {
+      visit(child, node.type === 'root');
+    }
+  };
+  visit(tree, false);
+}
+
+/**
+ * Whether markdown reads the paragraph as the lone image it holds, which
+ * markdown has no line breaks at the edges of a paragraph for.
+ */
+function isLoneInlineImage(paragraph: ProseMirrorNode): boolean {
+  const children = childrenOfNode(paragraph).filter(
+    (child) =>
+      !child.type.spec.linebreakReplacement &&
+      !(child.isText && /^\n*$/.test(child.text ?? '')),
+  );
+  const [only] = children;
+  return (
+    children.length === 1 &&
+    only?.type.name === 'inlineImage' &&
+    only.marks.length === 0
+  );
+}
+
 function inlineImageNotation(inlineImage: AnyExtension): NotationDefinition {
   return defineNotation({
     name: 'inlineImage',
     version: 1,
     extensions: [inlineImage],
+    remarkPlugins: [transformPlugin(findSpacedParagraphs)],
     fromMarkdown: {
       image: (node, context) =>
         context.schema.nodes.inlineImage?.create(
@@ -590,12 +643,20 @@ function inlineImageNotation(inlineImage: AnyExtension): NotationDefinition {
           null,
           context.marks,
         ),
+      paragraph: (node, context, next) =>
+        (node as SpacedMdast).spaced
+          ? context.schema.nodes.paragraph?.create(null, context.inlines(node))
+          : next(),
     },
     nodes: {
       inlineImage: {
         write: (node) => imageMarkdown(node, plainAlt),
         writtenAttrs: imageWrittenAttrs,
       },
+      // The space after the image keeps it in its paragraph, which a client
+      // other than this one may have left it alone in.
+      paragraph: (node, _, next) =>
+        `${next()}${isLoneInlineImage(node) ? ' ' : ''}`,
     },
   });
 }

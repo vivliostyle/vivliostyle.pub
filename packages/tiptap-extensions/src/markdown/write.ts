@@ -283,6 +283,11 @@ export class MarkdownWriter {
           .filter(([, writer]) => writer.flanking)
           .map(([name]) => name),
       ),
+      textOnly: new Set(
+        [...this.markWriters]
+          .filter(([, writer]) => writer.run)
+          .map(([name]) => name),
+      ),
       readRaw: (text) => {
         try {
           return childrenOf(parser.parseBody(text).doc);

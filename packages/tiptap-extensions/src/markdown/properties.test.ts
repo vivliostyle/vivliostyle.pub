@@ -61,6 +61,16 @@ const KNOWN_VIOLATIONS: Record<
     reason:
       'a rewritten paragraph gives its lazy lines the prefix of the container, as in a quote or a list item',
   },
+  '![a](a.png) \n\n ![b](b.png)\n\n> ![c](c.png) ': {
+    violations: [
+      {
+        property: 'locality',
+        detail: 'appending plain text to block 2, character by character',
+      },
+    ],
+    reason:
+      'the space that keeps an image alone in its paragraph is not in the document, so text after the image is written in its place',
+  },
   'a\n\n---\n\nb': {
     violations: [{ property: 'locality', detail: 'deleting block 0' }],
     reason:

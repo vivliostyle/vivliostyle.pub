@@ -10,6 +10,21 @@ export function isRemote(tr: Transaction): boolean {
   return Boolean(tr.getMeta('y-sync$'));
 }
 
+const LOADING = 'pubMarkdownLoading';
+
+/** Marks the transaction that replaces the document with what was read. */
+export function markLoading(tr: Transaction): Transaction {
+  return tr.setMeta(LOADING, true);
+}
+
+/**
+ * Whether the transaction put in what the markdown was read as, which a
+ * plugin that changes what was typed into what it means leaves as it is.
+ */
+export function isLoading(tr: Transaction): boolean {
+  return Boolean(tr.getMeta(LOADING));
+}
+
 /**
  * Where the transactions of this client changed the document they end
  * with. Steps that change marks move nothing, so they are found by the

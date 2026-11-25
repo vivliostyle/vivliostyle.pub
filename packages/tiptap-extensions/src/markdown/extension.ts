@@ -6,7 +6,7 @@ import {
 } from '@tiptap/pm/model';
 import { Plugin, type Transaction } from '@tiptap/pm/state';
 
-import { changedNodes, isRemote } from './changes';
+import { changedNodes, isRemote, markLoading } from './changes';
 import {
   createLegacyBaselineReader,
   type LegacyBaselineReader,
@@ -440,7 +440,8 @@ export const PubMarkdown = Extension.create<
     return {
       setMarkdown:
         (markdown, options) =>
-        ({ commands, dispatch, editor }) => {
+        ({ commands, dispatch, editor, tr }) => {
+          markLoading(tr);
           const { doc } = currentPipeline(editor).parse(markdown);
           const done = commands.setContent(doc.toJSON(), {
             emitUpdate: options?.emitUpdate ?? true,
