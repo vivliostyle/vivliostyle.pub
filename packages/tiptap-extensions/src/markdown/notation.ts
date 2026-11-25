@@ -373,7 +373,7 @@ export type NotationDeclaration =
 
 function selectorOf(spec: Pick<HtmlElementSpec, 'tag' | 'match'>): string {
   return `${spec.tag}${Object.entries(spec.match ?? {})
-    .map(([name, value]) => `[${name}="${value.replace(/"/g, '\\"')}"]`)
+    .map(([name, value]) => `[${name}="${value.replace(/["\\]/g, '\\$&')}"]`)
     .join('')}`;
 }
 
