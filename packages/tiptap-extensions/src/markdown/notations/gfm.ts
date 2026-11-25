@@ -30,7 +30,7 @@ export const gfmNotations: NotationDefinition[] = [
       // cannot be escaped out of it: the links are found in the text after
       // escapes are read.
       {
-        pattern: /(?<![A-Za-z0-9])https?:\/\/[^\s<>]*[^\s<>.,:;!?'"]/gi,
+        pattern: /(?<![A-Za-z0-9])https?:\/\/[^\s<>]*[^\s<>.,:;!?'"*_~)]/gi,
         enclose: (url, marks) => (inLink(marks) ? null : `<${url}>`),
       },
       {
@@ -40,7 +40,7 @@ export const gfmNotations: NotationDefinition[] = [
       // Link text is markdown, so only what holds nothing to escape.
       {
         pattern:
-          /(?<![A-Za-z0-9_.])www\.[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?:\/[A-Za-z0-9/%=+-]*)?/gi,
+          /(?<![A-Za-z0-9])www\.[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?:\/[A-Za-z0-9/%=+-]*)?/gi,
         enclose: (domain, marks) =>
           inLink(marks) ? null : `[${domain}](http://${domain})`,
       },
