@@ -162,6 +162,10 @@ describe('code captions', () => {
     ['js:a\\:b', 'a:b'],
     [':app.js', null],
     ['js', null],
+    ['js title=a=b', 'a'],
+    ['js title="a=b c"', 'a'],
+    ['js title==b', null],
+    ['js:a=b', 'a=b'],
   ])('%j has the caption %j', (info, caption) => {
     expect(
       codeBlockCaption(info, info.includes('{title=') ? { title: 't' } : null),
@@ -174,6 +178,11 @@ describe('code captions', () => {
     ['js title=a {#c}', 'b', 'js title=b {#c}'],
     ['js', '', 'js'],
     ['', 'x', 'text title=x'],
+    ['js', 'x=y', 'js:x=y'],
+    ['js:app.js', 'x=y', 'js:x=y'],
+    ['js {#c}', 'x=y', 'js:x=y {#c}'],
+    ['js title=a', 'x=y', null],
+    ['js', 'x = y', null],
   ])('%j with %j is %j', (info, caption, written) => {
     expect(withCodeBlockCaption(info, caption)).toBe(written);
   });

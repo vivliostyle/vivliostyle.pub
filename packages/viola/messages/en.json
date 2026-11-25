@@ -23,6 +23,7 @@
   "code_block_panel_info_placeholder": "Language and meta (e.g. js title=a.js)",
   "code_block_panel_suggestions_aria": "Language suggestions",
   "code_caption_panel_apply_aria": "Apply caption",
+  "code_caption_panel_in_attributes": "The caption is a title in the attributes of the info string. Change it there.",
   "code_caption_panel_input_aria": "Code block caption",
   "code_caption_panel_invalid": "VFM cannot read this caption in the info string.",
   "code_caption_panel_placeholder": "Caption, e.g. app.js",

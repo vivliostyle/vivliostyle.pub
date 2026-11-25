@@ -23,6 +23,7 @@
   "code_block_panel_info_placeholder": "言語とメタ情報（例：js title=a.js）",
   "code_block_panel_suggestions_aria": "言語の候補",
   "code_caption_panel_apply_aria": "キャプションを適用",
+  "code_caption_panel_in_attributes": "キャプションはinfo stringの属性のtitleです。そちらで変更してください。",
   "code_caption_panel_input_aria": "コードブロックのキャプション",
   "code_caption_panel_invalid": "このキャプションはinfo stringに書くとVFMで読めません。",
   "code_caption_panel_placeholder": "キャプション（例：app.js）",

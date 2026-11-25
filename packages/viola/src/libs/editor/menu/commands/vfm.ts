@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/core';
 
 import {
+  codeBlockAttributes,
   codeBlockCaption,
   findSelectedCodeBlock,
   findSelectedInline,
@@ -223,10 +224,13 @@ registerEditorMenuCommand({
   label: m.editor_command_code_block_caption,
   icon: CaptionsIcon,
   isVisible: isInCodeBlock,
-  value: (editor) =>
-    codeBlockCaption(
-      findSelectedCodeBlock(editor.state)?.node.attrs.language,
-    ) ?? m.editor_command_code_block_caption_none(),
+  value: (editor) => {
+    const info = findSelectedCodeBlock(editor.state)?.node.attrs.language;
+    return (
+      codeBlockCaption(info, codeBlockAttributes(info)) ??
+      m.editor_command_code_block_caption_none()
+    );
+  },
   panel: CodeCaptionPanel,
 });
 
