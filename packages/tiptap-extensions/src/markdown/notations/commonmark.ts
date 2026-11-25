@@ -528,6 +528,11 @@ const hardBreakNotation = defineNotation({
   },
 });
 
+// Markdown has no alt text apart from an empty one.
+function imageWrittenAttrs(attrs: Record<string, unknown>) {
+  return { ...attrs, alt: attrs.alt || null };
+}
+
 /** An image's markdown, with its alt text written as `alt` gives it. */
 export function imageMarkdown(
   node: ProseMirrorNode,
@@ -556,7 +561,10 @@ function inlineImageNotation(inlineImage: AnyExtension): NotationDefinition {
         ),
     },
     nodes: {
-      inlineImage: (node) => imageMarkdown(node, plainAlt),
+      inlineImage: {
+        write: (node) => imageMarkdown(node, plainAlt),
+        writtenAttrs: imageWrittenAttrs,
+      },
     },
   });
 }
@@ -581,9 +589,12 @@ function imageNotation(image: AnyExtension): NotationDefinition {
       },
     },
     nodes: {
-      image: (node, context) => {
-        const alt = String(node.attrs.alt ?? '');
-        return `![${context.escaping === 'safe' ? alt.replace(/[[\]\\]/g, '\\$&') : alt}](${linkDestination(String(node.attrs.src ?? ''))}${linkTitle(node.attrs.title)})`;
+      image: {
+        write: (node, context) => {
+          const alt = String(node.attrs.alt ?? '');
+          return `![${context.escaping === 'safe' ? alt.replace(/[[\]\\]/g, '\\$&') : alt}](${linkDestination(String(node.attrs.src ?? ''))}${linkTitle(node.attrs.title)})`;
+        },
+        writtenAttrs: imageWrittenAttrs,
       },
     },
     escapes: [{ pattern: /!(?=\[)/g }],

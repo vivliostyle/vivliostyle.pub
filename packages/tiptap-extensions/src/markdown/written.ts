@@ -211,9 +211,13 @@ export class WrittenForm {
             }
           : null;
         // Markdown has no marks for a line break, e.g. code cannot hold one.
+        const atom = (lineBreak ? child.mark([]) : child).toJSON();
         chars.push({
           atom: JSON.stringify(
-            content ?? (lineBreak ? child.mark([]).toJSON() : child.toJSON()),
+            content ??
+              (this.options.attrsOf && atom.attrs
+                ? { ...atom, attrs: this.options.attrsOf(child) }
+                : atom),
           ),
           lineBreak,
           marks: lineBreak ? [] : marks,

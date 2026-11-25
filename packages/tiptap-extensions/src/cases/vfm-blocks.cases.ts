@@ -890,6 +890,28 @@ export const vfmBlockSuites: CaseSuite[] = [
         expect: '![新しい \\[図\\] \\\\](a.png)\n\n本文',
       },
       {
+        name: 'emptying the caption',
+        given: '![旧](a.png){#fig}\n\n本文‸',
+        steps: [
+          selectNode('image'),
+          run('empty the caption', (editor) => {
+            editor.commands.updateAttributes('image', { alt: '' });
+          }),
+        ],
+        expect: '![](a.png){#fig}\n\n本文',
+      },
+      {
+        name: 'emptying the alt text of an image in text',
+        given: 'a ![旧](a.png) b‸',
+        steps: [
+          selectNode('inlineImage'),
+          run('empty the alt text', (editor) => {
+            editor.commands.updateAttributes('inlineImage', { alt: '' });
+          }),
+        ],
+        expect: 'a ![](a.png) b',
+      },
+      {
         name: 'changing the caption keeps the attributes',
         given: '![旧](a.png){#fig}\n\n本文‸',
         steps: [
