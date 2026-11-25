@@ -15,16 +15,16 @@ import { NativeSelect } from '../../theme-settings/native-select';
 import { dismissPanel, PanelForm } from './panel-form';
 
 const TYPE_LABELS: Record<string, () => string> = {
-  sec: m.cross_reference_type_sec,
-  fig: m.cross_reference_type_fig,
-  tbl: m.cross_reference_type_tbl,
-  lst: m.cross_reference_type_lst,
-  eq: m.cross_reference_type_eq,
-  thm: m.cross_reference_type_thm,
-  sidenote: m.cross_reference_type_sidenote,
-  cite: m.cross_reference_type_cite,
-  appendix: m.cross_reference_type_appendix,
-  page: m.cross_reference_type_page,
+  sec: m.cross_reference_panel_type_sec,
+  fig: m.cross_reference_panel_type_fig,
+  tbl: m.cross_reference_panel_type_tbl,
+  lst: m.cross_reference_panel_type_lst,
+  eq: m.cross_reference_panel_type_eq,
+  thm: m.cross_reference_panel_type_thm,
+  sidenote: m.cross_reference_panel_type_sidenote,
+  cite: m.cross_reference_panel_type_cite,
+  appendix: m.cross_reference_panel_type_appendix,
+  page: m.cross_reference_panel_type_page,
 };
 const TYPE_ORDER = Object.keys(TYPE_LABELS);
 
