@@ -54,32 +54,3 @@ export function vfmNotations(
     inlineAttributesNotation,
   ];
 }
-
-export {
-  formatAttributes,
-  type InlineAttributes,
-  isAttributeName,
-  isRenderedAttribute,
-  parseAttributes,
-  renderedAttributes,
-  writableAttributes,
-} from './attributes';
-export { type FoundNode, findSelectedInline } from './commands';
-export { imageLabel } from './figures';
-export {
-  type FootnoteStatus,
-  footnoteIdentifier,
-  footnoteStatus,
-} from './footnote-definitions';
-export { isWritableFootnoteLabel } from './footnotes';
-export {
-  codeBlockAttributes,
-  codeBlockId,
-  type DocumentId,
-  documentIds,
-  headingText,
-  sectionEnds,
-} from './headings';
-export { isWritableMath } from './math';
-export { isWritableRubyText } from './ruby';
-export { Slugger, slug } from './slug';

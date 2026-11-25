@@ -2,12 +2,14 @@ import type { Editor, JSONContent } from '@tiptap/core';
 import { NodeSelection } from '@tiptap/pm/state';
 
 import {
-  allThemeNotations,
   currentNotations,
   MARKED_NOTATIONS,
   setDocumentNotations,
+} from '../markdown/extension';
+import {
+  allThemeNotations,
   themeBaseNotations,
-} from '../markdown';
+} from '../markdown/notations/theme';
 import { paste, press, run, type Step } from '../testing/steps';
 import type { CaseSuite } from '../testing/vitest';
 

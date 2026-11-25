@@ -5,7 +5,7 @@ import {
   currentNotations,
   MARKED_NOTATIONS,
   setDocumentNotations,
-} from '../markdown';
+} from '../markdown/extension';
 import { press, run, type Step } from '../testing/steps';
 import type { CaseSuite } from '../testing/vitest';
 

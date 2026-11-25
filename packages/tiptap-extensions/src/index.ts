@@ -9,21 +9,21 @@ import {
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
 import { imageExtensions } from './images';
+import { HtmlElementCommands } from './markdown/declare';
+import { PubMarkdown, type PubMarkdownOptions } from './markdown/extension';
+import type { NotationDefinition } from './markdown/notation';
+import { commonMarkNotations } from './markdown/notations/commonmark';
+import { gfmNotations, htmlMarkNotations } from './markdown/notations/gfm';
+import { rawNotation } from './markdown/notations/raw';
 import {
   allThemeNotations,
-  commonMarkNotations,
-  gfmNotations,
-  HtmlElementCommands,
-  htmlMarkNotations,
-  type NotationDefinition,
-  PubMarkdown,
-  type PubMarkdownOptions,
-  rawNotation,
   themeBaseNotations,
+} from './markdown/notations/theme';
+import {
   VFM_2_SYNTAX,
   type VfmSyntax,
   vfmNotations,
-} from './markdown';
+} from './markdown/notations/vfm/notations';
 
 export { type BlockFormat, getBlockFormat } from './block-format';
 export {
@@ -41,45 +41,59 @@ export {
   serializeCustomDragPayload,
 } from './custom-drag-handler';
 export {
-  CROSS_REFERENCE,
-  codeBlockAttributes,
-  currentNotations,
   type DeclaredElement,
-  type DocumentId,
-  type DocumentRecord,
   declaredElementOf,
-  documentIds,
-  type FoundNode,
-  findSelectedInline,
-  footnoteIdentifier,
-  footnoteStatus,
-  formatAttributes,
+  OTHER_ATTRIBUTES,
+} from './markdown/declare';
+export {
+  currentNotations,
+  type DocumentRecord,
   getMarkdown,
   hasDocumentNotation,
-  headingText,
+  MARKED_NOTATIONS,
+  parseMarkdown,
+  setDocumentNotations,
+  setMarkdownBaseline,
+  upgradeDocumentNotations,
+} from './markdown/extension';
+export type { NotationDefinition } from './markdown/notation';
+export {
+  CROSS_REFERENCE,
+  knownIds,
+  referencedId,
+} from './markdown/notations/theme';
+export {
+  formatAttributes,
   type InlineAttributes,
   isAttributeName,
   isRenderedAttribute,
-  isWritableFootnoteLabel,
-  isWritableMath,
-  isWritableRubyText,
-  knownIds,
-  MARKED_NOTATIONS,
-  MarkdownWriteError,
-  type NotationDefinition,
-  OTHER_ATTRIBUTES,
   parseAttributes,
-  parseMarkdown,
-  referencedId,
+  writableAttributes,
+} from './markdown/notations/vfm/attributes';
+export {
+  type FoundNode,
+  findSelectedInline,
+} from './markdown/notations/vfm/commands';
+export {
+  footnoteIdentifier,
+  footnoteStatus,
+} from './markdown/notations/vfm/footnote-definitions';
+export { isWritableFootnoteLabel } from './markdown/notations/vfm/footnotes';
+export {
+  codeBlockAttributes,
+  type DocumentId,
+  documentIds,
+  headingText,
   sectionEnds,
-  setDocumentNotations,
-  setMarkdownBaseline,
-  slug,
-  upgradeDocumentNotations,
+} from './markdown/notations/vfm/headings';
+export { isWritableMath } from './markdown/notations/vfm/math';
+export {
   VFM_2_SYNTAX,
   type VfmSyntax,
-  writableAttributes,
-} from './markdown';
+} from './markdown/notations/vfm/notations';
+export { isWritableRubyText } from './markdown/notations/vfm/ruby';
+export { slug } from './markdown/notations/vfm/slug';
+export { MarkdownWriteError } from './markdown/write';
 
 export const IMAGE_MIME_TYPES = [
   'image/png',

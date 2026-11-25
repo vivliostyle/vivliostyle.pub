@@ -5,14 +5,14 @@ import type { Transaction } from '@tiptap/pm/state';
 import {
   getMarkdownWithResult,
   MARKED_NOTATIONS,
-  MarkdownWriteError,
   markdownPipeline,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
-} from '../markdown';
+} from '../markdown/extension';
 import { createLegacyBaselineReader } from '../markdown/legacy';
 import { splitSource } from '../markdown/source';
+import { MarkdownWriteError } from '../markdown/write';
 import {
   isEmptyParagraph,
   judgeReadBack,
