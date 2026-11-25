@@ -491,6 +491,14 @@ export function takesAttributes(
   adjacent: WriteContext['adjacent'],
 ): boolean {
   const last = before?.slice(-1);
+  // A URL the writer encloses in angle brackets is an autolink, whatever
+  // the marks say.
+  if (
+    before &&
+    /<[A-Za-z][A-Za-z0-9+.-]*:[^\s<>]*>$|<[^\s<>@]+@[^\s<>]+>$/.test(before)
+  ) {
+    return true;
+  }
   if (!adjacent || !last || !/[)\]`*_~]/.test(last)) {
     return false;
   }

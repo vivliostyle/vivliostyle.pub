@@ -666,7 +666,9 @@ const inlineCodeNotation = defineNotation({
     },
   },
   marks: {
-    code: { open: '', close: '', run: (text) => codeSpan(text) },
+    // A code span of only a line break at the edge of its textblock has no
+    // markdown, as the line break has none.
+    code: { open: '', close: '', run: (text) => (text ? codeSpan(text) : '') },
   },
 });
 
