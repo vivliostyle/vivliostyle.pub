@@ -427,6 +427,32 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a", footnoteReference, "\\ntext\\n", rawInline("[^1]: def")))',
       },
       {
+        name: 'one right after another is a definition of its own',
+        given: '本文[^1]と[^2]。\n\n[^1]: 注一\n[^2]: 注二',
+        doc: 'doc(paragraph("本文", footnoteReference, "と", footnoteReference, "。"), footnoteDefinition(paragraph("注一")), footnoteDefinition(paragraph("注二")))',
+      },
+      {
+        name: 'one right after another’s list',
+        given: '[^1]:\n    - x\n[^2]: two',
+        doc: 'doc(footnoteDefinition(bulletList(listItem(paragraph("x")))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'one right after another in a quote',
+        given: '> [^1]: one\n[^2]: two',
+        doc: 'doc(blockquote(footnoteDefinition(paragraph("one"))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'one indented into another is more of its lines',
+        given: '[^1]: one\n    [^2]: two',
+        doc: 'doc(footnoteDefinition(paragraph("one\\n", rawInline("[^2]: two"))))',
+      },
+      {
+        name: 'editing one right before another',
+        given: '本文[^1]と[^2]。\n\n[^1]: ‸注一\n[^2]: 注二',
+        steps: ['X'],
+        expect: '本文[^1]と[^2]。\n\n[^1]: X‸注一\n[^2]: 注二',
+      },
+      {
         name: 'one of paragraphs interrupting a paragraph is kept as written',
         given: 'a\n[^1]: x\n\n    b',
         doc: 'doc(paragraph("a"), rawBlock("[^1]: x\\n\\n    b"))',

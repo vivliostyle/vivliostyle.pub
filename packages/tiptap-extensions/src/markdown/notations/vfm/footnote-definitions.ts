@@ -83,7 +83,7 @@ function clampEnds(node: UnknownMdastNode, source: string): void {
 /**
  * A definition that would interrupt a paragraph is, to VFM 2, more lines of
  * the paragraph. One of a single paragraph is put there as raw markdown;
- * VFM reads its label as a reference.
+ * VFM reads its label as a reference. VFM 2 ends a definition at the next.
  */
 function continueParagraphs(tree: UnknownMdastNode, source: string): void {
   const visit = (parent: UnknownMdastNode) => {
@@ -99,6 +99,7 @@ function continueParagraphs(tree: UnknownMdastNode, source: string): void {
       if (
         child.type !== 'footnoteDefinition' ||
         !found ||
+        found.path.some((it) => it.type === 'footnoteDefinition') ||
         line === undefined ||
         previous.position?.end.line !== line - 1
       ) {

@@ -696,6 +696,65 @@ describe('elements the editor makes of markdown, compared with VFM', () => {
   }
 });
 
+interface Element {
+  type: string;
+  name?: string;
+  data?: string;
+  attribs?: Record<string, string>;
+  children?: Element[];
+}
+
+function elementsOf(
+  nodes: readonly Element[],
+  test: (element: Element) => boolean,
+): Element[] {
+  return nodes.flatMap((node) =>
+    test(node) ? [node] : elementsOf(node.children ?? [], test),
+  );
+}
+
+function textOf(node: Element): string {
+  return node.type === 'text'
+    ? (node.data ?? '')
+    : (node.children ?? []).map(textOf).join('');
+}
+
+// The text of each note VFM collects at the end, and of each definition the
+// editor shows where it is written: the same as long as they are referred to
+// in the order they are defined.
+function vfmNotes(markdown: string): string[] {
+  const html = stringify(markdown, { partial: true, disableFormatHtml: true });
+  return elementsOf(
+    htmlToDOM(html) as unknown as Element[],
+    (it) => it.name === 'li' && /^fn/.test(it.attribs?.id ?? ''),
+  ).map((it) => textOf(it).replace(/↩|\s+/g, ''));
+}
+
+function editorNotes(markdown: string): string[] {
+  return elementsOf(
+    htmlToDOM(
+      documentHtml(parseMarkdown(editor, markdown).doc),
+    ) as unknown as Element[],
+    (it) => /\bfootnote-definition\b/.test(it.attribs?.class ?? ''),
+  ).map((it) => textOf(it).replace(/\s+/g, ''));
+}
+
+const NOTES = [
+  'a[^1][^2]\n\n[^1]: 注一\n[^2]: 注二',
+  'a[^1][^2]\n\n[^1]: one\n  more\n[^2]: two',
+  'a[^1][^2]\n\n[^1]:\n    - x\n[^2]: two',
+  'a[^1][^2]\n\n> [^1]: one\n[^2]: two',
+  'a[^1][^2]\n\n- [^1]: one\n[^2]: two',
+  'a[^1][^2]\n\n[^1]: one\n  [^2]: two',
+  'a[^1][^2]\n\n[^1]: one\n\n    para\n[^2]: two',
+];
+
+describe('notes, compared with VFM', () => {
+  it.each(NOTES)('%j', (markdown) => {
+    expect(editorNotes(markdown)).toEqual(vfmNotes(markdown));
+  });
+});
+
 function vfmHeadingIds(markdown: string): string[] {
   return [
     ...stringify(markdown, { partial: true, disableFormatHtml: true }).matchAll(
