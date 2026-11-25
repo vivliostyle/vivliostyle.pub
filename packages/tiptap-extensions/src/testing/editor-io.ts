@@ -1,11 +1,8 @@
 import type { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
-import {
-  getMarkdown,
-  MarkdownWriteError,
-  setMarkdownBaseline,
-} from '../markdown';
+import { getMarkdown, setMarkdownBaseline } from '../markdown/extension';
+import { MarkdownWriteError } from '../markdown/write';
 import { CARET } from './selection-marks';
 
 export function loadMarkdown(editor: Editor, markdown: string): void {

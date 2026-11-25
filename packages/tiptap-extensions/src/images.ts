@@ -5,8 +5,8 @@ import { Plugin } from '@tiptap/pm/state';
 import { Mapping } from '@tiptap/pm/transform';
 import { join } from 'pathe';
 
-import { hasDocumentNotation } from './markdown';
 import { changedNodes, isLoading, isRemote } from './markdown/changes';
+import { hasDocumentNotation } from './markdown/extension';
 import { renderedAttributes } from './markdown/notations/vfm/attributes';
 import { inlineSourceRules } from './markdown/notations/vfm/input-rules';
 import { inlineNodeRules } from './markdown/notations/vfm/normalize';
