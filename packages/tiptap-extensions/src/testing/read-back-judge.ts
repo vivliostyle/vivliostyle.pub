@@ -93,12 +93,13 @@ function charsOf(
         lineBreak: true,
       });
     } else {
-      // Inline content holds what a textblock's holds.
+      // Inline content holds what a textblock's holds, line breaks at its
+      // edges too.
       const value = child.inlineContent
         ? {
             type: child.type.name,
             attrs: child.attrs,
-            content: normalizeChars(charsOf(child, used), used).map(
+            content: normalizeChars(charsOf(child, used), used, false).map(
               ({ value, marks, raw }) => [value, marks, raw],
             ),
           }
@@ -115,10 +116,14 @@ function charsOf(
 }
 
 /** Applies the allowed differences that only remove something. */
-function normalizeChars(chars: Char[], used: Set<AllowedDifference>): Char[] {
+function normalizeChars(
+  chars: Char[],
+  used: Set<AllowedDifference>,
+  textblock = true,
+): Char[] {
   const result = [...chars];
   const isBreak = (char: Char | undefined) =>
-    Boolean(char && (char.lineBreak || char.value === '\n'));
+    textblock && Boolean(char && (char.lineBreak || char.value === '\n'));
   const isRawSpace = (char: Char | undefined) =>
     Boolean(char?.raw && /^[ \t]$/.test(char.value));
   for (;;) {

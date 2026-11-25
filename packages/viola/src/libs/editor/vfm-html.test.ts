@@ -323,6 +323,17 @@ const comparisons: Record<string, Comparison[]> = {
           "The editor shows a note where it is written, as VFM's gcpm mode puts it, instead of collecting it at the end.",
       },
     },
+    {
+      markdown: '本文^[注\\\n\\\n]です。',
+      options: { footnote: 'gcpm' },
+      differs: {
+        vfm: '<p>本文<span class="footnote" id="fn-1" role="doc-footnote">注<br>\n<br>\n</span>です。</p>',
+        editor:
+          '<p>本文<span class="footnote" role="doc-footnote">注<br><br></span>です。</p>',
+        reason:
+          'VFM numbers notes in the order of the book, and the line ending after a hard break is part of the break.',
+      },
+    },
     // VFM reads braces after a reference as its attributes, which ruby is not.
     { markdown: 'a[^1]{漢|かん}' },
     {

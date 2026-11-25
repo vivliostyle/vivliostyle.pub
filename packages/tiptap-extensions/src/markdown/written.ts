@@ -220,8 +220,9 @@ export class WrittenForm {
     if (read) {
       this.findAutolinks(textblock, chars);
     }
+    // Only a textblock's content cannot start or end with a line break.
     const isBreak = (it: Char | undefined) =>
-      it?.char === '\n' || Boolean(it?.lineBreak);
+      !textblock.isInline && (it?.char === '\n' || Boolean(it?.lineBreak));
     // Raw markdown at the edges of a textblock may start or end with
     // whitespace, which markdown does not keep there.
     const isEdgeSpace = (it: Char | undefined) =>

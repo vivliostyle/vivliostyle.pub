@@ -1511,11 +1511,12 @@ export class MarkdownWriter {
       const last = index === children.length - 1 && edges.end;
       if (child.isText) {
         let text = child.text ?? '';
-        // A line break can neither start nor end a textblock in markdown.
-        if (first) {
+        // A line break can neither start nor end a textblock in markdown;
+        // the content of an inline node can have one at its edges.
+        if (first && !textblock.isInline) {
           text = text.replace(/^\n+/, '');
         }
-        if (last) {
+        if (last && !textblock.isInline) {
           text = text.replace(/\n+$/, '');
         }
         const runMark = child.marks.find((mark) => this.markWriter(mark)?.run);
@@ -1567,7 +1568,11 @@ export class MarkdownWriter {
             child.marks,
           );
         }
-      } else if (child.type.spec.linebreakReplacement && (first || last)) {
+      } else if (
+        child.type.spec.linebreakReplacement &&
+        (first || last) &&
+        !textblock.isInline
+      ) {
         // A line break can neither start nor end a textblock in markdown.
         content = '';
       } else {

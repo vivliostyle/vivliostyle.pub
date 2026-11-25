@@ -623,6 +623,18 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'x^[ab‸] y',
       },
       {
+        name: 'line breaks at the end of a note',
+        given: '本文^[注‸]です。',
+        steps: [press('Shift-Enter'), press('Shift-Enter')],
+        expect: '本文^[注  \n\\\n]です。',
+        doc: 'doc(paragraph("本文", inlineFootnote("注", hardBreak, hardBreak), "です。"))',
+      },
+      {
+        name: 'line breaks at the edges of a note as written',
+        given: '本文^[\\\n注\\\n\\\n]です。',
+        doc: 'doc(paragraph("本文", inlineFootnote(hardBreak, "注", hardBreak, hardBreak), "です。"))',
+      },
+      {
         name: 'a bracket typed into a note is escaped',
         given: 'x^[a‸] y',
         steps: [']'],
