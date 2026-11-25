@@ -13,7 +13,11 @@ import {
 } from '../markdown';
 import { createLegacyBaselineReader } from '../markdown/legacy';
 import { splitSource } from '../markdown/source';
-import { judgeReadBack, rawMeaningOf } from './read-back-judge';
+import {
+  isEmptyParagraph,
+  judgeReadBack,
+  rawMeaningOf,
+} from './read-back-judge';
 
 /** A way the markdown conversion breaks one of its guarantees. */
 export interface PropertyViolation {
@@ -74,7 +78,7 @@ export function unexplainedDifferences(
   }
   const blocks: ProseMirrorNode[] = [];
   doc.forEach((child) => {
-    if (!(child.type.name === 'paragraph' && child.childCount === 0)) {
+    if (!isEmptyParagraph(child)) {
       blocks.push(child);
     }
   });

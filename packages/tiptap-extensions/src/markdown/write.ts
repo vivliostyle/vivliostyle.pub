@@ -7,13 +7,14 @@ import {
   type SourceSegment,
 } from './inline-reuse';
 import { keyOf, matchSequences } from './match';
-import type {
-  ChildrenOptions,
-  EscapeRule,
-  MarkToMarkdown,
-  NodeWriter,
-  NotationDefinition,
-  WriteContext,
+import {
+  type ChildrenOptions,
+  type EscapeRule,
+  isEmptyTextblock,
+  type MarkToMarkdown,
+  type NodeWriter,
+  type NotationDefinition,
+  type WriteContext,
 } from './notation';
 import {
   type MarkdownParser,
@@ -562,9 +563,8 @@ export class MarkdownWriter {
   /** Empty paragraphs have no markdown, so they are left out. */
   private isUnwritten(node: ProseMirrorNode): boolean {
     return (
-      node.isTextblock &&
-      node.childCount === 0 &&
-      node.type === this.schema.topNodeType.contentMatch.defaultType
+      node.type === this.schema.topNodeType.contentMatch.defaultType &&
+      isEmptyTextblock(node)
     );
   }
 
@@ -1436,7 +1436,15 @@ export class MarkdownWriter {
         content = '';
       } else {
         const writer = this.nodeWriters.get(child.type.name);
-        content = writer?.write(child, context, () => '') ?? '';
+        const preceding = `${edges.before}${output}${opens.map((it) => it.text).join('')}`;
+        const newline = preceding.lastIndexOf('\n');
+        const line =
+          newline !== -1 || edges.start
+            ? preceding.slice(newline + 1)
+            : `\u0000${preceding}`;
+        content =
+          writer?.write(child, { ...context, lineBefore: line }, () => '') ??
+          '';
       }
 
       // Whitespace that markdown would strip at the start or end of a line.

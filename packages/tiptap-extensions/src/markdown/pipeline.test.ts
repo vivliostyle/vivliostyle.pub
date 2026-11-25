@@ -6,6 +6,7 @@ import { PubExtensions } from '../index';
 import {
   loadAsMarkedDocument,
   readsBackAs,
+  unexplainedDifferences,
 } from '../testing/markdown-properties';
 import {
   currentNotations,
@@ -332,6 +333,9 @@ function savesAsDocument(editor: Editor): string {
   const result = getMarkdownWithResult(editor);
   expect(result.strategy).not.toBe('generated');
   expect(readsBackAs(editor, result.markdown, editor.state.doc)).toBe(true);
+  expect(
+    unexplainedDifferences(editor, result.markdown, editor.state.doc),
+  ).toEqual([]);
   return result.markdown;
 }
 
@@ -517,6 +521,43 @@ describe('saving keeps what the document means', () => {
     const editor = load('---\ntitle: x\n---');
     editor.view.dispatch(editor.state.tr.insertText('hello', 1));
     expect(getMarkdown(editor)).toBe('---\ntitle: x\n---\nhello');
+  });
+});
+
+describe('saving what an edit can leave in a paragraph', () => {
+  it('writes a line break on a line of its own with a backslash', () => {
+    const editor = load('ab\n');
+    const { hardBreak } = editor.state.schema.nodes;
+    editor.view.dispatch(
+      editor.state.tr.insert(2, [hardBreak.create(), hardBreak.create()]),
+    );
+    expect(savesAsDocument(editor)).toBe('a  \n\\\nb\n');
+  });
+
+  it('writes a line break that starts a line with a backslash', () => {
+    const editor = load('a\nb\n');
+    editor.view.dispatch(
+      editor.state.tr.insert(3, editor.state.schema.nodes.hardBreak.create()),
+    );
+    expect(savesAsDocument(editor)).toBe('a\n\\\nb\n');
+  });
+
+  it('leaves out a paragraph of line breaks', () => {
+    const editor = load('ab\n\ncd\n');
+    editor.view.dispatch(editor.state.tr.insertText('\n\n', 1, 3));
+    expect(savesAsDocument(editor)).toBe('cd\n');
+  });
+
+  it('writes a blank line in the text of a paragraph', () => {
+    const editor = load('ab\n');
+    editor.view.dispatch(editor.state.tr.insertText('\n\n', 2));
+    expect(savesAsDocument(editor)).toBe('a&#xA;\nb\n');
+  });
+
+  it('writes an ampersand that would start a character reference', () => {
+    const editor = load('ab\n');
+    appendAfter(editor, 'a', '&amp;');
+    expect(savesAsDocument(editor)).toBe('a&#x26;amp;b\n');
   });
 });
 

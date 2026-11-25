@@ -40,4 +40,10 @@ describe('judging read-back', () => {
     const actual = paragraphs([['a', [bold]], [' '], ['b', [italic]]]);
     expect(judgeReadBack(expected, actual).unexplained).toEqual([]);
   });
+
+  it('takes a paragraph of line breaks for an empty one', () => {
+    const expected = paragraphs([['\n\n']], [['b']]);
+    const actual = paragraphs([['b']]);
+    expect(judgeReadBack(expected, actual).unexplained).toEqual([]);
+  });
 });

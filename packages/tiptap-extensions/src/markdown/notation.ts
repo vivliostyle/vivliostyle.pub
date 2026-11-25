@@ -70,6 +70,8 @@ export interface WriteContext {
   readonly avoidMarkers: ReadonlySet<string>;
   /** The node's source before it changed, when it had one. */
   readonly base: BaseNode | null;
+  /** For an inline node, what is written on its line before it. */
+  readonly lineBefore?: string;
   /** The markdown of a textblock's content, with `data` for its writers. */
   inline(node: ProseMirrorNode, data?: Record<string, unknown>): string;
   /**
@@ -185,6 +187,23 @@ export interface HtmlElementSpec {
   match?: Record<string, string>;
   /** Attributes the opening tag may have, kept as the type's attributes. */
   capture?: string[];
+}
+
+/**
+ * Whether a textblock holds nothing markdown can: line breaks alone, which
+ * cannot start or end one, leave it empty.
+ */
+export function isEmptyTextblock(node: ProseMirrorNode): boolean {
+  if (!node.isTextblock) {
+    return false;
+  }
+  let empty = true;
+  node.forEach((child) => {
+    empty &&= child.isText
+      ? /^\n*$/.test(child.text ?? '')
+      : child.type.spec.linebreakReplacement === true;
+  });
+  return empty;
 }
 
 /** The attributes of an opening tag, from the text after its name. */

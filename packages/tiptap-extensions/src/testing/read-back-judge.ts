@@ -37,6 +37,26 @@ interface Char {
   lineBreak: boolean;
 }
 
+/**
+ * A paragraph with nothing in it, or only line breaks, which are dropped at
+ * the edges of a textblock.
+ */
+export function isEmptyParagraph(node: ProseMirrorNode): boolean {
+  if (node.type.name !== 'paragraph') {
+    return false;
+  }
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    const lineBreak = child.isText
+      ? [...(child.text ?? '')].every((char) => char === '\n')
+      : Boolean(child.type.spec.linebreakReplacement);
+    if (!lineBreak) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function isAutolinkText(text: string, href: unknown): boolean {
   return (
     typeof href === 'string' &&
@@ -284,9 +304,7 @@ function compareNodes(
     node.forEach((child) => {
       all.push(child);
     });
-    const kept = all.filter(
-      (child) => !(child.type.name === 'paragraph' && child.childCount === 0),
-    );
+    const kept = all.filter((child) => !isEmptyParagraph(child));
     if (kept.length === all.length) {
       return all;
     }
@@ -333,7 +351,7 @@ export function judgeReadBack(
   const blocks = (doc: ProseMirrorNode) => {
     const children: ProseMirrorNode[] = [];
     doc.forEach((child) => {
-      if (child.type.name === 'paragraph' && child.childCount === 0) {
+      if (isEmptyParagraph(child)) {
         used.add('empty paragraph');
       } else {
         children.push(child);

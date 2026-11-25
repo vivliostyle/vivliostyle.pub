@@ -100,6 +100,21 @@ describe('saved markdown as VFM reads it', () => {
     expect(html(getMarkdown(editor))).toContain('\\(x^2 + \\alpha_1\\)');
   });
 
+  it('keeps two line breaks in a row in the paragraph', () => {
+    const editor = load('ab\n');
+    const { hardBreak } = editor.state.schema.nodes;
+    editor.view.dispatch(
+      editor.state.tr.insert(2, [hardBreak.create(), hardBreak.create()]),
+    );
+    expect(html(getMarkdown(editor))).toBe('<p>a<br>\n<br>\nb</p>');
+  });
+
+  it('keeps a blank line and an ampersand typed into the text', () => {
+    const editor = load('ab\n');
+    insertAfter(editor, 'a', '&amp;\n\n');
+    expect(html(getMarkdown(editor))).toBe('<p>a&#x26;amp;\n\nb</p>');
+  });
+
   it('changes nothing else in VFM when the edit adds only text', () => {
     const markdown = 'a {a|b} $a_1$ c\n';
     const editor = load(markdown);
