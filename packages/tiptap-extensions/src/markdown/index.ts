@@ -54,6 +54,7 @@ export {
   formatAttributes,
   type InlineAttributes,
   isAttributeName,
+  isRenderedAttribute,
   isWritableFootnoteLabel,
   isWritableMath,
   isWritableRubyText,

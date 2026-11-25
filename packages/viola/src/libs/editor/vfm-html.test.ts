@@ -268,7 +268,16 @@ const comparisons: Record<string, Comparison[]> = {
     },
   ],
   'VFM attributes': [
-    { markdown: '**s**{.x} *e*{#i .a k="v w"}' },
+    {
+      markdown: '**s**{.x} *e*{#i .a k="v w"}',
+      differs: {
+        vfm: '<p><strong class="x">s</strong> <em class="a" id="i" k="v w">e</em></p>',
+        editor:
+          '<p><strong class="x">s</strong> <em class="a" id="i">e</em></p>',
+        reason:
+          'The editor puts on its elements only the attributes a theme can select them by and that do not change how the editor behaves; the document keeps the others.',
+      },
+    },
     { markdown: '`c`{.y} ~~d~~{.z}' },
     { markdown: '**s** {.x} and para {.x}' },
     { markdown: '**s**{onclick=alert(1)}' },

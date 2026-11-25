@@ -10,8 +10,48 @@ import {
 describe('attributes on the editor’s elements', () => {
   it('leave out names a DOM element cannot have', () => {
     expect(
-      renderedAttributes({ 'http://example.com': '', 'a|b': '', ok: '1' }),
-    ).toEqual({ ok: '1' });
+      renderedAttributes({ 'http://example.com': '', 'a|b': '', title: '1' }),
+    ).toEqual({ title: '1' });
+  });
+
+  it('are only those a theme can select the element by', () => {
+    expect(
+      renderedAttributes({
+        id: 'i',
+        lang: 'ja',
+        dir: 'rtl',
+        title: 't',
+        role: 'note',
+        'aria-label': 'l',
+        hidden: '',
+        'data-x': 'y',
+        name: 'n',
+        popover: '',
+        autofocus: '',
+        tabindex: '0',
+        target: '_top',
+        k: 'v',
+        width: '10',
+        'data-mark': 'm',
+        'data-type': 't',
+      }),
+    ).toEqual({
+      id: 'i',
+      lang: 'ja',
+      dir: 'rtl',
+      title: 't',
+      role: 'note',
+      'aria-label': 'l',
+      hidden: '',
+      'data-x': 'y',
+    });
+  });
+
+  it('are the size of an image too', () => {
+    expect(renderedAttributes({ width: '10', height: '5' }, 'img')).toEqual({
+      width: '10',
+      height: '5',
+    });
   });
 
   it('leave out what runs script or what the editor relies on', () => {

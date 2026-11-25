@@ -286,29 +286,48 @@ export function isAttributeName(name: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name);
 }
 
-// Event handlers run script, the editor's own rendering depends on the
-// others, and the data attributes and classes would make pasted HTML read
-// as the editor's other nodes. VFM itself leaves out only some handlers.
-const UNRENDERED =
-  /^(?:on.*|href|src|srcset|srcdoc|style|ping|action|formaction|contenteditable|draggable|xmlns.*|data-(?:pm|raw|math).*)$/i;
+// What a theme can select an element by, and what does not change how the
+// editor behaves. The data attributes and classes of the editor's own
+// rendering would make pasted HTML read as its other nodes.
+const RENDERED = /^(?:id|class|lang|dir|title|role|hidden|aria-[a-z-]+)$/;
+const OWN_DATA = /^data-(?:pm|raw|math|mark|type|language)/;
 const OWN_CLASSES = new Set(['footnote-ref', 'footnote', 'math']);
+const RENDERED_BY_ELEMENT: Record<string, ReadonlySet<string>> = {
+  img: new Set(['width', 'height']),
+};
 
 /**
- * The attributes the editor puts on its own element: the document keeps the
- * others, which are written back to markdown.
+ * Whether the editor puts an attribute from markdown on its element, an
+ * `element` of the tag name. VFM puts on almost every one.
+ */
+export function isRenderedAttribute(name: string, element?: string): boolean {
+  const key = name.toLowerCase();
+  return (
+    RENDERED.test(key) ||
+    (/^data-[a-z0-9_.-]+$/.test(key) && !OWN_DATA.test(key)) ||
+    Boolean(element && RENDERED_BY_ELEMENT[element]?.has(key))
+  );
+}
+
+/**
+ * The attributes the editor puts on its own element, see
+ * `isRenderedAttribute`: the document keeps the others, which are written
+ * back to markdown.
  */
 export function renderedAttributes(
   attributes: unknown,
+  element?: string,
 ): Record<string, string> {
   if (!attributes || typeof attributes !== 'object') {
     return {};
   }
   const rendered: Record<string, string> = {};
   for (const [key, value] of Object.entries(attributes as InlineAttributes)) {
-    if (typeof value !== 'string' || !isAttributeName(key)) {
-      continue;
-    }
-    if (UNRENDERED.test(key)) {
+    if (
+      typeof value !== 'string' ||
+      !isAttributeName(key) ||
+      !isRenderedAttribute(key, element)
+    ) {
       continue;
     }
     if (key.toLowerCase() === 'class') {
@@ -536,17 +555,20 @@ export const InlineAttributesExtension = Extension.create({
   name: 'inlineAttributes',
 
   addGlobalAttributes() {
+    const attributes = (element?: string) => ({
+      attributes: {
+        default: null,
+        parseHTML: () => null,
+        renderHTML: (attrs: Record<string, unknown>) =>
+          renderedAttributes(attrs.attributes, element),
+      },
+    });
     return [
       {
-        types: ATTRIBUTED_TYPES,
-        attributes: {
-          attributes: {
-            default: null,
-            parseHTML: () => null,
-            renderHTML: (attrs) => renderedAttributes(attrs.attributes),
-          },
-        },
+        types: ATTRIBUTED_TYPES.filter((type) => type !== 'image'),
+        attributes: attributes(),
       },
+      { types: ['image'], attributes: attributes('img') },
     ];
   },
 });
