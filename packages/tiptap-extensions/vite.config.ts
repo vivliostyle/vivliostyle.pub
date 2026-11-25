@@ -9,5 +9,8 @@ export default defineConfig({
       reporter: ['json', 'html'],
       enabled: true,
     },
+    // Turbo runs every package's tests at once on CI's few cores, where
+    // the build artifact checks of cli-bundle then run out of time.
+    maxWorkers: process.env.CI ? 1 : undefined,
   },
 });
