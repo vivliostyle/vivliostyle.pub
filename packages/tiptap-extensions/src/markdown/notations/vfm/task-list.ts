@@ -1,5 +1,9 @@
 import { Extension, InputRule } from '@tiptap/core';
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import {
+  Fragment,
+  type Node as ProseMirrorNode,
+  Slice,
+} from '@tiptap/pm/model';
 import { type EditorState, Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 
@@ -91,6 +95,9 @@ function checkbox(checked: boolean) {
     input.checked = checked;
     input.addEventListener('mousedown', (event) => {
       event.preventDefault();
+      if (!view.editable) {
+        return;
+      }
       const at = getPos();
       // The widget sits at the start of the item's first paragraph.
       const pos = at === undefined ? -1 : at - 2;
@@ -287,6 +294,36 @@ const TaskList = Extension.create({
   },
 });
 
+/**
+ * An item with the checkbox kept raw at the start of its text, without the
+ * line ending and indentation after it, which are a line break of the text.
+ */
+function checkboxAsText(
+  item: ProseMirrorNode | undefined,
+): ProseMirrorNode | undefined {
+  const paragraph = item?.firstChild;
+  const box = paragraph?.firstChild;
+  const found = box?.isText ? box.text?.match(/^(\[[ xX]\])\s+$/) : null;
+  if (!item || !paragraph || !box || !found?.[1]) {
+    return item;
+  }
+  const { schema } = item.type;
+  const children: ProseMirrorNode[] = [
+    schema.text(found[1], box.marks),
+    schema.text('\n'),
+  ];
+  paragraph.forEach((child, _, index) => {
+    if (index > 0) {
+      children.push(child);
+    }
+  });
+  return item.replace(
+    0,
+    paragraph.nodeSize,
+    new Slice(Fragment.from(paragraph.copy(Fragment.from(children))), 0, 0),
+  );
+}
+
 export const taskListNotation = defineNotation({
   name: 'taskList',
   version: 1,
@@ -294,12 +331,21 @@ export const taskListNotation = defineNotation({
   attributes: ['listItem:checked'],
   remarkPlugins: [transformPlugin(readEmptyTasks)],
   fromMarkdown: {
-    listItem: (node, context, next) =>
-      typeof (node as ItemMdast).checked === 'boolean'
-        ? convertListItem(node as MdastNodeOf<'listItem'>, context, {
-            checkbox: 'attribute',
-          })
-        : next(),
+    listItem: (node, context, next) => {
+      if (typeof (node as ItemMdast).checked !== 'boolean') {
+        return next();
+      }
+      const item = node as MdastNodeOf<'listItem'>;
+      // VFM 2 reads no checkbox that ends its line, as GFM does.
+      if (
+        /^(?:[-*+]|\d{1,9}[.)])[ \t]+\[[ xX]\]\n/.test(context.source(node))
+      ) {
+        return checkboxAsText(
+          convertListItem(item, context, { checkbox: 'raw' }),
+        );
+      }
+      return convertListItem(item, context, { checkbox: 'attribute' });
+    },
   },
   nodes: {
     listItem: {

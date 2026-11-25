@@ -887,6 +887,24 @@ export const vfmBlockSuites: CaseSuite[] = [
         ],
       },
       {
+        name: 'a checkbox that ends its line is text, as in VFM',
+        given: '- [x]\n  text\n- [ ]\n  b',
+        doc: 'doc(bulletList(listItem(paragraph(rawInline("[x]"), "\\ntext")), listItem(paragraph(rawInline("[ ]"), "\\nb"))))',
+      },
+      {
+        name: 'editing the text after a checkbox that ends its line',
+        given: '- [x]\n  text‸',
+        steps: ['X'],
+        expect: '- [x]\n  textX‸',
+      },
+      {
+        name: 'a heading after the checkbox',
+        given: '- [x] # h',
+        doc: 'doc(bulletList(listItem(paragraph, heading("h"))))',
+        fails:
+          'VFM 2 reads a block after the checkbox; micromark reads the rest of the line as text',
+      },
+      {
         name: 'a quote after the checkbox',
         given: '- [ ] > q',
         doc: 'doc(bulletList(listItem(paragraph, blockquote(paragraph("q")))))',

@@ -645,6 +645,16 @@ const comparisons: Record<string, Comparison[]> = {
   ],
   'GFM task lists': [
     {
+      markdown: '- [x]\n  text',
+      differs: {
+        vfm: '<ul><li>[x]\ntext</li></ul>',
+        editor:
+          '<ul><li><p><code data-raw-inline="">[x]</code>\ntext</p></li></ul>',
+        reason:
+          'A checkbox that ends its line is no checkbox to VFM 2; the editor keeps it as written, and a list item always holds a paragraph in the editor.',
+      },
+    },
+    {
       markdown: '- [ ] task\n- [x] done',
       differs: {
         vfm: '<ul class="contains-task-list"><li class="task-list-item"><input disabled="" type="checkbox"> task</li><li class="task-list-item"><input checked="" disabled="" type="checkbox"> done</li></ul>',
