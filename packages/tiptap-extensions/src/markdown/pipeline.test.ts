@@ -6,6 +6,7 @@ import { PubExtensions } from '../index';
 import {
   loadAsMarkedDocument,
   readsBackAs,
+  unexplainedDifferences,
 } from '../testing/markdown-properties';
 import {
   currentNotations,
@@ -351,6 +352,9 @@ function savesAsDocument(editor: Editor): string {
   const result = getMarkdownWithResult(editor);
   expect(result.strategy).not.toBe('generated');
   expect(readsBackAs(editor, result.markdown, editor.state.doc)).toBe(true);
+  expect(
+    unexplainedDifferences(editor, result.markdown, editor.state.doc),
+  ).toEqual([]);
   return result.markdown;
 }
 
@@ -550,6 +554,81 @@ describe('saving keeps what the document means', () => {
     const editor = load('---\ntitle: x\n---');
     editor.view.dispatch(editor.state.tr.insertText('hello', 1));
     expect(getMarkdown(editor)).toBe('---\ntitle: x\n---\nhello');
+  });
+});
+
+describe('saving what an edit can leave in a paragraph', () => {
+  it('writes a line break on a line of its own with a backslash', () => {
+    const editor = load('ab\n');
+    const { hardBreak } = editor.state.schema.nodes;
+    editor.view.dispatch(
+      editor.state.tr.insert(2, [hardBreak.create(), hardBreak.create()]),
+    );
+    expect(savesAsDocument(editor)).toBe('a  \n\\\nb\n');
+  });
+
+  it('writes a line break that starts a line with a backslash', () => {
+    const editor = load('a\nb\n');
+    editor.view.dispatch(
+      editor.state.tr.insert(3, editor.state.schema.nodes.hardBreak.create()),
+    );
+    expect(savesAsDocument(editor)).toBe('a\n\\\nb\n');
+  });
+
+  it('leaves out a paragraph of line breaks', () => {
+    const editor = load('ab\n\ncd\n');
+    editor.view.dispatch(editor.state.tr.insertText('\n\n', 1, 3));
+    expect(savesAsDocument(editor)).toBe('cd\n');
+  });
+
+  it('writes a blank line in the text of a paragraph', () => {
+    const editor = load('ab\n');
+    editor.view.dispatch(editor.state.tr.insertText('\n\n', 2));
+    expect(savesAsDocument(editor)).toBe('a&#xA;\nb\n');
+  });
+
+  it('writes an ampersand that would start a character reference', () => {
+    const editor = load('ab\n');
+    appendAfter(editor, 'a', '&amp;');
+    expect(savesAsDocument(editor)).toBe('a&#x26;amp;b\n');
+  });
+
+  it.each([
+    ['[y](u)\n', 'https://x.jp', '<https://x.jp>[y](u)\n'],
+    ['`y`\n', 'https://x.jp', '<https://x.jp>`y`\n'],
+    ['[y](u)\n', 'www.a.jp', '[www.a.jp](http://www.a.jp)[y](u)\n'],
+  ])('ends a URL that would take in what follows: %j after %j', (md, url, expected) => {
+    const editor = load(md);
+    editor.view.dispatch(
+      editor.state.tr.insert(1, editor.state.schema.text(url)),
+    );
+    expect(savesAsDocument(editor)).toBe(expected);
+  });
+
+  it.each([
+    ['ab\n', ' *www.a.jp* ', 'a \\*[www.a.jp](http://www.a.jp)\\* b\n'],
+    ['ab\n', ' _www.a.jp_ ', 'a \\_[www.a.jp](http://www.a.jp)\\_ b\n'],
+    ['ab\n', ' *https://a.jp* ', 'a \\*<https://a.jp>\\* b\n'],
+    ['- a\n', ' www.a.jp ', '- a [www.a.jp](http://www.a.jp)&#x20;\n'],
+  ])('ends a URL that an escape would go into: %j', (md, text, expected) => {
+    const editor = load(md);
+    appendAfter(editor, 'a', text);
+    expect(savesAsDocument(editor)).toBe(expected);
+  });
+
+  it('keeps a link on whitespace that emphasis leaves out', () => {
+    const editor = load('text\n');
+    const { schema } = editor.state;
+    editor.view.dispatch(
+      editor.state.tr.insert(5, [
+        schema.text('\nSe', [
+          schema.marks.link.create({ href: 'u' }),
+          schema.marks.bold.create(),
+        ]),
+        schema.text('te', [schema.marks.bold.create()]),
+      ]),
+    );
+    expect(savesAsDocument(editor)).toBe('text[\n](u)**[Se](u)te**\n');
   });
 });
 
