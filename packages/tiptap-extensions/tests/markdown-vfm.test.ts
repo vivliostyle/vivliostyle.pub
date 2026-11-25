@@ -2,7 +2,7 @@ import { Editor } from '@tiptap/core';
 import { stringify } from '@vivliostyle/vfm';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
+import { getMarkdown, PubExtensions } from '../src/index';
 
 let editor: Editor | undefined;
 
