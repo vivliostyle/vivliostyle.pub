@@ -1,7 +1,7 @@
 import { Editor } from '@tiptap/core';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '../index';
+import { PubExtensions } from '../src/index';
 import { judgeReadBack } from './read-back-judge';
 
 const editor = new Editor({

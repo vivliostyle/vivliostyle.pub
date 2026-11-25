@@ -1,8 +1,26 @@
 import type { Editor, JSONContent } from '@tiptap/core';
 
-import { MARKED_NOTATIONS, setDocumentNotations } from '../markdown/extension';
-import { press, run } from '../testing/steps';
-import type { CaseSuite } from '../testing/vitest';
+import {
+  currentNotations,
+  setDocumentNotations,
+} from '../../src/markdown/extension';
+import { vfmNotations } from '../../src/markdown/notations/vfm/notations';
+import { press, run } from '../../testing/steps';
+import type { CaseSuite } from '../../testing/vitest';
+
+const VFM = new Set(vfmNotations().map((it) => it.name));
+const recordWithoutVfm = run(
+  'record the document as made without VFM',
+  (editor: Editor) => {
+    setDocumentNotations(
+      editor,
+      currentNotations(editor)
+        .split(' ')
+        .filter((entry) => !VFM.has(entry.split('@')[0]))
+        .join(' '),
+    );
+  },
+);
 
 const PLAIN_TEXT = 'kept as plain text';
 
@@ -963,12 +981,7 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'typed syntax stays text',
         given: 'a‸',
-        steps: [
-          run('record the document as made with marked', (editor) => {
-            setDocumentNotations(editor, MARKED_NOTATIONS);
-          }),
-          '{漢字|かんじ}と$x$ と^[注]',
-        ],
+        steps: [recordWithoutVfm, '{漢字|かんじ}と$x$ と^[注]'],
         expect: 'a{漢字|かんじ}と$x$ と^[注]‸',
         doc: 'doc(paragraph("a{漢字|かんじ}と$x$ と^[注]"))',
       },
@@ -976,9 +989,7 @@ export const vfmSuites: CaseSuite[] = [
         name: 'pasted syntax becomes what the document can hold',
         given: 'a‸b',
         steps: [
-          run('record the document as made with marked', (editor) => {
-            setDocumentNotations(editor, MARKED_NOTATIONS);
-          }),
+          recordWithoutVfm,
           insert('insert what pasted HTML makes', [
             {
               type: 'ruby',
@@ -1000,9 +1011,7 @@ export const vfmSuites: CaseSuite[] = [
         name: 'commands do nothing',
         given: 'a ‸漢字‸ b',
         steps: [
-          run('record the document as made with marked', (editor) => {
-            setDocumentNotations(editor, MARKED_NOTATIONS);
-          }),
+          recordWithoutVfm,
           run('try every command', (editor) => {
             const done = [
               editor.commands.setRuby('かんじ'),

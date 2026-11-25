@@ -1,13 +1,13 @@
 import { Editor } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
 
-import { suites } from '../cases/suites';
-import { PubExtensions } from '../index';
+import { PubExtensions } from '../../src/index';
 import {
   checkMarkdownProperties,
   type PropertyViolation,
-} from '../testing/markdown-properties';
-import { removeSelectionMarks } from '../testing/selection-marks';
+} from '../../testing/markdown-properties';
+import { removeSelectionMarks } from '../../testing/selection-marks';
+import { suites } from '../cases/suites';
 
 // With the plugins, which keep nodes in a state their markdown can hold, as
 // in the app: what they change on loading would change the file unedited.
