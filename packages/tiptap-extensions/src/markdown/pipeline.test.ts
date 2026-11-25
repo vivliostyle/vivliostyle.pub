@@ -559,6 +559,27 @@ describe('saving what an edit can leave in a paragraph', () => {
     appendAfter(editor, 'a', '&amp;');
     expect(savesAsDocument(editor)).toBe('a&#x26;amp;b\n');
   });
+
+  it.each([
+    ['[y](u)\n', 'https://x.jp', '<https://x.jp>[y](u)\n'],
+    ['`y`\n', 'https://x.jp', '<https://x.jp>`y`\n'],
+    ['[y](u)\n', 'www.a.jp', '[www.a.jp](http://www.a.jp)[y](u)\n'],
+  ])('ends a URL that would take in what follows: %j after %j', (md, url, expected) => {
+    const editor = load(md);
+    editor.view.dispatch(
+      editor.state.tr.insert(1, editor.state.schema.text(url)),
+    );
+    expect(savesAsDocument(editor)).toBe(expected);
+  });
+
+  it.each([
+    ['ab\n', '~www.a.jp[~](u)', 'a\\~[www.a.jp](http://www.a.jp)[~](u\\)b\n'],
+    ['- a\n', ' www.a.jp ', '- a [www.a.jp](http://www.a.jp)&#x20;\n'],
+  ])('ends a URL that an escape would go into: %j', (md, text, expected) => {
+    const editor = load(md);
+    appendAfter(editor, 'a', text);
+    expect(savesAsDocument(editor)).toBe(expected);
+  });
 });
 
 describe('what the document records', () => {

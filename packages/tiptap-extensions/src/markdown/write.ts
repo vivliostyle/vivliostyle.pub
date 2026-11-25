@@ -956,37 +956,60 @@ export class MarkdownWriter {
    * escape rule matches is one candidate, counted in `state.counter` in the
    * order they are met, so a selection names the same characters each time
    * the block is written. `before` and `after` are what surrounds the text,
-   * with `\n` for a line break or the edges of the block.
+   * with `\n` for a line break or the edges of the block. A match of a rule
+   * that encloses is one candidate too, counted before the characters in it,
+   * which are counted whether or not it is enclosed.
    */
   private escapeText(
     text: string,
     state: WriteState,
     before: string,
     after: string,
+    marks: readonly Mark[] = [],
   ): string {
     const subject = `${before}${text}${after}`;
     const actions = new Map<number, 'backslash' | 'entity'>();
+    const enclosures = new Map<number, { end: number; written: string }>();
     for (const rule of this.escapes) {
       for (const match of subject.matchAll(rule.pattern)) {
         const index = match.index - before.length;
         if (index < 0 || index >= text.length) {
           continue;
         }
-        if (rule.entity) {
+        if (rule.enclose) {
+          const end = Math.min(text.length, index + match[0].length);
+          const written = rule.enclose(text.slice(index, end), marks);
+          const overlaps = [...enclosures].some(
+            ([start, it]) => start < end && index < it.end,
+          );
+          if (written !== null && !overlaps) {
+            enclosures.set(index, { end, written });
+          }
+        } else if (rule.entity) {
           actions.set(index, 'entity');
         } else if (!actions.has(index)) {
           actions.set(index, 'backslash');
         }
       }
     }
-    if (actions.size === 0) {
+    if (actions.size === 0 && enclosures.size === 0) {
       return text;
     }
     let output = '';
+    let enclosed = -1;
     for (let index = 0; index < text.length; index++) {
+      const enclosure = enclosures.get(index);
+      if (enclosure && this.selects(state)) {
+        output += enclosure.written;
+        enclosed = enclosure.end;
+      }
       const action = actions.get(index);
       const char = text[index];
-      if (action && this.selects(state)) {
+      const selected = action !== undefined && this.selects(state);
+      if (index < enclosed) {
+        continue;
+      }
+      if (selected) {
         output += action === 'entity' ? codePoint(char) : `\\${char}`;
       } else {
         output += char;
@@ -1429,6 +1452,7 @@ export class MarkdownWriter {
             state,
             lineBefore(leading + opens.map((it) => it.text).join('')),
             after,
+            child.marks,
           );
         }
       } else if (child.type.spec.linebreakReplacement && (first || last)) {

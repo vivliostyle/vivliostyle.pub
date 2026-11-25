@@ -115,6 +115,16 @@ describe('saved markdown as VFM reads it', () => {
     expect(html(getMarkdown(editor))).toBe('<p>a&#x26;amp;\n\nb</p>');
   });
 
+  it('keeps a URL before a link apart from the link', () => {
+    const editor = load('[y](u)\n');
+    editor.view.dispatch(
+      editor.state.tr.insert(1, editor.state.schema.text('https://x.jp')),
+    );
+    expect(html(getMarkdown(editor))).toBe(
+      '<p><a href="https://x.jp">https://x.jp</a><a href="u">y</a></p>',
+    );
+  });
+
   it('changes nothing else in VFM when the edit adds only text', () => {
     const markdown = 'a {a|b} $a_1$ c\n';
     const editor = load(markdown);

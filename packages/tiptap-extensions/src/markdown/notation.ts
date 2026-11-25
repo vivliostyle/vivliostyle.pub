@@ -163,7 +163,8 @@ export interface StyleSpec {
 
 /**
  * Characters that `safe` escaping has to escape in text. Each match of
- * `pattern` (which must be global) is one character. A text starts after a
+ * `pattern` (which must be global) is one character, unless the rule
+ * encloses. A text starts after a
  * `\n` when it starts a line, and ends before one when it ends a block, so
  * patterns can look around for `\n`.
  */
@@ -171,6 +172,13 @@ export interface EscapeRule {
   pattern: RegExp;
   /** Writes a character reference, for characters a backslash cannot escape. */
   entity?: boolean;
+  /**
+   * Writes the whole match in a form that reads back as it, instead of
+   * escaping its first character, or null where there is none for text
+   * under `marks`. The match is then not escaped within: an enclosure is for
+   * text that markdown reads into syntax whatever is escaped in it.
+   */
+  enclose?: (match: string, marks: readonly Mark[]) => string | null;
 }
 
 /**
