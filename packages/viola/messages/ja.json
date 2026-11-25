@@ -23,6 +23,7 @@
   "edit_mode_visual": "ビジュアル",
   "edit_pane_title": "コンテンツエディター",
   "edit_pane_title_with_file": "コンテンツエディター：ファイル{filename}",
+  "edit_save_failed": "最新の変更は保存されていません。読み直すと同じ内容になるMarkdownに書き出せないためです。直前の編集を元に戻すか、ソース表示で直してください。",
   "edit_source_editor_aria": "Markdownソースエディター",
   "editor_command_blockquote": "引用",
   "editor_command_blockquote_keywords": "引用 いんよう",
