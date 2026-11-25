@@ -1,21 +1,23 @@
 import { InputRule, Node } from '@tiptap/core';
 import { Fragment } from '@tiptap/pm/model';
 import { TextSelection } from '@tiptap/pm/state';
+import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown';
+import { codes } from 'micromark-util-symbol';
+import type {
+  Code,
+  Construct,
+  Effects,
+  State,
+  TokenizeContext,
+} from 'micromark-util-types';
 
 import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
-  type Code,
-  type Construct,
-  codes,
   currentNode,
-  type Effects,
   enterNode,
-  type FromMarkdownExtension,
   isLineEnding,
-  type State,
   syntaxPlugin,
-  type TokenizeContext,
   tokenType,
 } from '../../micromark';
 import { defineNotation } from '../../notation';

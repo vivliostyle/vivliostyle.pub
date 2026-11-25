@@ -4,12 +4,12 @@ import { EditorState } from '@tiptap/pm/state';
 import type { DecorationSet } from '@tiptap/pm/view';
 import { describe, expect, it } from 'vitest';
 
+import { documentHtml } from '../../../../testing/html';
 import {
   codeBlockCaption,
   withCodeBlockCaption,
 } from '../../../code-block-prism';
 import { PubExtensions } from '../../../index';
-import { documentHtml } from '../../../testing/html';
 import {
   currentNotations,
   getMarkdown,

@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '../index';
+import { PubExtensions } from '../src/index';
 import { type EditorCase, runCase } from './case';
 import { createNodeDriver, toKeyEvent } from './node-driver';
 import { press } from './steps';

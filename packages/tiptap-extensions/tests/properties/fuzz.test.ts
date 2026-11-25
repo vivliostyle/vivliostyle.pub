@@ -1,13 +1,13 @@
 import { Editor } from '@tiptap/core';
 import { expect, it } from 'vitest';
 
-import { PubExtensions } from '../index';
+import { PubExtensions } from '../../src/index';
 import {
   type FuzzStatistics,
   fuzzMarkdownEdits,
   VFM_FRAGMENTS,
   VFM_INSERTS,
-} from '../testing/markdown-properties';
+} from '../../testing/markdown-properties';
 
 // With the plugins, which keep nodes in a state their markdown can hold, as
 // in the app; a headless editor's state has none.

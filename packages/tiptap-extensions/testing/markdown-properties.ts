@@ -4,15 +4,11 @@ import type { Transaction } from '@tiptap/pm/state';
 
 import {
   getMarkdownWithResult,
-  MARKED_NOTATIONS,
   markdownPipeline,
   parseMarkdown,
-  setDocumentNotations,
-  setMarkdownBaseline,
-} from '../markdown/extension';
-import { createLegacyBaselineReader } from '../markdown/legacy';
-import { splitSource } from '../markdown/source';
-import { MarkdownWriteError } from '../markdown/write';
+} from '../src/markdown/extension';
+import { splitSource } from '../src/markdown/source';
+import { MarkdownWriteError } from '../src/markdown/write';
 import {
   isEmptyParagraph,
   judgeReadBack,
@@ -397,111 +393,6 @@ export function checkMarkdownProperties(
         }
       }
     }
-  } finally {
-    editor.destroy();
-  }
-  return violations;
-}
-
-/**
- * Loads `markdown` as the editor did before it moved to remark, the way the
- * old parser read the whole file.
- */
-export function loadAsMarkedDocument(editor: Editor, markdown: string): void {
-  const { body } = splitSource(markdown);
-  const doc = createLegacyBaselineReader(
-    editor.schema,
-    editor.extensionManager.extensions,
-  ).readDocument(body);
-  if (!doc) {
-    throw new Error('The old parser did not read the markdown');
-  }
-  editor.commands.setContent(doc.toJSON(), { emitUpdate: false });
-  setMarkdownBaseline(editor, markdown);
-  setDocumentNotations(editor, MARKED_NOTATIONS);
-}
-
-function changedLines(before: string, after: string): string[] {
-  const a = before.split('\n');
-  const b = after.split('\n');
-  let head = 0;
-  while (head < a.length && head < b.length && a[head] === b[head]) {
-    head++;
-  }
-  let tail = 0;
-  while (
-    tail < a.length - head &&
-    tail < b.length - head &&
-    a[a.length - 1 - tail] === b[b.length - 1 - tail]
-  ) {
-    tail++;
-  }
-  return a.slice(head, a.length - tail);
-}
-
-/**
- * Checks a document the old parser made from `markdown`: saving it unedited
- * gives the file back, and appending to one textblock changes no more lines
- * than that textblock has.
- */
-export function checkMarkedDocumentProperties(
-  createEditor: () => Editor,
-  markdown: string,
-): PropertyViolation[] {
-  const violations: PropertyViolation[] = [];
-  const editor = createEditor();
-  try {
-    loadAsMarkedDocument(editor, markdown);
-    const saved = write(editor, editor.state.doc);
-    if ('error' in saved || saved.markdown !== markdown) {
-      violations.push({
-        property: 'identity',
-        detail: 'saving the unedited document',
-        actual: 'error' in saved ? String(saved.error) : saved.markdown,
-        expected: markdown,
-      });
-    }
-    editor.state.doc.forEach((child, offset, index) => {
-      let target: { pos: number; node: ProseMirrorNode } | undefined;
-      child.descendants((node, pos) => {
-        if (
-          !target &&
-          node.isTextblock &&
-          !node.type.spec.code &&
-          node.content.size > 0
-        ) {
-          target = { pos: offset + 1 + pos, node };
-        }
-        return !target;
-      });
-      if (!target) {
-        return;
-      }
-      const doc = editor.state.tr.insertText(
-        'X',
-        target.pos + target.node.nodeSize - 1,
-      ).doc;
-      const result = write(editor, doc);
-      const detail = `appending to block ${index}`;
-      if ('error' in result) {
-        violations.push({
-          property: 'error',
-          detail,
-          actual: result.error.markdown,
-          expected: String(doc),
-        });
-        return;
-      }
-      const changed = changedLines(markdown, result.markdown);
-      if (changed.length > target.node.textContent.split('\n').length + 2) {
-        violations.push({
-          property: 'locality',
-          detail,
-          actual: changed.join('\n'),
-          expected: target.node.textContent,
-        });
-      }
-    });
   } finally {
     editor.destroy();
   }

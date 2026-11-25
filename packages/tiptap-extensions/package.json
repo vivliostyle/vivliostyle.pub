@@ -7,10 +7,12 @@
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
+    "./testing/*": "./testing/*.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
     "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --project unit",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -34,10 +36,14 @@
     "@tiptap/extension-text-style": "catalog:",
     "@tiptap/extension-underline": "catalog:",
     "@tiptap/extensions": "catalog:",
-    "@tiptap/markdown": "catalog:",
     "@tiptap/pm": "catalog:",
+    "@types/mdast": "4.0.4",
     "@types/refractor": "3.4.1",
     "@v/config": "workspace:*",
+    "@vivliostyle/vfm": "catalog:",
+    "htmlparser2": "12.0.0",
+    "mdast-util-from-markdown": "2.0.2",
+    "micromark-util-types": "2.0.1",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
     "pathe": "catalog:",
@@ -45,13 +51,12 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@handlewithcare/remark-prosemirror": "0.1.5",
     "micromark-util-decode-string": "2.0.1",
+    "micromark-util-symbol": "2.0.1",
     "prosemirror-model": "1.25.5",
     "refractor": "3.6.0",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
-    "remark-stringify": "11.0.0",
     "unified": "11.0.5"
   }
 }

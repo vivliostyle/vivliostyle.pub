@@ -3,11 +3,11 @@ import { NodeSelection } from '@tiptap/pm/state';
 
 import {
   currentNotations,
-  MARKED_NOTATIONS,
   setDocumentNotations,
-} from '../markdown/extension';
-import { press, run, type Step } from '../testing/steps';
-import type { CaseSuite } from '../testing/vitest';
+} from '../../src/markdown/extension';
+import { vfmNotations } from '../../src/markdown/notations/vfm/notations';
+import { press, run, type Step } from '../../testing/steps';
+import type { CaseSuite } from '../../testing/vitest';
 
 // The definitions this set of syntax added to those the inline syntax came
 // with: a document recorded without them was made before.
@@ -35,10 +35,18 @@ const recordInlineEra = run(
   },
 );
 
-const recordMarked = run(
-  'record the document as made with marked',
-  (editor) => {
-    setDocumentNotations(editor, MARKED_NOTATIONS);
+const VFM = new Set(vfmNotations().map((it) => it.name));
+
+const recordWithoutVfm = run(
+  'record the document as made without VFM',
+  (editor: Editor) => {
+    setDocumentNotations(
+      editor,
+      currentNotations(editor)
+        .split(' ')
+        .filter((entry) => !VFM.has(entry.split('@')[0] ?? ''))
+        .join(' '),
+    );
   },
 );
 
@@ -763,10 +771,10 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(paragraph("本文", footnoteReference), paragraph("[^1]: 注の本文"))',
       },
       {
-        name: 'no definition is added to a document made with marked',
+        name: 'no definition is added to a document made without VFM',
         given: '本文‸',
         steps: [
-          recordMarked,
+          recordWithoutVfm,
           refused('add a definition', (editor) =>
             editor.commands.insertFootnoteDefinition('1'),
           ),
@@ -1530,12 +1538,12 @@ export const vfmBlockSuites: CaseSuite[] = [
     ],
   },
   {
-    title: 'block VFM in a document made with marked',
+    title: 'block VFM in a document made without VFM',
     cases: [
       {
         name: 'typed syntax stays text',
         given: '‸',
-        steps: [recordMarked, '[[toc]]'],
+        steps: [recordWithoutVfm, '[[toc]]'],
         expect: '[[toc]]‸',
         doc: 'doc(paragraph("[[toc]]"))',
       },
@@ -1543,7 +1551,7 @@ export const vfmBlockSuites: CaseSuite[] = [
         name: 'commands do nothing',
         given: '- a‸',
         steps: [
-          recordMarked,
+          recordWithoutVfm,
           refused('use a block command', (editor) =>
             [
               editor.commands.insertTableOfContents(),

@@ -7,25 +7,14 @@ import {
 import { Plugin, type Transaction } from '@tiptap/pm/state';
 
 import { changedNodes, isRemote, markLoading } from './changes';
-import {
-  createLegacyBaselineReader,
-  type LegacyBaselineReader,
-} from './legacy';
 import type { NotationDefinition } from './notation';
 import { RAW_INLINE } from './parse';
 import {
-  type BaselineReader,
   MarkdownPipeline,
   notationSignature,
   type ParsedMarkdown,
 } from './pipeline';
 import { MarkdownWriteError, type WriteResult } from './write';
-
-/**
- * Stands for the definitions of the marked-based parser the editor used
- * before remark, for documents made back then.
- */
-export const MARKED_NOTATIONS = 'marked';
 
 /** What a document records, outside its content, about how it was made. */
 export interface DocumentRecord {
@@ -43,12 +32,6 @@ export interface PubMarkdownOptions {
    * through another client.
    */
   documentRecord?: ((editor: Editor) => DocumentRecord) | undefined;
-  /**
-   * The definitions that write documents made with marked, by name. They
-   * have to stay the set that was in use when the editor moved to remark,
-   * or text in old documents would be escaped for syntax added since.
-   */
-  markedEraNotations?: readonly string[] | undefined;
   /** Called after `setMarkdown` has replaced the document. */
   onSetMarkdown?: ((editor: Editor) => void) | undefined;
 }
@@ -60,12 +43,11 @@ export interface PubMarkdownStorage {
    */
   baseline: string;
   /**
-   * The definitions the document was made with, as a signature or
-   * `MARKED_NOTATIONS`, when they are not the current ones.
+   * The definitions the document was made with, as a signature, when they
+   * are not the current ones.
    */
   documentNotations: string | null;
   pipelines: Map<string, MarkdownPipeline>;
-  legacyReader: LegacyBaselineReader | null;
   /** The last write that failed, so the same state is not tried again. */
   failure: {
     key: readonly unknown[];
@@ -125,7 +107,7 @@ function pipelineOf(
  */
 function notationsOf(
   editor: Editor,
-  entries: readonly { name: string; version: number | null }[],
+  entries: readonly { name: string; version: number }[],
 ): { notations: NotationDefinition[]; exact: boolean } {
   const all = optionsOf(editor).notations;
   let exact = true;
@@ -134,7 +116,7 @@ function notationsOf(
     if (!entry) {
       return [];
     }
-    if (entry.version === null || entry.version === (notation.version ?? 1)) {
+    if (entry.version === (notation.version ?? 1)) {
       return [notation];
     }
     const earlier = notation.earlier?.find(
@@ -175,52 +157,22 @@ export function hasDocumentNotation(editor: Editor, name: string): boolean {
   if (signature === null || signature === currentNotations(editor)) {
     return optionsOf(editor).notations.some((it) => it.name === name);
   }
-  if (signature === MARKED_NOTATIONS) {
-    const names = optionsOf(editor).markedEraNotations;
-    return names
-      ? names.includes(name)
-      : optionsOf(editor).notations.some((it) => it.name === name);
-  }
   return signature.split(' ').some((entry) => entry.split('@')[0] === name);
 }
 
 /**
- * The pipeline that writes the document the way it was read, and how to read
- * its baseline: a document keeps meaning what it meant when it was made.
+ * The pipeline that writes the document the way it was read: a document
+ * keeps meaning what it meant when it was made.
  */
 function documentPipeline(
   editor: Editor,
   signature: string | null,
 ): {
   pipeline: MarkdownPipeline;
-  reader: BaselineReader | null;
   approximate: boolean;
 } {
-  const storage = storageOf(editor);
   if (signature === null || signature === currentNotations(editor)) {
-    return {
-      pipeline: currentPipeline(editor),
-      reader: null,
-      approximate: false,
-    };
-  }
-  if (signature === MARKED_NOTATIONS) {
-    storage.legacyReader ??= createLegacyBaselineReader(
-      editor.schema,
-      editor.extensionManager.extensions,
-    );
-    const names = optionsOf(editor).markedEraNotations;
-    const { notations } = names
-      ? notationsOf(
-          editor,
-          names.map((name) => ({ name, version: null })),
-        )
-      : { notations: optionsOf(editor).notations };
-    return {
-      pipeline: pipelineOf(editor, notations),
-      reader: storage.legacyReader,
-      approximate: false,
-    };
+    return { pipeline: currentPipeline(editor), approximate: false };
   }
   const entries = signature.split(' ').map((entry) => {
     const [name, version] = entry.split('@');
@@ -230,11 +182,7 @@ function documentPipeline(
   // document was made with, cannot be brought back: the document is written
   // with what is there, without rewriting what was not edited.
   const { notations, exact } = notationsOf(editor, entries);
-  return {
-    pipeline: pipelineOf(editor, notations),
-    reader: null,
-    approximate: !exact,
-  };
+  return { pipeline: pipelineOf(editor, notations), approximate: !exact };
 }
 
 /**
@@ -488,7 +436,6 @@ export const PubMarkdown = Extension.create<
     return {
       notations: [],
       documentRecord: undefined,
-      markedEraNotations: undefined,
       onSetMarkdown: undefined,
     };
   },
@@ -498,7 +445,6 @@ export const PubMarkdown = Extension.create<
       baseline: '',
       documentNotations: null,
       pipelines: new Map(),
-      legacyReader: null,
       failure: null,
     };
   },
@@ -563,14 +509,14 @@ export function getMarkdownWithResult(
     storage.documentNotations =
       record.notations === currentNotations(editor) ? null : record.notations;
   }
-  const { pipeline, reader, approximate } =
+  const { pipeline, approximate } =
     options.baseline === undefined
       ? documentPipeline(editor, storage.documentNotations)
-      : { pipeline: currentPipeline(editor), reader: null, approximate: false };
+      : { pipeline: currentPipeline(editor), approximate: false };
   const doc = options.doc ?? editor.state.doc;
   const baseline = options.baseline ?? storage.baseline;
   const frontmatter = options.frontmatter ?? record?.frontmatter;
-  const key = [doc, baseline, pipeline, reader, approximate, frontmatter];
+  const key = [doc, baseline, pipeline, approximate, frontmatter];
   const { failure } = storage;
   if (failure?.key.every((it, index) => it === key[index])) {
     throw failure.error;
@@ -578,7 +524,6 @@ export function getMarkdownWithResult(
   try {
     const result = pipeline.serializeWithResult(doc, {
       baseline,
-      baselineReader: reader,
       approximate,
       ...(frontmatter !== undefined && { frontmatter }),
     });
@@ -616,7 +561,7 @@ export function setMarkdownBaseline(editor: Editor, markdown: string): void {
 
 /**
  * Records which definitions the document was made with, as a signature from
- * `currentNotations` or `MARKED_NOTATIONS`; `null` means the current ones.
+ * `currentNotations`; `null` means the current ones.
  */
 export function setDocumentNotations(
   editor: Editor,

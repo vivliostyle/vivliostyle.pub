@@ -1,16 +1,12 @@
 import { Editor } from '@tiptap/core';
 import { type StringifyMarkdownOptions, stringify } from '@vivliostyle/vfm';
-import { htmlToDOM } from 'html-react-parser';
+import { parseDocument } from 'htmlparser2';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import {
-  documentIds,
-  PubExtensions,
-  parseMarkdown,
-} from '@v/tiptap-extensions';
-import { documentHtml } from '@v/tiptap-extensions/testing/html';
+import { documentIds, PubExtensions, parseMarkdown } from '../src/index';
+import { documentHtml } from '../testing/html';
 
-type DomNode = ReturnType<typeof htmlToDOM>[number];
+type DomNode = ReturnType<typeof parseDocument>['children'][number];
 
 const VOID = new Set(['br', 'hr', 'img', 'input', 'wbr']);
 // Whitespace between the children of these is not rendered.
@@ -73,7 +69,7 @@ function canonical(nodes: readonly DomNode[], container: boolean): string {
 
 /** HTML with attributes and classes sorted and unrendered whitespace left out. */
 function normalize(html: string): string {
-  return canonical(htmlToDOM(html), true);
+  return canonical(parseDocument(html).children, true);
 }
 
 const editor = new Editor({
@@ -808,16 +804,15 @@ function textOf(node: Element): string {
 function vfmNotes(markdown: string): string[] {
   const html = stringify(markdown, { partial: true, disableFormatHtml: true });
   return elementsOf(
-    htmlToDOM(html) as unknown as Element[],
+    parseDocument(html).children as unknown as Element[],
     (it) => it.name === 'li' && /^fn/.test(it.attribs?.id ?? ''),
   ).map((it) => textOf(it).replace(/↩|\s+/g, ''));
 }
 
 function editorNotes(markdown: string): string[] {
   return elementsOf(
-    htmlToDOM(
-      documentHtml(parseMarkdown(editor, markdown).doc),
-    ) as unknown as Element[],
+    parseDocument(documentHtml(parseMarkdown(editor, markdown).doc))
+      .children as unknown as Element[],
     (it) => /\bfootnote-definition\b/.test(it.attribs?.class ?? ''),
   ).map((it) => textOf(it).replace(/\s+/g, ''));
 }
@@ -847,8 +842,8 @@ function vfmHeadingIds(markdown: string): string[] {
 }
 
 function decodeEntities(text: string): string {
-  return htmlToDOM(`<p>${text}</p>`)
-    .flatMap(
+  return parseDocument(`<p>${text}</p>`)
+    .children.flatMap(
       (node) => (node as unknown as { children: { data: string }[] }).children,
     )
     .map((child) => child.data)
