@@ -53,6 +53,10 @@ export interface WrittenFormOptions {
   readRaw?: (text: string) => ProseMirrorNode[] | null;
   /** The attributes as the markdown holds them, see `NodeWriter`. */
   attrsOf?: (node: ProseMirrorNode) => Record<string, unknown>;
+  /** See `NodeWriter.writtenAs`. */
+  writtenAs?: (
+    node: ProseMirrorNode,
+  ) => { type: string; attrs: Record<string, unknown> } | null;
   /**
    * A top-level block as markdown with every character that could mean
    * something escaped, so that only its raw markdown means anything.
@@ -152,6 +156,10 @@ export class WrittenForm {
   }
 
   private form(node: ProseMirrorNode, read: boolean): WrittenNode {
+    const as = this.options.writtenAs?.(node);
+    if (as) {
+      return { type: as.type, attrs: JSON.stringify(as.attrs) };
+    }
     const attrs = JSON.stringify(this.options.attrsOf?.(node) ?? node.attrs);
     if (node.isTextblock) {
       return { type: node.type.name, attrs, runs: this.runs(node, read) };

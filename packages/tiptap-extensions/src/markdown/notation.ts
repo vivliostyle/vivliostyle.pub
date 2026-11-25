@@ -121,6 +121,13 @@ export interface NodeWriter {
    */
   writtenAttrs?: (attrs: Record<string, unknown>) => Record<string, unknown>;
   /**
+   * The node markdown reads the node's markdown as, when it is another one,
+   * as an empty heading is read as the end of a section.
+   */
+  writtenAs?: (
+    node: ProseMirrorNode,
+  ) => { type: string; attrs: Record<string, unknown> } | null;
+  /**
    * The marker of a list written as `source`. Two adjacent lists of one type
    * with the same marker would be read as a single list.
    */

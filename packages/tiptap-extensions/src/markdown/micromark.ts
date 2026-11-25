@@ -72,6 +72,18 @@ export function syntaxPlugin(
   };
 }
 
+/**
+ * A remark plugin running `transform` on the mdast with the source it was
+ * read from.
+ */
+export function transformPlugin(
+  transform: (tree: UnknownMdastNode, source: string) => void,
+) {
+  return () => (tree: unknown, file: { value: unknown }) => {
+    transform(tree as UnknownMdastNode, String(file.value ?? ''));
+  };
+}
+
 // Character codes as micromark passes them: line endings and tabs are
 // negative, and the end of the input is null.
 export const codes = {

@@ -280,6 +280,8 @@ export class MarkdownWriter {
       attrsOf: (node) =>
         this.nodeWriters.get(node.type.name)?.writtenAttrs?.(node.attrs) ??
         node.attrs,
+      writtenAs: (node) =>
+        this.nodeWriters.get(node.type.name)?.writtenAs?.(node) ?? null,
       writeSafe: (node) =>
         this.generate(node, null, {}, new Set(), {
           ...this.initialState(new Map(), false),
@@ -404,9 +406,9 @@ export class MarkdownWriter {
   }
 
   /**
-   * The first top-level block holding an inline node or a mark that no
-   * definition writes, as when a document's definitions lack the syntax the
-   * editor made it with, or -1. Leaving it out would lose it unnoticed.
+   * The first top-level block holding a node or a mark that no definition
+   * writes, as when a document's definitions lack the syntax the editor made
+   * it with, or -1. Leaving it out would lose it unnoticed.
    */
   private unwritableBlock(doc: ProseMirrorNode): number {
     let found = -1;
@@ -417,9 +419,7 @@ export class MarkdownWriter {
       const check = (node: ProseMirrorNode) => {
         if (
           node.marks.some((mark) => !this.markWriters.has(mark.type.name)) ||
-          (node.isInline &&
-            !node.isText &&
-            !this.nodeWriters.has(node.type.name))
+          (!node.isText && !this.nodeWriters.has(node.type.name))
         ) {
           found = index;
         }

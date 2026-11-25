@@ -25,7 +25,9 @@ export type AllowedDifference =
   /** A code block's info string is trimmed. */
   | 'trimmed info string'
   /** Markdown has no marks for a line break, e.g. code cannot hold one. */
-  | 'marks on a hard break';
+  | 'marks on a hard break'
+  /** An empty heading is a line of hashes, which VFM ends a section with. */
+  | 'empty heading as a section end';
 
 const FLANKING_MARKS = new Set(['bold', 'italic', 'strike']);
 const RAW_INLINE = 'rawInline';
@@ -266,6 +268,15 @@ function attrsOf(node: ProseMirrorNode, used: Set<AllowedDifference>) {
   return JSON.stringify({ ...node.attrs, language });
 }
 
+function isBareEmptyHeading(node: ProseMirrorNode): boolean {
+  return (
+    node.type.name === 'heading' &&
+    node.childCount === 0 &&
+    !node.attrs.closingSequence &&
+    !node.attrs.attributes
+  );
+}
+
 function compareNodes(
   expected: ProseMirrorNode,
   actual: ProseMirrorNode,
@@ -273,6 +284,14 @@ function compareNodes(
   used: Set<AllowedDifference>,
   unexplained: string[],
 ): void {
+  if (
+    isBareEmptyHeading(expected) &&
+    actual.type.name === 'sectionEnd' &&
+    actual.attrs.level === expected.attrs.level
+  ) {
+    used.add('empty heading as a section end');
+    return;
+  }
   if (
     expected.type !== actual.type ||
     attrsOf(expected, used) !== attrsOf(actual, used)
