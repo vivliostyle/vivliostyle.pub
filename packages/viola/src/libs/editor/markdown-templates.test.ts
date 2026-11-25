@@ -4,10 +4,7 @@ import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 
 import { PubExtensions } from '@v/tiptap-extensions';
-import {
-  checkMarkdownProperties,
-  checkMarkedDocumentProperties,
-} from '@v/tiptap-extensions/testing/markdown-properties';
+import { checkMarkdownProperties } from '@v/tiptap-extensions/testing/markdown-properties';
 
 const templatesDir = join(import.meta.dirname, '../../../templates');
 
@@ -30,14 +27,5 @@ describe('template manuscripts', () => {
   it.each(manuscripts)('%s keeps its guarantees', { timeout }, (path) => {
     const markdown = readFileSync(join(templatesDir, path), 'utf8');
     expect(checkMarkdownProperties(createEditor, markdown)).toEqual([]);
-  });
-
-  it.each(
-    manuscripts,
-  )('%s keeps its guarantees as a document made with marked', {
-    timeout,
-  }, (path) => {
-    const markdown = readFileSync(join(templatesDir, path), 'utf8');
-    expect(checkMarkedDocumentProperties(createEditor, markdown)).toEqual([]);
   });
 });

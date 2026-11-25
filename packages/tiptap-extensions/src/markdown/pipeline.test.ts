@@ -3,7 +3,6 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  loadAsMarkedDocument,
   readsBackAs,
   unexplainedDifferences,
 } from '../../testing/markdown-properties';
@@ -12,7 +11,6 @@ import {
   currentNotations,
   getMarkdown,
   getMarkdownWithResult,
-  MARKED_NOTATIONS,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
@@ -220,89 +218,6 @@ describe('raw markdown', () => {
       'doc(paragraph("a ", underline("b"), " c"))',
     );
     expect(getMarkdown(editor, { baseline: '' })).toBe('a <u>b</u> c');
-  });
-});
-
-describe('documents made by the old parser', () => {
-  function loadMarked(markdown: string): Editor {
-    const editor = load('');
-    loadAsMarkedDocument(editor, markdown);
-    return editor;
-  }
-
-  it('keeps the source of blocks the old parser read differently', () => {
-    const markdown =
-      'text[^1] <span class="x">y</span>\n\n[^1]: note\n\n| a |\n| - |\n\n1. a\n\n   ```js title=x\n   b\n   ```\n- > c\n\nedit me\n';
-    const editor = loadMarked(markdown);
-    expect(editor.state.doc.toString()).toContain(
-      'orderedList(listItem(paragraph("a"), codeBlock("b"))), bulletList(listItem(paragraph, blockquote(paragraph("c"))))',
-    );
-    expect(editor.state.doc.toString()).toContain(
-      'paragraph("text", link("^1"), " <span class=\\"x\\">y</span>")',
-    );
-    expect(getMarkdown(editor)).toBe(markdown);
-    appendTo(editor, 'edit me', '!');
-    expect(getMarkdown(editor)).toBe(markdown.replace('edit me', 'edit me!'));
-  });
-
-  it('keeps an HTML block as written without any definitions', () => {
-    const markdown = '<div class="note">\n\n**md**\n\n</div>\n\nlast\n';
-    const editor = loadMarked(markdown);
-    appendTo(editor, 'last', '!');
-    expect(getMarkdown(editor)).toBe(markdown.replace('last', 'last!'));
-  });
-
-  it('keeps a block the old parser dropped where it was', () => {
-    const markdown = 'a\n\n| t |\n|---|\n| 1 |\n\nb\n';
-    const editor = loadMarked(markdown);
-    appendTo(editor, 'a', '!');
-    expect(getMarkdown(editor)).toBe(markdown.replace('a\n', 'a!\n'));
-  });
-
-  it('keeps the HTML of a paragraph the old parser made of it', () => {
-    const markdown = 'a\n\n<div class="x">\n<b>html</b>\n</div>\n\nb\n';
-    const editor = loadMarked(markdown);
-    const html = editor.state.doc.child(1);
-    expect(html.textContent).toContain('<b>html</b>');
-    let end = 0;
-    editor.state.doc.forEach((node, offset, index) => {
-      if (index === 1) {
-        end = offset + node.nodeSize - 1;
-      }
-    });
-    editor.view.dispatch(editor.state.tr.insertText('X', end));
-    // The old parser kept the blank line after the HTML in the paragraph.
-    expect(getMarkdown(editor)).toBe(
-      'a\n\n<div class="x">\n<b>html</b>\n</div>\n\nX\n\nb\n',
-    );
-  });
-
-  it.each([
-    ['本文', '注[^1]の本文X\n\n[^1]: note\n'],
-    ['注', '注X[^1]の本文\n\n[^1]: note\n'],
-  ])('keeps a footnote reference the old parser read as a link, after %j', (needle, expected) => {
-    const editor = loadMarked('注[^1]の本文\n\n[^1]: note\n');
-    expect(editor.state.doc.toString()).toBe(
-      'doc(paragraph("注", link("^1"), "の本文"))',
-    );
-    appendAfter(editor, needle, 'X');
-    expect(getMarkdown(editor)).toBe(expected);
-  });
-
-  it('keeps the escapes the old parser read away', () => {
-    const markdown = '{漢字|かんじ}と\\{x\\}とa\\\\bと\\*c\\*\n';
-    const editor = loadMarked(markdown);
-    appendAfter(editor, '{漢字|かんじ}', 'X');
-    expect(getMarkdown(editor)).toBe(
-      '{漢字|かんじ}Xと\\{x\\}とa\\\\bと\\*c\\*\n',
-    );
-  });
-
-  it('writes text with the definitions of the time', () => {
-    const editor = loadMarked('a ~~b~~ c\n\nd\n');
-    expect(currentNotations(editor)).not.toBe(MARKED_NOTATIONS);
-    appendTo(editor, 'd', '!');
-    expect(getMarkdown(editor)).toBe('a ~~b~~ c\n\nd!\n');
   });
 });
 

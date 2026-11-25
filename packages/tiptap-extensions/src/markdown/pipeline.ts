@@ -1,6 +1,6 @@
 import type { Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
 
-import { type BaseDocument, baseDocumentOf } from './base';
+import { baseDocumentOf } from './base';
 import type { NotationDefinition } from './notation';
 import { MarkdownParser, type ParsedBody } from './parse';
 import { joinSource, splitSource } from './source';
@@ -12,13 +12,6 @@ export interface ParsedMarkdown {
   frontmatter: string;
 }
 
-/** Reads the baseline the way the document was read when it was made. */
-export interface BaselineReader {
-  read(body: string): BaseDocument | null;
-  /** A block's markdown as the same parser reads it. */
-  readDocument?(body: string): ProseMirrorNode | null;
-}
-
 export interface SerializeOptions {
   /**
    * The markdown the document was last read from or written as. Unchanged
@@ -26,19 +19,13 @@ export interface SerializeOptions {
    * newline come from it.
    */
   baseline?: string;
-  /**
-   * Reads the baseline instead of the pipeline's own parser. Its blocks may
-   * mean something else to this parser, so the output is not read back as a
-   * whole; only blocks written anew are checked.
-   */
-  baselineReader?: BaselineReader | null;
   /** Frontmatter written instead of the baseline's. */
   frontmatter?: string;
   /**
    * The document was read with definitions that are not quite these, e.g.
    * other versions of them. Reading the output back cannot prove it right,
-   * so as with `baselineReader`, only blocks written anew are checked and
-   * text that was not edited stays as written.
+   * so only blocks written anew are checked and text that was not edited
+   * stays as written.
    */
   approximate?: boolean;
 }
@@ -106,8 +93,7 @@ export class MarkdownPipeline {
     const source = splitSource(options.baseline ?? '');
     const frontmatter = options.frontmatter ?? source.frontmatter;
     const parsed = this.parseBody(source.body);
-    const reader = options.baselineReader;
-    const base = reader ? reader.read(source.body) : baseDocumentOf(parsed);
+    const base = baseDocumentOf(parsed);
     // A file of frontmatter alone may end at its closing fence.
     const head = (body: string) =>
       frontmatter && body && !frontmatter.endsWith('\n')
@@ -118,19 +104,17 @@ export class MarkdownPipeline {
       bareStart: !frontmatter,
       // The whole file is read back, so a body that would start frontmatter
       // of its own is caught too. An unchanged body is parsed already.
-      check:
-        reader || options.approximate
-          ? null
-          : (body, layout) => {
-              const read = splitSource(join(body));
-              const readBody = this.parseBody(read.body);
-              if (read.body !== body) {
-                const first = this.writer.difference(readBody.doc, doc);
-                return new Set(first === -1 ? [] : [first]);
-              }
-              return this.writer.differences(readBody, doc, layout);
-            },
-      readBlock: reader?.readDocument?.bind(reader),
+      check: options.approximate
+        ? null
+        : (body, layout) => {
+            const read = splitSource(join(body));
+            const readBody = this.parseBody(read.body);
+            if (read.body !== body) {
+              const first = this.writer.difference(readBody.doc, doc);
+              return new Set(first === -1 ? [] : [first]);
+            }
+            return this.writer.differences(readBody, doc, layout);
+          },
     });
     return {
       ...result,

@@ -36,7 +36,6 @@
     "@tiptap/extension-text-style": "catalog:",
     "@tiptap/extension-underline": "catalog:",
     "@tiptap/extensions": "catalog:",
-    "@tiptap/markdown": "catalog:",
     "@tiptap/pm": "catalog:",
     "@types/refractor": "3.4.1",
     "@v/config": "workspace:*",
@@ -47,13 +46,11 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@handlewithcare/remark-prosemirror": "0.1.5",
     "micromark-util-decode-string": "2.0.1",
     "prosemirror-model": "1.25.5",
     "refractor": "3.6.0",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
-    "remark-stringify": "11.0.0",
     "unified": "11.0.5"
   }
 }
