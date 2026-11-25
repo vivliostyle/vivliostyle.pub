@@ -2,14 +2,18 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, type Transaction } from '@tiptap/pm/state';
 
 /**
- * Where the transactions changed the document they end with. Steps that
- * change marks move nothing, so they are found by the range they cover.
+ * Where the transactions of this client changed the document they end
+ * with. Steps that change marks move nothing, so they are found by the
+ * range they cover.
  */
 function changedRanges(
   transactions: readonly Transaction[],
 ): { from: number; to: number }[] {
   const ranges: { from: number; to: number }[] = [];
   transactions.forEach((tr, t) => {
+    if (isRemote(tr)) {
+      return;
+    }
     tr.steps.forEach((step, index) => {
       const covered: { from: number; to: number }[] = [];
       step.getMap().forEach((_, __, from, to) => {
@@ -50,6 +54,15 @@ function contentHas(node: ProseMirrorNode, name: string): boolean {
 }
 
 /**
+ * Whether the transaction came from another client: each client normalizes
+ * only its own changes, or all of them would make the same change at once
+ * and the document would get it once from each.
+ */
+export function isRemote(tr: Transaction): boolean {
+  return Boolean(tr.getMeta('y-sync$'));
+}
+
+/**
  * Keeps nodes of a type in a state their markdown can hold, where the
  * transactions changed the document: the marks markdown cannot put on them
  * are taken off, and a node without content is removed when it has to have
@@ -70,7 +83,7 @@ export function inlineNodeRules(
 ): Plugin {
   return new Plugin({
     appendTransaction: (transactions, _, state) => {
-      if (!transactions.some((tr) => tr.docChanged)) {
+      if (!transactions.some((tr) => tr.docChanged && !isRemote(tr))) {
         return null;
       }
       const ranges = changedRanges(transactions);
