@@ -97,8 +97,20 @@ function missingTargets(doc: ProseMirrorNode): DecorationSet {
 }
 
 /**
+ * Whether a click would make the browser follow a link of the document:
+ * one in an element that is not editable, such as a reference, which the
+ * editor's own handling of links does not open.
+ */
+export function followsLink(event: Event, root: Node): boolean {
+  const target = event.target as Element | null;
+  const link =
+    typeof target?.closest === 'function' ? target.closest('a[href]') : null;
+  return link !== null && root.contains(link);
+}
+
+/**
  * Marks a cross-reference whose target the document lacks, and keeps a
- * click on one from following it as a link.
+ * click on any link of the document from following it.
  */
 const CrossReferenceTargets = Extension.create({
   name: 'crossReferenceTargets',
@@ -113,6 +125,15 @@ const CrossReferenceTargets = Extension.create({
         },
         props: {
           decorations: (state) => missingKey.getState(state),
+          // A reference is not editable, so a browser follows it on a click.
+          handleDOMEvents: {
+            click: (view, event) => {
+              if (followsLink(event, view.dom)) {
+                event.preventDefault();
+              }
+              return false;
+            },
+          },
           handleClickOn: (view, _, node, nodePos) => {
             if (node.type.name !== CROSS_REFERENCE) {
               return false;
@@ -193,7 +214,9 @@ export const themeBaseNotations: NotationDefinition[] = [
     capture: ID,
     keepOtherAttributes: true,
     reference: 'tbl',
+    content: 'htmlFigcaption? block+ htmlFigcaption?',
   }),
+  // A caption of nothing but the table's, which HTML from elsewhere has too.
   declareNotation({
     kind: 'htmlTextblock',
     name: 'htmlFigcaption',
@@ -201,6 +224,7 @@ export const themeBaseNotations: NotationDefinition[] = [
     tag: 'figcaption',
     capture: ID,
     keepOtherAttributes: true,
+    group: null,
   }),
   ...(
     [
@@ -257,7 +281,7 @@ export const themeNotations: Readonly<Record<string, NotationDefinition[]>> = {
     span('sesame', 'sesame'),
     span('sesameDot', 'sesame_dot'),
   ],
-  '@vivliostyle/theme-epub3j': [tcy, upright],
+  '@vivliostyle/theme-epub3j': [tcy, upright, span('emSesame', 'em-sesame')],
   '@vivliostyle/theme-academic': [div('frameBlock', 'frame')],
   // The boxes the manuscripts of Pub's templates show in their own CSS.
   template: [div('noteBlock', 'note'), div('warningBlock', 'warning')],

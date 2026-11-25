@@ -1,9 +1,9 @@
 import type { Extensions } from '@tiptap/core';
 import type { Mark, Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
-import { decodeString } from 'micromark-util-decode-string';
 import type { Pluggable } from 'unified';
 
 import type { BaseNode } from './base';
+import { encodeAttribute, readOpeningTag } from './html';
 import type { MdastNodeOf, MdastType, UnknownMdastNode } from './mdast';
 import type { LinePrefix } from './source';
 
@@ -75,6 +75,14 @@ export interface WriteContext {
   readonly avoidMarkers: ReadonlySet<string>;
   /** The node's source before it changed, when it had one. */
   readonly base: BaseNode | null;
+  /**
+   * The tags an element was written with in the baseline, where a node of
+   * its type with the same attributes was read from one there: the node
+   * being written, or an inline node in its content.
+   */
+  tags(node: ProseMirrorNode): ElementTags | null;
+  /** For a mark's delimiters, the tags of its element, as with `tags`. */
+  readonly markTags?: ElementTags | null;
   /** For an inline node, what is written on its line before it. */
   readonly lineBefore?: string;
   /**
@@ -97,6 +105,17 @@ export interface WriteContext {
   escape(text: string): string;
   /** The link reference definition of `label` in the document, if any. */
   definition(label: string): { url: string; title: string | null } | undefined;
+}
+
+/** See `WriteContext.tags`. */
+export interface ElementTags {
+  open: string;
+  close: string;
+  /** For a textblock, its content as written. */
+  inner?: string;
+  /** For a block, what is between its tags and its first and last block. */
+  lead?: string;
+  trail?: string;
 }
 
 export interface ChildrenOptions {
@@ -263,51 +282,6 @@ export function isEmptyTextblock(node: ProseMirrorNode): boolean {
   return empty;
 }
 
-/** The attributes of an opening tag, from the text after its name. */
-export function readTagAttributes(text: string): Record<string, string> {
-  const attributes: Record<string, string> = {};
-  for (const match of text.matchAll(
-    /([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g,
-  )) {
-    attributes[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? '';
-  }
-  return attributes;
-}
-
-/**
- * HTML text with its character references read. A backslash is a character
- * of its own there, so it escapes nothing.
- */
-export function decodeHtml(text: string): string {
-  return text.includes('&')
-    ? text.split('\\').map(decodeString).join('\\')
-    : text;
-}
-
-/** HTML text that reads back as `text`, where tags could start. */
-export function encodeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-}
-
-function escapeAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-
-/** The name and attributes of HTML that is one opening tag. */
-export function readOpeningTag(
-  value: string,
-): { name: string; attributes: Record<string, string> } | null {
-  const tag = value.trim().match(/^<([A-Za-z][\w-]*)(\s[^>]*)?>$/);
-  if (!tag) {
-    return null;
-  }
-  const attributes = readTagAttributes(tag[2] ?? '');
-  for (const [name, written] of Object.entries(attributes)) {
-    attributes[name] = decodeHtml(written);
-  }
-  return { name: tag[1].toLowerCase(), attributes };
-}
-
 function classesOf(value: string | undefined): string[] {
   return value?.split(/[ \t\n\f\r]+/).filter(Boolean) ?? [];
 }
@@ -388,7 +362,7 @@ export function openingTag(
       typeof attrs[name] === 'string' ? [[name, attrs[name] as string]] : [],
     ),
     ...Object.entries(others).filter(([name]) => name !== 'class'),
-  ].map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`);
+  ].map(([name, value]) => ` ${name}="${encodeAttribute(value)}"`);
   return `<${spec.tag}${parts.join('')}>`;
 }
 
@@ -431,6 +405,11 @@ export interface NotationDefinition {
    * tags as raw markdown around its content.
    */
   dissolve?: Record<string, (node: ProseMirrorNode) => ProseMirrorNode[]>;
+  /** The same for marks, by mark type: the source around the marked text. */
+  dissolveMarks?: Record<
+    string,
+    (mark: Mark) => { open: string; close: string }
+  >;
 }
 
 export function defineNotation(

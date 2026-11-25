@@ -8,7 +8,7 @@ import {
   setDocumentNotations,
   themeBaseNotations,
 } from '../markdown';
-import { paste, run, type Step } from '../testing/steps';
+import { paste, press, run, type Step } from '../testing/steps';
 import type { CaseSuite } from '../testing/vitest';
 
 const THEME_NOTATIONS = new Set(
@@ -552,6 +552,217 @@ export const themeSuites: CaseSuite[] = [
         given: '本文‸です',
         steps: [paste({ text: '<span class="footnote">注</span>' })],
         expect: '本文<span class="footnote">注</span>‸です',
+      },
+    ],
+  },
+  {
+    title: 'how the tags of themes are written',
+    cases: [
+      {
+        name: 'a > in a quoted value of a caption',
+        given: '<p class="fig-caption" data-x="a>b">x‸y</p>',
+        steps: ['Z'],
+        expect: '<p class="fig-caption" data-x="a>b">xZ‸y</p>',
+        doc: 'doc(figureCaption("xZy"))',
+      },
+      {
+        name: 'a > in a quoted value of a note',
+        given: 'a<span class="footnote" title="a>b">x‸y</span>',
+        steps: ['Z'],
+        expect: 'a<span class="footnote" title="a>b">xZ‸y</span>',
+      },
+      {
+        name: 'line feeds in a value of a block',
+        given: '<div class="note" title="a&#10;&#10;b">\n\nx‸y\n\n</div>',
+        steps: ['Z'],
+        expect: '<div class="note" title="a&#10;&#10;b">\n\nxZ‸y\n\n</div>',
+      },
+      {
+        name: 'a tag in a value of a caption',
+        given: '<p class="fig-caption" data-x="&lt;/p&gt;">x‸y</p>',
+        steps: ['Z'],
+        expect: '<p class="fig-caption" data-x="&lt;/p&gt;">xZ‸y</p>',
+      },
+      {
+        name: 'line feeds in a value of a note and of a mark',
+        given:
+          'a<span class="footnote" title="a&#10;&#10;b">x‸y</span><span class="tcy" title="a&#10;&#10;b">12</span>',
+        steps: ['Z'],
+        expect:
+          'a<span class="footnote" title="a&#10;&#10;b">xZ‸y</span><span class="tcy" title="a&#10;&#10;b">12</span>',
+      },
+      {
+        name: 'a value written anew that holds what ends a tag or a block',
+        given: '本文‸',
+        steps: [
+          command('insert a note', (editor) =>
+            editor.commands.setHtmlElement(
+              'htmlFootnote',
+              { id: 'a"<b>\n\nc' },
+              '注',
+            ),
+          ),
+        ],
+        expect:
+          '本文<span class="footnote" id="a&quot;&lt;b&gt;&#10;&#10;c">注</span>‸',
+      },
+      {
+        name: 'editing a note keeps its tags as written',
+        given: "a<SPAN CLASS='x footnote' hidden id=n>注‸</SPAN>b",
+        steps: ['の内容'],
+        expect: "a<SPAN CLASS='x footnote' hidden id=n>注の内容‸</SPAN>b",
+      },
+      {
+        name: 'editing a block keeps its tags and blank lines as written',
+        given: "<DIV class='note' hidden>\n\n\n一‸\n\n二\n\n\n</DIV>",
+        steps: ['。'],
+        expect: "<DIV class='note' hidden>\n\n\n一。‸\n\n二\n\n\n</DIV>",
+      },
+      {
+        name: 'editing a caption keeps how its text was written',
+        given: "<p class='fig-caption' id=c>&#x41;&amp;b&copy;‸</p>",
+        steps: ['<'],
+        expect: "<p class='fig-caption' id=c>&#x41;&amp;b&copy;&lt;‸</p>",
+        doc: 'doc(figureCaption("A&b©<"))',
+      },
+      {
+        name: 'editing a mark keeps its tags as written',
+        given: "<span class='tcy' data-k=v>1‸</span>月",
+        steps: ['2'],
+        expect: "<span class='tcy' data-k=v>12</span>‸月",
+      },
+      {
+        name: 'editing an element inside a note keeps the tags of both',
+        given: "a<span class='footnote'>x <span class='tcy'>1‸</span></span>",
+        steps: ['2'],
+        expect: "a<span class='footnote'>x <span class='tcy'>12</span>‸</span>",
+      },
+      {
+        name: 'a reference without a semicolon keeps the caption raw',
+        given: '<p class="fig-caption">&copy x</p>',
+        doc: 'doc(rawBlock("<p class=\\"fig-caption\\">&copy x</p>"))',
+      },
+      {
+        name: 'a carriage return in a caption',
+        given: '<p class="fig-caption">&#13;a‸</p>',
+        steps: ['b'],
+        expect: '<p class="fig-caption">&#13;ab‸</p>',
+        doc: 'doc(figureCaption("\\rab"))',
+      },
+      {
+        name: 'a mark inside one of its type is raw',
+        given:
+          '<span class="sesame" id="o">a<span class="sesame" id="i">b</span>c‸</span>',
+        steps: ['d'],
+        expect:
+          '<span class="sesame" id="o">a<span class="sesame" id="i">b</span>cd</span>‸',
+        doc: 'doc(paragraph(sesame("a"), sesame(rawInline("<span class=\\"sesame\\" id=\\"i\\">")), sesame("b"), sesame(rawInline("</span>")), sesame("cd")))',
+      },
+      {
+        name: 'combined text inside combined text is kept',
+        given: '<span class="tcy"><span class="tcy">1</span>2</span>',
+        doc: 'doc(paragraph(tcy(rawInline("<span class=\\"tcy\\">")), tcy("1"), tcy(rawInline("</span>")), tcy("2")))',
+      },
+      {
+        name: 'a mark split in two keeps its id once',
+        given: '<span class="sesame" id="o">a‸b‸c</span>',
+        steps: [
+          run('take the mark off the middle', (editor) => {
+            const { from, to } = editor.state.selection;
+            const type = editor.state.schema.marks.sesame;
+            if (type) {
+              editor.view.dispatch(editor.state.tr.removeMark(from, to, type));
+            }
+          }),
+        ],
+        expect:
+          '<span class="sesame" id="o">a</span>‸b‸<span class="sesame">c</span>',
+      },
+      {
+        name: 'a block of the same tag inside, opened in a longer HTML block',
+        given:
+          '<div class="note">\n\n<div class="inner">\n<p>x</p>\n\nin\n\n</div>\n\nafter\n\n</div>',
+        doc: 'doc(noteBlock(rawBlock("<div class=\\"inner\\">\\n<p>x</p>"), paragraph("in"), rawBlock("</div>"), paragraph("after")))',
+      },
+      {
+        name: 'a tag of the same name that cannot be read keeps the block raw',
+        given: '<div class="note">\n\n<div class="x\n\n</div>',
+        doc: 'doc(rawBlock("<div class=\\"note\\">"), rawBlock("<div class=\\"x"), rawBlock("</div>"))',
+      },
+      {
+        name: 'elements as specific as each other are raw',
+        given:
+          '<div class="note equation">\n\nx\n\n</div>\n\na<span class="tcy footnote">1</span>',
+        doc: 'doc(rawBlock("<div class=\\"note equation\\">"), paragraph("x"), rawBlock("</div>"), paragraph("a", rawInline("<span class=\\"tcy footnote\\">"), "1", rawInline("</span>")))',
+      },
+      {
+        name: 'a reference in a link is raw, as a browser splits them',
+        given: '[x<a data-ref="fig" href="#f"></a>](u)',
+        doc: 'doc(paragraph(link("x"), link(rawInline("<a data-ref=\\"fig\\" href=\\"#f\\"></a>"))))',
+      },
+      {
+        name: 'a caption of a figure is a caption only in a table’s figure',
+        given:
+          '<figcaption>Cap</figcaption>\n\n<figure class="tbl">\n\n| a |\n| - |\n| 1 |\n\n<figcaption>下</figcaption>\n\n</figure>',
+        doc: 'doc(rawBlock("<figcaption>Cap</figcaption>"), tableFigure(rawBlock("| a |\\n| - |\\n| 1 |"), htmlFigcaption("下")))',
+      },
+      {
+        name: 'emphasis dots of EPUB3J',
+        given: '<span class="em-sesame">圏点</span>',
+        doc: 'doc(paragraph(emSesame("圏点")))',
+      },
+    ],
+  },
+  {
+    title: 'joining into captions of themes',
+    cases: [
+      {
+        name: 'Backspace keeps a paragraph with more than text out of a caption',
+        given: '<p class="fig-caption">cap</p>\n\n‸see **bold** $x$ and [l](u)',
+        steps: [press('Backspace')],
+        expect:
+          '<p class="fig-caption">cap‸</p>\n\nsee **bold** $x$ and [l](u)',
+      },
+      {
+        name: 'Delete keeps a paragraph with more than text out of a caption',
+        given: '<p class="fig-caption">cap‸</p>\n\nsee **bold**',
+        steps: [press('Delete')],
+        expect: '<p class="fig-caption">cap</p>\n\n‸see **bold**',
+      },
+      {
+        name: 'Backspace joins a paragraph of text into a caption',
+        given: '<p class="fig-caption">cap</p>\n\n‸and more',
+        steps: [press('Backspace')],
+        expect: '<p class="fig-caption">cap‸and more</p>',
+      },
+      {
+        name: 'taking a caption away',
+        given: '<p class="fig-caption">cap‸</p>',
+        steps: [
+          command('take the caption away', (editor) =>
+            editor.commands.unsetHtmlElement('figureCaption'),
+          ),
+        ],
+        expect: 'cap‸',
+      },
+    ],
+  },
+  {
+    title: 'combined text in a document recorded before it',
+    cases: [
+      {
+        name: 'a pasted mark is its tags around its text',
+        given: 'a‸',
+        steps: [
+          recordBeforeThemes,
+          insert('insert what pasted HTML makes', {
+            type: 'text',
+            text: '12',
+            marks: [{ type: 'tcy' }],
+          }),
+        ],
+        expect: 'a<span class="tcy">12</span>‸',
+        doc: 'doc(paragraph("a", rawInline("<span class=\\"tcy\\">"), "12", rawInline("</span>")))',
       },
     ],
   },

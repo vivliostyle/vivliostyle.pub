@@ -12,6 +12,7 @@ import {
   type LegacyBaselineReader,
 } from './legacy';
 import type { NotationDefinition } from './notation';
+import { RAW_INLINE, rawBlockElements } from './parse';
 import {
   type BaselineReader,
   MarkdownPipeline,
@@ -295,6 +296,9 @@ function dissolveUnwritable(editor: Editor): Plugin {
         transactions,
         (node) => node !== state.doc,
       );
+      const notations = optionsOf(editor).notations;
+      const dissolveMark = (name: string) =>
+        notations.find((it) => it.dissolveMarks?.[name])?.dissolveMarks?.[name];
       for (const { pos } of found) {
         const node = tr.doc.nodeAt(pos);
         if (!node) {
@@ -302,6 +306,9 @@ function dissolveUnwritable(editor: Editor): Plugin {
         }
         for (const mark of node.marks) {
           if (!writer.writesMark(mark.type.name)) {
+            if (node.isText && dissolveMark(mark.type.name)) {
+              continue;
+            }
             removeMark(tr, pos, node, mark);
           } else if (lost(mark.type.name, mark.attrs).length > 0) {
             removeMark(tr, pos, node, mark);
@@ -335,9 +342,86 @@ function dissolveUnwritable(editor: Editor): Plugin {
           tr.setNodeMarkup(pos, undefined, cleared(type, current.attrs));
         }
       }
+      dissolveMarks(
+        tr,
+        found
+          .filter(({ node }) => node.isTextblock)
+          .map(({ pos }) => tr.mapping.map(pos)),
+        (name) => !writer.writesMark(name),
+        dissolveMark,
+      );
       return tr.docChanged ? tr : null;
     },
   });
+}
+
+/**
+ * Writes the marks the document's definitions cannot write, in the given
+ * textblocks, as the source their definitions write around the text.
+ */
+function dissolveMarks(
+  tr: Transaction,
+  textblocks: readonly number[],
+  unwritable: (name: string) => boolean,
+  dissolve: (
+    name: string,
+  ) => ((mark: Mark) => { open: string; close: string }) | undefined,
+): void {
+  const raw = tr.doc.type.schema.marks[RAW_INLINE];
+  for (const pos of [...new Set(textblocks)].sort((a, b) => b - a)) {
+    const textblock = tr.doc.nodeAt(pos);
+    if (!textblock?.isTextblock) {
+      continue;
+    }
+    const runs: {
+      from: number;
+      to: number;
+      mark: Mark;
+      first: readonly Mark[];
+      last: readonly Mark[];
+    }[] = [];
+    const children: { node: ProseMirrorNode; from: number }[] = [];
+    textblock.forEach((child, offset) => {
+      children.push({ node: child, from: pos + 1 + offset });
+    });
+    children.forEach(({ node, from }, index) => {
+      const previous = children[index - 1]?.node.marks ?? [];
+      for (const mark of node.marks) {
+        if (
+          !unwritable(mark.type.name) ||
+          !dissolve(mark.type.name) ||
+          mark.isInSet(previous)
+        ) {
+          continue;
+        }
+        let last = index;
+        while (mark.isInSet(children[last + 1]?.node.marks ?? [])) {
+          last++;
+        }
+        runs.push({
+          from,
+          to: children[last].from + children[last].node.nodeSize,
+          mark,
+          first: mark.removeFromSet(node.marks),
+          last: mark.removeFromSet(children[last].node.marks),
+        });
+      }
+    });
+    for (const run of runs.sort((a, b) => b.from - a.from)) {
+      const source = dissolve(run.mark.type.name)?.(run.mark);
+      if (!source) {
+        continue;
+      }
+      const text = (value: string, marks: readonly Mark[]) =>
+        tr.doc.type.schema.text(
+          value,
+          raw ? raw.create().addToSet(marks) : marks,
+        );
+      tr.removeMark(run.from, run.to, run.mark);
+      tr.insert(run.to, text(source.close, run.last));
+      tr.insert(run.from, text(source.open, run.first));
+    }
+  }
 }
 
 function removeMark(
@@ -407,6 +491,82 @@ function contentOf(node: ProseMirrorNode): ProseMirrorNode[] {
   return text ? [schema.text(text, node.marks)] : [];
 }
 
+/**
+ * Throws where two definitions have the same name, which documents record
+ * them by, or make marks or nodes of the same type, one of which would be
+ * lost: a definition may come from data the user wrote.
+ */
+function checkNames(notations: readonly NotationDefinition[]): void {
+  const names = new Set<string>();
+  const types = new Map<string, string>();
+  for (const notation of notations) {
+    if (names.has(notation.name)) {
+      throw new Error(`Two definitions are named ${notation.name}`);
+    }
+    names.add(notation.name);
+    for (const extension of notation.extensions ?? []) {
+      const other = types.get(extension.name);
+      if (other !== undefined) {
+        throw new Error(
+          `The definitions ${other} and ${notation.name} both make ${extension.name}`,
+        );
+      }
+      types.set(extension.name, notation.name);
+    }
+  }
+}
+
+/**
+ * Makes the element of raw blocks that came to be the tags of a declared
+ * element around blocks, wherever this client changed the document, as by
+ * deleting a block that kept them apart: their markdown reads as the
+ * element, which the document then holds too.
+ */
+function structureRawElements(editor: Editor): Plugin {
+  return new Plugin({
+    appendTransaction: (transactions, _, state) => {
+      if (!transactions.some((tr) => tr.docChanged && !isRemote(tr))) {
+        return null;
+      }
+      const record = optionsOf(editor).documentRecord?.(editor);
+      const signature = record
+        ? record.notations
+        : storageOf(editor).documentNotations;
+      const { pipeline } = documentPipeline(editor, signature);
+      const specs = pipeline.parser.htmlElements.filter(
+        (spec) => spec.kind === 'block',
+      );
+      if (specs.length === 0) {
+        return null;
+      }
+      const containers = [
+        { pos: -1, node: state.doc },
+        ...changedNodes(
+          state.doc,
+          transactions,
+          (node) => !node.isTextblock && !node.isLeaf && !node.isInline,
+        ),
+      ];
+      const { tr } = state;
+      for (const { pos, node } of containers.sort((a, b) => b.pos - a.pos)) {
+        const found = rawBlockElements(node, specs);
+        for (const { from, to, node: element } of found.reverse()) {
+          let start = pos + 1;
+          for (let i = 0; i < from; i++) {
+            start += node.child(i).nodeSize;
+          }
+          let end = start;
+          for (let i = from; i <= to; i++) {
+            end += node.child(i).nodeSize;
+          }
+          tr.replaceWith(start, end, element);
+        }
+      }
+      return tr.docChanged ? tr : null;
+    },
+  });
+}
+
 export const PubMarkdown = Extension.create<
   PubMarkdownOptions,
   PubMarkdownStorage
@@ -433,13 +593,14 @@ export const PubMarkdown = Extension.create<
   },
 
   addExtensions() {
+    checkNames(this.options.notations);
     return this.options.notations.flatMap(
       (notation) => notation.extensions ?? [],
     );
   },
 
   addProseMirrorPlugins() {
-    return [dissolveUnwritable(this.editor)];
+    return [dissolveUnwritable(this.editor), structureRawElements(this.editor)];
   },
 
   addCommands() {

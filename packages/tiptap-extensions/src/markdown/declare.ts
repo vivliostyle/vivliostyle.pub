@@ -6,16 +6,26 @@ import {
 } from '@tiptap/core';
 import type {
   DOMOutputSpec,
+  Mark,
   NodeType,
   Node as ProseMirrorNode,
   Schema,
 } from '@tiptap/pm/model';
-import { NodeSelection } from '@tiptap/pm/state';
+import {
+  type EditorState,
+  NodeSelection,
+  Plugin,
+  TextSelection,
+  type Transaction,
+} from '@tiptap/pm/state';
 
+import { changedNodes, isRemote } from './changes';
 import { hasDocumentNotation } from './extension';
+import { decodeHtml, encodeHtml, readStartTag } from './html';
+import { matchSequences } from './match';
 import type { UnknownMdastNode } from './mdast';
 import {
-  encodeHtml,
+  type ElementTags,
   type HtmlElementSpec,
   matchAttributes,
   matchOpeningTag,
@@ -71,6 +81,11 @@ interface NodeDeclaration extends ElementDeclaration {
   /** The node type, the name by default. */
   node?: string;
   /**
+   * The group of the node, `block` or `inline` by default, or null for none,
+   * so it is only where another node's content names it.
+   */
+  group?: string | null;
+  /**
    * What a cross-reference to an element of the node with an id calls it,
    * as `data-ref` does in Vivliostyle Themes: `fig`, `eq`, …
    */
@@ -121,6 +136,8 @@ export interface HtmlAtomDeclaration extends NodeDeclaration {
  */
 export interface HtmlBlockDeclaration extends NodeDeclaration {
   kind: 'htmlBlock';
+  /** What it holds, as a ProseMirror content expression, `block+` by default. */
+  content?: string;
 }
 
 /**
@@ -183,6 +200,102 @@ export function declaredElementOf(
   return spec?.htmlElement ?? null;
 }
 
+// Elements a definition may be of: none that runs script, loads anything or
+// takes input. Phrasing for marks and inline nodes, flow for blocks.
+const PHRASING = new Set(
+  'a abbr b bdi bdo cite code data del dfn em i ins kbd mark q s samp small span strong sub sup time u var'.split(
+    ' ',
+  ),
+);
+const FLOW = new Set(
+  'address article aside blockquote details div figcaption figure footer h1 h2 h3 h4 h5 h6 header hgroup nav p section summary'.split(
+    ' ',
+  ),
+);
+const ATTRIBUTE_NAME = /^[a-z_][a-z0-9_.:-]*$/;
+const CLASS_NAME = /^[A-Za-z_-][A-Za-z0-9_-]*$/;
+const TYPE_NAME = /^[A-Za-z][A-Za-z0-9]*$/;
+const CONTENT = /^[A-Za-z0-9_ ?*+|(){},]+$/;
+
+/** The attribute the editor marks its element with, which no document has. */
+const ELEMENT_ATTRIBUTE = 'data-pub-element';
+
+function validate(
+  declaration: Exclude<NotationDeclaration, DelimitedMarkDeclaration>,
+): void {
+  const fail = (what: string) => {
+    throw new Error(
+      `The declaration of ${JSON.stringify(declaration.name)} ${what}`,
+    );
+  };
+  const inline =
+    declaration.kind === 'htmlMark' ||
+    declaration.kind === 'htmlInline' ||
+    declaration.kind === 'htmlAtom';
+  if (!(inline ? PHRASING : FLOW).has(declaration.tag)) {
+    fail(`cannot be of a <${declaration.tag}> element`);
+  }
+  const type =
+    declaration.kind === 'htmlMark' ? declaration.mark : declaration.node;
+  for (const name of [declaration.name, type ?? declaration.name]) {
+    if (!TYPE_NAME.test(name)) {
+      fail(`has a name that is no type name: ${JSON.stringify(name)}`);
+    }
+  }
+  for (const name of declaration.classes ?? []) {
+    if (!CLASS_NAME.test(name)) {
+      fail(`has a class that is no class name: ${JSON.stringify(name)}`);
+    }
+  }
+  const attributes = [
+    ...Object.keys(declaration.match ?? {}),
+    ...(declaration.capture ?? []),
+    ...(declaration.require ?? []),
+  ];
+  for (const name of attributes) {
+    if (
+      !ATTRIBUTE_NAME.test(name) ||
+      name.startsWith('on') ||
+      name === 'style' ||
+      name.startsWith(ELEMENT_ATTRIBUTE)
+    ) {
+      fail(`names an attribute it cannot have: ${JSON.stringify(name)}`);
+    }
+  }
+  for (const name of declaration.require ?? []) {
+    if (!declaration.capture?.includes(name)) {
+      fail(
+        `requires an attribute it does not capture: ${JSON.stringify(name)}`,
+      );
+    }
+  }
+  if (
+    declaration.kind !== 'htmlMark' &&
+    declaration.kind !== 'htmlBlock' &&
+    'content' in declaration
+  ) {
+    fail('gives content to a node that holds no blocks');
+  }
+  if (
+    declaration.kind === 'htmlBlock' &&
+    declaration.content !== undefined &&
+    !CONTENT.test(declaration.content)
+  ) {
+    fail(
+      `has content that is no content expression: ${JSON.stringify(declaration.content)}`,
+    );
+  }
+  if (
+    declaration.kind !== 'htmlMark' &&
+    declaration.group != null &&
+    !/^[A-Za-z][A-Za-z0-9 ]*$/.test(declaration.group)
+  ) {
+    fail(
+      `has a group that is no group name: ${JSON.stringify(declaration.group)}`,
+    );
+  }
+}
+
 function selectorOf(pattern: HtmlElementPattern): string {
   const quote = (value: string) => `"${value.replace(/["\\]/g, '\\$&')}"`;
   return [
@@ -207,10 +320,13 @@ function isSafeHref(value: string): boolean {
 
 /**
  * The attributes the editor puts on the element: those of the pattern, and
- * of the others those a theme can select it by, see `isRenderedAttribute`.
+ * of the others those a theme can select it by, see `isRenderedAttribute`,
+ * with the type it is, so the element is read back as itself and not as
+ * another node whose rule it matches.
  */
 function renderedElementAttributes(
   pattern: HtmlElementPattern,
+  type: string,
   attrs: Readonly<Record<string, unknown>>,
 ): Record<string, string> {
   const others = renderedAttributes(attrs[OTHER_ATTRIBUTES], pattern.tag);
@@ -241,6 +357,7 @@ function renderedElementAttributes(
   if (classes.length > 0) {
     rendered.class = classes.join(' ');
   }
+  rendered[ELEMENT_ATTRIBUTE] = type;
   return rendered;
 }
 
@@ -258,35 +375,63 @@ function typeAttributes(pattern: HtmlElementPattern) {
   );
 }
 
-function parseRule(pattern: HtmlElementPattern) {
-  return {
-    tag: selectorOf(pattern),
-    // Before the rules of links and paragraphs, which the tag also is.
-    priority: 60,
-    getAttrs: (element: HTMLElement) => {
-      const attributes: Record<string, string> = {};
-      for (const attribute of Array.from(element.attributes)) {
-        attributes[attribute.name.toLowerCase()] = attribute.value;
-      }
-      const read = matchAttributes(attributes, {
-        ...pattern,
-        rest: OTHER_ATTRIBUTES,
-      });
-      if (!read) {
-        return false;
-      }
-      // Pasted HTML has attributes of its page, which are not the
-      // document's: only those a theme can select the element by are kept.
-      const { [OTHER_ATTRIBUTES]: rest, ...own } = read;
-      const others = renderedAttributes(rest, pattern.tag);
-      return pattern.keepOtherAttributes
-        ? {
-            ...own,
-            [OTHER_ATTRIBUTES]: Object.keys(others).length > 0 ? others : null,
-          }
-        : own;
+function domAttributes(element: HTMLElement): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  for (const attribute of Array.from(element.attributes)) {
+    const name = attribute.name.toLowerCase();
+    if (name !== ELEMENT_ATTRIBUTE) {
+      attributes[name] = attribute.value;
+    }
+  }
+  return attributes;
+}
+
+/**
+ * The editor's own element of the type comes back as itself, with what it
+ * rendered of its other attributes. Other HTML is read as the element where
+ * it matches, with the attributes it declares alone: the rest are those of
+ * the page it came from, not the document's.
+ */
+function parseRules(pattern: HtmlElementPattern, type: string) {
+  const read = (element: HTMLElement) =>
+    matchAttributes(domAttributes(element), {
+      ...pattern,
+      rest: OTHER_ATTRIBUTES,
+    });
+  return [
+    {
+      tag: `${pattern.tag}[${ELEMENT_ATTRIBUTE}="${type}"]`,
+      priority: 100,
+      getAttrs: (element: HTMLElement) => {
+        const attrs = read(element);
+        if (!attrs) {
+          return false;
+        }
+        const { [OTHER_ATTRIBUTES]: rest, ...own } = attrs;
+        const others = renderedAttributes(rest, pattern.tag);
+        return pattern.keepOtherAttributes
+          ? {
+              ...own,
+              [OTHER_ATTRIBUTES]:
+                Object.keys(others).length > 0 ? others : null,
+            }
+          : own;
+      },
     },
-  };
+    {
+      tag: selectorOf(pattern),
+      // Before the rules of links and paragraphs, which the tag also is.
+      priority: 60,
+      getAttrs: (element: HTMLElement) => {
+        const attrs = read(element);
+        if (!attrs) {
+          return false;
+        }
+        const { [OTHER_ATTRIBUTES]: _, ...own } = attrs;
+        return own;
+      },
+    },
+  ];
 }
 
 function otherAttributesOf(
@@ -317,12 +462,9 @@ function specOf(
   };
 }
 
-function rawText(schema: Schema, text: string, node: ProseMirrorNode) {
+function rawText(schema: Schema, text: string, marks: readonly Mark[]) {
   const raw = schema.marks[RAW_INLINE];
-  return schema.text(
-    text,
-    raw ? raw.create().addToSet(node.marks) : node.marks,
-  );
+  return schema.text(text, raw ? raw.create().addToSet(marks) : marks);
 }
 
 function rawBlock(schema: Schema, text: string): ProseMirrorNode {
@@ -338,20 +480,153 @@ function openingTagOf(pattern: HtmlElementPattern, node: ProseMirrorNode) {
   return openingTag(pattern, node.attrs, otherAttributesOf(node.attrs));
 }
 
-// HTML blocks end at a blank line, which a line feed can stand for.
-function textblockHtml(text: string): string {
-  return encodeHtml(text).replace(/\n(?=[ \t]*(?:\n|$))/g, '&#10;');
+/** Whether the line feed at `index` would end an HTML block. */
+function endsBlock(text: string, index: number): boolean {
+  let i = index + 1;
+  while (text[i] === ' ' || text[i] === '\t') {
+    i++;
+  }
+  return i >= text.length || text[i] === '\n';
 }
 
-function sourceOf(match: string, tag: string) {
-  const open = match.indexOf('>') + 1;
-  return { open, close: match.length - `</${tag}>`.length };
+/** The pieces of HTML text, each with the text it reads as. */
+function htmlPieces(html: string): { text: string; source: string }[] {
+  const pieces: { text: string; source: string }[] = [];
+  let i = 0;
+  while (i < html.length) {
+    const end = html[i] === '&' ? html.indexOf(';', i) + 1 : 0;
+    const text = end > i ? decodeHtml(html.slice(i, end)) : null;
+    if (text !== null && end > i) {
+      pieces.push({ text, source: html.slice(i, end) });
+      i = end;
+    } else {
+      pieces.push({ text: html[i], source: html[i] });
+      i++;
+    }
+  }
+  return pieces;
+}
+
+/**
+ * The content of a textblock element as HTML, writing what did not change
+ * as `written` did. HTML blocks end at a blank line, which a line feed is
+ * written as a reference for.
+ */
+function textblockHtml(text: string, written?: string): string {
+  const pieces = written === undefined ? [] : htmlPieces(written);
+  const old: { char: string; piece: number }[] = [];
+  pieces.forEach((piece, index) => {
+    for (const char of piece.text.split('')) {
+      old.push({ char, piece: index });
+    }
+  });
+  const chars = text.split('');
+  const matches = matchSequences(
+    chars,
+    old.map((it) => it.char),
+  );
+  let html = '';
+  let i = 0;
+  while (i < chars.length) {
+    const j = matches[i];
+    if (j !== -1) {
+      const index = old[j].piece;
+      const piece = pieces[index];
+      let whole = old[j - 1]?.piece !== index;
+      for (let k = 1; whole && k < piece.text.length; k++) {
+        whole = matches[i + k] === j + k;
+      }
+      // A line feed written as itself may now end the block.
+      if (whole && !(piece.source === '\n' && endsBlock(text, i))) {
+        html += piece.source;
+        i += piece.text.length;
+        continue;
+      }
+    }
+    const char = chars[i];
+    html += char === '\n' && endsBlock(text, i) ? '&#10;' : encodeHtml(char);
+    i++;
+  }
+  return html;
+}
+
+function sourceOf(match: string) {
+  const tag = readStartTag(match, 0);
+  const close = match.lastIndexOf('</');
+  return tag && close >= tag.end ? { open: tag.end, close } : null;
+}
+
+/**
+ * Takes an id off every later occurrence of a mark of the type in a
+ * textblock that has the same one, where this client changed it: a mark
+ * split in two by an edit would otherwise give two elements the id.
+ */
+function uniqueMarkIds(type: string): Plugin {
+  const idOf = (mark: Mark) => {
+    const others = otherAttributesOf(mark.attrs);
+    return typeof mark.attrs.id === 'string'
+      ? mark.attrs.id
+      : typeof others.id === 'string'
+        ? others.id
+        : null;
+  };
+  const withoutId = (mark: Mark) => {
+    const attrs = { ...mark.attrs };
+    if (typeof attrs.id === 'string') {
+      attrs.id = null;
+    }
+    const others = { ...otherAttributesOf(attrs) };
+    delete others.id;
+    if (OTHER_ATTRIBUTES in attrs) {
+      attrs[OTHER_ATTRIBUTES] = Object.keys(others).length > 0 ? others : null;
+    }
+    return mark.type.create(attrs);
+  };
+  return new Plugin({
+    appendTransaction: (transactions, _, state) => {
+      if (!transactions.some((tr) => tr.docChanged && !isRemote(tr))) {
+        return null;
+      }
+      const { tr } = state;
+      for (const { pos, node } of changedNodes(
+        state.doc,
+        transactions,
+        (it) => it.isTextblock,
+      )) {
+        const children: { node: ProseMirrorNode; from: number }[] = [];
+        node.forEach((child, offset) => {
+          children.push({ node: child, from: pos + 1 + offset });
+        });
+        const seen = new Set<string>();
+        children.forEach(({ node: child, from }, index) => {
+          const previous = children[index - 1]?.node.marks ?? [];
+          for (const mark of child.marks) {
+            const id = mark.type.name === type ? idOf(mark) : null;
+            if (id === null || mark.isInSet(previous)) {
+              continue;
+            }
+            if (seen.has(id)) {
+              let last = index;
+              while (mark.isInSet(children[last + 1]?.node.marks ?? [])) {
+                last++;
+              }
+              const to = children[last].from + children[last].node.nodeSize;
+              tr.removeMark(from, to, mark).addMark(from, to, withoutId(mark));
+            }
+            seen.add(id);
+          }
+        });
+      }
+      return tr.docChanged ? tr : null;
+    },
+  });
 }
 
 /**
  * Builds a definition from a plain description, for syntax that needs no
  * code of its own. Without `extensions`, the mark or node is created for
- * the schema.
+ * the schema. Throws where the declaration names an element, attribute or
+ * type it cannot: it may come from data the user wrote.
  */
 export function declareNotation(
   declaration: NotationDeclaration,
@@ -360,6 +635,7 @@ export function declareNotation(
   if (declaration.kind === 'delimitedMark') {
     return delimitedMark(declaration, extensions);
   }
+  validate(declaration);
   const { name, version, tag } = declaration;
   const pattern: HtmlElementPattern = {
     tag,
@@ -382,33 +658,44 @@ export function declareNotation(
   const base = { name, ...(version !== undefined && { version }) };
   const enabled = (editor: Parameters<typeof hasDocumentNotation>[0]) => () =>
     hasDocumentNotation(editor, name);
+  const tagsOf = (tags: ElementTags | null, node: ProseMirrorNode) =>
+    tags ?? { open: openingTagOf(pattern, node), close };
 
   if (declaration.kind === 'htmlMark') {
     const mark = declaration.mark ?? name;
     const own = element('mark');
+    const ids = pattern.capture?.includes('id') || pattern.keepOtherAttributes;
     return {
       ...base,
       extensions: extensions ?? [
         MarkExtension.create({
           name: mark,
           addAttributes: () => typeAttributes(pattern),
-          parseHTML: () => [parseRule(pattern)],
+          parseHTML: () => parseRules(pattern, mark),
           renderHTML: ({ mark: it }) => [
             tag,
-            renderedElementAttributes(pattern, it.attrs),
+            renderedElementAttributes(pattern, mark, it.attrs),
             0,
           ],
           extendMarkSchema: (extension) =>
             extension.name === mark ? { htmlElement: own } : {},
+          addProseMirrorPlugins: () => (ids ? [uniqueMarkIds(mark)] : []),
         }),
       ],
       htmlElements: [specOf(declaration, 'mark', mark)],
       marks: {
         [mark]: {
-          open: (it) =>
+          open: (it, context) =>
+            context.markTags?.open ??
             openingTag(pattern, it.attrs, otherAttributesOf(it.attrs)),
-          close,
+          close: (_, context) => context.markTags?.close ?? close,
         },
+      },
+      dissolveMarks: {
+        [mark]: (it) => ({
+          open: openingTag(pattern, it.attrs, otherAttributesOf(it.attrs)),
+          close,
+        }),
       },
     };
   }
@@ -424,18 +711,27 @@ export function declareNotation(
           : 'textblock',
     declaration.reference,
   );
+  const inline = own.kind === 'inline' || own.kind === 'atom';
+  const group =
+    declaration.group === undefined
+      ? inline
+        ? 'inline'
+        : 'block'
+      : (declaration.group ?? undefined);
   const shared = {
     name: node,
+    group,
     addAttributes: () => typeAttributes(pattern),
-    parseHTML: () => [
-      declaration.kind === 'htmlTextblock'
-        ? { ...parseRule(pattern), preserveWhitespace: 'full' as const }
-        : parseRule(pattern),
-    ],
+    parseHTML: () =>
+      parseRules(pattern, node).map((rule) =>
+        own.kind === 'textblock'
+          ? { ...rule, preserveWhitespace: 'full' as const }
+          : rule,
+      ),
     renderHTML: ({ node: it }: { node: ProseMirrorNode }): DOMOutputSpec =>
       own.kind === 'atom'
-        ? [tag, renderedElementAttributes(pattern, it.attrs)]
-        : [tag, renderedElementAttributes(pattern, it.attrs), 0],
+        ? [tag, renderedElementAttributes(pattern, node, it.attrs)]
+        : [tag, renderedElementAttributes(pattern, node, it.attrs), 0],
     extendNodeSchema: (extension: { name: string }) =>
       extension.name === node ? { htmlElement: own } : {},
   };
@@ -447,11 +743,15 @@ export function declareNotation(
           find,
           enabled: enabled(this.editor),
           build: ({ state, match, content: slice }) => {
-            const { open, close: end } = sourceOf(match[0], tag);
-            const attrs = matchOpeningTag(match[0].slice(0, open), spec);
+            const found = sourceOf(match[0]);
+            const attrs =
+              found && matchOpeningTag(match[0].slice(0, found.open), spec);
             const type = state.schema.nodes[node];
-            return attrs && type
-              ? type.create(attrs, content ? slice(open, end) : null)
+            return found && attrs && type
+              ? type.create(
+                  attrs,
+                  content ? slice(found.open, found.close) : null,
+                )
               : null;
           },
         }).paste,
@@ -465,7 +765,6 @@ export function declareNotation(
         extensions: extensions ?? [
           NodeExtension.create({
             ...shared,
-            group: 'inline',
             inline: true,
             content: 'inline*',
             // Code cannot hold the tags, and a link not one holding a link.
@@ -486,14 +785,15 @@ export function declareNotation(
         htmlElements: [spec],
         nodes: {
           [node]: (it, context) => {
+            const tags = tagsOf(context.tags(it), it);
             const content = context.inline(it);
             // An opening tag that ends the first line of a paragraph starts
             // an HTML block instead.
-            return `${openingTagOf(pattern, it)}${
+            return `${tags.open}${
               context.lineBefore === '' && content.startsWith('\n')
                 ? `&#10;${content.slice(1)}`
                 : content
-            }${close}`;
+            }${tags.close}`;
           },
         },
         dissolve: {
@@ -511,9 +811,9 @@ export function declareNotation(
               );
             });
             return [
-              rawText(schema, openingTagOf(pattern, it), it),
+              rawText(schema, openingTagOf(pattern, it), it.marks),
               ...content,
-              rawText(schema, close, it),
+              rawText(schema, close, it.marks),
             ];
           },
         },
@@ -524,7 +824,6 @@ export function declareNotation(
         extensions: extensions ?? [
           NodeExtension.create({
             ...shared,
-            group: 'inline',
             inline: true,
             atom: true,
             selectable: true,
@@ -538,10 +837,19 @@ export function declareNotation(
           }),
         ],
         htmlElements: [spec],
-        nodes: { [node]: (it) => `${openingTagOf(pattern, it)}${close}` },
+        nodes: {
+          [node]: (it, context) => {
+            const tags = tagsOf(context.tags(it), it);
+            return `${tags.open}${tags.close}`;
+          },
+        },
         dissolve: {
           [node]: (it) => [
-            rawText(it.type.schema, `${openingTagOf(pattern, it)}${close}`, it),
+            rawText(
+              it.type.schema,
+              `${openingTagOf(pattern, it)}${close}`,
+              it.marks,
+            ),
           ],
         },
       };
@@ -551,15 +859,19 @@ export function declareNotation(
         extensions: extensions ?? [
           NodeExtension.create({
             ...shared,
-            group: 'block',
-            content: 'block+',
+            content: declaration.content ?? 'block+',
             defining: true,
           }),
         ],
         htmlElements: [spec],
         nodes: {
-          [node]: (it, context) =>
-            `${openingTagOf(pattern, it)}\n\n${context.children(it)}\n\n${close}`,
+          [node]: (it, context) => {
+            const found = context.tags(it);
+            const tags = tagsOf(found, it);
+            return `${tags.open}${found?.lead ?? '\n\n'}${context.children(it)}${
+              found?.trail ?? '\n\n'
+            }${tags.close}`;
+          },
         },
         dissolve: {
           [node]: (it) => {
@@ -582,7 +894,6 @@ export function declareNotation(
         extensions: extensions ?? [
           NodeExtension.create({
             ...shared,
-            group: 'block',
             content: 'text*',
             marks: '',
             defining: true,
@@ -590,8 +901,11 @@ export function declareNotation(
         ],
         htmlElements: [spec],
         nodes: {
-          [node]: (it) =>
-            `${openingTagOf(pattern, it)}${textblockHtml(it.textContent)}${close}`,
+          [node]: (it, context) => {
+            const found = context.tags(it);
+            const tags = tagsOf(found, it);
+            return `${tags.open}${textblockHtml(it.textContent, found?.inner)}${tags.close}`;
+          },
         },
         dissolve: {
           [node]: (it) => [
@@ -669,8 +983,58 @@ function isPlainText(node: ProseMirrorNode): boolean {
 }
 
 /** The commands for the elements definitions declare, see `setHtmlElement`. */
+/**
+ * Keeps Backspace and Delete from joining a paragraph that holds more than
+ * text into a textblock element, which holds text alone and would drop the
+ * rest: the caret moves into the element instead.
+ */
+function refuseJoin(state: EditorState, forward: boolean): Transaction | null {
+  const { selection } = state;
+  const { $from } = selection;
+  const parent = $from.parent;
+  if (!selection.empty || !parent.isTextblock || $from.depth === 0) {
+    return null;
+  }
+  const isElement = (node: ProseMirrorNode | null | undefined) =>
+    node &&
+    declaredElementOf(state.schema, node.type.name)?.kind === 'textblock';
+  const index = $from.index($from.depth - 1);
+  const container = $from.node($from.depth - 1);
+  if (!forward && $from.parentOffset === 0) {
+    const before = container.maybeChild(index - 1);
+    if (isElement(before) && !isPlainText(parent)) {
+      return state.tr.setSelection(
+        TextSelection.create(state.doc, $from.before() - 1),
+      );
+    }
+  }
+  if (forward && $from.parentOffset === parent.content.size) {
+    const after = container.maybeChild(index + 1);
+    if (isElement(parent) && after?.isTextblock && !isPlainText(after)) {
+      return state.tr.setSelection(
+        TextSelection.create(state.doc, $from.after() + 1),
+      );
+    }
+  }
+  return null;
+}
+
 export const HtmlElementCommands = Extension.create({
   name: 'htmlElementCommands',
+  // Before the keymap that joins textblocks.
+  priority: 110,
+
+  addKeyboardShortcuts() {
+    const keep = (forward: boolean) => () => {
+      const tr = refuseJoin(this.editor.state, forward);
+      if (!tr) {
+        return false;
+      }
+      this.editor.view.dispatch(tr);
+      return true;
+    };
+    return { Backspace: keep(false), Delete: keep(true) };
+  },
 
   addCommands() {
     return {

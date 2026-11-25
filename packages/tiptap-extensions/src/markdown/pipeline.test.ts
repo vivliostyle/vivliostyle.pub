@@ -3,6 +3,7 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { PubExtensions } from '../index';
+import { documentHtml } from '../testing/html';
 import {
   loadAsMarkedDocument,
   readsBackAs,
@@ -915,5 +916,138 @@ describe('declared HTML elements', () => {
     expect(getMarkdown(editor, { baseline: '' })).toBe(
       '<p class="lead" id="l">*a* &amp; &lt;b> \\x</p>\n\n<p class="lead" title="t">y</p>',
     );
+  });
+
+  it('reads an element both of two declarations match as the more specific one', () => {
+    editor = new Editor({
+      element: null,
+      extensions: [
+        PubExtensions.configure({
+          notations: [
+            declareNotation({
+              kind: 'htmlInline',
+              name: 'plainBox',
+              tag: 'span',
+              classes: ['box'],
+            }),
+            declareNotation({
+              kind: 'htmlInline',
+              name: 'wideBox',
+              tag: 'span',
+              classes: ['box', 'wide'],
+              keepOtherAttributes: true,
+            }),
+          ],
+        }),
+      ],
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    editor.commands.setMarkdown(
+      '<span class="box">a</span><span class="wide box">b</span>',
+    );
+    expect(editor.state.doc.toString()).toBe(
+      'doc(paragraph(plainBox("a"), wideBox("b")))',
+    );
+  });
+
+  it.each([
+    [
+      { kind: 'htmlInline', name: 'x', tag: 'script' },
+      'cannot be of a <script> element',
+    ],
+    [
+      { kind: 'htmlBlock', name: 'x', tag: 'iframe' },
+      'cannot be of a <iframe> element',
+    ],
+    [
+      { kind: 'htmlInline', name: 'x', tag: 'div' },
+      'cannot be of a <div> element',
+    ],
+    [
+      { kind: 'htmlBlock', name: 'x', tag: 'span' },
+      'cannot be of a <span> element',
+    ],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', capture: ['onclick'] },
+      'names an attribute',
+    ],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', match: { style: 'a' } },
+      'names an attribute',
+    ],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', classes: ['a b'] },
+      'has a class',
+    ],
+    [{ kind: 'htmlMark', name: 'x y', tag: 'span' }, 'has a name'],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', require: ['id'] },
+      'requires an attribute',
+    ],
+    [
+      { kind: 'htmlBlock', name: 'x', tag: 'div', content: 'block+; x' },
+      'has content',
+    ],
+  ] as const)('refuses to declare %j', (declaration, message) => {
+    expect(() =>
+      declareNotation(declaration as unknown as NotationDeclaration),
+    ).toThrow(message);
+  });
+
+  it.each([
+    ['a type of the standard syntax', 'paragraph'],
+    ['a type of another declaration', 'combined'],
+  ])('refuses declarations of %s', (_, type) => {
+    expect(
+      () =>
+        new Editor({
+          element: null,
+          extensions: [
+            PubExtensions.configure({
+              notations: [
+                declareNotation({
+                  kind: 'htmlMark',
+                  name: 'combined',
+                  tag: 'span',
+                  classes: ['a'],
+                }),
+                declareNotation({
+                  kind: 'htmlInline',
+                  name: 'other',
+                  node: type,
+                  tag: 'span',
+                  classes: ['b'],
+                }),
+              ],
+            }),
+          ],
+        }),
+    ).toThrow(/both make/);
+  });
+
+  it('reads the editor’s element back before the rules of other nodes', () => {
+    const editor = withDeclared();
+    const rules = (type: string) =>
+      (editor.schema.nodes[type]?.spec.parseDOM ?? []).map((rule) => ({
+        tag: 'tag' in rule ? rule.tag : undefined,
+        priority: rule.priority ?? 50,
+      }));
+    expect(rules('remark')[0]).toEqual({
+      tag: 'span[data-pub-element="remark"]',
+      priority: 100,
+    });
+    expect(
+      documentHtml(
+        parseMarkdown(
+          editor,
+          'a<span class="remark" role="doc-footnote">n</span>',
+        ).doc,
+      ),
+    ).toBe(
+      '<p>a<span role="doc-footnote" class="remark" data-pub-element="remark">n</span></p>',
+    );
+    expect(
+      Math.max(...rules('inlineFootnote').map((it) => it.priority)),
+    ).toBeLessThan(100);
   });
 });

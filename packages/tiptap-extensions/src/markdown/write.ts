@@ -9,6 +9,7 @@ import {
 import { keyOf, matchSequences } from './match';
 import {
   type ChildrenOptions,
+  type ElementTags,
   type EscapeRule,
   isEmptyTextblock,
   type MarkToMarkdown,
@@ -18,6 +19,7 @@ import {
   type WriteContext,
 } from './notation';
 import {
+  type ElementSource,
   type MarkdownParser,
   type ParsedBody,
   RAW_BLOCK,
@@ -220,6 +222,8 @@ interface MarkOccurrence {
   closeLength: number;
   /** The text under the mark, as it is in the document. */
   text: string;
+  /** The tags of its element in the baseline, see `WriteContext.tags`. */
+  tags: ElementTags | null;
 }
 
 interface InlineEdges {
@@ -229,15 +233,33 @@ interface InlineEdges {
   /** The output before the piece and the source after it. */
   before: string;
   after: string;
+  /** Where the piece starts in the content of `container`. */
+  offset?: number;
+  /** The textblock or inline node the piece is of, when not the piece. */
+  container?: ProseMirrorNode;
 }
 
 const WHOLE: InlineEdges = { start: true, end: true, before: '', after: '' };
+
+function tagsOf(source: ElementSource): ElementTags {
+  return {
+    open: source.open,
+    close: source.close,
+    ...(source.inner !== undefined && { inner: source.inner }),
+    ...(source.lead !== undefined && { lead: source.lead }),
+    ...(source.trail !== undefined && { trail: source.trail }),
+  };
+}
 
 export class MarkdownWriter {
   private readonly nodeWriters = new Map<string, NodeWriter>();
   private readonly markWriters = new Map<string, MarkToMarkdown>();
   private readonly escapes: EscapeRule[];
   readonly form: WrittenForm;
+  /** The baseline's tags of the inline nodes being written, see `pairTags`. */
+  private nodeTags = new WeakMap<ProseMirrorNode, ElementTags>();
+  /** The same for marks, by container and where they start in it. */
+  private markTags = new WeakMap<ProseMirrorNode, Map<string, ElementTags>>();
 
   constructor(
     private readonly parser: MarkdownParser,
@@ -352,6 +374,8 @@ export class MarkdownWriter {
       throw new MarkdownWriteError('', unwritable);
     }
     const { check } = options;
+    this.nodeTags = new WeakMap();
+    this.markTags = new WeakMap();
     this.readBlock = options.readBlock;
     this.definitions = this.definitionsOf(doc);
     this.references = readDefinitions([
@@ -993,6 +1017,19 @@ export class MarkdownWriter {
         ),
       escape: (text) => this.escapeAll(text),
       definition: (label) => this.references.get(labelKey(label)),
+      tags: (it) => {
+        if (!state.reuse) {
+          return null;
+        }
+        if (it !== node) {
+          return this.nodeTags.get(it) ?? null;
+        }
+        const [source] = base?.elements?.() ?? [];
+        return source?.type === it.type.name &&
+          source.attrs === JSON.stringify(it.attrs)
+          ? tagsOf(source)
+          : null;
+      },
     };
     const writer = this.nodeWriters.get(node.type.name);
     if (writer) {
@@ -1118,6 +1155,54 @@ export class MarkdownWriter {
       : (value ?? '');
   }
 
+  /**
+   * Pairs the HTML elements of a textblock's content with those of its
+   * baseline of the same type and attributes, in the order they open, so
+   * an element whose content changed keeps its tags as written.
+   */
+  private pairTags(textblock: ProseMirrorNode, base: BaseNode): void {
+    const queues = new Map<string, ElementSource[]>();
+    for (const source of base.elements?.() ?? []) {
+      const key = `${source.type}\u0000${source.attrs}`;
+      queues.set(key, [...(queues.get(key) ?? []), source]);
+    }
+    if (queues.size === 0) {
+      return;
+    }
+    const take = (type: string, attrs: Record<string, unknown>) =>
+      queues.get(`${type}\u0000${JSON.stringify(attrs)}`)?.shift();
+    const walk = (container: ProseMirrorNode) => {
+      const marks = new Map<string, ElementTags>();
+      let offset = 0;
+      let previous: readonly Mark[] = [];
+      container.forEach((child) => {
+        for (const mark of child.marks) {
+          if (!mark.isInSet(previous)) {
+            const source = take(mark.type.name, mark.attrs);
+            if (source) {
+              marks.set(`${offset}:${mark.type.name}`, tagsOf(source));
+            }
+          }
+        }
+        if (!child.isText) {
+          const source = take(child.type.name, child.attrs);
+          if (source) {
+            this.nodeTags.set(child, tagsOf(source));
+          }
+          if (child.inlineContent) {
+            walk(child);
+          }
+        }
+        previous = child.marks;
+        offset += child.nodeSize;
+      });
+      if (marks.size > 0) {
+        this.markTags.set(container, marks);
+      }
+    };
+    walk(textblock);
+  }
+
   private inline(
     textblock: ProseMirrorNode,
     context: WriteContext,
@@ -1130,6 +1215,9 @@ export class MarkdownWriter {
             { from: 0, to: textblock.content.size },
           ])
         : [{ from: 0, to: textblock.content.size }];
+    if (state.reuse && base) {
+      this.pairTags(textblock, base);
+    }
     const start = state.counter.candidates;
     const output = this.composeInline(textblock, pieces, context, state, true);
     if (output.implied === 0 || this.inlineReadsBack(output.text, textblock)) {
@@ -1168,6 +1256,8 @@ export class MarkdownWriter {
         const whole = this.inlineWith(textblock, context, state, allowImplied, {
           ...WHOLE,
           before: text,
+          container: textblock,
+          offset: 0,
         });
         text += whole.text;
         implied += whole.implied;
@@ -1187,6 +1277,8 @@ export class MarkdownWriter {
         end: piece.to === size,
         before: text,
         after,
+        container: textblock,
+        offset: piece.from,
       });
       text += output.text;
       implied += output.implied;
@@ -1417,7 +1509,7 @@ export class MarkdownWriter {
         const close = this.delimiter(
           mark,
           'close',
-          context,
+          occurrence.tags ? { ...context, markTags: occurrence.tags } : context,
           occurrence.form,
           occurrence.text,
         );
@@ -1455,6 +1547,9 @@ export class MarkdownWriter {
       });
     };
 
+    const tagsHere =
+      (edges.container && this.markTags.get(edges.container)) || null;
+    let at = edges.offset ?? 0;
     children.forEach((child, index) => {
       const marks = outerMarks(index, true);
       const continuation = (mark: Mark) => {
@@ -1508,12 +1603,21 @@ export class MarkdownWriter {
           close: 0,
           closeLength: 0,
           text: '',
+          tags:
+            (state.reuse && tagsHere?.get(`${at}:${mark.type.name}`)) || null,
         };
         occurrences.push(occurrence);
         return {
           mark,
           occurrence,
-          text: this.delimiter(mark, 'open', context, form),
+          text: this.delimiter(
+            mark,
+            'open',
+            occurrence.tags
+              ? { ...context, markTags: occurrence.tags }
+              : context,
+            form,
+          ),
         };
       });
 
@@ -1646,6 +1750,7 @@ export class MarkdownWriter {
           ? referenceAfter(output, trailing)
           : trailing;
       }
+      at += child.nodeSize;
     });
     closeTo(0);
     return { text: output, implied, occurrences };

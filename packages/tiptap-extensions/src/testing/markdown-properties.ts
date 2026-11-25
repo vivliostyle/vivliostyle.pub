@@ -314,7 +314,9 @@ export function checkMarkdownProperties(
         const detail = `${name} block ${block.index}`;
         const tr = editor.state.tr;
         apply(tr);
-        const { doc } = tr;
+        // As the editor holds it, after its plugins, which keep it in a state
+        // its markdown can hold.
+        const { doc } = editor.state.applyTransaction(tr).state;
         const result = write(editor, doc);
         if ('error' in result) {
           violations.push({
@@ -646,7 +648,9 @@ export const THEME_FRAGMENTS = [
   'a<span class="x footnote" id="n">注 <span class="tcy">1</span></span>b',
   '<div class="note">\n\n**md**\n\n</div>',
   '<aside class="sidenote" id="sn-1">\n\n傍注 *強調*\n\n</aside>',
-  '<div class="equation" id="eq1">\n\n$$\nx\n$$\n\n</div>',
+  // Text after the math: two display maths side by side have no markdown,
+  // a limit of VFM's syntax that the cases record.
+  '<div class="equation" id="eq1">\n\n$$\nx\n$$ (1)\n\n</div>',
   '<div class="theorem">\n\n定理。\n\n二段落目\n\n</div>',
   '<p class="fig-caption" id="c">図の題 &amp; *x*</p>',
   '<figure class="tbl" id="t1">\n\n<figcaption>表</figcaption>\n\n| a |\n| - |\n| 1 |\n\n</figure>',
