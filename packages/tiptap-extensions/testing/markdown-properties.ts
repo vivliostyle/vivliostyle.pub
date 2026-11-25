@@ -9,10 +9,10 @@ import {
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
-} from '../markdown/extension';
-import { createLegacyBaselineReader } from '../markdown/legacy';
-import { splitSource } from '../markdown/source';
-import { MarkdownWriteError } from '../markdown/write';
+} from '../src/markdown/extension';
+import { createLegacyBaselineReader } from '../src/markdown/legacy';
+import { splitSource } from '../src/markdown/source';
+import { MarkdownWriteError } from '../src/markdown/write';
 import {
   isEmptyParagraph,
   judgeReadBack,

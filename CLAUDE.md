@@ -169,13 +169,13 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 
 ## Editor behaviour tests
 
-`@v/tiptap-extensions` pins the editor's behaviour down as data, in `src/cases/`.
+`@v/tiptap-extensions` pins the editor's behaviour down as data, in `tests/cases/`. The framework that runs them is in `testing/`, outside `src/`.
 
 - A case gives the markdown the document is loaded from, the steps applied to it (typed text, key presses, editor commands) and the markdown it is saved as. A caret mark in the markdown stands for the selection, so a case reads like what the user sees. Add a case there instead of a one-off test that builds an editor by hand.
 - The cases run in `pnpm test` against a headless editor in Node. Its driver calls the hooks a view would call, so it covers keymaps and input rules. A case whose steps it cannot perform, such as paste, IME composition or caret movement, is skipped.
 - Write a behaviour the editor lacks as the case it should be, with the reason it fails. Such a case is required to differ from what it expects, so once a change makes it pass, remove the reason. A mistake in the case itself fails it all the same. Never bend the expected markdown to match what the editor does now.
 - The framework loads and saves markdown through a single module, so swapping the markdown conversion layer means changing that module, not the cases. A case's `given` is also the baseline it is saved against.
-- Every case's markdown, and the template manuscripts in `@v/viola`, are also checked for the guarantees of saving: an unedited document saves byte for byte, editing or deleting one block changes only that block's lines, appending plain text to a block only adds to the file, and what is saved reads back as the same document. Random edits of such markdown are checked the same way.
+- Every case's markdown, and the template manuscripts in `@v/viola`, are also checked for the guarantees of saving: an unedited document saves byte for byte, editing or deleting one block changes only that block's lines, appending plain text to a block only adds to the file, and what is saved reads back as the same document. Random edits of such markdown are checked the same way. These property tests are slow and live in `tests/properties/`, a Vitest project of their own beside the unit tests, and `pnpm test` runs both.
 
 ## Internationalization (i18n)
 

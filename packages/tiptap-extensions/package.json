@@ -7,10 +7,12 @@
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
+    "./testing/*": "./testing/*.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
     "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --project unit",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

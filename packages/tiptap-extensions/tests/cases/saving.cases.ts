@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core';
 
-import { press, run, type Step } from '../testing/steps';
-import type { CaseSuite } from '../testing/vitest';
+import { press, run, type Step } from '../../testing/steps';
+import type { CaseSuite } from '../../testing/vitest';
 
 /** Inserts text at the selection as a paste would, without input rules. */
 function insert(text: string): Step {

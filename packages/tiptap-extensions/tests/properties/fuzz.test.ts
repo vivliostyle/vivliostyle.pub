@@ -1,11 +1,11 @@
 import { Editor } from '@tiptap/core';
 import { expect, it } from 'vitest';
 
-import { PubExtensions } from '../index';
+import { PubExtensions } from '../../src/index';
 import {
   type FuzzStatistics,
   fuzzMarkdownEdits,
-} from '../testing/markdown-properties';
+} from '../../testing/markdown-properties';
 
 const createEditor = () =>
   new Editor({

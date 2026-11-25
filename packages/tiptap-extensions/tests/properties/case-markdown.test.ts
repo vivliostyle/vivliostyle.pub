@@ -1,13 +1,13 @@
 import { Editor } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
 
-import { suites } from '../cases/suites';
-import { PubExtensions } from '../index';
+import { PubExtensions } from '../../src/index';
 import {
   checkMarkdownProperties,
   type PropertyViolation,
-} from '../testing/markdown-properties';
-import { removeSelectionMarks } from '../testing/selection-marks';
+} from '../../testing/markdown-properties';
+import { removeSelectionMarks } from '../../testing/selection-marks';
+import { suites } from '../cases/suites';
 
 const createEditor = () =>
   new Editor({

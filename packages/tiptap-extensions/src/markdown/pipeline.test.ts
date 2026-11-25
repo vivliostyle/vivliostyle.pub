@@ -2,12 +2,12 @@ import { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '../index';
 import {
   loadAsMarkedDocument,
   readsBackAs,
   unexplainedDifferences,
-} from '../testing/markdown-properties';
+} from '../../testing/markdown-properties';
+import { PubExtensions } from '../index';
 import {
   currentNotations,
   getMarkdown,
