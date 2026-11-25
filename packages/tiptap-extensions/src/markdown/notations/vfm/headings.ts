@@ -1,9 +1,15 @@
 import { Extension, InputRule, Node } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
+import {
+  Plugin,
+  PluginKey,
+  TextSelection,
+  type Transaction,
+} from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { decodeString } from 'micromark-util-decode-string';
 
+import { touchesNodes } from '../../changes';
 import { hasDocumentNotation } from '../../extension';
 import { childrenOf, type UnknownMdastNode } from '../../mdast';
 import { transformPlugin } from '../../micromark';
@@ -734,6 +740,14 @@ export function documentIds(doc: ProseMirrorNode): DocumentId[] {
 
 const headingIdsKey = new PluginKey<DecorationSet>('headingIds');
 
+const isHeading = (node: ProseMirrorNode) =>
+  node.type.name === 'heading' || node.type.name === 'sectionEnd';
+
+// The ids and the sections depend on the headings alone, and on their text.
+function touchesHeadings(tr: Transaction): boolean {
+  return touchesNodes(tr, isHeading, isHeading);
+}
+
 function headingIdDecorations(doc: ProseMirrorNode): DecorationSet {
   return DecorationSet.create(
     doc,
@@ -752,7 +766,12 @@ function headingIdsPlugin(): Plugin {
     key: headingIdsKey,
     state: {
       init: (_, { doc }) => headingIdDecorations(doc),
-      apply: (tr, set) => (tr.docChanged ? headingIdDecorations(tr.doc) : set),
+      apply: (tr, set) =>
+        !tr.docChanged
+          ? set
+          : touchesHeadings(tr)
+            ? headingIdDecorations(tr.doc)
+            : set.map(tr.mapping, tr.doc),
     },
     props: {
       decorations: (state) => headingIdsKey.getState(state),
@@ -906,7 +925,11 @@ export const SectionEnd = Node.create({
         state: {
           init: (_, { doc }) => sectionEndDecorations(doc),
           apply: (tr, set) =>
-            tr.docChanged ? sectionEndDecorations(tr.doc) : set,
+            !tr.docChanged
+              ? set
+              : touchesHeadings(tr)
+                ? sectionEndDecorations(tr.doc)
+                : set.map(tr.mapping, tr.doc),
         },
         props: {
           decorations: (state) => sectionEndsKey.getState(state),

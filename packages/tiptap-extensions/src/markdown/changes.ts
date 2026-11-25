@@ -1,5 +1,16 @@
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type {
+  Fragment,
+  Node as ProseMirrorNode,
+  Slice,
+} from '@tiptap/pm/model';
 import type { Transaction } from '@tiptap/pm/state';
+import {
+  AddMarkStep,
+  AttrStep,
+  RemoveMarkStep,
+  ReplaceAroundStep,
+  ReplaceStep,
+} from '@tiptap/pm/transform';
 
 /**
  * Whether the transaction came from another client: each client normalizes
@@ -23,6 +34,62 @@ export function markLoading(tr: Transaction): Transaction {
  */
 export function isLoading(tr: Transaction): boolean {
   return Boolean(tr.getMeta(LOADING));
+}
+
+function fragmentHas(
+  fragment: Fragment,
+  matches: (node: ProseMirrorNode) => boolean,
+): boolean {
+  let found = false;
+  fragment.descendants((node) => {
+    found ||= matches(node);
+    return !found;
+  });
+  return found;
+}
+
+/**
+ * Whether the transaction could have changed anything that depends only on
+ * the nodes `matches` takes: it put in, took out or changed one of them, or
+ * changed the content of a node `within` takes. Decorations that depend on
+ * nothing else can be mapped through any other transaction.
+ */
+export function touchesNodes(
+  tr: Transaction,
+  matches: (node: ProseMirrorNode) => boolean,
+  within?: (node: ProseMirrorNode) => boolean,
+): boolean {
+  return tr.steps.some((step, index) => {
+    const doc = tr.docs[index];
+    if (!doc) {
+      return true;
+    }
+    if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep) {
+      const { from, to, slice } = step as unknown as {
+        from: number;
+        to: number;
+        slice: Slice;
+      };
+      if (
+        fragmentHas(slice.content, matches) ||
+        fragmentHas(doc.slice(from, to).content, matches)
+      ) {
+        return true;
+      }
+      const $from = doc.resolve(from);
+      for (let depth = $from.depth; within && depth > 0; depth--) {
+        if (within($from.node(depth))) {
+          return true;
+        }
+      }
+      return false;
+    }
+    if (step instanceof AttrStep) {
+      const node = doc.nodeAt(step.pos);
+      return !node || matches(node);
+    }
+    return !(step instanceof AddMarkStep || step instanceof RemoveMarkStep);
+  });
 }
 
 /**

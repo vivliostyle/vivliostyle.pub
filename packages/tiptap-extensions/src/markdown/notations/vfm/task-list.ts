@@ -3,6 +3,7 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { type EditorState, Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 
+import { touchesNodes } from '../../changes';
 import { hasDocumentNotation } from '../../extension';
 import {
   childrenOf,
@@ -76,6 +77,12 @@ function findItem(
 }
 
 const taskListKey = new PluginKey<DecorationSet>('taskList');
+
+const LIST_NODES = new Set(['bulletList', 'orderedList', 'listItem']);
+
+function isListNode(node: ProseMirrorNode): boolean {
+  return LIST_NODES.has(node.type.name);
+}
 
 function checkbox(checked: boolean) {
   return (view: EditorView, getPos: () => number | undefined) => {
@@ -253,7 +260,12 @@ const TaskList = Extension.create({
         key: taskListKey,
         state: {
           init: (_, { doc }) => taskDecorations(doc),
-          apply: (tr, set) => (tr.docChanged ? taskDecorations(tr.doc) : set),
+          apply: (tr, set) =>
+            !tr.docChanged
+              ? set
+              : touchesNodes(tr, isListNode)
+                ? taskDecorations(tr.doc)
+                : set.map(tr.mapping, tr.doc),
         },
         props: {
           decorations: (state) => taskListKey.getState(state),

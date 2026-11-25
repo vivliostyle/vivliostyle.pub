@@ -1,5 +1,7 @@
 import { Editor } from '@tiptap/core';
 import { Fragment, Slice } from '@tiptap/pm/model';
+import { EditorState } from '@tiptap/pm/state';
+import type { DecorationSet } from '@tiptap/pm/view';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -222,5 +224,62 @@ describe('a document recorded before the block syntax', () => {
         editor.can().setHeadingAttributes({ id: 'x' }),
       ].some(Boolean),
     ).toBe(false);
+  });
+});
+
+describe('the decorations of the whole document', () => {
+  const KEYS = ['footnoteStatus$', 'headingIds$', 'sectionEnds$', 'taskList$'];
+
+  function decorations(state: EditorState) {
+    return KEYS.map((key) => {
+      const plugin = state.plugins.find(
+        (it) => (it as unknown as { key: string }).key === key,
+      );
+      return (plugin?.getState(state) as DecorationSet | undefined)
+        ?.find()
+        .map((it) => {
+          const { attrs } = it.type as unknown as { attrs?: unknown };
+          return [it.from, it.to, JSON.stringify(attrs ?? it.spec)];
+        });
+    });
+  }
+
+  it('are the ones made anew after each edit, mapped or not', () => {
+    const editor = createEditor();
+    editor.view.updateState(
+      editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
+    );
+    editor.commands.setMarkdown(
+      '# A\n\n本文[^1]と[^2]。\n\n## B\n\n- [x] 済み\n- 項目\n\n##\n\n[^1]: 注\n\n[^2]: 注二\n\n[^3]: 余り',
+    );
+    const at = (text: string) => {
+      let found = -1;
+      editor.state.doc.descendants((node, pos) => {
+        if (found === -1 && node.isText && node.text?.includes(text)) {
+          found = pos + node.text.indexOf(text);
+        }
+      });
+      return found;
+    };
+    const edits = [
+      () => editor.state.tr.insertText('X', at('本文')),
+      () => editor.state.tr.insertText('Y', at('B')),
+      () => editor.state.tr.insertText('Z', at('済み')),
+      () => editor.state.tr.delete(at('と'), at('と') + 1),
+      () =>
+        editor.state.tr.insert(
+          at('項目'),
+          editor.schema.nodes.footnoteReference.create({ label: '3' }),
+        ),
+      () => editor.state.tr.insertText('W', at('余り')),
+    ];
+    for (const edit of edits) {
+      editor.view.dispatch(edit());
+      const fresh = EditorState.create({
+        doc: editor.state.doc,
+        plugins: editor.state.plugins,
+      });
+      expect(decorations(editor.state)).toEqual(decorations(fresh));
+    }
   });
 });
