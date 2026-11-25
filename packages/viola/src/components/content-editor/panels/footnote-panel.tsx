@@ -4,6 +4,7 @@ import { isWritableFootnoteLabel } from '@v/tiptap-extensions';
 import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
+import { setFootnote } from '../../../libs/editor/theme-support';
 import {
   hasFootnoteDefinition,
   nextFootnoteLabel,
@@ -21,7 +22,7 @@ export function FootnotePanel({ editor, close }: EditorMenuPanelProps) {
       dismissPanel({ editor, close });
       return;
     }
-    editor.chain().focus().setInlineFootnote(text).run();
+    setFootnote(editor, text);
     close();
   };
 

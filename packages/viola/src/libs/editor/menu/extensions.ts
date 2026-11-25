@@ -1,6 +1,7 @@
 import type { Extensions } from '@tiptap/core';
 
 import { TriggerMenu } from '@v/tiptap-extensions/trigger-menu';
+import { ThemeMarkupExtension } from '../theme-support';
 import { getActiveTriggers } from './config';
 import {
   closeTriggerMenuSession,
@@ -13,6 +14,7 @@ import './commands';
 
 export function createEditorMenuExtensions(): Extensions {
   return [
+    ThemeMarkupExtension,
     TriggerMenu.configure({
       getTriggers: getActiveTriggers,
       onOpen: openTriggerMenu,

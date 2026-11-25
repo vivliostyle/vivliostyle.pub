@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
 import { m } from '../../generated/paraglide/messages';
+import { setThemeCss } from '../../libs/editor/theme-support';
 import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
@@ -103,6 +104,9 @@ function labelProperties(): React.CSSProperties {
     '--content-editor-footnote-unreferenced': cssString(
       m.content_editor_footnote_unreferenced(),
     ),
+    '--content-editor-reference-missing': cssString(
+      m.content_editor_reference_missing(),
+    ),
   } as React.CSSProperties;
 }
 
@@ -126,17 +130,19 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   const installedTheme =
     themeSnap.installPromise && use(themeSnap.installPromise);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const bundledCss = installedTheme?.bundledCss ?? '';
+  const customCss =
+    themeSnap.bundledStylesheetCss ??
+    themeSnap.stylesheets.map((it) => it.css).join('\n');
+
+  useLayoutEffect(() => {
+    setThemeCss(file.editor, `${bundledCss}\n${customCss}`);
+  }, [file.editor, bundledCss, customCss]);
 
   return (
     <EditorContext.Provider value={{ editor: file.editor }}>
       <div ref={wrapperRef} className="relative h-full">
-        <EditorStyleContainer
-          bundledCss={installedTheme?.bundledCss ?? ''}
-          customCss={
-            themeSnap.bundledStylesheetCss ??
-            themeSnap.stylesheets.map((it) => it.css).join('\n')
-          }
-        >
+        <EditorStyleContainer bundledCss={bundledCss} customCss={customCss}>
           <EditArea />
         </EditorStyleContainer>
         <TriggerMenu />

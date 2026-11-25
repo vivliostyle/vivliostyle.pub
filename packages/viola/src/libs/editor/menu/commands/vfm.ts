@@ -1,9 +1,9 @@
 import type { Editor } from '@tiptap/core';
 
 import {
+  CROSS_REFERENCE,
   codeBlockCaption,
   findSelectedCodeBlock,
-  findSelectedInline,
   hasDocumentNotation,
 } from '@v/tiptap-extensions';
 import {
@@ -30,6 +30,12 @@ import { MathPanel } from '../../../../components/content-editor/panels/math-pan
 import { RubyPanel } from '../../../../components/content-editor/panels/ruby-panel';
 import { m } from '../../../../generated/paraglide/messages';
 import {
+  canSetFootnote,
+  selectedFootnote,
+  setFootnote,
+  unsetFootnote,
+} from '../../theme-support';
+import {
   attributedMarkOf,
   sectionLevelAt,
   selectedHeading,
@@ -45,7 +51,8 @@ import { isInCodeBlock, splitKeywords } from './utils';
 const isTextSelection = (editor: Editor) =>
   !isInCodeBlock(editor) &&
   !selectedNodeOf(editor.state, 'math') &&
-  !selectedNodeOf(editor.state, 'footnoteReference');
+  !selectedNodeOf(editor.state, 'footnoteReference') &&
+  !selectedNodeOf(editor.state, CROSS_REFERENCE);
 
 registerEditorMenuCommand({
   id: 'insert.ruby',
@@ -84,7 +91,7 @@ registerEditorMenuCommand({
     'note',
   ],
   icon: StickyNoteIcon,
-  isEnabled: (editor) => editor.can().setInlineFootnote('-'),
+  isEnabled: (editor) => canSetFootnote(editor, '-'),
   panel: FootnotePanel,
 });
 
@@ -119,19 +126,14 @@ registerEditorMenuCommand({
   surfaces: ['selection'],
   label: m.editor_command_footnote,
   icon: StickyNoteIcon,
-  isActive: (editor) =>
-    findSelectedInline(editor.state, 'inlineFootnote') !== null,
+  isActive: (editor) => selectedFootnote(editor) !== null,
   isEnabled: (editor) =>
-    editor.can().unsetInlineFootnote() || editor.can().setInlineFootnote(),
+    selectedFootnote(editor) !== null || canSetFootnote(editor),
   isVisible: isTextSelection,
   run: ({ editor }) => {
-    const chain = editor.chain().focus();
-    if (findSelectedInline(editor.state, 'inlineFootnote')) {
-      chain.unsetInlineFootnote();
-    } else {
-      chain.setInlineFootnote();
+    if (!unsetFootnote(editor)) {
+      setFootnote(editor);
     }
-    chain.run();
   },
 });
 
