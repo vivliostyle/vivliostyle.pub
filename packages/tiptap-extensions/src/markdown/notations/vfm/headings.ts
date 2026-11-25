@@ -7,6 +7,7 @@ import {
   type Transaction,
 } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { characterEntitiesLegacy } from 'character-entities-legacy';
 import { decodeString } from 'micromark-util-decode-string';
 
 import { touchesNodes } from '../../changes';
@@ -46,13 +47,6 @@ interface HeadingMdast extends UnknownMdastNode {
   nextLine?: boolean;
 }
 
-// The named character references that remark 8 also reads without the
-// semicolon, as HTML does.
-const LEGACY_REFERENCES =
-  'AElig AMP Aacute Acirc Agrave Aring Atilde Auml COPY Ccedil ETH Eacute Ecirc Egrave Euml GT Iacute Icirc Igrave Iuml LT Ntilde Oacute Ocirc Ograve Oslash Otilde Ouml QUOT REG THORN Uacute Ucirc Ugrave Uuml Yacute aacute acirc acute aelig agrave amp aring atilde auml brvbar ccedil cedil cent copy curren deg divide eacute ecirc egrave eth euml frac12 frac14 frac34 gt iacute icirc iexcl igrave iquest iuml laquo lt macr micro middot nbsp not ntilde oacute ocirc ograve ordf ordm oslash otilde ouml para plusmn pound quot raquo reg sect shy sup1 sup2 sup3 szlig thorn times uacute ucirc ugrave uml uuml yacute yen yuml'.split(
-    ' ',
-  );
-
 function characterReferenceEnd(text: string, index: number): number {
   const rest = text.slice(index);
   const numeric = rest.match(/^&#(?:[xX][\da-fA-F]+|\d+);?/)?.[0];
@@ -65,7 +59,9 @@ function characterReferenceEnd(text: string, index: number): number {
   }
   const word = rest.match(/^&([A-Za-z\d]+)/)?.[1] ?? '';
   let longest = 0;
-  for (const name of LEGACY_REFERENCES) {
+  // remark 8 also reads these references without the semicolon, as HTML
+  // does.
+  for (const name of characterEntitiesLegacy) {
     if (name.length > longest && word.startsWith(name)) {
       longest = name.length;
     }

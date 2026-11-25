@@ -51,6 +51,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
+    "character-entities-legacy": "3.0.0",
     "micromark-util-decode-string": "2.0.1",
     "micromark-util-symbol": "2.0.1",
     "prosemirror-model": "1.25.5",
