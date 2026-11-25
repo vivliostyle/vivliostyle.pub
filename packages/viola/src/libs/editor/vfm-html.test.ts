@@ -476,6 +476,15 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
     {
+      markdown: '# a &copy {#z}',
+      differs: {
+        vfm: '<section class="level1"><h1 id="a--z">a © {#z}</h1></section>',
+        editor: '<h1>a &amp;copy {#z}</h1>',
+        reason:
+          'remark 8 reads a reference without its semicolon, as HTML does, where micromark keeps it as text. Either way the reference keeps the braces from being attributes.',
+      },
+    },
+    {
       markdown: '#\n\nafter',
       differs: {
         vfm: '<section class="level1"><h1 id=""></h1><p>after</p></section>',
@@ -787,6 +796,13 @@ const HEADINGS = [
   'Setext\n---\n\n# Setext',
   '# A\n\n#\n\n# B\n\n##\n\n## ',
   '> # quoted\n\n- # listed',
+  '# C\\# {#cs}\n\n# a\\* {#id}\n\n# a &copy;{#id}\n\n# a\\\\ {#id}\n\n# 参考 [1] {#refs}',
+  '# a [b] {#z}\n\n# Q&amp; {#x}\n\n# H {title="a\\"b"}\n\n# H {title=a&amp;b}',
+  '# a [] {#z}\n\n# a [ ] {#z}\n\n# a [[b]] {#z}\n\n# a [b]c {#z}',
+  '# a &copyx {#z}\n\n# a &bogus; {#z}\n\n# a\\b {#z}',
+  '# a ![b] {#z}\n\n# a [^1] {#z}\n\n# a [^ x] {#z}\n\n# a {#x title="{"}',
+  '# H\n{#id} x\n\n> # H\n> {#q}\n> body\n\n-\n  # H\n  {#z}\n\n- # *H*\n  {#y}',
+  '# H1 {.a}\n{#b}\n\n# H #\n{#id}\n\n# a\\*\n{#c}',
 ];
 
 describe('ids of headings, compared with VFM', () => {

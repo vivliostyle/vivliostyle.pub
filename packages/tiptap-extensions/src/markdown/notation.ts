@@ -129,7 +129,10 @@ export interface NodeWriter {
    * The attributes as markdown holds them, when the writer normalises them:
    * a document and the one read back from its markdown are compared by these.
    */
-  writtenAttrs?: (attrs: Record<string, unknown>) => Record<string, unknown>;
+  writtenAttrs?: (
+    attrs: Record<string, unknown>,
+    node: ProseMirrorNode,
+  ) => Record<string, unknown>;
   /**
    * The writer only adds to the one registered before it, so without one
    * the definition writes no such node.

@@ -159,7 +159,11 @@ const headingNotation = defineNotation({
     heading: {
       default: 'atx',
       detect: {
-        heading: (_, source) => (source.includes('\n') ? 'setext' : 'atx'),
+        // Attributes on the line after an ATX heading are part of its source.
+        heading: (_, source) =>
+          /^ {0,3}#{1,6}(?:[ \t]|$)/.test(source.split('\n')[0] ?? '')
+            ? 'atx'
+            : 'setext',
       },
     },
   },
@@ -259,6 +263,17 @@ function listSeparator(context: WriteContext) {
   return () => (loose ? '\n\n' : '\n');
 }
 
+// Blocks that can start on a list marker's line, unlike a thematic break,
+// which would make the line one.
+const MARKER_LINE_BLOCKS = new Set([
+  'heading',
+  'blockquote',
+  'codeBlock',
+  'bulletList',
+  'orderedList',
+  'footnoteDefinition',
+]);
+
 function itemMarkerOf(source: string): string | undefined {
   return source.match(/^(?:[-*+]|\d{1,9}[.)])(?=[ \t\n]|$)/)?.[0];
 }
@@ -333,7 +348,23 @@ const listNotation = defineNotation({
             ? '\n'
             : '\n\n',
       });
-      const [head = '', ...tail] = content.split('\n');
+      let [head = '', ...tail] = content.split('\n');
+      // The block after the empty paragraph an item has to start with goes
+      // on the marker's line, unless the source has it apart: VFM reads the
+      // lines after a marker alone with a space too many, so attributes on
+      // them are text.
+      const second = node.childCount > 1 ? node.child(1) : null;
+      const base = context.base?.text;
+      if (
+        isEmptyParagraph(node.firstChild ?? undefined) &&
+        second &&
+        MARKER_LINE_BLOCKS.has(second.type.name) &&
+        !head &&
+        tail[0] &&
+        !(base && /^\S+[ \t]*(?:\n|$)/.test(base))
+      ) {
+        [head = '', ...tail] = tail;
+      }
       return [
         head ? marker + head : marker.trimEnd(),
         ...tail.map((line) => (line ? indent + line : line)),

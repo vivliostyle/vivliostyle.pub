@@ -87,8 +87,6 @@ function refused(label: string, apply: (editor: Editor) => boolean): Step {
   });
 }
 
-const NEXT_LINE_ONLY =
-  'VFM 2 drops `{…}` on the line after a heading that has attributes on its own line; the editor keeps it a paragraph';
 const SHORTCODE_TEXT =
   'VFM 2 reads a shortcode that text follows on its line, and the text as a paragraph after it; the editor only reads one alone on its line';
 
@@ -223,10 +221,83 @@ export const vfmBlockSuites: CaseSuite[] = [
         json: [{ type: 'heading', attrs: { attributes: { id: 'はじめに' } } }],
       },
       {
-        name: 'on the next line after attributes of its own',
+        name: 'on the next line after attributes of its own, dropped as in VFM',
         given: '# H1 {.a}\n{.b}',
         doc: 'doc(heading("H1"))',
-        fails: NEXT_LINE_ONLY,
+        json: [{ type: 'heading', attrs: { attributes: { class: 'a' } } }],
+      },
+      ...[
+        ['after an escape', '# C\\# {#cs}', 'doc(heading("C# {#cs}"))'],
+        [
+          'after an escaped backslash',
+          '# a\\\\ {#id}',
+          'doc(heading("a\\\\ {#id}"))',
+        ],
+        ['after a reference', '# a &copy;{#id}', 'doc(heading("a ©{#id}"))'],
+        [
+          'after brackets',
+          '# 参考 [1] {#refs}',
+          'doc(heading("参考 [1] {#refs}"))',
+        ],
+        ['with an escape in them', '# H {title="a\\"b"}'],
+        [
+          'with a reference in them',
+          '# H {title=a&amp;b}',
+          'doc(heading("H {title=a&b}"))',
+        ],
+      ].map(([what, given, doc]) => ({
+        name: `${what} they are text, as in VFM`,
+        given: given ?? '',
+        doc,
+        json: [{ type: 'heading', attrs: { attributes: null } }],
+      })),
+      {
+        name: 'after text that follows an escape or brackets',
+        given: '# a\\*b {#x}\n\n# a [b]c {#y}\n\n# a [[b]] {#z}',
+        json: [
+          { type: 'heading', attrs: { attributes: { id: 'x' } } },
+          { type: 'heading', attrs: { attributes: { id: 'y' } } },
+          { type: 'heading', attrs: { attributes: { id: 'z' } } },
+        ],
+      },
+      {
+        name: 'the last braces only',
+        given: '# a {#x title="{"}',
+        doc: 'doc(heading("a {#x title=\\""))',
+      },
+      {
+        name: 'on the next line, read as written',
+        given: '# C\\#\n{title=a&amp;b}',
+        doc: 'doc(heading("C#"))',
+        json: [
+          { type: 'heading', attrs: { attributes: { title: 'a&amp;b' } } },
+        ],
+      },
+      {
+        name: 'on the next line with text after them',
+        given: '# H\n{#id} x',
+        doc: 'doc(heading("H"), paragraph(" x"))',
+        json: [{ type: 'heading', attrs: { attributes: { id: 'id' } } }, {}],
+      },
+      {
+        name: 'on the next line in a quote, before more lines',
+        given: '> # H\n> {#id}\n> body',
+        doc: 'doc(blockquote(heading("H"), paragraph("body")))',
+      },
+      {
+        name: 'on the next line in an item whose marker is alone, they are text',
+        given: '-\n  # H\n  {#z}',
+        doc: 'doc(bulletList(listItem(paragraph, heading("H"), paragraph("{#z}"))))',
+      },
+      {
+        name: 'on the next line, the closing sequence opens a section all the same',
+        given: '# H #\n{#id}',
+        json: [
+          {
+            type: 'heading',
+            attrs: { closingSequence: null, attributes: { id: 'id' } },
+          },
+        ],
       },
       {
         name: 'editing the text keeps them',
@@ -259,6 +330,83 @@ export const vfmBlockSuites: CaseSuite[] = [
           ),
         ],
         expect: '# 見出し *強調*\n{#a}',
+      },
+      ...[
+        ['brackets', '# a [b]‸', { id: 'z' }, '# a [b]\n{#z}'],
+        ['a bare reference', '# a &copy‸', { id: 'z' }, '# a &copy\n{#z}'],
+        ['an escaped character', '# a\\*‸', { id: 'x' }, '# a\\*\n{#x}'],
+        ['', '# H‸', { title: 'a"b' }, '# H\n{title="a\\"b"}'],
+        ['', '# H‸', { title: 'a&amp;b' }, '# H\n{title=a&amp;b}'],
+        ['', '# H‸', { title: '[x]' }, '# H\n{title=[x]}'],
+      ].map(([what, given, attributes, expect]) => ({
+        name: what
+          ? `setting them after ${what} puts them on the next line`
+          : `setting ${JSON.stringify(attributes)} puts them on the next line`,
+        given: String(given),
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes(
+              attributes as Record<string, string>,
+            ),
+          ),
+        ],
+        expect: String(expect),
+      })),
+      {
+        name: 'setting them after an ampersand',
+        given: '# Q&‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '# Q& {#x}',
+      },
+      {
+        name: 'setting them on the first heading of an item',
+        given: '- # *H*‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'z' }),
+          ),
+        ],
+        expect: '- # *H*\n  {#z}',
+      },
+      {
+        name: 'setting them before a closing sequence',
+        given: '## D‸ ##',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '## D {#x} ##',
+      },
+      {
+        name: 'none that would have to go on the next line of a heading with a closing sequence',
+        given: '## *D*‸ ##',
+        steps: [
+          refused('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '## *D* ##',
+      },
+      {
+        name: 'taking away those on the next line keeps the heading ATX',
+        given: '# H‸\n{#id}\ntext',
+        steps: [
+          command('take the attributes away', (editor) =>
+            editor.commands.setHeadingAttributes(null),
+          ),
+        ],
+        expect: '# H\ntext',
+      },
+      {
+        name: 'editing another heading keeps headings ATX',
+        given: '# A\n{#a}\n\n# B‸',
+        steps: ['X'],
+        expect: '# A\n{#a}\n\n# BX‸',
       },
       {
         name: 'changing them keeps where they are written',
@@ -440,6 +588,13 @@ export const vfmBlockSuites: CaseSuite[] = [
         name: 'one right after another in a quote',
         given: '> [^1]: one\n[^2]: two',
         doc: 'doc(blockquote(footnoteDefinition(paragraph("one"))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'one right after another in a list item',
+        given: '- [^1]: one‸\n[^2]: two',
+        steps: ['X'],
+        expect: '- [^1]: oneX‸\n[^2]: two',
+        doc: 'doc(bulletList(listItem(paragraph, footnoteDefinition(paragraph("oneX")))), footnoteDefinition(paragraph("two")))',
       },
       {
         name: 'one indented into another is more of its lines',

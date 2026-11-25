@@ -1,4 +1,5 @@
 import { Editor } from '@tiptap/core';
+import { Fragment, Slice } from '@tiptap/pm/model';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -79,6 +80,33 @@ describe('the lines that end sections', () => {
       it ? headingText(it) : null,
     );
     expect(ended).toEqual(['B', 'A', null, null]);
+  });
+
+  // As VFM sections a heading by its source, `{…}` on the next line included.
+  it.each([
+    ['# A #\n{#a}\n\n#', ['A']],
+    ['# A {#a} #\n\n#', [null]],
+    ['# A #\n\n#', [null]],
+  ])('follow the closing sequence of %j as VFM does', (markdown, expected) => {
+    const editor = createEditor();
+    const { doc } = parseMarkdown(editor, markdown);
+    const ended = [...sectionEnds(doc).values()].map((it) =>
+      it ? headingText(it) : null,
+    );
+    expect(ended).toEqual(expected);
+  });
+
+  it('let a closing sequence open a section once its attributes go on the next line', () => {
+    const editor = createEditor();
+    const { doc } = parseMarkdown(editor, '# A {#a} #\n\n#');
+    const heading = doc.child(0);
+    const italic = editor.schema.marks.italic.create();
+    const edited = doc.replace(
+      1,
+      heading.nodeSize - 1,
+      new Slice(Fragment.from(editor.schema.text('A', [italic])), 0, 0),
+    );
+    expect([...sectionEnds(edited).values()].map(Boolean)).toEqual([true]);
   });
 });
 

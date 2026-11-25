@@ -10,7 +10,7 @@ import {
   type UnknownMdastNode,
 } from '../../mdast';
 import { transformPlugin } from '../../micromark';
-import { defineNotation } from '../../notation';
+import { defineNotation, isEmptyTextblock } from '../../notation';
 import { convertListItem } from '../commonmark';
 
 declare module '@tiptap/core' {
@@ -289,7 +289,13 @@ export const taskListNotation = defineNotation({
           ? (context.base?.text?.match(/^\S+[ \t]+\[([xX])\]/)?.[1] ?? 'x')
           : ' ';
         const [head = '', ...tail] = written.split('\n');
-        const content = head.slice(marker.length).replace(/^ /, '');
+        let content = head.slice(marker.length).replace(/^ /, '');
+        // A block written on the marker's line would follow the checkbox,
+        // which VFM then reads as text.
+        if (content && node.firstChild && isEmptyTextblock(node.firstChild)) {
+          tail.unshift(`${' '.repeat(marker.length + 1)}${content}`);
+          content = '';
+        }
         return [`${marker} [${box}] ${content}`, ...tail].join('\n');
       },
     },

@@ -36,38 +36,139 @@ declare module '@tiptap/core' {
 interface HeadingMdast extends UnknownMdastNode {
   depth?: number;
   attributes?: InlineAttributes;
+  /** `{…}` was on the line after, where VFM sections ignore closing hashes. */
+  nextLine?: boolean;
 }
 
-function isEscaped(text: string, index: number): boolean {
-  let count = 0;
-  for (let i = index - 1; i >= 0 && text[i] === '\\'; i--) {
-    count++;
+// The named character references that remark 8 also reads without the
+// semicolon, as HTML does.
+const LEGACY_REFERENCES =
+  'AElig AMP Aacute Acirc Agrave Aring Atilde Auml COPY Ccedil ETH Eacute Ecirc Egrave Euml GT Iacute Icirc Igrave Iuml LT Ntilde Oacute Ocirc Ograve Oslash Otilde Ouml QUOT REG THORN Uacute Ucirc Ugrave Uuml Yacute aacute acirc acute aelig agrave amp aring atilde auml brvbar ccedil cedil cent copy curren deg divide eacute ecirc egrave eth euml frac12 frac14 frac34 gt iacute icirc iexcl igrave iquest iuml laquo lt macr micro middot nbsp not ntilde oacute ocirc ograve ordf ordm oslash otilde ouml para plusmn pound quot raquo reg sect shy sup1 sup2 sup3 szlig thorn times uacute ucirc ugrave uml uuml yacute yen yuml'.split(
+    ' ',
+  );
+
+function characterReferenceEnd(text: string, index: number): number {
+  const rest = text.slice(index);
+  const numeric = rest.match(/^&#(?:[xX][\da-fA-F]+|\d+);?/)?.[0];
+  if (numeric) {
+    return index + numeric.length;
   }
-  return count % 2 === 1;
+  const named = rest.match(/^&[A-Za-z][A-Za-z\d]*;/)?.[0];
+  if (named && decodeString(named) !== named) {
+    return index + named.length;
+  }
+  const word = rest.match(/^&([A-Za-z\d]+)/)?.[1] ?? '';
+  let longest = 0;
+  for (const name of LEGACY_REFERENCES) {
+    if (name.length > longest && word.startsWith(name)) {
+      longest = name.length;
+    }
+  }
+  return longest > 0 ? index + 1 + longest : -1;
+}
+
+/** The end of a reference at `index`, as remark 8 reads one, or -1. */
+function bracketReferenceEnd(text: string, index: number): number {
+  let at = text[index] === '!' ? index + 1 : index;
+  if (text[at] !== '[') {
+    return -1;
+  }
+  const call = text.slice(at).match(/^\[\^[^\s\]]+\]/)?.[0];
+  if (call) {
+    return at + call.length;
+  }
+  if (text[at + 1] === '^') {
+    return -1;
+  }
+  const open = ++at;
+  let depth = 0;
+  let bracketed = false;
+  for (; at < text.length; at++) {
+    const char = text[at];
+    if (char === '\\') {
+      at++;
+    } else if (char === '[') {
+      bracketed = true;
+      depth++;
+    } else if (char === ']') {
+      if (depth === 0) {
+        break;
+      }
+      depth--;
+    }
+  }
+  if (text[at] !== ']') {
+    return -1;
+  }
+  const empty = at === open;
+  at++;
+  let full = false;
+  if (text[at] === '[') {
+    at++;
+    let end = at;
+    while (end < text.length && text[end] !== '[' && text[end] !== ']') {
+      end += text[end] === '\\' ? 2 : 1;
+    }
+    if (text[end] === ']') {
+      full = end > at;
+      at = end + 1;
+    }
+  } else if (empty) {
+    return -1;
+  }
+  return !full && bracketed ? -1 : at;
 }
 
 /**
- * The attributes that end `source`, the source of a heading's last text,
- * and where they start. VFM only reads them where the text has more than
- * whitespace before them.
+ * Where remark 8, which VFM 2 reads markdown with, starts the text node that
+ * ends `text`, the source of text with no syntax micromark reads: escapes,
+ * character references and references are nodes of their own there.
+ */
+function remarkTextStart(text: string): number {
+  let start = 0;
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    let end = -1;
+    if (char === '\\' && /[!-/:-@[-`{-~]/.test(text[index + 1] ?? '')) {
+      end = index + 2;
+    } else if (char === '&') {
+      end = characterReferenceEnd(text, index);
+    } else if (char === '[' || (char === '!' && text[index + 1] === '[')) {
+      end = bracketReferenceEnd(text, index);
+    }
+    if (end !== -1) {
+      start = end;
+      index = end - 1;
+    }
+  }
+  return start;
+}
+
+/**
+ * The attributes that end `text`, the source of a heading's last text node
+ * as remark 8 has it, and where they start: VFM reads them from the last
+ * `{`, where the text has more than whitespace before it.
  */
 function trailingAttributes(
-  source: string,
+  text: string,
 ): { attributes: InlineAttributes; start: number } | null {
-  const end = source.trimEnd().length;
-  for (let start = source.lastIndexOf('{'); start > 0; ) {
-    const found = attributesAt(source, start);
-    if (
-      found &&
-      found.end === end &&
-      !isEscaped(source, start) &&
-      /\S/.test(source.slice(0, start))
-    ) {
-      return { attributes: found.attributes, start };
-    }
-    start = source.lastIndexOf('{', start - 1);
-  }
-  return null;
+  const value = text.trimEnd();
+  const start = value.lastIndexOf('{');
+  const found = start > 0 ? attributesAt(value, start) : null;
+  return found && found.end === value.length && /\S/.test(value.slice(0, start))
+    ? { attributes: found.attributes, start }
+    : null;
+}
+
+/** Whether VFM reads `{…}` written after `text` on its line as `attributes`. */
+function readsOnSameLine(
+  text: string,
+  written: string,
+  attributes: InlineAttributes,
+): boolean {
+  const line = `${text} ${written}`;
+  const found = trailingAttributes(line.slice(remarkTextStart(line)));
+  return JSON.stringify(found?.attributes) === JSON.stringify(attributes);
 }
 
 function isAtx(node: UnknownMdastNode, source: string): boolean {
@@ -87,11 +188,12 @@ function sameLineAttributes(heading: HeadingMdast, source: string): boolean {
     return false;
   }
   const text = source.slice(start, end);
-  const found = trailingAttributes(text);
+  const textStart = remarkTextStart(text);
+  const found = trailingAttributes(text.slice(textStart));
   if (!found) {
     return false;
   }
-  const kept = text.slice(0, found.start).trimEnd();
+  const kept = text.slice(0, textStart + found.start).trimEnd();
   last.value = decodeString(kept);
   last.position = {
     start: last.position?.start ?? { line: 0, column: 0 },
@@ -105,29 +207,44 @@ function sameLineAttributes(heading: HeadingMdast, source: string): boolean {
   return true;
 }
 
+function pointAt(source: string, offset: number, line: number) {
+  return {
+    line,
+    column: offset - source.lastIndexOf('\n', offset - 1),
+    offset,
+  };
+}
+
 /**
- * `{…}` on the line after an ATX heading, as the first line of a paragraph
- * that starts where the heading does, is the heading's.
+ * `{…}` at the start of the line after an ATX heading, the first line of a
+ * paragraph that starts where the heading does, is the heading's: VFM reads
+ * it as written and leaves the rest to the paragraph. It drops one after
+ * attributes on the heading's own line.
  */
 function nextLineAttributes(
   parent: UnknownMdastNode,
   index: number,
   source: string,
+  dropped: boolean,
 ): void {
   const children = childrenOf(parent);
   const heading = children[index] as HeadingMdast;
   const next = children[index + 1];
-  const headingEnd = heading.position?.end;
+  const headingStart = heading.position?.start;
   const start = next?.position?.start;
+  const end = next?.position?.end;
   const first = childrenOf(next ?? { type: '' })[0];
+  const firstEnd = first?.position?.end.offset;
   if (
     next?.type !== 'paragraph' ||
-    !headingEnd ||
+    !headingStart ||
+    !end ||
     start?.offset === undefined ||
-    start.line !== headingEnd.line + 1 ||
-    start.column !== heading.position?.start.column ||
+    start.line !== (heading.position?.end.line ?? 0) + 1 ||
+    start.column !== headingStart.column ||
     first?.type !== 'text' ||
-    first.position?.start.offset !== start.offset
+    first.position?.start.offset !== start.offset ||
+    firstEnd === undefined
   ) {
     return;
   }
@@ -137,67 +254,92 @@ function nextLineAttributes(
     lineEnd === -1 ? source.length : lineEnd,
   );
   const found = attributesAt(line, 0);
-  if (!found || found.end !== line.trimEnd().length) {
+  if (!found) {
     return;
   }
-  const paragraphEnd = next.position?.end;
-  const firstEnd = first.position?.end.offset ?? 0;
-  if (!paragraphEnd || paragraphEnd.line === start.line) {
-    heading.attributes = found.attributes;
-    heading.position = {
-      start: heading.position?.start ?? headingEnd,
-      end: paragraphEnd ?? headingEnd,
+  const text = first.value ?? '';
+  const restOfLine = line.slice(found.end);
+  let rest: { offset: number; line: number; value: string } | null = null;
+  if (/\S/.test(restOfLine)) {
+    const read = decodeString(line.slice(0, found.end));
+    if (!text.startsWith(read)) {
+      return;
+    }
+    rest = {
+      offset: start.offset + found.end,
+      line: start.line,
+      value: text.slice(read.length),
     };
+  } else if (end.line !== start.line) {
+    // A line that ends in other syntax, like a hard break, is left alone.
+    if (firstEnd <= lineEnd) {
+      return;
+    }
+    const after = source.slice(lineEnd + 1).match(/^[ \t>]*/)?.[0] ?? '';
+    rest = {
+      offset: lineEnd + 1 + after.length,
+      line: start.line + 1,
+      value: text.slice(text.indexOf('\n') + 1),
+    };
+  }
+  if (!dropped) {
+    heading.attributes = found.attributes;
+  }
+  heading.nextLine = true;
+  const headingEnd = start.offset + (rest ? found.end : line.length);
+  heading.position = {
+    start: headingStart,
+    end: pointAt(source, Math.min(headingEnd, end.offset ?? 0), start.line),
+  };
+  if (!rest) {
     children.splice(index + 1, 1);
     return;
   }
-  // Only at the top level do the paragraph's lines start without a prefix.
-  if (parent.type !== 'root' || firstEnd <= lineEnd) {
-    return;
+  const restStart = pointAt(source, rest.offset, rest.line);
+  next.position = { start: restStart, end };
+  if (rest.value === '' && firstEnd <= rest.offset) {
+    next.children = childrenOf(next).slice(1);
+  } else {
+    first.value = rest.value;
+    first.position = { start: restStart, end: first.position?.end ?? end };
   }
-  heading.attributes = found.attributes;
-  // The rest of the paragraph stays one, from the line after.
-  heading.position = {
-    start: heading.position?.start ?? headingEnd,
-    end: {
-      line: start.line,
-      column: start.column + line.length,
-      offset: start.offset + line.length,
-    },
-  };
-  const rest = lineEnd + 1;
-  const restStart = {
-    line: start.line + 1,
-    column: rest - source.lastIndexOf('\n', rest - 1),
-    offset: rest,
-  };
-  next.position = { start: restStart, end: paragraphEnd };
-  const text = first.value ?? '';
-  first.value = text.slice(text.indexOf('\n') + 1);
-  first.position = {
-    start: restStart,
-    end: first.position?.end ?? paragraphEnd,
-  };
+}
+
+/** Whether a list item's marker is alone on its line, with nothing after. */
+function isBareItem(item: UnknownMdastNode, source: string): boolean {
+  const start = item.position?.start.offset;
+  return (
+    start !== undefined &&
+    /^(?:[-*+]|\d{1,9}[.)])(?:\n|$)/.test(source.slice(start))
+  );
 }
 
 function readHeadingAttributes(tree: UnknownMdastNode, source: string): void {
-  const visit = (parent: UnknownMdastNode) => {
+  // VFM reads the lines in a list item whose marker is alone on its line
+  // with a space more than the item's content has, so `{` does not start
+  // the line after a heading there.
+  const visit = (parent: UnknownMdastNode, bareItem: boolean) => {
     const children = childrenOf(parent);
     for (let index = 0; index < children.length; index++) {
       const child = children[index];
       if (child.type === 'heading') {
-        if (
-          isAtx(child, source) &&
-          !sameLineAttributes(child as HeadingMdast, source)
-        ) {
-          nextLineAttributes(parent, index, source);
+        if (isAtx(child, source)) {
+          const own = sameLineAttributes(child as HeadingMdast, source);
+          if (!bareItem) {
+            nextLineAttributes(parent, index, source, own);
+          }
         }
       } else {
-        visit(child);
+        visit(
+          child,
+          child.type === 'listItem'
+            ? isBareItem(child, source)
+            : child.type !== 'blockquote' && bareItem,
+        );
       }
     }
   };
-  visit(tree);
+  visit(tree, false);
 }
 
 function attributesOf(node: ProseMirrorNode): InlineAttributes | null {
@@ -220,25 +362,44 @@ function takesSameLineAttributes(node: ProseMirrorNode): boolean {
   );
 }
 
+/**
+ * The closing sequence as VFM reads it: one before attributes that have to
+ * go on the next line does not keep the heading from opening a section.
+ */
+function closingOf(node: ProseMirrorNode): string {
+  const closing = node.attrs.closingSequence;
+  return typeof closing === 'string' &&
+    (!attributesOf(node) || takesSameLineAttributes(node))
+    ? closing
+    : '';
+}
+
 function writeHeading(node: ProseMirrorNode, context: WriteContext): string {
-  const attributes = attributesOf(node);
-  const written = attributes && formatAttributes(attributes);
+  const attributes = attributesOf(node) ?? {};
+  const written = formatAttributes(attributes) ?? '';
   const level = Number(node.attrs.level) || 1;
-  const closing =
-    typeof node.attrs.closingSequence === 'string'
-      ? node.attrs.closingSequence
-      : '';
+  const closing = closingOf(node);
   const line = context
     .inline(node, { singleLine: true })
     .replaceAll('\n', '&#10;');
   const head = `${'#'.repeat(level)}${line ? ` ${line}` : ''}`;
+  const last = node.lastChild;
+  // Escapes and references in the text before them hide them from VFM.
+  const sameLine =
+    last !== null &&
+    takesSameLineAttributes(node) &&
+    readsOnSameLine(
+      context.inline(node.type.create(node.attrs, last), { singleLine: true }),
+      written,
+      attributes,
+    );
   const base = context.base?.text;
   const nextLine =
-    !takesSameLineAttributes(node) ||
-    (base != null && /^[ \t]*#[^\n]*\n\{[^\n]*\}[ \t]*$/.test(base));
-  return nextLine
-    ? `${head}${closing}\n${written}`
-    : `${head} ${written}${closing}`;
+    !sameLine ||
+    (!closing &&
+      base != null &&
+      /^[ \t]*#[^\n]*\n\{[^\n]*\}[ \t]*$/.test(base));
+  return nextLine ? `${head}\n${written}` : `${head} ${written}${closing}`;
 }
 
 const HeadingAttributes = Extension.create({
@@ -276,9 +437,14 @@ const HeadingAttributes = Extension.create({
             attributes && Object.keys(attributes).length > 0
               ? writableAttributes(attributes)
               : null;
+          // Attributes that have to go on the next line would make a heading
+          // with a closing sequence open a section.
           if (
             (attributes && Object.keys(attributes).length > 0 && !written) ||
-            (written && $from.parent.content.size === 0)
+            (written && $from.parent.content.size === 0) ||
+            (written &&
+              $from.parent.attrs.closingSequence &&
+              !takesSameLineAttributes($from.parent))
           ) {
             return false;
           }
@@ -349,20 +515,26 @@ export const headingAttributesNotation = defineNotation({
   remarkPlugins: [transformPlugin(readHeadingAttributes)],
   fromMarkdown: {
     heading: (node, context, next) => {
-      const { attributes } = node as HeadingMdast;
+      const { attributes, nextLine } = node as HeadingMdast;
       const result = next();
-      if (!attributes || !result || Array.isArray(result)) {
+      if ((!attributes && !nextLine) || !result || Array.isArray(result)) {
         return result;
       }
       const heading = result as ProseMirrorNode;
       if (heading.type.name !== 'heading') {
         return result;
       }
-      // Attributes on the next line are not where the closing sequence is.
-      const firstLine = context.source(node).split('\n')[0];
-      const closing = firstLine.match(/[ \t]+#+[ \t]*$/)?.[0] ?? null;
+      // VFM sections a heading with `{…}` on the line after whatever closing
+      // sequence it has, which is left out where the heading is written anew.
+      const closing = nextLine
+        ? null
+        : (context.source(node).match(/[ \t]+#+[ \t]*$/)?.[0] ?? null);
       return heading.type.create(
-        { ...heading.attrs, closingSequence: closing, attributes },
+        {
+          ...heading.attrs,
+          closingSequence: closing,
+          attributes: attributes ?? null,
+        },
         heading.content,
         heading.marks,
       );
@@ -372,7 +544,7 @@ export const headingAttributesNotation = defineNotation({
     heading: {
       write: (node, context, next) =>
         attributesOf(node) ? writeHeading(node, context) : next(),
-      writtenAttrs: (attrs) => {
+      writtenAttrs: (attrs, node) => {
         const { attributes } = attrs;
         const written =
           attributes &&
@@ -380,7 +552,11 @@ export const headingAttributesNotation = defineNotation({
           Object.keys(attributes).length > 0
             ? writableAttributes(attributes as InlineAttributes)
             : null;
-        return { ...attrs, attributes: written };
+        return {
+          ...attrs,
+          closingSequence: closingOf(node) || null,
+          attributes: written,
+        };
       },
     },
   },
@@ -611,7 +787,7 @@ export function sectionEnds(
       return;
     }
     open.length = Math.min(open.length, level);
-    const closing = String(node.attrs.closingSequence ?? '').trim().length;
+    const closing = closingOf(node).trim().length;
     if (closing < level) {
       open[level] = node;
     }
