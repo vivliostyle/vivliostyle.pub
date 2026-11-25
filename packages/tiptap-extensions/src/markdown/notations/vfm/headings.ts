@@ -401,7 +401,32 @@ export function headingText(node: ProseMirrorNode): string {
     });
   };
   visit(node);
-  return text.replace(/<[^<>]*>/g, '');
+  return withoutTags(text);
+}
+
+/** The text without what looks like HTML tags, as VFM leaves them out. */
+function withoutTags(text: string): string {
+  let result = '';
+  let index = 0;
+  while (index < text.length) {
+    const open = text.indexOf('<', index);
+    if (open === -1) {
+      break;
+    }
+    const close = text.indexOf('>', open + 1);
+    const next = text.indexOf('<', open + 1);
+    if (close === -1) {
+      break;
+    }
+    if (next !== -1 && next < close) {
+      result += text.slice(index, next);
+      index = next;
+      continue;
+    }
+    result += text.slice(index, open);
+    index = close + 1;
+  }
+  return result + text.slice(index);
 }
 
 export interface DocumentId {
@@ -419,6 +444,23 @@ function explicitId(attributes: unknown): string | null {
   return typeof id === 'string' && id ? id : null;
 }
 
+/** What follows the first word of an info string and the blanks after it. */
+function metaOf(info: string): string {
+  const word = info.match(/^[ \t]*/)?.[0].length ?? 0;
+  let index = word;
+  while (index < info.length && info[index] !== ' ' && info[index] !== '\t') {
+    index++;
+  }
+  if (index === word) {
+    return '';
+  }
+  const start = index;
+  while (info[index] === ' ' || info[index] === '\t') {
+    index++;
+  }
+  return index === start ? '' : info.slice(index);
+}
+
 /** The `{#id}` among the attributes of a code block's info string. */
 export function codeBlockId(info: unknown): string | null {
   return explicitId(codeBlockAttributes(info));
@@ -432,7 +474,7 @@ export function codeBlockAttributes(info: unknown): InlineAttributes | null {
   if (typeof info !== 'string') {
     return null;
   }
-  const meta = info.match(/^[ \t]*[^ \t]+[ \t]+(.*)$/)?.[1];
+  const meta = metaOf(info);
   if (!meta) {
     return null;
   }

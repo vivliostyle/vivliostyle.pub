@@ -81,29 +81,89 @@ interface MetaTitle {
   end: number;
 }
 
+const isBlank = (char: string | undefined) => char === ' ' || char === '\t';
+
 /** The `title=…` or `title="…"` pairs of an info string's meta. */
 function metaTitles(meta: string): MetaTitle[] {
   const titles: MetaTitle[] = [];
-  for (const match of meta.matchAll(/([^"\s=]+)=(?:"([^"]*)"|([^"\s]+))/g)) {
-    if (match[1] === 'title') {
-      titles.push({
-        value: match[2] ?? match[3] ?? '',
-        start: match.index,
-        end: match.index + match[0].length,
-      });
+  const isKeyChar = (char: string | undefined) =>
+    char !== undefined && char !== '"' && char !== '=' && !/\s/.test(char);
+  let index = 0;
+  while (index < meta.length) {
+    if (!isKeyChar(meta[index])) {
+      index++;
+      continue;
     }
+    const start = index;
+    while (isKeyChar(meta[index])) {
+      index++;
+    }
+    const key = meta.slice(start, index);
+    if (meta[index] !== '=') {
+      continue;
+    }
+    let value: string;
+    let end: number;
+    if (meta[index + 1] === '"') {
+      const close = meta.indexOf('"', index + 2);
+      if (close === -1) {
+        continue;
+      }
+      value = meta.slice(index + 2, close);
+      end = close + 1;
+    } else {
+      end = index + 1;
+      while (
+        end < meta.length &&
+        meta[end] !== '"' &&
+        !/\s/.test(meta[end] ?? '')
+      ) {
+        end++;
+      }
+      value = meta.slice(index + 1, end);
+      if (!value) {
+        continue;
+      }
+    }
+    if (key === 'title') {
+      titles.push({ value, start, end });
+    }
+    index = end;
   }
   return titles;
 }
 
+/** The indentation, first word, the blanks after it and the rest. */
 function splitInfo(info: string | null | undefined) {
-  const match = (info ?? '').match(/^([ \t]*)([^ \t]*)(?:([ \t]+)(.*))?$/);
+  const text = info ?? '';
+  let index = 0;
+  while (isBlank(text[index])) {
+    index++;
+  }
+  const wordStart = index;
+  while (index < text.length && !isBlank(text[index])) {
+    index++;
+  }
+  const spaceStart = index;
+  while (isBlank(text[index])) {
+    index++;
+  }
   return {
-    indent: match?.[1] ?? '',
-    word: match?.[2] ?? '',
-    space: match?.[3] ?? '',
-    meta: match?.[4] ?? '',
+    indent: text.slice(0, wordStart),
+    word: text.slice(wordStart, spaceStart),
+    space: text.slice(spaceStart, index),
+    meta: text.slice(index),
   };
+}
+
+/** The language and the title of `lang:title`, as VFM splits them. */
+function languageTitle(
+  word: string,
+): { language: string; title: string } | null {
+  const colon = word.indexOf(':', 1);
+  return colon === -1 || colon === word.length - 1
+    ? null
+    : { language: word.slice(0, colon), title: word.slice(colon + 1) };
 }
 
 /**
@@ -123,7 +183,7 @@ export function codeBlockCaption(
   if (title) {
     return decodeString(title.value) || null;
   }
-  return decodeString(word).match(/^.+?:(.+)$/)?.[1] ?? null;
+  return languageTitle(decodeString(word))?.title ?? null;
 }
 
 /**
@@ -149,7 +209,7 @@ export function withCodeBlockCaption(
       : `${meta.slice(0, last.start)}${meta.slice(last.end)}`.trim();
     return `${indent}${word}${next ? `${space || ' '}${next}` : ''}` || null;
   }
-  const language = word.match(/^(.+?):(.+)$/)?.[1];
+  const language = languageTitle(word)?.language;
   if (language !== undefined && (!caption || !/[\s\\&]/.test(caption))) {
     const replaced = `${language}${caption ? `:${caption}` : ''}`;
     return `${indent}${replaced}${space}${meta}` || null;
