@@ -5,6 +5,7 @@ import { footnoteDefinitionNotation } from './footnote-definitions';
 import { type FootnoteOptions, footnoteNotations } from './footnotes';
 import { headingAttributesNotation, sectionEndNotation } from './headings';
 import { mathNotation } from './math';
+import { paragraphContinuationNotation } from './paragraphs';
 import { rubyNotation } from './ruby';
 import { taskListNotation } from './task-list';
 import { tableOfContentsNotation } from './toc';
@@ -37,6 +38,8 @@ export function vfmNotations(
   syntax: VfmSyntax = VFM_2_SYNTAX,
 ): NotationDefinition[] {
   return [
+    // Headings that VFM 2 reads as lines of a paragraph have no attributes.
+    paragraphContinuationNotation,
     headingAttributesNotation,
     sectionEndNotation,
     tableOfContentsNotation,

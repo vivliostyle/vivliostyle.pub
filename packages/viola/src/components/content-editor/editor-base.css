@@ -43,7 +43,8 @@
   }
 
   & [data-section-end]::before {
-    content: var(--content-editor-section-end) ": " attr(data-ends);
+    content: var(--content-editor-section-end) attr(data-ends)
+      var(--content-editor-section-end-after);
   }
 
   & [data-section-end][data-ends-nothing]::before {
@@ -66,10 +67,13 @@
     font-size: 0.8em;
   }
 
-  & .footnote-definition[data-unreferenced]::before,
-  & .footnote-definition[data-duplicate]::before {
+  & .footnote-definition[data-unreferenced]::before {
     content: "[^" attr(data-label) "] "
       var(--content-editor-footnote-unreferenced);
+  }
+
+  & .footnote-definition[data-duplicate]::before {
+    content: "[^" attr(data-label) "] " var(--content-editor-footnote-duplicate);
   }
 
   & .footnote-ref[data-undefined] {

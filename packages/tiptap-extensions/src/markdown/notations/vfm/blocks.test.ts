@@ -1,4 +1,7 @@
 import { Editor } from '@tiptap/core';
+import { Fragment, Slice } from '@tiptap/pm/model';
+import { EditorState } from '@tiptap/pm/state';
+import type { DecorationSet } from '@tiptap/pm/view';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,6 +9,7 @@ import {
   withCodeBlockCaption,
 } from '../../../code-block-prism';
 import { PubExtensions } from '../../../index';
+import { documentHtml } from '../../../testing/html';
 import {
   currentNotations,
   getMarkdown,
@@ -27,6 +31,7 @@ const createEditor = () =>
   });
 
 const BLOCK_NOTATIONS = new Set([
+  'paragraphContinuation',
   'headingAttributes',
   'sectionEnd',
   'tableOfContents',
@@ -65,6 +70,8 @@ describe('the ids of a document', () => {
     expect(slug('A.B_C-D')).toBe('ab_c-d');
     expect(slug('Ⓐ ① ¹')).toBe('ⓐ--');
     expect(slug('Foo', true)).toBe('Foo');
+    expect(slug('🅰 🄰 ⒜')).toBe('🅰-🄰-');
+    expect(slug('新\u9ffd\u{2a6de}\u{20000}')).toBe('新\u{20000}');
   });
 });
 
@@ -79,6 +86,33 @@ describe('the lines that end sections', () => {
       it ? headingText(it) : null,
     );
     expect(ended).toEqual(['B', 'A', null, null]);
+  });
+
+  // As VFM sections a heading by its source, `{…}` on the next line included.
+  it.each([
+    ['# A #\n{#a}\n\n#', ['A']],
+    ['# A {#a} #\n\n#', [null]],
+    ['# A #\n\n#', [null]],
+  ])('follow the closing sequence of %j as VFM does', (markdown, expected) => {
+    const editor = createEditor();
+    const { doc } = parseMarkdown(editor, markdown);
+    const ended = [...sectionEnds(doc).values()].map((it) =>
+      it ? headingText(it) : null,
+    );
+    expect(ended).toEqual(expected);
+  });
+
+  it('let a closing sequence open a section once its attributes go on the next line', () => {
+    const editor = createEditor();
+    const { doc } = parseMarkdown(editor, '# A {#a} #\n\n#');
+    const heading = doc.child(0);
+    const italic = editor.schema.marks.italic.create();
+    const edited = doc.replace(
+      1,
+      heading.nodeSize - 1,
+      new Slice(Fragment.from(editor.schema.text('A', [italic])), 0, 0),
+    );
+    expect([...sectionEnds(edited).values()].map(Boolean)).toEqual([true]);
   });
 });
 
@@ -129,6 +163,10 @@ describe('code captions', () => {
     ['js:a\\:b', 'a:b'],
     [':app.js', null],
     ['js', null],
+    ['js title=a=b', 'a'],
+    ['js title="a=b c"', 'a'],
+    ['js title==b', null],
+    ['js:a=b', 'a=b'],
   ])('%j has the caption %j', (info, caption) => {
     expect(
       codeBlockCaption(info, info.includes('{title=') ? { title: 't' } : null),
@@ -141,6 +179,11 @@ describe('code captions', () => {
     ['js title=a {#c}', 'b', 'js title=b {#c}'],
     ['js', '', 'js'],
     ['', 'x', 'text title=x'],
+    ['js', 'x=y', 'js:x=y'],
+    ['js:app.js', 'x=y', 'js:x=y'],
+    ['js {#c}', 'x=y', 'js:x=y {#c}'],
+    ['js title=a', 'x=y', null],
+    ['js', 'x = y', null],
   ])('%j with %j is %j', (info, caption, written) => {
     expect(withCodeBlockCaption(info, caption)).toBe(written);
   });
@@ -194,5 +237,120 @@ describe('a document recorded before the block syntax', () => {
         editor.can().setHeadingAttributes({ id: 'x' }),
       ].some(Boolean),
     ).toBe(false);
+  });
+});
+
+describe('HTML on the clipboard', () => {
+  // Enough of an element for the parse rules, which tests have no DOM for.
+  const element = (attributes: Record<string, string>, checkbox?: boolean) =>
+    ({
+      getAttribute: (name: string) => attributes[name] ?? null,
+      hasAttribute: (name: string) => name in attributes,
+      classList: {
+        contains: (name: string) =>
+          (attributes.class ?? '').split(' ').includes(name),
+      },
+      querySelector: () =>
+        checkbox === undefined ? null : { checked: checkbox },
+    }) as unknown as HTMLElement;
+
+  it('keeps whether a task is checked without its checkbox', () => {
+    const editor = createEditor();
+    const { doc } = parseMarkdown(editor, '- [x] a\n- [ ] b');
+    expect(documentHtml(doc)).toBe(
+      '<ul><li class="task-list-item" data-checked="true"><p>a</p></li><li class="task-list-item" data-checked="false"><p>b</p></li></ul>',
+    );
+    const [rule] = editor.schema.nodes.listItem.spec.parseDOM ?? [];
+    const checked = (it: HTMLElement) => rule?.getAttrs?.(it);
+    expect([
+      checked(element({ class: 'task-list-item', 'data-checked': 'true' })),
+      checked(element({ class: 'task-list-item' }, true)),
+      checked(element({ class: 'task-list-item' }, false)),
+      checked(element({})),
+    ]).toEqual([
+      expect.objectContaining({ checked: true }),
+      expect.objectContaining({ checked: true }),
+      expect.objectContaining({ checked: false }),
+      {},
+    ]);
+  });
+
+  it('reads an image as one in text where the document has them', () => {
+    const editor = createEditor();
+    editor.commands.setMarkdown('a');
+    const rules = editor.schema.nodes.inlineImage.spec.parseDOM ?? [];
+    const [rule] = rules;
+    expect(rule?.tag).toBe('img[src]');
+    expect(rule?.priority).toBeGreaterThan(50);
+    const img = element({ src: 'a.png', alt: 'a' });
+    expect(rule?.getAttrs?.(img)).toEqual(
+      expect.objectContaining({ src: 'a.png', alt: 'a' }),
+    );
+    setDocumentNotations(
+      editor,
+      currentNotations(editor)
+        .split(' ')
+        .filter((entry) => !entry.startsWith('inlineImage@'))
+        .join(' '),
+    );
+    expect(rule?.getAttrs?.(img)).toBe(false);
+  });
+});
+
+describe('the decorations of the whole document', () => {
+  const KEYS = ['footnoteStatus$', 'headingIds$', 'sectionEnds$', 'taskList$'];
+
+  function decorations(state: EditorState) {
+    return KEYS.map((key) => {
+      const plugin = state.plugins.find(
+        (it) => (it as unknown as { key: string }).key === key,
+      );
+      return (plugin?.getState(state) as DecorationSet | undefined)
+        ?.find()
+        .map((it) => {
+          const { attrs } = (it as unknown as { type: { attrs?: unknown } })
+            .type;
+          return [it.from, it.to, JSON.stringify(attrs ?? it.spec)];
+        });
+    });
+  }
+
+  it('are the ones made anew after each edit, mapped or not', () => {
+    const editor = createEditor();
+    editor.view.updateState(
+      editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
+    );
+    editor.commands.setMarkdown(
+      '# A\n\n本文[^1]と[^2]。\n\n## B\n\n- [x] 済み\n- 項目\n\n##\n\n[^1]: 注\n\n[^2]: 注二\n\n[^3]: 余り',
+    );
+    const at = (text: string) => {
+      let found = -1;
+      editor.state.doc.descendants((node, pos) => {
+        if (found === -1 && node.isText && node.text?.includes(text)) {
+          found = pos + node.text.indexOf(text);
+        }
+      });
+      return found;
+    };
+    const edits = [
+      () => editor.state.tr.insertText('X', at('本文')),
+      () => editor.state.tr.insertText('Y', at('B')),
+      () => editor.state.tr.insertText('Z', at('済み')),
+      () => editor.state.tr.delete(at('と'), at('と') + 1),
+      () =>
+        editor.state.tr.insert(
+          at('項目'),
+          editor.schema.nodes.footnoteReference.create({ label: '3' }),
+        ),
+      () => editor.state.tr.insertText('W', at('余り')),
+    ];
+    for (const edit of edits) {
+      editor.view.dispatch(edit());
+      const fresh = EditorState.create({
+        doc: editor.state.doc,
+        plugins: editor.state.plugins,
+      });
+      expect(decorations(editor.state)).toEqual(decorations(fresh));
+    }
   });
 });

@@ -4,6 +4,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { findWrapping } from '@tiptap/pm/transform';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
+import { touchesNodes } from '../../changes';
 import { hasDocumentNotation } from '../../extension';
 import { childrenOf, type UnknownMdastNode } from '../../mdast';
 import { transformPlugin } from '../../micromark';
@@ -83,7 +84,7 @@ function clampEnds(node: UnknownMdastNode, source: string): void {
 /**
  * A definition that would interrupt a paragraph is, to VFM 2, more lines of
  * the paragraph. One of a single paragraph is put there as raw markdown;
- * VFM reads its label as a reference.
+ * VFM reads its label as a reference. VFM 2 ends a definition at the next.
  */
 function continueParagraphs(tree: UnknownMdastNode, source: string): void {
   const visit = (parent: UnknownMdastNode) => {
@@ -99,6 +100,7 @@ function continueParagraphs(tree: UnknownMdastNode, source: string): void {
       if (
         child.type !== 'footnoteDefinition' ||
         !found ||
+        found.path.some((it) => it.type === 'footnoteDefinition') ||
         line === undefined ||
         previous.position?.end.line !== line - 1
       ) {
@@ -204,30 +206,42 @@ export function footnoteStatus(doc: ProseMirrorNode): FootnoteStatus {
 
 const footnoteStatusKey = new PluginKey<DecorationSet>('footnoteStatus');
 
+const NOTES = new Set([
+  'footnoteReference',
+  'footnoteDefinition',
+  'inlineFootnote',
+]);
+
+function isNote(node: ProseMirrorNode): boolean {
+  return NOTES.has(node.type.name);
+}
+
 function footnoteDecorations(doc: ProseMirrorNode): DecorationSet {
   const status = footnoteStatus(doc);
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
-    const name = node.type.name;
-    if (
-      name !== 'footnoteReference' &&
-      name !== 'footnoteDefinition' &&
-      name !== 'inlineFootnote'
-    ) {
+    if (!isNote(node)) {
       return;
     }
     const attrs: Record<string, string> = {};
-    const number = status.numbers.get(pos);
-    if (number !== undefined) {
-      attrs['data-footnote-number'] = String(number);
-    }
-    if (status.undefinedReferences.has(pos)) {
-      attrs['data-undefined'] = '';
-    }
-    if (status.duplicateDefinitions.has(pos)) {
-      attrs['data-duplicate'] = '';
-    } else if (status.unreferencedDefinitions.has(pos)) {
-      attrs['data-unreferenced'] = '';
+    if (node.type.name === 'footnoteDefinition') {
+      // Mapping a decoration of a block at the top level looks the block up
+      // among all of them, so a definition only has one for what is wrong.
+      if (status.duplicateDefinitions.has(pos)) {
+        attrs['data-duplicate'] = '';
+      } else if (status.unreferencedDefinitions.has(pos)) {
+        attrs['data-unreferenced'] = '';
+      } else {
+        return;
+      }
+    } else {
+      const number = status.numbers.get(pos);
+      if (number !== undefined) {
+        attrs['data-footnote-number'] = String(number);
+      }
+      if (status.undefinedReferences.has(pos)) {
+        attrs['data-undefined'] = '';
+      }
     }
     decorations.push(Decoration.node(pos, pos + node.nodeSize, attrs));
   });
@@ -412,7 +426,11 @@ export const FootnoteDefinition = Node.create({
         state: {
           init: (_, { doc }) => footnoteDecorations(doc),
           apply: (tr, set) =>
-            tr.docChanged ? footnoteDecorations(tr.doc) : set,
+            !tr.docChanged
+              ? set
+              : touchesNodes(tr, isNote)
+                ? footnoteDecorations(tr.doc)
+                : set.map(tr.mapping, tr.doc),
         },
         props: {
           decorations: (state) => footnoteStatusKey.getState(state),

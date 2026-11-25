@@ -32,16 +32,27 @@ declare module '@tiptap/core' {
 const types = {
   shortcode: tokenType('vfmShortcode'),
   space: tokenType('vfmShortcodeSpace'),
+  rest: tokenType('vfmShortcodeRest'),
+  text: tokenType('chunkText'),
 };
 
 interface ShortcodeMdast extends UnknownMdastNode {
   identifier: string;
 }
 
+function isSpace(code: Code): boolean {
+  return (
+    code === codes.space ||
+    code === codes.horizontalTab ||
+    code === codes.virtualSpace
+  );
+}
+
 /**
- * `[[identifier …]]` alone on a line, as VFM 2 reads a shortcode: at the
- * start of the line, not interrupting a paragraph. VFM 2 also reads one
- * that text follows on its line, which is left out here.
+ * `[[identifier …]]` at the start of a line, as VFM 2 reads a shortcode:
+ * not after indentation or interrupting a paragraph, and not blank. What
+ * follows on the line is a paragraph of its own, as VFM 2 has it; VFM 2
+ * also reads one up to `]]` on a later line, which is left out here.
  */
 function tokenizeShortcode(
   this: TokenizeContext,
@@ -49,25 +60,38 @@ function tokenizeShortcode(
   ok: State,
   nok: State,
 ): State {
+  let blank = true;
+
+  const rest: State = (code) => {
+    if (code === null || isLineEnding(code)) {
+      effects.exit(types.text);
+      effects.exit(types.rest);
+      return ok(code);
+    }
+    effects.consume(code);
+    return rest;
+  };
+
   const after: State = (code: Code) => {
     if (code === null || isLineEnding(code)) {
       return ok(code);
     }
-    if (
-      code === codes.space ||
-      code === codes.horizontalTab ||
-      code === codes.virtualSpace
-    ) {
+    if (isSpace(code)) {
       effects.enter(types.space);
       effects.consume(code);
       effects.exit(types.space);
       return after;
     }
-    return nok(code);
+    effects.enter(types.rest);
+    effects.enter(types.text, { contentType: 'text' });
+    return rest(code);
   };
 
   const closing: State = (code) => {
     if (code === codes.rightSquareBracket) {
+      if (blank) {
+        return nok(code);
+      }
       effects.consume(code);
       effects.exit(types.shortcode);
       return after;
@@ -78,6 +102,9 @@ function tokenizeShortcode(
   const inside: State = (code) => {
     if (code === null || isLineEnding(code)) {
       return nok(code);
+    }
+    if (code !== codes.rightSquareBracket && !isSpace(code)) {
+      blank = false;
     }
     effects.consume(code);
     return code === codes.rightSquareBracket ? closing : inside;
@@ -113,11 +140,17 @@ const shortcodeFromMarkdown: FromMarkdownExtension = {
     [types.shortcode](token) {
       enterNode(this, { type: 'shortcode', identifier: '' }, token);
     },
+    [types.rest](token) {
+      enterNode(this, { type: 'paragraph', children: [] }, token);
+    },
   },
   exit: {
     [types.shortcode](token) {
       const inner = this.sliceSerialize(token).slice(2, -2).trim();
       currentNode(this).identifier = inner.split(/\s+/)[0] ?? '';
+      this.exit(token);
+    },
+    [types.rest](token) {
       this.exit(token);
     },
   },

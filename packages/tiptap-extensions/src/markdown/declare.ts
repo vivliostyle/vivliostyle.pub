@@ -19,7 +19,7 @@ import {
   type Transaction,
 } from '@tiptap/pm/state';
 
-import { changedNodes, isRemote } from './changes';
+import { changedNodes, isLoading, isRemote } from './changes';
 import { hasDocumentNotation } from './extension';
 import { decodeHtml, encodeHtml, readStartTag } from './html';
 import { matchSequences } from './match';
@@ -45,7 +45,6 @@ import {
 } from './notations/vfm/commands';
 import { inlineSourceRules } from './notations/vfm/input-rules';
 import { inlineNodeRules } from './notations/vfm/normalize';
-import { RAW_BLOCK, RAW_INLINE } from './parse';
 
 /**
  * The attribute of a declared element's mark or node that keeps the
@@ -462,19 +461,6 @@ function specOf(
   };
 }
 
-function rawText(schema: Schema, text: string, marks: readonly Mark[]) {
-  const raw = schema.marks[RAW_INLINE];
-  return schema.text(text, raw ? raw.create().addToSet(marks) : marks);
-}
-
-function rawBlock(schema: Schema, text: string): ProseMirrorNode {
-  const type = schema.nodes[RAW_BLOCK] ?? schema.nodes.paragraph;
-  if (!type) {
-    throw new Error('The schema has no block for raw markdown');
-  }
-  return type.create(null, schema.text(text));
-}
-
 /** The node's opening tag, as `pattern` writes it. */
 function openingTagOf(pattern: HtmlElementPattern, node: ProseMirrorNode) {
   return openingTag(pattern, node.attrs, otherAttributesOf(node.attrs));
@@ -583,7 +569,9 @@ function uniqueMarkIds(type: string): Plugin {
     return mark.type.create(attrs);
   };
   return new Plugin({
-    appendTransaction: (transactions, _, state) => {
+    appendTransaction: (all, _, state) => {
+      // Two marks of one id read from a file are the file's.
+      const transactions = all.slice(all.findLastIndex(isLoading) + 1);
       if (!transactions.some((tr) => tr.docChanged && !isRemote(tr))) {
         return null;
       }
@@ -796,27 +784,6 @@ export function declareNotation(
             }${tags.close}`;
           },
         },
-        dissolve: {
-          [node]: (it) => {
-            const { schema } = it.type;
-            const content: ProseMirrorNode[] = [];
-            it.forEach((child) => {
-              content.push(
-                child.mark(
-                  it.marks.reduce(
-                    (set, mark) => mark.addToSet(set),
-                    child.marks,
-                  ),
-                ),
-              );
-            });
-            return [
-              rawText(schema, openingTagOf(pattern, it), it.marks),
-              ...content,
-              rawText(schema, close, it.marks),
-            ];
-          },
-        },
       };
     case 'htmlAtom':
       return {
@@ -843,15 +810,6 @@ export function declareNotation(
             return `${tags.open}${tags.close}`;
           },
         },
-        dissolve: {
-          [node]: (it) => [
-            rawText(
-              it.type.schema,
-              `${openingTagOf(pattern, it)}${close}`,
-              it.marks,
-            ),
-          ],
-        },
       };
     case 'htmlBlock':
       return {
@@ -873,20 +831,6 @@ export function declareNotation(
             }${tags.close}`;
           },
         },
-        dissolve: {
-          [node]: (it) => {
-            const { schema } = it.type;
-            const children: ProseMirrorNode[] = [];
-            it.forEach((child) => {
-              children.push(child);
-            });
-            return [
-              rawBlock(schema, openingTagOf(pattern, it)),
-              ...children,
-              rawBlock(schema, close),
-            ];
-          },
-        },
       };
     case 'htmlTextblock':
       return {
@@ -906,14 +850,6 @@ export function declareNotation(
             const tags = tagsOf(found, it);
             return `${tags.open}${textblockHtml(it.textContent, found?.inner)}${tags.close}`;
           },
-        },
-        dissolve: {
-          [node]: (it) => [
-            rawBlock(
-              it.type.schema,
-              `${openingTagOf(pattern, it)}${textblockHtml(it.textContent)}${close}`,
-            ),
-          ],
         },
       };
   }

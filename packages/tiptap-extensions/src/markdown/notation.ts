@@ -145,7 +145,10 @@ export interface NodeWriter {
    * The attributes as markdown holds them, when the writer normalises them:
    * a document and the one read back from its markdown are compared by these.
    */
-  writtenAttrs?: (attrs: Record<string, unknown>) => Record<string, unknown>;
+  writtenAttrs?: (
+    attrs: Record<string, unknown>,
+    node: ProseMirrorNode,
+  ) => Record<string, unknown>;
   /**
    * The writer only adds to the one registered before it, so without one
    * the definition writes no such node.
@@ -400,12 +403,10 @@ export interface NotationDefinition {
    */
   attributes?: readonly string[];
   /**
-   * What a node of the definition becomes in a document whose definitions
-   * lack it, by node type, so its content and markup are not lost: e.g. its
-   * tags as raw markdown around its content.
+   * What a mark of the definition becomes in a document whose definitions
+   * lack it, by mark type: the source written around the marked text, which
+   * is kept raw, so its meaning is not lost.
    */
-  dissolve?: Record<string, (node: ProseMirrorNode) => ProseMirrorNode[]>;
-  /** The same for marks, by mark type: the source around the marked text. */
   dissolveMarks?: Record<
     string,
     (mark: Mark) => { open: string; close: string }

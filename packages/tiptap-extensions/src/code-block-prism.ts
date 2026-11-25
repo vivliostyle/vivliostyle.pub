@@ -179,9 +179,10 @@ export function codeBlockCaption(
   if (typeof attributes?.title === 'string') {
     return attributes.title || null;
   }
+  // VFM takes the value up to an `=` in it, quoted or not.
   const title = metaTitles(meta).at(-1);
   if (title) {
-    return decodeString(title.value) || null;
+    return decodeString(title.value.split('=')[0] ?? '') || null;
   }
   return languageTitle(decodeString(word))?.title ?? null;
 }
@@ -202,6 +203,12 @@ export function withCodeBlockCaption(
   const titles = metaTitles(meta);
   const quoted = (value: string) =>
     /[\s]/.test(value) || !value ? `title="${value}"` : `title=${value}`;
+  // VFM ends a title in the meta at `=`, so only the language holds one
+  // with it, as `js:a=b`, where a title in the meta does not win over it.
+  const bare = !/[\s\\&]/.test(caption);
+  if (caption.includes('=') && (titles.length > 0 || !bare)) {
+    return null;
+  }
   if (titles.length > 0) {
     const last = titles[titles.length - 1];
     const next = caption
@@ -210,7 +217,7 @@ export function withCodeBlockCaption(
     return `${indent}${word}${next ? `${space || ' '}${next}` : ''}` || null;
   }
   const language = languageTitle(word)?.language;
-  if (language !== undefined && (!caption || !/[\s\\&]/.test(caption))) {
+  if (language !== undefined && (!caption || bare)) {
     const replaced = `${language}${caption ? `:${caption}` : ''}`;
     return `${indent}${replaced}${space}${meta}` || null;
   }
@@ -218,6 +225,9 @@ export function withCodeBlockCaption(
     return infoString ?? null;
   }
   const lang = language ?? (word || 'text');
+  if (caption.includes('=')) {
+    return `${indent}${lang}:${caption}${space}${meta}`;
+  }
   return `${indent}${lang}${space || ' '}${meta ? `${meta} ` : ''}${quoted(caption)}`;
 }
 

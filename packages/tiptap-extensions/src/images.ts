@@ -2,10 +2,11 @@ import { InputRule, mergeAttributes, nodeInputRule } from '@tiptap/core';
 import { Image } from '@tiptap/extension-image';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
+import { Mapping } from '@tiptap/pm/transform';
 import { join } from 'pathe';
 
 import { hasDocumentNotation } from './markdown';
-import { changedNodes, isRemote } from './markdown/changes';
+import { changedNodes, isLoading, isRemote } from './markdown/changes';
 import { renderedAttributes } from './markdown/notations/vfm/attributes';
 import { inlineSourceRules } from './markdown/notations/vfm/input-rules';
 import { inlineNodeRules } from './markdown/notations/vfm/normalize';
@@ -68,13 +69,15 @@ function loneChild(textblock: ProseMirrorNode): ProseMirrorNode | null {
 }
 
 /**
- * Turns a paragraph holding nothing but an image in its text into the image
- * on its own, which is what its markdown reads as.
+ * Turns a paragraph that an edit of this client left holding nothing but an
+ * image in its text into the image on its own, as a figure. One read from
+ * markdown stays: whitespace around the image keeps it in its paragraph.
  */
 function loneImageRule(blockName: string, inlineName: string): Plugin {
   return new Plugin({
-    appendTransaction: (transactions, _, state) => {
+    appendTransaction: (all, _, state) => {
       const block = state.schema.nodes[blockName];
+      const transactions = all.slice(all.findLastIndex(isLoading) + 1);
       if (
         !block ||
         !transactions.some((tr) => tr.docChanged && !isRemote(tr))
@@ -87,7 +90,20 @@ function loneImageRule(blockName: string, inlineName: string): Plugin {
         transactions,
         (node) => node.type.name === 'paragraph',
       );
+      const mapping = new Mapping();
+      for (const it of transactions) {
+        mapping.appendMapping(it.mapping);
+      }
+      const inverted = mapping.invert();
+      const before = transactions[0]?.before;
       for (const { pos, node } of found) {
+        const was = before?.nodeAt(inverted.map(pos, 1));
+        if (
+          was?.type.name === 'paragraph' &&
+          loneChild(was)?.type.name === inlineName
+        ) {
+          continue;
+        }
         const image = loneChild(node);
         const $pos = tr.doc.resolve(pos);
         const index = $pos.index();
@@ -208,8 +224,19 @@ export function imageExtensions(basePath: string | undefined) {
       return { basePath };
     },
 
+    // An image in text is read as one, where the document has them: the
+    // image's rule would split the paragraph around it into a figure.
     parseHTML() {
-      return [];
+      return [
+        {
+          tag: 'img[src]',
+          priority: 60,
+          getAttrs: () =>
+            this.editor && hasDocumentNotation(this.editor, this.name)
+              ? null
+              : false,
+        },
+      ];
     },
 
     renderHTML({ node, HTMLAttributes }) {

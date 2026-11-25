@@ -16,7 +16,8 @@ import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 import { CodeBlockPrism, toInfoString } from '../../code-block-prism';
 import { PubListKeymap } from '../../list';
-import type { MdastNodeOf } from '../mdast';
+import type { MdastNodeOf, UnknownMdastNode } from '../mdast';
+import { transformPlugin } from '../micromark';
 import {
   defineNotation,
   type InlineRun,
@@ -159,7 +160,11 @@ const headingNotation = defineNotation({
     heading: {
       default: 'atx',
       detect: {
-        heading: (_, source) => (source.includes('\n') ? 'setext' : 'atx'),
+        // Attributes on the line after an ATX heading are part of its source.
+        heading: (_, source) =>
+          /^ {0,3}#{1,6}(?:[ \t]|$)/.test(source.split('\n')[0] ?? '')
+            ? 'atx'
+            : 'setext',
       },
     },
   },
@@ -259,6 +264,17 @@ function listSeparator(context: WriteContext) {
   return () => (loose ? '\n\n' : '\n');
 }
 
+// Blocks that can start on a list marker's line, unlike a thematic break,
+// which would make the line one.
+const MARKER_LINE_BLOCKS = new Set([
+  'heading',
+  'blockquote',
+  'codeBlock',
+  'bulletList',
+  'orderedList',
+  'footnoteDefinition',
+]);
+
 function itemMarkerOf(source: string): string | undefined {
   return source.match(/^(?:[-*+]|\d{1,9}[.)])(?=[ \t\n]|$)/)?.[0];
 }
@@ -333,7 +349,23 @@ const listNotation = defineNotation({
             ? '\n'
             : '\n\n',
       });
-      const [head = '', ...tail] = content.split('\n');
+      let [head = '', ...tail] = content.split('\n');
+      // The block after the empty paragraph an item has to start with goes
+      // on the marker's line, unless the source has it apart: VFM reads the
+      // lines after a marker alone with a space too many, so attributes on
+      // them are text.
+      const second = node.childCount > 1 ? node.child(1) : null;
+      const base = context.base?.text;
+      if (
+        isEmptyParagraph(node.firstChild ?? undefined) &&
+        second &&
+        MARKER_LINE_BLOCKS.has(second.type.name) &&
+        !head &&
+        tail[0] &&
+        !(base && /^\S+[ \t]*(?:\n|$)/.test(base))
+      ) {
+        [head = '', ...tail] = tail;
+      }
       return [
         head ? marker + head : marker.trimEnd(),
         ...tail.map((line) => (line ? indent + line : line)),
@@ -528,6 +560,11 @@ const hardBreakNotation = defineNotation({
   },
 });
 
+// Markdown has no alt text apart from an empty one.
+function imageWrittenAttrs(attrs: Record<string, unknown>) {
+  return { ...attrs, alt: attrs.alt || null };
+}
+
 /** An image's markdown, with its alt text written as `alt` gives it. */
 export function imageMarkdown(
   node: ProseMirrorNode,
@@ -542,11 +579,63 @@ function plainAlt(text: string): string {
   return text.replace(/[!-/:-@[-`{-~]/g, '\\$&').replace(/\n/g, '&#10;');
 }
 
+interface SpacedMdast extends UnknownMdastNode {
+  /** Whitespace is written around the paragraph on its lines. */
+  spaced?: boolean;
+}
+
+// remark 8, which VFM 2 reads with, keeps whitespace at the edges of a
+// paragraph as text, so an image with whitespace around it is no figure.
+function findSpacedParagraphs(tree: UnknownMdastNode, source: string): void {
+  const visit = (node: UnknownMdastNode, topLevel: boolean) => {
+    const start = node.position?.start.offset;
+    const end = node.position?.end.offset;
+    const [only, ...rest] = node.children ?? [];
+    if (
+      node.type === 'paragraph' &&
+      only?.type === 'image' &&
+      rest.length === 0 &&
+      start !== undefined &&
+      end !== undefined
+    ) {
+      const lineStart = source.lastIndexOf('\n', start - 1) + 1;
+      const after = source.slice(end).match(/^[^\n]*/)?.[0] ?? '';
+      (node as SpacedMdast).spaced =
+        /[ \t]$/.test(source.slice(start, end) + after) ||
+        (topLevel && /^[ \t]+$/.test(source.slice(lineStart, start)));
+      return;
+    }
+    for (const child of node.children ?? []) {
+      visit(child, node.type === 'root');
+    }
+  };
+  visit(tree, false);
+}
+
+/**
+ * Whether markdown reads the paragraph as the lone image it holds, which
+ * markdown has no line breaks at the edges of a paragraph for.
+ */
+function isLoneInlineImage(paragraph: ProseMirrorNode): boolean {
+  const children = childrenOfNode(paragraph).filter(
+    (child) =>
+      !child.type.spec.linebreakReplacement &&
+      !(child.isText && /^\n*$/.test(child.text ?? '')),
+  );
+  const [only] = children;
+  return (
+    children.length === 1 &&
+    only?.type.name === 'inlineImage' &&
+    only.marks.length === 0
+  );
+}
+
 function inlineImageNotation(inlineImage: AnyExtension): NotationDefinition {
   return defineNotation({
     name: 'inlineImage',
     version: 1,
     extensions: [inlineImage],
+    remarkPlugins: [transformPlugin(findSpacedParagraphs)],
     fromMarkdown: {
       image: (node, context) =>
         context.schema.nodes.inlineImage?.create(
@@ -554,9 +643,20 @@ function inlineImageNotation(inlineImage: AnyExtension): NotationDefinition {
           null,
           context.marks,
         ),
+      paragraph: (node, context, next) =>
+        (node as SpacedMdast).spaced
+          ? context.schema.nodes.paragraph?.create(null, context.inlines(node))
+          : next(),
     },
     nodes: {
-      inlineImage: (node) => imageMarkdown(node, plainAlt),
+      inlineImage: {
+        write: (node) => imageMarkdown(node, plainAlt),
+        writtenAttrs: imageWrittenAttrs,
+      },
+      // The space after the image keeps it in its paragraph, which a client
+      // other than this one may have left it alone in.
+      paragraph: (node, _, next) =>
+        `${next()}${isLoneInlineImage(node) ? ' ' : ''}`,
     },
   });
 }
@@ -581,9 +681,12 @@ function imageNotation(image: AnyExtension): NotationDefinition {
       },
     },
     nodes: {
-      image: (node, context) => {
-        const alt = String(node.attrs.alt ?? '');
-        return `![${context.escaping === 'safe' ? alt.replace(/[[\]\\]/g, '\\$&') : alt}](${linkDestination(String(node.attrs.src ?? ''))}${linkTitle(node.attrs.title)})`;
+      image: {
+        write: (node, context) => {
+          const alt = String(node.attrs.alt ?? '');
+          return `![${context.escaping === 'safe' ? alt.replace(/[[\]\\]/g, '\\$&') : alt}](${linkDestination(String(node.attrs.src ?? ''))}${linkTitle(node.attrs.title)})`;
+        },
+        writtenAttrs: imageWrittenAttrs,
       },
     },
     escapes: [{ pattern: /!(?=\[)/g }],

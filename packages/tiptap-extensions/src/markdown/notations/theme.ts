@@ -3,6 +3,7 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeSelection, Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
+import { touchesNodes } from '../changes';
 import { declareNotation, OTHER_ATTRIBUTES } from '../declare';
 import type { NotationDefinition } from '../notation';
 import { RAW_BLOCK, RAW_INLINE } from '../parse';
@@ -77,6 +78,27 @@ export function referencedId(href: unknown): string | null {
 
 const missingKey = new PluginKey<DecorationSet>('crossReferenceTargets');
 
+/**
+ * Whether a node refers to an id or may give one, which a step touching it
+ * can change: a heading's is made of its text, so a step in one does too.
+ */
+function givesIds(node: ProseMirrorNode): boolean {
+  return (
+    node.type.name === CROSS_REFERENCE ||
+    node.type.name === 'heading' ||
+    node.type.name === 'sectionEnd' ||
+    node.type.name === 'image' ||
+    node.type.name === 'inlineImage' ||
+    node.type.name === 'codeBlock' ||
+    node.type.name === RAW_BLOCK ||
+    Boolean(node.type.spec.htmlElement) ||
+    Boolean(node.attrs.attributes) ||
+    node.marks.some(
+      (mark) => mark.type.name === RAW_INLINE || Boolean(mark.attrs.attributes),
+    )
+  );
+}
+
 function missingTargets(doc: ProseMirrorNode): DecorationSet {
   let ids: Set<string> | null = null;
   const decorations: Decoration[] = [];
@@ -121,7 +143,16 @@ const CrossReferenceTargets = Extension.create({
         key: missingKey,
         state: {
           init: (_, { doc }) => missingTargets(doc),
-          apply: (tr, set) => (tr.docChanged ? missingTargets(tr.doc) : set),
+          apply: (tr, set) =>
+            !tr.docChanged
+              ? set
+              : touchesNodes(
+                    tr,
+                    givesIds,
+                    (node) => node.type.name === 'heading',
+                  )
+                ? missingTargets(tr.doc)
+                : set.map(tr.mapping, tr.doc),
         },
         props: {
           decorations: (state) => missingKey.getState(state),

@@ -127,7 +127,7 @@ const DEFINITION_IN_PLACE =
 const CODE_DECORATIONS =
   'The editor highlights code with decorations rather than spans in its content, and keeps the info string as written on the element.';
 const TASK_DECORATIONS =
-  'The checkbox and the class of the list are decorations, which follow the items, and a list item always holds a paragraph in the editor.';
+  'The checkbox and the class of the list are decorations, which follow the items, so an item says whether it is checked for the clipboard, and a list item always holds a paragraph in the editor.';
 const ONLY_LISTED =
   'The editor puts on its elements only the attributes a theme can select them by and that do not change how the editor behaves; the document keeps the others.';
 const LINK_TARGET =
@@ -480,6 +480,15 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
     {
+      markdown: '# a &copy {#z}',
+      differs: {
+        vfm: '<section class="level1"><h1 id="a--z">a © {#z}</h1></section>',
+        editor: '<h1>a &amp;copy {#z}</h1>',
+        reason:
+          'remark 8 reads a reference without its semicolon, as HTML does, where micromark keeps it as text. Either way the reference keeps the braces from being attributes.',
+      },
+    },
+    {
       markdown: '#\n\nafter',
       differs: {
         vfm: '<section class="level1"><h1 id=""></h1><p>after</p></section>',
@@ -498,6 +507,26 @@ const comparisons: Record<string, Comparison[]> = {
     { markdown: '![cap](a.png){width=100 #i .c}' },
     { markdown: '![cap](a.png){alt="other"}' },
     { markdown: '> ![cap](a.png)' },
+    {
+      markdown: '![a](a.png) \n\n ![b](b.png)',
+      differs: {
+        vfm: '<p><img alt="a" src="a.png"> </p><p> <img alt="b" src="b.png"></p>',
+        editor:
+          '<p><img alt="a" src="a.png"></p><p><img alt="b" src="b.png"></p>',
+        reason:
+          'remark 8 keeps whitespace at the edges of a paragraph as text, which the editor has no place for; an image with it stays in its paragraph in both.',
+      },
+    },
+    {
+      markdown: '![a](a.png)<!-- c -->',
+      differs: {
+        vfm: '<figure><img alt="a" src="a.png"><!-- c --><figcaption aria-hidden="true">a</figcaption></figure>',
+        editor:
+          '<p><img alt="a" src="a.png"><code data-raw-inline="">&lt;!-- c --&gt;</code></p>',
+        reason:
+          'VFM makes a figure of an image with comments alone around it; the editor keeps the paragraph, which holds the comments.',
+      },
+    },
     {
       markdown: '[![cap](a.png)](u)',
       differs: {
@@ -577,8 +606,51 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
   ],
+  'VFM paragraphs': [
+    { markdown: 'a\nb\n---' },
+    {
+      markdown: 'text\n# H\n\na\nb\n===',
+      differs: {
+        vfm: '<p>text\n# H</p><p>a\nb\n===</p>',
+        editor:
+          '<p>text\n<code data-raw-inline=""># H</code></p><p>a\nb\n<code data-raw-inline="">===</code></p>',
+        reason:
+          'VFM 2 reads an ATX heading, or the underline of a setext heading of more lines, as more lines of the paragraph before; the editor keeps those lines as written.',
+      },
+    },
+    {
+      markdown: 'text\n```\nx\n```',
+      differs: {
+        vfm: '<p>text\n<code>x</code></p>',
+        editor:
+          '<p>text</p><pre class="language-text"><code class="language-text">x</code></pre>',
+        reason:
+          'VFM 2 reads fenced code right after a paragraph as more of its lines; the editor keeps the code block, as raw lines in a paragraph would not survive editing.',
+      },
+    },
+  ],
   'VFM table of contents': [
     { markdown: 'text [[toc]]' },
+    { markdown: '[[ ]]\n\n[[]]\n\ntext\n[[toc]]' },
+    {
+      markdown: '[[toc]] text *em*',
+      differs: {
+        vfm: '<div></div><p> text <em>em</em></p>',
+        editor: '<div data-toc=""></div><p>text <em>em</em></p>',
+        reason:
+          'The attribute lets the editor show where the table of contents goes, which VFM leaves empty.',
+      },
+    },
+    {
+      markdown: '> [[foo]] x',
+      differs: {
+        vfm: '<blockquote><p> x</p></blockquote>',
+        editor:
+          '<blockquote><pre data-raw-block=""><code>[[foo]]</code></pre><p>x</p></blockquote>',
+        reason:
+          'VFM removes shortcodes other than `[[toc]]`; the editor keeps them as written.',
+      },
+    },
     {
       markdown: '[[toc]]',
       differs: {
@@ -600,11 +672,21 @@ const comparisons: Record<string, Comparison[]> = {
   ],
   'GFM task lists': [
     {
+      markdown: '- [x]\n  text',
+      differs: {
+        vfm: '<ul><li>[x]\ntext</li></ul>',
+        editor:
+          '<ul><li><p><code data-raw-inline="">[x]</code>\ntext</p></li></ul>',
+        reason:
+          'A checkbox that ends its line is no checkbox to VFM 2; the editor keeps it as written, and a list item always holds a paragraph in the editor.',
+      },
+    },
+    {
       markdown: '- [ ] task\n- [x] done',
       differs: {
         vfm: '<ul class="contains-task-list"><li class="task-list-item"><input disabled="" type="checkbox"> task</li><li class="task-list-item"><input checked="" disabled="" type="checkbox"> done</li></ul>',
         editor:
-          '<ul><li class="task-list-item"><p>task</p></li><li class="task-list-item"><p>done</p></li></ul>',
+          '<ul><li class="task-list-item" data-checked="false"><p>task</p></li><li class="task-list-item" data-checked="true"><p>done</p></li></ul>',
         reason: TASK_DECORATIONS,
       },
     },
@@ -612,7 +694,8 @@ const comparisons: Record<string, Comparison[]> = {
       markdown: '- [ ] a\n\n  para',
       differs: {
         vfm: '<ul class="contains-task-list"><li class="task-list-item"><p><input disabled="" type="checkbox"> a</p><p>para</p></li></ul>',
-        editor: '<ul><li class="task-list-item"><p>a</p><p>para</p></li></ul>',
+        editor:
+          '<ul><li class="task-list-item" data-checked="false"><p>a</p><p>para</p></li></ul>',
         reason: TASK_DECORATIONS,
       },
     },
@@ -764,6 +847,65 @@ describe('elements the editor makes of markdown, compared with VFM', () => {
   }
 });
 
+interface Element {
+  type: string;
+  name?: string;
+  data?: string;
+  attribs?: Record<string, string>;
+  children?: Element[];
+}
+
+function elementsOf(
+  nodes: readonly Element[],
+  test: (element: Element) => boolean,
+): Element[] {
+  return nodes.flatMap((node) =>
+    test(node) ? [node] : elementsOf(node.children ?? [], test),
+  );
+}
+
+function textOf(node: Element): string {
+  return node.type === 'text'
+    ? (node.data ?? '')
+    : (node.children ?? []).map(textOf).join('');
+}
+
+// The text of each note VFM collects at the end, and of each definition the
+// editor shows where it is written: the same as long as they are referred to
+// in the order they are defined.
+function vfmNotes(markdown: string): string[] {
+  const html = stringify(markdown, { partial: true, disableFormatHtml: true });
+  return elementsOf(
+    htmlToDOM(html) as unknown as Element[],
+    (it) => it.name === 'li' && /^fn/.test(it.attribs?.id ?? ''),
+  ).map((it) => textOf(it).replace(/↩|\s+/g, ''));
+}
+
+function editorNotes(markdown: string): string[] {
+  return elementsOf(
+    htmlToDOM(
+      documentHtml(parseMarkdown(editor, markdown).doc),
+    ) as unknown as Element[],
+    (it) => /\bfootnote-definition\b/.test(it.attribs?.class ?? ''),
+  ).map((it) => textOf(it).replace(/\s+/g, ''));
+}
+
+const NOTES = [
+  'a[^1][^2]\n\n[^1]: 注一\n[^2]: 注二',
+  'a[^1][^2]\n\n[^1]: one\n  more\n[^2]: two',
+  'a[^1][^2]\n\n[^1]:\n    - x\n[^2]: two',
+  'a[^1][^2]\n\n> [^1]: one\n[^2]: two',
+  'a[^1][^2]\n\n- [^1]: one\n[^2]: two',
+  'a[^1][^2]\n\n[^1]: one\n  [^2]: two',
+  'a[^1][^2]\n\n[^1]: one\n\n    para\n[^2]: two',
+];
+
+describe('notes, compared with VFM', () => {
+  it.each(NOTES)('%j', (markdown) => {
+    expect(editorNotes(markdown)).toEqual(vfmNotes(markdown));
+  });
+});
+
 function vfmHeadingIds(markdown: string): string[] {
   return [
     ...stringify(markdown, { partial: true, disableFormatHtml: true }).matchAll(
@@ -797,6 +939,15 @@ const HEADINGS = [
   'Setext\n---\n\n# Setext',
   '# A\n\n#\n\n# B\n\n##\n\n## ',
   '> # quoted\n\n- # listed',
+  '# C\\# {#cs}\n\n# a\\* {#id}\n\n# a &copy;{#id}\n\n# a\\\\ {#id}\n\n# 参考 [1] {#refs}',
+  '# a [b] {#z}\n\n# Q&amp; {#x}\n\n# H {title="a\\"b"}\n\n# H {title=a&amp;b}',
+  '# a [] {#z}\n\n# a [ ] {#z}\n\n# a [[b]] {#z}\n\n# a [b]c {#z}',
+  '# a &copyx {#z}\n\n# a &bogus; {#z}\n\n# a\\b {#z}',
+  '# a ![b] {#z}\n\n# a [^1] {#z}\n\n# a [^ x] {#z}\n\n# a {#x title="{"}',
+  '# H\n{#id} x\n\n> # H\n> {#q}\n> body\n\n-\n  # H\n  {#z}\n\n- # *H*\n  {#y}',
+  '# H1 {.a}\n{#b}\n\n# H #\n{#id}\n\n# a\\*\n{#c}',
+  '# 🅰🅱 🄰 🅐 Ⓐ ⒜\n\n# 新\u9ffd字 \u{2a6de}\u{20000} \u0870ء',
+  'text\n# H\n\n> a\n# Q\n\na\nb\n===\n\n$$\na\n=\nb$$\n\n# T\n\nc\n===',
 ];
 
 describe('ids of headings, compared with VFM', () => {

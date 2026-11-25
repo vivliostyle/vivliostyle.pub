@@ -449,7 +449,7 @@ export const themeSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a<span class=\\"footnote\\">注</span>"))',
       },
       {
-        name: 'a pasted note is its tags around its content',
+        name: 'a pasted note and reference are their markdown, raw',
         given: 'a‸b',
         steps: [
           recordBeforeThemes,
@@ -469,7 +469,7 @@ export const themeSuites: CaseSuite[] = [
         ],
         expect:
           'a<span class="footnote">注の**強調**</span><a data-ref="fig" href="#f1"></a>‸b',
-        doc: 'doc(paragraph("a", rawInline("<span class=\\"footnote\\">"), "注の", bold("強調"), rawInline("</span><a data-ref=\\"fig\\" href=\\"#f1\\"></a>"), "b"))',
+        doc: 'doc(paragraph("a", rawInline("<span class=\\"footnote\\">注の**強調**</span><a data-ref=\\"fig\\" href=\\"#f1\\"></a>"), "b"))',
       },
       {
         name: 'a pasted block is its tags around its blocks',
@@ -662,6 +662,11 @@ export const themeSuites: CaseSuite[] = [
         name: 'combined text inside combined text is kept',
         given: '<span class="tcy"><span class="tcy">1</span>2</span>',
         doc: 'doc(paragraph(tcy(rawInline("<span class=\\"tcy\\">")), tcy("1"), tcy(rawInline("</span>")), tcy("2")))',
+      },
+      {
+        name: 'two marks of one id read from a file stay as written',
+        given:
+          '<span class="sesame" id="o">a</span>x<span class="sesame" id="o">b</span>',
       },
       {
         name: 'a mark split in two keeps its id once',

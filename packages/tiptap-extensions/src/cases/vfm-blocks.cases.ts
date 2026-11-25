@@ -12,6 +12,7 @@ import type { CaseSuite } from '../testing/vitest';
 // The definitions this set of syntax added to those the inline syntax came
 // with: a document recorded without them was made before.
 const BLOCK_NOTATIONS = new Set([
+  'paragraphContinuation',
   'headingAttributes',
   'sectionEnd',
   'tableOfContents',
@@ -87,12 +88,73 @@ function refused(label: string, apply: (editor: Editor) => boolean): Step {
   });
 }
 
-const NEXT_LINE_ONLY =
-  'VFM 2 drops `{…}` on the line after a heading that has attributes on its own line; the editor keeps it a paragraph';
-const SHORTCODE_TEXT =
-  'VFM 2 reads a shortcode that text follows on its line, and the text as a paragraph after it; the editor only reads one alone on its line';
+const SHORTCODE_LINES =
+  'VFM 2 reads a shortcode up to `]]` on a later line too; the editor only reads one on a line';
 
 export const vfmBlockSuites: CaseSuite[] = [
+  {
+    title: 'VFM paragraphs',
+    cases: [
+      {
+        name: 'an ATX heading right after a paragraph is more of its lines',
+        given: 'text\n# H\n{#id} more',
+        doc: 'doc(paragraph("text\\n", rawInline("# H"), "\\n{#id} more"))',
+      },
+      {
+        name: 'after a blank line it is a heading',
+        given: 'text\n\n# H',
+        doc: 'doc(paragraph("text"), heading("H"))',
+      },
+      {
+        name: 'lazily in a quote, a list item or a note',
+        given: '> a\n# H\n\n- b\n#\n\n[^1]: c\n## d',
+        doc: 'doc(blockquote(paragraph("a\\n", rawInline("# H"))), bulletList(listItem(paragraph("b\\n", rawInline("#")))), footnoteDefinition(paragraph("c\\n", rawInline("## d"))))',
+      },
+      {
+        name: 'a setext heading of more lines is a paragraph',
+        given: 'a\nb\n===\nc',
+        doc: 'doc(paragraph("a\\nb\\n", rawInline("==="), "\\nc"))',
+      },
+      {
+        name: 'one with a thematic break under it is a paragraph before it',
+        given: 'a\nb\n---',
+        doc: 'doc(paragraph("a\\nb"), horizontalRule)',
+      },
+      {
+        name: 'display math with a line of an equals sign',
+        given: '$$\na\n=\nb$$',
+        doc: 'doc(paragraph("$$\\na\\n", rawInline("="), "\\nb$$"))',
+      },
+      {
+        name: 'a setext heading of one line stays one',
+        given: 'a\n===',
+        doc: 'doc(heading("a"))',
+      },
+      {
+        name: 'fenced code right after a paragraph',
+        given: 'text\n```\nx\n```',
+        doc: 'doc(paragraph("text\\n", rawInline("```\\nx\\n```")))',
+        fails:
+          'VFM 2 reads fenced code right after a paragraph as more of its lines, where a code span can take it; the editor keeps the code block, as lines of raw markdown in a paragraph would not survive editing',
+      },
+      {
+        name: 'editing the paragraph',
+        given: 'text‸\n# H',
+        steps: ['X'],
+        expect: 'textX‸\n# H',
+      },
+      {
+        name: 'a heading made of lines is written on one',
+        given: 'a\nb‸',
+        steps: [
+          command('make a heading', (editor) =>
+            editor.commands.setNode('heading', { level: 2 }),
+          ),
+        ],
+        expect: '## a<br>b‸',
+      },
+    ],
+  },
   {
     title: 'VFM heading attributes',
     cases: [
@@ -223,10 +285,83 @@ export const vfmBlockSuites: CaseSuite[] = [
         json: [{ type: 'heading', attrs: { attributes: { id: 'はじめに' } } }],
       },
       {
-        name: 'on the next line after attributes of its own',
+        name: 'on the next line after attributes of its own, dropped as in VFM',
         given: '# H1 {.a}\n{.b}',
         doc: 'doc(heading("H1"))',
-        fails: NEXT_LINE_ONLY,
+        json: [{ type: 'heading', attrs: { attributes: { class: 'a' } } }],
+      },
+      ...[
+        ['after an escape', '# C\\# {#cs}', 'doc(heading("C# {#cs}"))'],
+        [
+          'after an escaped backslash',
+          '# a\\\\ {#id}',
+          'doc(heading("a\\\\ {#id}"))',
+        ],
+        ['after a reference', '# a &copy;{#id}', 'doc(heading("a ©{#id}"))'],
+        [
+          'after brackets',
+          '# 参考 [1] {#refs}',
+          'doc(heading("参考 [1] {#refs}"))',
+        ],
+        ['with an escape in them', '# H {title="a\\"b"}'],
+        [
+          'with a reference in them',
+          '# H {title=a&amp;b}',
+          'doc(heading("H {title=a&b}"))',
+        ],
+      ].map(([what, given, doc]) => ({
+        name: `${what} they are text, as in VFM`,
+        given: given ?? '',
+        doc,
+        json: [{ type: 'heading', attrs: { attributes: null } }],
+      })),
+      {
+        name: 'after text that follows an escape or brackets',
+        given: '# a\\*b {#x}\n\n# a [b]c {#y}\n\n# a [[b]] {#z}',
+        json: [
+          { type: 'heading', attrs: { attributes: { id: 'x' } } },
+          { type: 'heading', attrs: { attributes: { id: 'y' } } },
+          { type: 'heading', attrs: { attributes: { id: 'z' } } },
+        ],
+      },
+      {
+        name: 'the last braces only',
+        given: '# a {#x title="{"}',
+        doc: 'doc(heading("a {#x title=\\""))',
+      },
+      {
+        name: 'on the next line, read as written',
+        given: '# C\\#\n{title=a&amp;b}',
+        doc: 'doc(heading("C#"))',
+        json: [
+          { type: 'heading', attrs: { attributes: { title: 'a&amp;b' } } },
+        ],
+      },
+      {
+        name: 'on the next line with text after them',
+        given: '# H\n{#id} x',
+        doc: 'doc(heading("H"), paragraph(" x"))',
+        json: [{ type: 'heading', attrs: { attributes: { id: 'id' } } }, {}],
+      },
+      {
+        name: 'on the next line in a quote, before more lines',
+        given: '> # H\n> {#id}\n> body',
+        doc: 'doc(blockquote(heading("H"), paragraph("body")))',
+      },
+      {
+        name: 'on the next line in an item whose marker is alone, they are text',
+        given: '-\n  # H\n  {#z}',
+        doc: 'doc(bulletList(listItem(paragraph, heading("H"), paragraph("{#z}"))))',
+      },
+      {
+        name: 'on the next line, the closing sequence opens a section all the same',
+        given: '# H #\n{#id}',
+        json: [
+          {
+            type: 'heading',
+            attrs: { closingSequence: null, attributes: { id: 'id' } },
+          },
+        ],
       },
       {
         name: 'editing the text keeps them',
@@ -259,6 +394,83 @@ export const vfmBlockSuites: CaseSuite[] = [
           ),
         ],
         expect: '# 見出し *強調*\n{#a}',
+      },
+      ...[
+        ['brackets', '# a [b]‸', { id: 'z' }, '# a [b]\n{#z}'],
+        ['a bare reference', '# a &copy‸', { id: 'z' }, '# a &copy\n{#z}'],
+        ['an escaped character', '# a\\*‸', { id: 'x' }, '# a\\*\n{#x}'],
+        ['', '# H‸', { title: 'a"b' }, '# H\n{title="a\\"b"}'],
+        ['', '# H‸', { title: 'a&amp;b' }, '# H\n{title=a&amp;b}'],
+        ['', '# H‸', { title: '[x]' }, '# H\n{title=[x]}'],
+      ].map(([what, given, attributes, expect]) => ({
+        name: what
+          ? `setting them after ${what} puts them on the next line`
+          : `setting ${JSON.stringify(attributes)} puts them on the next line`,
+        given: String(given),
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes(
+              attributes as Record<string, string>,
+            ),
+          ),
+        ],
+        expect: String(expect),
+      })),
+      {
+        name: 'setting them after an ampersand',
+        given: '# Q&‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '# Q& {#x}',
+      },
+      {
+        name: 'setting them on the first heading of an item',
+        given: '- # *H*‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'z' }),
+          ),
+        ],
+        expect: '- # *H*\n  {#z}',
+      },
+      {
+        name: 'setting them before a closing sequence',
+        given: '## D‸ ##',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '## D {#x} ##',
+      },
+      {
+        name: 'none that would have to go on the next line of a heading with a closing sequence',
+        given: '## *D*‸ ##',
+        steps: [
+          refused('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '## *D* ##',
+      },
+      {
+        name: 'taking away those on the next line keeps the heading ATX',
+        given: '# H‸\n{#id}\ntext',
+        steps: [
+          command('take the attributes away', (editor) =>
+            editor.commands.setHeadingAttributes(null),
+          ),
+        ],
+        expect: '# H\ntext',
+      },
+      {
+        name: 'editing another heading keeps headings ATX',
+        given: '# A\n{#a}\n\n# B‸',
+        steps: ['X'],
+        expect: '# A\n{#a}\n\n# BX‸',
       },
       {
         name: 'changing them keeps where they are written',
@@ -427,6 +639,46 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a", footnoteReference, "\\ntext\\n", rawInline("[^1]: def")))',
       },
       {
+        name: 'one right after another is a definition of its own',
+        given: '本文[^1]と[^2]。\n\n[^1]: 注一\n[^2]: 注二',
+        doc: 'doc(paragraph("本文", footnoteReference, "と", footnoteReference, "。"), footnoteDefinition(paragraph("注一")), footnoteDefinition(paragraph("注二")))',
+      },
+      {
+        name: 'one right after another’s list',
+        given: '[^1]:\n    - x\n[^2]: two',
+        doc: 'doc(footnoteDefinition(bulletList(listItem(paragraph("x")))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'one right after another in a quote',
+        given: '> [^1]: one\n[^2]: two',
+        doc: 'doc(blockquote(footnoteDefinition(paragraph("one"))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'one right after another in a list item',
+        given: '- [^1]: one‸\n[^2]: two',
+        steps: ['X'],
+        expect: '- [^1]: oneX‸\n[^2]: two',
+        doc: 'doc(bulletList(listItem(paragraph, footnoteDefinition(paragraph("oneX")))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'a thematic break right after one',
+        given: 'a[^1]\n\n[^1]: one\n---',
+        doc: 'doc(paragraph("a", footnoteReference), heading("[^1]: one"))',
+        fails:
+          'VFM 2 reads the line of the definition and the break under it as a setext heading, as it tries one before a definition; micromark reads the definition and a thematic break',
+      },
+      {
+        name: 'one indented into another is more of its lines',
+        given: '[^1]: one\n    [^2]: two',
+        doc: 'doc(footnoteDefinition(paragraph("one\\n", rawInline("[^2]: two"))))',
+      },
+      {
+        name: 'editing one right before another',
+        given: '本文[^1]と[^2]。\n\n[^1]: ‸注一\n[^2]: 注二',
+        steps: ['X'],
+        expect: '本文[^1]と[^2]。\n\n[^1]: X‸注一\n[^2]: 注二',
+      },
+      {
         name: 'one of paragraphs interrupting a paragraph is kept as written',
         given: 'a\n[^1]: x\n\n    b',
         doc: 'doc(paragraph("a"), rawBlock("[^1]: x\\n\\n    b"))',
@@ -564,10 +816,50 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(paragraph("[[toc]]"))',
       },
       {
-        name: 'text after it on its line',
-        given: '[[toc]] text',
-        doc: 'doc(tableOfContents, paragraph(" text"))',
-        fails: SHORTCODE_TEXT,
+        name: 'text after it on its line is a paragraph',
+        given: '[[toc]] text *em*',
+        doc: 'doc(tableOfContents, paragraph("text ", italic("em")))',
+      },
+      {
+        name: 'text after another shortcode, which VFM removes',
+        given: '[[注]] は本文\n\n> [[foo]] x',
+        doc: 'doc(rawBlock("[[注]]"), paragraph("は本文"), blockquote(rawBlock("[[foo]]"), paragraph("x")))',
+      },
+      {
+        name: 'a blank one is text',
+        given: '[[ ]]\n\n[[]]',
+        doc: 'doc(paragraph("[[ ]]"), paragraph("[[]]"))',
+      },
+      {
+        name: 'one that ends on a later line',
+        given: '[[foo\nbar]] c',
+        doc: 'doc(rawBlock("[[foo\\nbar]]"), paragraph("c"))',
+        fails: SHORTCODE_LINES,
+      },
+      {
+        name: 'a link around a reference that starts a paragraph is no shortcode',
+        given: 'a‸[[^1]](u)',
+        steps: [press('Backspace')],
+        expect: '[[^1]{}](u)',
+        doc: 'doc(paragraph(link(footnoteReference)))',
+      },
+      {
+        name: 'editing the text after it',
+        given: '[[toc]] text‸',
+        steps: ['X'],
+        expect: '[[toc]] textX‸',
+      },
+      {
+        name: 'text typed as one with text after it is escaped',
+        given: '‸',
+        steps: [insert('[[toc]] text')],
+        expect: '\\[[toc]\\] text‸',
+      },
+      {
+        name: 'text typed as another with text after it is escaped',
+        given: '‸',
+        steps: [insert('[[注]] は本文')],
+        expect: '\\[[注]\\] は本文‸',
       },
       {
         name: 'typed alone in a paragraph',
@@ -664,6 +956,24 @@ export const vfmBlockSuites: CaseSuite[] = [
             content: [{ type: 'listItem', attrs: { checked: null } }],
           },
         ],
+      },
+      {
+        name: 'a checkbox that ends its line is text, as in VFM',
+        given: '- [x]\n  text\n- [ ]\n  b',
+        doc: 'doc(bulletList(listItem(paragraph(rawInline("[x]"), "\\ntext")), listItem(paragraph(rawInline("[ ]"), "\\nb"))))',
+      },
+      {
+        name: 'editing the text after a checkbox that ends its line',
+        given: '- [x]\n  text‸',
+        steps: ['X'],
+        expect: '- [x]\n  textX‸',
+      },
+      {
+        name: 'a heading after the checkbox',
+        given: '- [x] # h',
+        doc: 'doc(bulletList(listItem(paragraph, heading("h"))))',
+        fails:
+          'VFM 2 reads a block after the checkbox; micromark reads the rest of the line as text',
       },
       {
         name: 'a quote after the checkbox',
@@ -807,6 +1117,93 @@ export const vfmBlockSuites: CaseSuite[] = [
         ],
       },
       {
+        name: 'whitespace around an image keeps it in its paragraph, as in VFM',
+        given: '![a](a.png) \n\n ![b](b.png)\n\n> ![c](c.png) ',
+        doc: 'doc(paragraph(inlineImage), paragraph(inlineImage), blockquote(paragraph(inlineImage)))',
+      },
+      {
+        name: 'a comment after an image',
+        given: '![a](a.png)<!-- c -->',
+        doc: 'doc(image)',
+        fails:
+          'VFM makes a figure of an image with comments alone around it in its paragraph; the editor keeps the paragraph, which holds the comments',
+      },
+      {
+        name: 'an image left alone in its paragraph by another client',
+        given: '前 ‸![a](x.png)',
+        steps: [
+          run('delete the text before it as another client', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr
+                .delete(1, editor.state.selection.from)
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect: '![a](x.png) ',
+        doc: 'doc(paragraph(inlineImage))',
+      },
+      ...(
+        [
+          ['an image in text', 'a ‸![i](i.png)‸ b', 'code', 'a ![i](i.png) b'],
+          ['a reference', 'a ‸[^1]‸ b', 'code', 'a [^1] b'],
+          ['math', 'a ‸$x$‸ b', 'code', 'a $x$ b'],
+          ['math', 'a ‸$x$‸ b', 'link', 'a $x$ b'],
+        ] as const
+      ).map(([what, given, mark, expect]) => ({
+        name: `${what} that another client put ${mark === 'code' ? 'code' : 'a link'} on`,
+        given,
+        steps: [
+          run(`put ${mark} on it as another client`, (editor) => {
+            const { from, to } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr
+                .addMark(
+                  from,
+                  to,
+                  editor.schema.marks[mark].create(
+                    mark === 'link' ? { href: 'u' } : null,
+                  ),
+                )
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect,
+        ...(mark === 'link' && {
+          fails:
+            'VFM reads no math in the text of a link, and the writer does not write the math apart from the link around it, so the save is refused',
+        }),
+      })),
+      {
+        name: 'a ruby whose base another client emptied',
+        given: 'a {‸漢‸|かん} b',
+        steps: [
+          run('empty the base as another client', (editor) => {
+            const { from, to } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr
+                .delete(from, to)
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect: 'a  b',
+        fails:
+          'A ruby without a base has no markdown, and only this client takes one away, so the save is refused',
+      },
+      {
+        name: 'editing an image in a paragraph of its own',
+        given: '![a](a.png) \n\nx‸',
+        steps: [
+          selectNode('inlineImage'),
+          run('change the alt text', (editor) => {
+            editor.commands.updateAttributes('inlineImage', { alt: 'b' });
+          }),
+        ],
+        expect: '![b](a.png) \n\nx',
+      },
+      {
         name: 'an image in a link',
         given: '[![cap](a.png)](u)',
         json: [
@@ -862,6 +1259,28 @@ export const vfmBlockSuites: CaseSuite[] = [
           }),
         ],
         expect: '![新しい \\[図\\] \\\\](a.png)\n\n本文',
+      },
+      {
+        name: 'emptying the caption',
+        given: '![旧](a.png){#fig}\n\n本文‸',
+        steps: [
+          selectNode('image'),
+          run('empty the caption', (editor) => {
+            editor.commands.updateAttributes('image', { alt: '' });
+          }),
+        ],
+        expect: '![](a.png){#fig}\n\n本文',
+      },
+      {
+        name: 'emptying the alt text of an image in text',
+        given: 'a ![旧](a.png) b‸',
+        steps: [
+          selectNode('inlineImage'),
+          run('empty the alt text', (editor) => {
+            editor.commands.updateAttributes('inlineImage', { alt: '' });
+          }),
+        ],
+        expect: 'a ![](a.png) b',
       },
       {
         name: 'changing the caption keeps the attributes',
@@ -1028,7 +1447,7 @@ export const vfmBlockSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a"), paragraph("[[toc]]"))',
       },
       {
-        name: 'a definition is its content',
+        name: 'a definition is its markdown, raw',
         given: 'a‸',
         steps: [
           recordInlineEra,
@@ -1042,10 +1461,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a\n\n注',
+        expect: 'a\n\n[^1]: 注',
+        doc: 'doc(paragraph("a"), rawBlock("[^1]: 注"))',
       },
       {
-        name: 'a line that ends a section is hashes as text',
+        name: 'a line that ends a section is an empty heading',
         given: 'a‸',
         steps: [
           recordInlineEra,
@@ -1056,10 +1476,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a\n\n\\#\\#',
+        expect: 'a\n\n##',
+        doc: 'doc(paragraph("a"), heading)',
       },
       {
-        name: 'a heading loses its attributes',
+        name: 'a heading keeps its attributes as text',
         given: 'a‸',
         steps: [
           recordInlineEra,
@@ -1071,10 +1492,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a\n\n## H',
+        expect: 'a\n\n## H {#x}',
+        doc: 'doc(paragraph("a"), heading("H {#x}"))',
       },
       {
-        name: 'a task is an item',
+        name: 'a task keeps its checkbox, raw',
         given: '- a‸',
         steps: [
           recordInlineEra,
@@ -1087,10 +1509,11 @@ export const vfmBlockSuites: CaseSuite[] = [
             );
           }),
         ],
-        expect: '- a',
+        expect: '- [x] a',
+        doc: 'doc(bulletList(listItem(paragraph(rawInline("[x] "), "a"))))',
       },
       {
-        name: 'an image in text is its markdown as text',
+        name: 'an image in text is its markdown, raw',
         given: 'a ‸b',
         steps: [
           recordInlineEra,
@@ -1101,7 +1524,8 @@ export const vfmBlockSuites: CaseSuite[] = [
             });
           }),
         ],
-        expect: 'a !\\[i](i.png\\)‸b',
+        expect: 'a ![i](i.png)‸b',
+        doc: 'doc(paragraph("a ", rawInline("![i](i.png)"), "b"))',
       },
     ],
   },

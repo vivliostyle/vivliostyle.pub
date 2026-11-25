@@ -674,7 +674,12 @@ export const inlineAttributesNotation = defineNotation({
       decorates: true,
       write: (node, _, next) => next() + written(node),
     },
-    footnoteReference: (node, _, next) => next() + written(node),
+    // `{}` keeps a reference in a link at the start of a line, as in
+    // `[[^1]{}](u)`, from closing the `[[…]]` that VFM removes as a shortcode.
+    footnoteReference: (node, context, next) =>
+      next() +
+      (written(node) ||
+        (`${context.lineBefore ?? ''}[`.startsWith('[[') ? '{}' : '')),
   },
   marks: Object.fromEntries(
     Object.values(ATTRIBUTED_MARKS).map((name) => [name, decorate]),
