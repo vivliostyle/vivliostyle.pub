@@ -815,7 +815,7 @@ describe('declared HTML elements', () => {
       otherAttributes: { class: 'x', title: 't' },
     });
     appendTo(editor, '二', '!');
-    expect(getMarkdown(editor)).toBe(markdown.replace('\n', '!\n'));
+    expect(getMarkdown(editor)).toBe(markdown.replace(/\n$/, '!\n'));
     expect(getMarkdown(editor, { baseline: '' })).toBe(
       'a<span class="remark x" title="t">注 *強調*</span><span class="remark">二</span>!',
     );
