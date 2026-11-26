@@ -795,6 +795,9 @@ importers:
       '@types/mdast':
         specifier: 4.0.4
         version: 4.0.4
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.8.0
       '@types/refractor':
         specifier: 3.4.1
         version: 3.4.1

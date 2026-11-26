@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vivliostyle.pub/schemas/editor-bug-hunt.json",
+  "title": "Editor bug hunt: probes and findings",
+  "description": "The formats the editor bug-hunt harness reads and writes. A probe is replayed by `pnpm bug-hunt run`; a finding is a probe plus the claim about it, replayed by `pnpm bug-hunt verify`.",
+  "oneOf": [
+    { "$ref": "#/$defs/finding" },
+    { "$ref": "#/$defs/probe" },
+    { "type": "array", "items": { "$ref": "#/$defs/probe" } }
+  ],
+  "$defs": {
+    "oracle": {
+      "description": "What the harness checks. All but `expectation` and `hang` are computed from the probe alone; `expectation` compares with the expected markdown; `hang` is only reported by `run --timeout`.",
+      "enum": [
+        "step-threw",
+        "invalid-document",
+        "save-refused",
+        "read-back",
+        "judge",
+        "baseline-given-up",
+        "locality",
+        "unstable-save",
+        "properties",
+        "unsafe-dom",
+        "expectation",
+        "hang"
+      ]
+    },
+    "step": {
+      "description": "One thing done to the editor. A bare string is typed character by character.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "required": ["kind", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "type" },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "key"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "press" },
+            "key": {
+              "type": "string",
+              "description": "TipTap shortcut notation: `Enter`, `Shift-Tab`, `Mod-b`, `Backspace`. Caret keys (arrows, Home, End) are unsupported headless."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "command" },
+            "name": {
+              "type": "string",
+              "description": "An `editor.commands` name; `pnpm bug-hunt commands` lists them."
+            },
+            "args": { "type": "array" },
+            "returns": {
+              "type": "boolean",
+              "description": "What the command should return; a different result is an `expectation` violation."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "anchor"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "select" },
+            "anchor": { "type": "integer", "minimum": 0 },
+            "head": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "node"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "select" },
+            "node": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Position before the node to select as a NodeSelection."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "all"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "select" },
+            "all": { "const": true }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "select" },
+            "text": {
+              "type": "string",
+              "description": "Text inside a single text node."
+            },
+            "nth": { "type": "integer", "minimum": 0 },
+            "at": { "enum": ["start", "end", "range"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "pasteText" },
+            "text": {
+              "type": "string",
+              "description": "Inserted over the selection as a pasted transaction, so paste rules run. Not the browser's clipboard parsing."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "content"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "pasteContent" },
+            "content": {
+              "type": "array",
+              "description": "ProseMirror JSON nodes, as pasted HTML would become; replaces the selection as a pasted transaction."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": ["save", "reload"],
+              "description": "`save` saves as the app does and makes the result the baseline; `reload` reopens the last saved file."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "without"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "recordNotations" },
+            "without": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Notation names (from `pnpm bug-hunt notations`, without `@version`) the document is recorded as made without."
+            }
+          }
+        }
+      ]
+    },
+    "probe": {
+      "type": "object",
+      "required": ["given"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "given": {
+          "type": "string",
+          "description": "The file's markdown when the editor opens it. `‸` (U+2038) marks the caret, two of them a range. Without a mark the selection is at the start."
+        },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+        "expect": {
+          "type": "string",
+          "description": "The markdown the final save should be; `‸` marks also check the selection. Leave it out of a finding's probe: there `expected.markdown` is the expectation."
+        },
+        "expectDoc": {
+          "type": "string",
+          "description": "The document after the steps as ProseMirror prints it: `doc(paragraph(\"a\"))`."
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "history": {
+              "type": "boolean",
+              "description": "Adds undo history (the app's comes from Yjs, so undo bugs found this way need confirming in the app)."
+            },
+            "properties": {
+              "type": "boolean",
+              "description": "Also checks the saving guarantees (identity, locality, round trip) on `given` and on the final save. Slow."
+            }
+          }
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "id",
+        "title",
+        "oracle",
+        "severity",
+        "category",
+        "probe",
+        "expected",
+        "confidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "vivliostyle-pub/editor-finding@1" },
+        "id": {
+          "type": "string",
+          "pattern": "^F-[A-Za-z0-9-]+$",
+          "description": "Unique and stable; also the file name: `<id>.json`."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 140,
+          "description": "One English sentence saying what goes wrong, in the user's terms. It becomes the name of the editor case."
+        },
+        "oracle": {
+          "$ref": "#/$defs/oracle",
+          "description": "The violation that shows the bug; `verify` requires the replay to report it."
+        },
+        "severity": {
+          "enum": [
+            "data-loss",
+            "corruption",
+            "crash",
+            "save-blocked",
+            "security",
+            "wrong-result",
+            "minor"
+          ]
+        },
+        "category": {
+          "enum": [
+            "typing",
+            "input-rule",
+            "keymap",
+            "command",
+            "paste-rule",
+            "selection",
+            "undo",
+            "parse",
+            "serialize",
+            "plugin",
+            "notation-record",
+            "html-element",
+            "dom",
+            "other"
+          ]
+        },
+        "probe": {
+          "allOf": [
+            { "$ref": "#/$defs/probe" },
+            { "not": { "required": ["expect"] } }
+          ],
+          "description": "Minimized: no step, block or character can be removed with the oracle still firing."
+        },
+        "expected": {
+          "type": "object",
+          "required": ["markdown", "rationale"],
+          "additionalProperties": false,
+          "properties": {
+            "markdown": {
+              "type": "string",
+              "description": "What the final save should be, with `‸` marks if the selection matters."
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why that is right: which guarantee of the agent guide or which VFM reading it follows."
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["kind"],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "vfm-render",
+                      "harness-verdict",
+                      "case",
+                      "spec",
+                      "other"
+                    ]
+                  }
+                }
+              },
+              "description": "E.g. `{ kind: 'vfm-render', markdown, html }` from the verdict's `html.vfm`, or an existing case that the finding contradicts."
+            }
+          }
+        },
+        "area": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "notations": { "type": "array", "items": { "type": "string" } },
+            "files": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "knownLimitation": {
+          "description": "The `fails` reason of an existing case this is an instance of, or null. Known limitations are still reported, but triaged last.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["file", "reason"],
+              "additionalProperties": false,
+              "properties": {
+                "file": { "type": "string" },
+                "reason": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "hypothesis": {
+          "type": "string",
+          "description": "Suspected cause, phrased as the `fails` reason of a case. Optional."
+        },
+        "related": { "type": "array", "items": { "type": "string" } },
+        "found": {
+          "type": "object",
+          "description": "Provenance: agent name and model, commit, harness version, the probe's fingerprint."
+        }
+      }
+    },
+    "report": {
+      "description": "What `pnpm bug-hunt verify` writes.",
+      "type": "object",
+      "required": ["schema", "harnessVersion", "generatedAt", "findings"],
+      "properties": {
+        "schema": { "const": "vivliostyle-pub/editor-bug-report@1" },
+        "harnessVersion": { "type": "integer" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "valid"],
+            "properties": {
+              "file": { "type": "string" },
+              "id": { "type": "string" },
+              "valid": { "type": "boolean" },
+              "problems": { "type": "array", "items": { "type": "string" } },
+              "state": {
+                "enum": ["reproduced", "fixed", "changed"],
+                "description": "`fixed`: nothing fires any more; `changed`: other violations fire instead of the claimed one."
+              },
+              "oracles": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/oracle" }
+              },
+              "fingerprint": { "type": "string" },
+              "duplicateOf": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

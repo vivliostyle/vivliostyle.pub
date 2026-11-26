@@ -120,7 +120,7 @@ function invalidDocument(label: string, check: () => void): Mismatch[] {
   }
 }
 
-function loadSelectingMarks(editor: Editor, given: string): void {
+export function loadSelectingMarks(editor: Editor, given: string): void {
   const marks = countSelectionMarks(given);
   if (marks === 0) {
     loadMarkdown(editor, given);

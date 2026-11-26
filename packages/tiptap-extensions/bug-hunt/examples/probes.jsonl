@@ -1,0 +1,5 @@
+{"id":"metamorphic-type-then-backspace","given":"これは「**重要**」です‸。\n","steps":["X",{"kind":"press","key":"Backspace"}],"expect":"これは「**重要**」です‸。\n"}
+{"id":"input-rule-next-to-cjk","given":"「‸」\n","steps":["**太字**"],"expect":"「**太字**‸」\n"}
+{"id":"save-reload-save","given":"# 見出し {#a}\n\n本文‸\n","steps":["と{漢字|かんじ}",{"kind":"save"},{"kind":"reload"},{"kind":"select","text":"本文","at":"end"},"$x$"]}
+{"id":"command-on-range","given":"a ‸b c‸ d\n","steps":[{"kind":"command","name":"setRuby","args":["るび"]}]}
+{"id":"recorded-without-ruby","given":"a‸\n","steps":[{"kind":"recordNotations","without":["ruby"]},"{漢字|かんじ}"]}
