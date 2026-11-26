@@ -1,6 +1,23 @@
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import {
+  appendFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
 
+import {
+  CORPORA,
+  type Corpus,
+  generateProbe,
+  groupOf,
+  parseDuration,
+} from './fuzz';
 import {
   HARNESS_VERSION,
   listCommands,
@@ -70,7 +87,20 @@ interface Flags {
   switches: Set<string>;
 }
 
-const VALUE_FLAGS = new Set(['--oracle', '--budget', '--out', '--timeout']);
+const VALUE_FLAGS = new Set([
+  '--oracle',
+  '--budget',
+  '--out',
+  '--timeout',
+  '--duration',
+  '--seed',
+  '--per-group',
+  '--corpus',
+  '--steps',
+  '--start',
+  '--deadline',
+  '--max',
+]);
 
 function parseFlags(argv: readonly string[]): Flags {
   const flags: Flags = {
@@ -368,6 +398,250 @@ function toCase(flags: Flags): number {
   return 0;
 }
 
+function numberFlag(flags: Flags, name: string, fallback: number): number {
+  const value = flags.values.get(name);
+  if (value === undefined) {
+    return fallback;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    throw new Error(`${name} takes a number, not ${JSON.stringify(value)}`);
+  }
+  return number;
+}
+
+function corpusFlag(flags: Flags): Corpus {
+  const corpus = flags.values.get('--corpus') ?? 'all';
+  if (!CORPORA.includes(corpus as Corpus)) {
+    throw new Error(`--corpus is one of ${CORPORA.join(', ')}`);
+  }
+  return corpus as Corpus;
+}
+
+/** Runs generated probes until the deadline, one JSON line per event. */
+async function fuzzWorker(flags: Flags): Promise<number> {
+  const options = {
+    seed: numberFlag(flags, '--seed', 1),
+    corpus: corpusFlag(flags),
+    steps: numberFlag(flags, '--steps', 4),
+    properties: flags.switches.has('--properties'),
+  };
+  const deadline = numberFlag(flags, '--deadline', Date.now() + 60_000);
+  const max = numberFlag(flags, '--max', Number.POSITIVE_INFINITY);
+  for (
+    let index = numberFlag(flags, '--start', 0);
+    index < max && Date.now() < deadline;
+    index++
+  ) {
+    // Written before the probe runs, so a probe that never returns is known.
+    // A caret mark in the middle of syntax changes how it parses, which
+    // says nothing about the editor: put it somewhere else.
+    const attempt = async (probe: Probe) => {
+      process.stdout.write(
+        `${JSON.stringify({ type: 'start', index, probe })}\n`,
+      );
+      return runProbe(probe);
+    };
+    let probe = generateProbe(index, options);
+    let verdict = await attempt(probe);
+    for (
+      let retry = 1;
+      retry < 8 &&
+      verdict.status === 'invalid-probe' &&
+      verdict.error?.includes('‸');
+      retry++
+    ) {
+      probe = generateProbe(index, options, retry);
+      verdict = await attempt(probe);
+    }
+    process.stdout.write(
+      `${JSON.stringify({ type: 'result', index, probe, verdict })}\n`,
+    );
+  }
+  return 0;
+}
+
+interface FuzzEvent {
+  type: 'start' | 'result';
+  index: number;
+  probe?: Probe;
+  verdict?: Verdict;
+}
+
+/**
+ * Fuzzes for a while in a child process, restarting it past any probe that
+ * outlives the timeout, and appends each new kind of violation to a JSONL
+ * file: the probe, its verdict and, with `--minimize`, a shrunk probe.
+ */
+async function fuzz(flags: Flags): Promise<number> {
+  const seed = numberFlag(flags, '--seed', Date.now() % 1_000_000_000);
+  const corpus = corpusFlag(flags);
+  const steps = numberFlag(flags, '--steps', 4);
+  const properties = flags.switches.has('--properties');
+  const timeout = numberFlag(flags, '--timeout', 20_000);
+  const perGroup = numberFlag(flags, '--per-group', 3);
+  const max = numberFlag(flags, '--max', Number.POSITIVE_INFINITY);
+  const deadline =
+    Date.now() + parseDuration(flags.values.get('--duration') ?? '10m');
+  const out = flags.values.get('--out') ?? `bug-hunt/work/fuzz-${seed}.jsonl`;
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, '');
+  const bin = fileURLToPath(new URL('./bin.mjs', import.meta.url));
+
+  const statuses = new Map<string, number>();
+  const groups = new Map<string, number>();
+  let probes = 0;
+  const startedAt = Date.now();
+  const options = { seed, corpus, steps, properties };
+
+  const kept: Record<string, unknown>[] = [];
+  const record = (index: number, probe: Probe, verdict: Verdict) => {
+    probes++;
+    statuses.set(verdict.status, (statuses.get(verdict.status) ?? 0) + 1);
+    if (verdict.status !== 'violations') {
+      return;
+    }
+    const group = groupOf(verdict);
+    const seen = groups.get(group) ?? 0;
+    groups.set(group, seen + 1);
+    if (seen >= perGroup) {
+      return;
+    }
+    const entry: Record<string, unknown> = { group, probe, verdict };
+    kept.push(entry);
+    appendFileSync(out, `${JSON.stringify(entry)}\n`);
+    process.stderr.write(`[${new Date().toISOString()}] #${index} ${group}\n`);
+  };
+
+  let start = 0;
+  while (Date.now() < deadline && start < max) {
+    const child = spawn(
+      process.execPath,
+      [
+        bin,
+        'fuzz-worker',
+        '--seed',
+        String(seed),
+        '--start',
+        String(start),
+        '--deadline',
+        String(deadline),
+        '--corpus',
+        corpus,
+        '--steps',
+        String(steps),
+        ...(Number.isFinite(max) ? ['--max', String(max)] : []),
+        ...(properties ? ['--properties'] : []),
+      ],
+      { stdio: ['ignore', 'pipe', 'inherit'] },
+    );
+    let current = -1;
+    let running: Probe | undefined;
+    let since = Date.now();
+    let hung = false;
+    const watchdog = setInterval(() => {
+      if (current !== -1 && Date.now() - since > timeout) {
+        hung = true;
+        child.kill('SIGKILL');
+      }
+    }, 500);
+    for await (const line of createInterface({ input: child.stdout })) {
+      let event: FuzzEvent;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (event.type === 'start') {
+        current = event.index;
+        running = event.probe;
+        since = Date.now();
+      } else if (event.verdict) {
+        current = -1;
+        start = event.index + 1;
+        record(
+          event.index,
+          event.probe ?? generateProbe(event.index, options),
+          event.verdict,
+        );
+      }
+    }
+    const code: number | null = await new Promise((done) => {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        done(child.exitCode);
+      } else {
+        child.on('exit', (exit) => done(exit));
+      }
+    });
+    clearInterval(watchdog);
+    if (current !== -1) {
+      const probe = running ?? generateProbe(current, options);
+      const oracle = hung ? 'hang' : 'step-threw';
+      const detail = hung
+        ? `did not finish within ${timeout} ms`
+        : `the worker exited with ${code} while running it`;
+      record(current, probe, {
+        id: probe.id ?? null,
+        status: 'violations',
+        violations: [{ oracle, step: -1, detail }],
+        signals: [],
+        saved: null,
+        savedWithSelection: null,
+        doc: null,
+        strategy: null,
+        html: { editor: null, vfm: null },
+        trace: [],
+        oracles: [oracle],
+        fingerprint: '',
+        harnessVersion: HARNESS_VERSION,
+      });
+      start = current + 1;
+    } else if (code !== 0) {
+      throw new Error(`The fuzz worker exited with ${code}`);
+    }
+  }
+
+  // After the run, so that shrinking never holds up the watchdog. The file
+  // already holds every entry in case the run is stopped before this.
+  if (flags.switches.has('--minimize')) {
+    for (const entry of kept) {
+      const verdict = entry.verdict as Verdict;
+      const oracle = verdict.oracles.find(
+        (it) => it !== 'expectation' && it !== 'hang',
+      );
+      if (oracle) {
+        const { expect: _, ...probe } = entry.probe as Probe;
+        entry.minimized = (
+          await minimizeProbe(probe, { oracle, budget: 150 })
+        ).probe;
+      }
+    }
+    writeFileSync(
+      out,
+      kept.map((entry) => `${JSON.stringify(entry)}\n`).join(''),
+    );
+  }
+
+  const summary = {
+    seed,
+    corpus,
+    steps,
+    properties,
+    durationMs: Date.now() - startedAt,
+    probes,
+    next: start,
+    statuses: Object.fromEntries(statuses),
+    groups: Object.fromEntries([...groups].sort((a, b) => b[1] - a[1])),
+    out,
+  };
+  writeFileSync(
+    `${out.replace(/\.jsonl$/, '')}.summary.json`,
+    `${JSON.stringify(summary, null, 2)}\n`,
+  );
+  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  return 0;
+}
+
 const USAGE = `Usage: pnpm bug-hunt <command> [args]
 
   run [file|-] [--full] [--properties] [--out file] [--timeout ms]
@@ -378,6 +652,11 @@ const USAGE = `Usage: pnpm bug-hunt <command> [args]
       Replays findings (default bug-hunt/work/findings) into a report.
   case [file|-]
       Prints a finding as an editor behaviour case for tests/cases/.
+  fuzz [--duration 10m] [--seed n] [--corpus all|markdown|vfm|html]
+       [--steps n] [--timeout ms] [--per-group n] [--minimize] [--properties]
+       [--max n] [--out file.jsonl]
+      Runs generated probes for a while and appends each new kind of
+      violation to a JSONL file (bug-hunt/work/fuzz-<seed>.jsonl).
   commands | notations | oracles
       Lists what probes can name.
 `;
@@ -403,6 +682,10 @@ export async function main(argv: readonly string[]): Promise<number> {
     case 'oracles':
       output(ORACLES, flags);
       return 0;
+    case 'fuzz':
+      return fuzz(flags);
+    case 'fuzz-worker':
+      return fuzzWorker(flags);
     default:
       process.stderr.write(USAGE);
       return command ? 2 : 0;

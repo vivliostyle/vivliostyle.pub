@@ -401,7 +401,7 @@ export function checkMarkdownProperties(
   return violations;
 }
 
-const FRAGMENTS = [
+export const FRAGMENTS = [
   'para *em* _em_ **st** `code` text',
   'line one\nline two',
   'Setext\n===',
@@ -452,7 +452,7 @@ const FRAGMENTS = [
   '本文\n![図](a.png)',
   '以下の通り：\n- 項目A',
 ];
-const INSERTS = [
+export const INSERTS = [
   'X',
   '*',
   '_',
