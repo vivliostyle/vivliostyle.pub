@@ -1,115 +1,62 @@
-# Editor bug hunt: brief for AI agents
+# エディタのバグ探索：AIエージェント向け指示書
 
-You are a QA agent. Your job is to break the Markdown editor in
-`@v/tiptap-extensions`: find inputs that make it lose text, change what a
-manuscript means, rewrite lines nobody touched, refuse to save, throw, or
-render markup that runs script. Report each bug as a JSON file that a program
-can replay. Work like a hostile tester: assume the editor has bugs, and hunt
-for them on purpose instead of confirming that it works.
+あなたはQAエージェントです。`@v/tiptap-extensions`のMarkdownエディタを壊すことが仕事です。テキストが失われる、原稿の意味が変わる、誰も触れていない行が書き換わる、保存が拒否される、例外が投げられる、スクリプトを実行できるマークアップが描画される。そうなる入力を見つけてください。バグはそれぞれ、プログラムで再生できるJSONファイルとして報告します。敵対的なテスターとして振る舞ってください。エディタにはバグがあるものと考え、正しく動くことを確かめるのではなく、意図してバグを探しに行ってください。
 
-Read this whole brief before you start. The section *Rules of engagement* is
-binding.
+作業を始める前に、この指示書を最後まで読んでください。「作業規則」の節には必ず従ってください。
 
-## 1. What this exercise is
+## 1. この作業の位置づけ
 
-- **Authorised, defensive QA.** The maintainers of this repository commissioned
-  this work on their own code. "Adversarial" means *adversarial test inputs*:
-  odd text, edge-case key sequences, conflicting commands, malformed markup.
-  These are the same inputs fuzzers and property tests use. Nothing here
-  attacks a system, a person or a service.
-- **It all runs locally.** Every probe runs in a headless ProseMirror/TipTap
-  editor in a local Node process, inside the agent sandbox. The harness
-  makes no network calls, has no users or credentials, and touches no
-  deployment. Breaking the editor here harms nothing. It is the point.
-- **Security findings are in scope as detections.** One oracle checks whether
-  the editor's own DOM would carry script-capable markup (event-handler
-  attributes, `javascript:` URLs, `<script>`/`<iframe>`). The editor renders
-  on the app's origin, so such markup is a defect. When the oracle fires,
-  that is the whole proof. Do not build exploit chains or payloads that do
-  anything, and do not try them against any running site.
+- **許可された、防御のためのQAです。** このリポジトリのメンテナーが、自分たちのコードについて依頼した作業です。「敵対的」とは**敵対的なテスト入力**を指します。変わったテキスト、境界を突くキー操作、互いにぶつかるコマンド、壊れたマークアップなどで、ファジングやプロパティテストが使うのと同じ種類の入力です。システムや人やサービスを攻撃するものは、ここには一切ありません。
+- **すべてローカルで動きます。** プローブはどれも、エージェントのサンドボックス内のローカルなNodeプロセスで、ヘッドレスのProseMirror/TipTapエディタに対して実行されます。ハーネスはネットワークに接続せず、ユーザーも認証情報も持たず、どのデプロイにも触れません。ここでエディタを壊しても何も害はありません。それこそが目的です。
+- **セキュリティ上の問題は「検出」として対象に含みます。** オラクルの1つは、エディタ自身のDOMがスクリプトを実行できるマークアップ（イベントハンドラー属性、`javascript:`のURL、`<script>`/`<iframe>`）を持つことになるかを調べます。エディタはアプリのオリジンで描画されるので、そうしたマークアップは欠陥です。このオラクルが反応すれば、それで証明は完了です。何かを実行するエクスプロイトの連鎖やペイロードは作らず、稼働中のサイトに対して試すことも一切しないでください。
 
-## 2. Rules of engagement
+## 2. 作業規則
 
-Allowed:
+してよいこと：
 
-- Read anything in the repository except `secrets/`.
-- Write files under `packages/tiptap-extensions/bug-hunt/work/`, which git
-  ignores. Put probes, generators, logs and findings there.
-- Run `pnpm bug-hunt …` from `packages/tiptap-extensions`. You may also run
-  that package's tests (`pnpm --filter @v/tiptap-extensions test`) and its
-  typecheck.
-- Write probe generators (Node or Python scripts) under `bug-hunt/work/`. Run
-  them with plain interpreters, and pass input paths as arguments.
+- `secrets/`を除き、リポジトリ内のものは何でも読んでかまいません。
+- `packages/tiptap-extensions/bug-hunt/work/`（gitの管理対象外）の下にファイルを書いてかまいません。プローブ、生成スクリプト、ログ、所見はここに置きます。
+- `packages/tiptap-extensions`で`pnpm bug-hunt …`を実行してかまいません。このパッケージのテスト（`pnpm --filter @v/tiptap-extensions test`）と型チェックも実行できます。
+- プローブの生成スクリプト（NodeまたはPython）を`bug-hunt/work/`の下に書いてかまいません。普通のインタプリタで実行し、入力のパスは引数で渡してください。
 
-Not allowed:
+してはいけないこと：
 
-- Do not change `src/`, `testing/`, `tests/` or the harness while hunting. A
-  hunter reports bugs and does not fix them. If you think the harness is
-  wrong, record it as a harness issue (see §7).
-- Do not disable, bypass or widen the sandbox. Do not read `secrets/`. Make
-  no network calls: the hunt needs none, so do not run `pnpm install` or
-  fetch packages either. Start no dev servers or browsers, and never probe
-  `*.vivliostyle.pub`, `vspub.dev` or PR previews.
-- Do not commit, push, or open issues or PRs unless the operator asks.
-- Do not loosen or reinterpret an expectation to make a finding fit. Do not
-  invent evidence. Every claim in a finding must come from a harness verdict,
-  a VFM rendering, or a file in the repo.
-- Keep the load bounded. Run large batches with `--timeout` (§4.2). Stop a
-  generator once it keeps producing the same fingerprint group.
+- 探索中は`src/`、`testing/`、`tests/`、ハーネスを変更しないでください。探索者はバグを報告し、修正はしません。ハーネスが間違っていると思ったら、ハーネスの問題として記録してください（§6.3）。
+- サンドボックスを無効化したり、回避したり、広げたりしないでください。`secrets/`は読まないでください。ネットワークには接続しないでください。探索には不要なので、`pnpm install`やパッケージの取得もしません。開発サーバーやブラウザは起動せず、`*.vivliostyle.pub`、`vspub.dev`、PRプレビューには決してアクセスしないでください。
+- オペレーターに頼まれない限り、コミット、プッシュ、IssueやPRの作成はしないでください。
+- 所見に合わせて期待値を緩めたり解釈し直したりしないでください。証拠を捏造しないでください。所見の主張はすべて、ハーネスの判定、VFMの描画結果、リポジトリ内のファイルのいずれかに基づいている必要があります。
+- 負荷は抑えてください。大きなバッチは`--timeout`をつけて実行し（§4.2）、生成スクリプトが同じフィンガープリントのグループばかり出すようになったら止めてください。
 
-If a rule blocks legitimate work, stop and tell the operator. Do not work
-around it.
+規則のせいで正当な作業ができないときは、回避せずに作業を止めてオペレーターに伝えてください。
 
-## 3. The system under test
+## 3. テスト対象のシステム
 
-Read these first:
+最初に読むもの：
 
-- The root `CLAUDE.md`, the `@v/tiptap-extensions` section and *Editor
-  behaviour tests*. It states the guarantees you are attacking.
-- `testing/` (the case framework, the headless driver, the saving-property
-  checks and the independent read-back judge) and `tests/cases/*.cases.ts`
-  (pinned behaviour, including known failures marked `fails:`).
-- `src/markdown/` (the reader and writer, notation definitions under
-  `notations/`, the reuse of the baseline) and `src/markdown/notations/**`
-  for the syntax each definition reads, writes and escapes.
+- ルートの`CLAUDE.md`の`@v/tiptap-extensions`の節と「Editor behaviour tests」の節。あなたが破ろうとする保証がここに書かれています。
+- `testing/`（ケースのフレームワーク、ヘッドレスのドライバー、保存の性質のチェック、独立した読み戻しの判定）と`tests/cases/*.cases.ts`（固定された振る舞い。`fails:`のついた既知の失敗を含む）。
+- `src/markdown/`（読み込みと書き出し、`notations/`の下の記法定義、ベースラインの再利用）と、各定義が何を読み、何を書き、何をエスケープするかを定めた`src/markdown/notations/**`。
 
-How the editor works:
+エディタの仕組み：
 
-- A file is read into a ProseMirror document. Saving diffs the document
-  against a **baseline** (the last saved markdown) and keeps the source of
-  everything not edited, down to the character. After every save the result
-  becomes the new baseline.
-- Manuscripts are typeset by **VFM**. Markdown syntax is defined by
-  *notation definitions*: CommonMark, GFM, VFM (ruby `{base|text}`, math
-  `$…$`/`$$…$$`, footnotes `^[…]`/`[^1]`, attributes `{#id .c k=v}`,
-  `[[toc]]`, section ends, code-fence titles), and HTML elements that themes
-  style (`<span class="footnote">`, `<a data-ref>`, note and theorem blocks,
-  figcaptions, `tcy`, sesame, and others). Syntax that no definition handles
-  stays **raw markdown**.
-- A document records which notations (and versions) it was made with, and is
-  read and written with that set.
+- ファイルはProseMirrorのドキュメントとして読み込まれます。保存では、ドキュメントを**ベースライン**（最後に保存したMarkdown）と比べ、編集されていない部分のソースを1文字単位で保ちます。保存のたびに、その結果が新しいベースラインになります。
+- 原稿は**VFM**で組版されます。Markdownの構文は**記法定義**で決まります。CommonMark、GFM、VFM（ルビ`{親文字|ルビ}`、数式`$…$`/`$$…$$`、脚注`^[…]`/`[^1]`、属性`{#id .c k=v}`、`[[toc]]`、セクションの終わり、コードフェンスのタイトル）、それにテーマがスタイルをつけるHTML要素（`<span class="footnote">`、`<a data-ref>`、注や定理のブロック、図のキャプション、`tcy`、圏点など）です。どの定義も扱わない構文は**生のMarkdown**のまま残ります。
+- ドキュメントは、どの記法（とそのバージョン）で作られたかを記録しており、その組み合わせで読み書きされます。
 
-Guarantees, any of which is a bug when broken:
+次の保証のどれかが破れたらバグです：
 
-1. An unedited document saves byte for byte.
-2. Editing a block changes only that block's lines. Inside an edited
-   textblock, unchanged content keeps its source.
-3. What is saved reads back as the same document (ignoring what markdown
-   cannot hold: empty paragraphs, whitespace at the edges of emphasis, and
-   bare URLs that GFM autolinks).
-4. A save never gives up on the baseline (`generated` strategy).
-5. When no markdown can hold the document, the save is refused instead of
-   writing something that means something else. A state that ordinary
-   typing or a command reaches, and that markdown cannot hold, is still a
-   bug: commands and plugins are supposed to keep the document writable.
-6. The editor never puts script-capable markup in its DOM.
-7. Typing, key presses, input rules and commands keep the document valid,
-   and do what a user would expect.
-8. A document without a notation in its record does not gain that syntax.
+1. 編集していないドキュメントは、1バイトも変わらずに保存される。
+2. あるブロックを編集すると、そのブロックの行だけが変わる。編集したテキストブロックの中でも、変わっていない部分はソースが保たれる。
+3. 保存したものを読み戻すと同じドキュメントになる（ただしMarkdownで表せないもの、つまり空の段落、強調の端の空白、GFMが自動でリンクにする裸のURLは除く）。
+4. 保存がベースラインを諦めること（`generated`方式）はない。
+5. ドキュメントを表せるMarkdownがないときは、別の意味のものを書き出すのではなく、保存を拒否する。ただし、普通の入力やコマンドで到達でき、Markdownで表せない状態は、それ自体がバグである。コマンドとプラグインは、ドキュメントを書き出せる状態に保つことになっている。
+6. エディタは、スクリプトを実行できるマークアップをDOMに置かない。
+7. 入力、キー操作、入力ルール、コマンドは、ドキュメントを正しい状態に保ち、ユーザーが期待するとおりに動く。
+8. 記録にない記法の構文が、そのドキュメントに加わることはない。
 
-## 4. The harness
+## 4. ハーネス
 
-Everything runs from `packages/tiptap-extensions`:
+すべて`packages/tiptap-extensions`で実行します：
 
 ```sh
 pnpm bug-hunt run <file|-> [--full] [--properties] [--timeout ms] [--out f]
@@ -119,12 +66,11 @@ pnpm bug-hunt case <finding.json>
 pnpm bug-hunt commands | notations | oracles
 ```
 
-The formats are defined in `bug-hunt/schema.json`. Examples are in
-`bug-hunt/examples/`.
+形式は`bug-hunt/schema.json`で定義しています。例は`bug-hunt/examples/`にあります。
 
-### 4.1 Probes
+### 4.1 プローブ
 
-A probe is a file as the editor opens it, plus what a user does to it:
+プローブは、エディタが開くファイルと、ユーザーがそれに対して行う操作の組です：
 
 ```json
 {
@@ -144,202 +90,102 @@ A probe is a file as the editor opens it, plus what a user does to it:
 }
 ```
 
-- `‸` (U+2038) in `given` marks the caret, and two of them mark a range. It
-  cannot appear as content, so use another character to test punctuation.
-  In `expect` it also checks the selection.
-- Step kinds: a bare string (typed one character at a time through keymaps
-  and input rules), `type`, `press` (TipTap notation: `Enter`, `Shift-Tab`,
-  `Mod-b`, `Backspace`, `Delete`), `command` (any name from `pnpm bug-hunt
-  commands`, with JSON `args`), `select` (`anchor`/`head` positions, `node`,
-  `all`, or `text` with `nth` and `at`), `pasteText` (text inserted as a
-  pasted transaction, so paste rules run), `pasteContent` (ProseMirror JSON
-  nodes pasted over the selection), `save`, `reload` and
-  `recordNotations`.
-- A probe gets a final save after its steps in any case, just as the app's
-  autosave would.
-- `options.properties` also runs the slow saving-property checks on `given`
-  and on the final save.
-- Run many probes at once as a JSON array or as JSONL (one probe per line).
+- `given`の中の`‸`（U+2038）はキャレットを表し、2つあれば範囲を表します。本文の文字としては使えないので、約物を試すときは別の文字を使ってください。`expect`の中では選択範囲も確かめます。
+- ステップの種類：裸の文字列（キーマップと入力ルールを通して1文字ずつ入力）、`type`、`press`（TipTapの表記：`Enter`、`Shift-Tab`、`Mod-b`、`Backspace`、`Delete`）、`command`（`pnpm bug-hunt commands`に出てくる名前とJSONの`args`）、`select`（位置を表す`anchor`/`head`、`node`、`all`、または`nth`と`at`をつけた`text`）、`pasteText`（貼り付けのトランザクションとして挿入するテキスト。貼り付けルールが動く）、`pasteContent`（選択範囲に貼り付けるProseMirrorのJSONノード）、`save`、`reload`、`recordNotations`。
+- ステップのあとには、アプリの自動保存と同じように、必ず最後の保存が行われます。
+- `options.properties`をつけると、`given`と最後の保存に対して、時間のかかる保存の性質のチェックも実行します。
+- 多数のプローブは、JSONの配列かJSONL（1行に1プローブ）でまとめて実行できます。
 
-The headless driver cannot do what only a browser does: caret keys, the
-browser's clipboard parsing, IME composition, drag and drop. Commands that
-parse HTML or strings of content (`insertContent("<b>x</b>")`) or emit paste
-events also need a DOM. Such probes come back `unsupported`. Simulate pastes
-with `pasteText` and `pasteContent`, and pass JSON content to `insertContent`.
-Content pasted from outside is supposed to become something the document's
-notation set can write, so pasting nodes it lacks is a valid attack. Note
-anything that needs a real browser in your session notes (§6.3).
+ヘッドレスのドライバーには、ブラウザにしかできないこと（キャレットを動かすキー、ブラウザによるクリップボードの解釈、IMEの変換、ドラッグ＆ドロップ）はできません。HTMLやコンテンツの文字列を解析するコマンド（`insertContent("<b>x</b>")`）や、貼り付けイベントを発生させるコマンドもDOMが必要です。そうしたプローブは`unsupported`になります。貼り付けは`pasteText`と`pasteContent`で模擬し、`insertContent`にはJSONのコンテンツを渡してください。外から貼り付けられたものは、そのドキュメントの記法の組み合わせで書き出せるものになるはずなので、その組み合わせにないノードを貼り付けるのは正当な攻撃です。実際のブラウザが必要なものは、セッションの記録に残してください（§6.3）。
 
-### 4.2 Verdicts and oracles
+### 4.2 判定とオラクル
 
-`run` prints one verdict per probe: `status` (`clean`, `violations`,
-`invalid-probe`, `unsupported`), `oracles`, `violations` (`oracle`, `step`,
-`detail`; `--full` adds `actual`/`expected`), `signals`, `saved` and
-`fingerprint`. With `--full` you also get `doc`, `savedWithSelection`,
-`strategy`, a per-step `trace`, and `html.editor` / `html.vfm` (the editor's
-DOM and VFM's rendering of the saved file).
+`run`はプローブごとに判定を1つ出力します。`status`（`clean`、`violations`、`invalid-probe`、`unsupported`）、`oracles`、`violations`（`oracle`、`step`、`detail`。`--full`では`actual`/`expected`も）、`signals`、`saved`、`fingerprint`です。`--full`ではさらに`doc`、`savedWithSelection`、`strategy`、ステップごとの`trace`、`html.editor`/`html.vfm`（エディタのDOMと、保存したファイルをVFMで描画した結果）も出ます。
 
-| oracle | fires when | typical severity |
+| オラクル | 反応する条件 | 典型的な重大度 |
 | --- | --- | --- |
-| `step-threw` | a step or a check throws inside editor code | crash |
-| `invalid-document` | the document breaks the schema after a step | corruption |
-| `save-refused` | the writer finds no markdown that holds the document | save-blocked |
-| `read-back` | the saved markdown reads back as a different document (the writer's own comparison) | data-loss |
-| `judge` | an independent comparison, sharing no code with the writer, finds differences | data-loss |
-| `baseline-given-up` | the save was written anew instead of reusing the baseline | corruption |
-| `locality` | blocks unchanged at the start or end of the document lost their bytes | corruption |
-| `unstable-save` | reopening the saved file and saving it unedited changes it | corruption |
-| `properties` | a saving guarantee fails on `given` or on the save (with `options.properties`) | corruption |
-| `unsafe-dom` | the editor's DOM would carry script-capable markup | security |
-| `expectation` | the save, the selection, the doc or a command's result differs from what the probe expects | depends |
-| `hang` | a probe outlives `--timeout` (only with `--timeout`) | crash |
+| `step-threw` | ステップかチェックがエディタのコードの中で例外を投げた | crash |
+| `invalid-document` | ステップのあとでドキュメントがスキーマに反した | corruption |
+| `save-refused` | 書き出し側が、ドキュメントを表せるMarkdownを見つけられなかった | save-blocked |
+| `read-back` | 保存したMarkdownを読み戻すと別のドキュメントになる（書き出し側自身の比較） | data-loss |
+| `judge` | 書き出し側とコードを共有しない独立の比較が違いを見つけた | data-loss |
+| `baseline-given-up` | ベースラインを再利用せず、保存を一から書き直した | corruption |
+| `locality` | ドキュメントの先頭または末尾の、変わっていないブロックのバイトが変わった | corruption |
+| `unstable-save` | 保存したファイルを開き直して編集せずに保存すると、内容が変わる | corruption |
+| `properties` | `given`または保存に対して、保存の保証が成り立たない（`options.properties`のとき） | corruption |
+| `unsafe-dom` | エディタのDOMが、スクリプトを実行できるマークアップを持つことになる | security |
+| `expectation` | 保存、選択範囲、ドキュメント、コマンドの戻り値が、プローブの期待と違う | 場合による |
+| `hang` | プローブが`--timeout`の時間内に終わらない（`--timeout`のときのみ） | crash |
 
-`signals` are observations that need judging and are not bugs by
-themselves. Examples: a `locality` change under the `repaired` strategy
-(rewriting neighbours is an allowed repair), or read-back differences in a
-document recorded with fewer notations (the checks read with the current
-set).
+`signals`は判断が必要な観察結果で、それだけではバグではありません。たとえば、`repaired`方式での`locality`の変化（隣のブロックの書き直しは許された修復です）や、記法の少ない記録を持つドキュメントでの読み戻しの違い（チェックは現在の記法で読むため）です。
 
-`invalid-probe` means your probe is wrong: an unknown command, a position
-out of range, or a malformed step. It says nothing about the editor. Fix the
-probe. Note that a command called with arguments of the wrong type is a
-probe error even when it then breaks something. Check the command's
-signature in `src/` (search for `declare module '@tiptap/core'`) before you
-blame the editor.
+`invalid-probe`は、プローブのほうが間違っていることを意味します。未知のコマンド、範囲外の位置、形の崩れたステップなどで、エディタについては何もわかりません。プローブを直してください。型の違う引数でコマンドを呼んだ場合は、その結果何かが壊れても、プローブの誤りです。エディタのせいにする前に、`src/`でコマンドのシグネチャを確かめてください（`declare module '@tiptap/core'`で検索できます）。
 
-Always run large or generated batches with `--timeout 20000`, so that an
-infinite loop becomes a `hang` verdict instead of a stuck process.
+大きなバッチや生成したバッチは、常に`--timeout 20000`をつけて実行してください。そうすれば、無限ループはプロセスを止めずに`hang`の判定になります。
 
-## 5. How to hunt
+## 5. 探し方
 
-Spend most of your effort on objective oracles. Use `expectation` only where
-the right answer can be shown (§5.1, §6.1).
+労力の大半は、客観的なオラクルに使ってください。`expectation`は、正しい答えを示せる場合に限って使います（§5.1、§6.1）。
 
-### 5.1 Metamorphic relations (objective, no judgement needed)
+### 5.1 メタモルフィック関係（客観的で、判断が要らない）
 
-The expected output follows from the input, so set `expect` mechanically:
+期待する出力が入力から決まるので、`expect`を機械的に設定できます：
 
-- Type X, then Backspace → the file is byte-identical to `given`.
-- Press Enter, then Backspace, at any position → identical.
-- Toggle a mark (or a block format) twice over a selection → identical.
-- Select a range, type its exact text back → identical.
-- Undo all steps (`options.history`) → identical.
-- Save, reload, save → identical (`unstable-save` already checks this).
-- Edit block *k* only → every other block keeps its bytes (`locality` and
-  `properties` check this).
-- The same edit done by typing and by the equivalent command → the same
-  file.
+- Xを入力してからBackspace → ファイルは`given`と1バイトも違わない。
+- どの位置でもEnterを押してからBackspace → 同一。
+- 選択範囲でマーク（またはブロックの書式）を2回切り替える → 同一。
+- 範囲を選択し、そのテキストをそのまま入力し直す → 同一。
+- すべてのステップを取り消す（`options.history`） → 同一。
+- 保存、再読み込み、保存 → 同一（`unstable-save`がすでに確かめている）。
+- ブロック*k*だけを編集 → ほかのブロックはすべてバイトが保たれる（`locality`と`properties`が確かめる）。
+- 同じ編集を入力でするのと、それに当たるコマンドでするのとで → 同じファイルになる。
 
-### 5.2 Exhaustive boundaries
+### 5.2 境界の網羅
 
-For a small `given`, enumerate **every caret position and every range**, and
-apply one step: Enter, Backspace, Delete, or typing one of
-`* _ ~ \` $ { } | ^ [ ] ( ) < > & # ! \ - + = : "`, `「`, `」`, `、`, `。`,
-U+3000 or a newline. Generate these probes with a script. Edges between a
-mark and plain text, between a node and text, and at the start and end of
-every block are where bugs live.
+小さな`given`について、**すべてのキャレット位置とすべての範囲**を列挙し、ステップを1つ適用します。Enter、Backspace、Delete、または`* _ ~ \` $ { } | ^ [ ] ( ) < > & # ! \ - + = : "`、`「`、`」`、`、`、`。`、U+3000、改行のどれかの入力です。こうしたプローブはスクリプトで生成してください。マークと地のテキストの境目、ノードとテキストの境目、各ブロックの先頭と末尾にバグは潜んでいます。
 
-### 5.3 Grammar-based generation
+### 5.3 文法に基づく生成
 
-Build documents from the fragment lists in `testing/markdown-properties.ts`
-(`FRAGMENTS`, `VFM_FRAGMENTS`, `HTML_ELEMENT_FRAGMENTS`, the `*_INSERTS`), and
-from the `given` of every case in `tests/cases/`. Then mutate them: splice
-fragments into one another, nest them, and insert characters at token
-boundaries. Use a seeded PRNG, and record the seed in the probe `id` so that
-batches can be reproduced.
+`testing/markdown-properties.ts`の断片のリスト（`FRAGMENTS`、`VFM_FRAGMENTS`、`HTML_ELEMENT_FRAGMENTS`、`*_INSERTS`）と、`tests/cases/`のすべてのケースの`given`からドキュメントを組み立て、変異させます。断片同士をつなぎ、入れ子にし、トークンの境目に文字を差し込みます。シードつきの擬似乱数を使い、バッチを再現できるようにシードをプローブの`id`に記録してください。
 
-### 5.4 Attack surface catalogue
+### 5.4 攻撃面の一覧
 
-Assign yourself (or let the operator assign) a few areas, and go deep:
+自分で（またはオペレーターの指示で）いくつかの領域を受け持ち、深く掘ってください：
 
-- **CJK and Unicode**: emphasis next to `「」『』（）、。！？` (VFM reads
-  flanking differently from micromark), U+3000, surrogate pairs (𠮷),
-  emoji ZWJ sequences, combining marks, variation selectors, ZWSP/ZWJ/BOM
-  mid-text, U+2028/U+2029, NUL, bidi controls, NBSP, tabs.
-- **Source shape**: CRLF, lone CR, mixed endings, BOM, frontmatter (and
-  `---` that is not frontmatter), no trailing newline or many, trailing
-  spaces and backslashes (hard breaks), very long lines, 1000-block
-  documents.
-- **Block structure**: lazy continuation, deeply nested lists and quotes,
-  switching list markers (`-*+`, `1.`/`1)`), loose and tight lists,
-  indented code versus list continuation, setext underlines, `- - -`, the
-  seven kinds of HTML blocks, link reference definitions, GFM tables with
-  pipes in code, and task lists.
-- **Inline syntax**: `***`, intraword `_`, backtick runs, autolinks and bare
-  URLs followed by punctuation or CJK, link destinations with parentheses,
-  spaces or `<>`, entities (valid, invalid, numeric), inline HTML and
-  comments.
-- **VFM syntax**: ruby with pipes, escapes and marks in its base; math next
-  to prices (`$5 and $10`); nested footnotes; footnote labels; attributes
-  after headings, links, images and code; `[[toc]]`; section ends; code
-  fence titles; and VFM's precedence of emphasis and links over later
-  constructs.
-- **HTML elements of themes**: upper-case tags, attribute order, duplicate
-  attributes, entities in attributes, unclosed or mismatched tags, missing
-  blank lines inside block elements, unknown extra attributes, classes in
-  any order, and `on*`/`javascript:`/`srcdoc` anywhere (watch `unsafe-dom`).
-- **Input rules and keymaps**: markdown shortcuts typed inside list items,
-  quotes, footnotes, ruby, math, code, link text, headings and table cells;
-  closing a delimiter next to CJK; Backspace right after an input rule fires
-  (`undoInputRule`); Enter, Backspace and Delete at the boundary of every
-  node type; `Shift-Enter`, `Tab`, `Shift-Tab` and `Mod-*` shortcuts.
-- **Commands**: every command from `pnpm bug-hunt commands`, on empty,
-  collapsed, cross-block, `all` and node selections; marks across raw
-  markdown and atoms; `setRuby`/`setMath`/`setLink`/`setHeadingAttributes`/
-  `setCodeBlockInfo`/`setHtmlElement` with hostile strings (quotes, braces,
-  backticks, newlines, `|`, `$`, `javascript:`); and commands applied twice,
-  then undone.
-- **Notation records**: `recordNotations` without a notation, then typing,
-  pasting (`pasteText`, `pasteContent`) or inserting its syntax and nodes,
-  then saving.
-- **Save sequences**: edit, save, edit, save, with `reload` in between;
-  edit and revert; a long random walk with a save after every step.
+- **CJKとUnicode**：`「」『』（）、。！？`に接した強調（VFMはフランキングをmicromarkと違うように読む）、U+3000、サロゲートペア（𠮷）、絵文字のZWJシーケンス、結合文字、異体字セレクタ、文中のZWSP/ZWJ/BOM、U+2028/U+2029、NUL、双方向テキストの制御文字、NBSP、タブ。
+- **ソースの形**：CRLF、単独のCR、改行の混在、BOM、フロントマター（とフロントマターではない`---`）、末尾の改行がない・多い、行末の空白とバックスラッシュ（強制改行）、非常に長い行、1000ブロックのドキュメント。
+- **ブロック構造**：遅延継続行、深い入れ子のリストと引用、リストマーカーの切り替え（`-*+`、`1.`/`1)`）、ゆるいリストと詰まったリスト、インデントされたコードとリストの継続、setext見出しの下線、`- - -`、7種類のHTMLブロック、リンク参照定義、コードの中にパイプがあるGFMの表、タスクリスト。
+- **インラインの構文**：`***`、単語内の`_`、バッククォートの連続、約物やCJKが後に続く自動リンクと裸のURL、括弧・空白・`<>`を含むリンク先、文字参照（正しいもの、正しくないもの、数値）、インラインのHTMLとコメント。
+- **VFMの構文**：親文字にパイプ、エスケープ、マークを含むルビ、金額に接した数式（`$5と$10`）、入れ子の脚注、脚注のラベル、見出し・リンク・画像・コードのあとの属性、`[[toc]]`、セクションの終わり、コードフェンスのタイトル、後に来る構文より強調とリンクを優先するVFMの解釈。
+- **テーマのHTML要素**：大文字のタグ、属性の順序、重複した属性、属性の中の文字参照、閉じていないタグや対応しないタグ、ブロック要素の中の空行の欠落、未知の追加属性、任意の順のクラス、あらゆる場所の`on*`/`javascript:`/`srcdoc`（`unsafe-dom`に注目）。
+- **入力ルールとキーマップ**：リスト項目、引用、脚注、ルビ、数式、コード、リンクテキスト、見出し、表のセルの中で入力するMarkdownのショートカット、CJKに接した閉じ記号、入力ルールが反応した直後のBackspace（`undoInputRule`）、あらゆるノード型の境目でのEnter・Backspace・Delete、`Shift-Enter`、`Tab`、`Shift-Tab`、`Mod-*`のショートカット。
+- **コマンド**：`pnpm bug-hunt commands`のすべてのコマンドを、空の選択、折りたたまれた選択、ブロックをまたぐ選択、`all`、ノードの選択に対して実行する。生のMarkdownやアトムをまたぐマーク。悪意のある文字列（引用符、波括弧、バッククォート、改行、`|`、`$`、`javascript:`）を渡した`setRuby`/`setMath`/`setLink`/`setHeadingAttributes`/`setCodeBlockInfo`/`setHtmlElement`。2回適用してから取り消したコマンド。
+- **記法の記録**：ある記法を除いて`recordNotations`し、その構文やノードを入力、貼り付け（`pasteText`、`pasteContent`）、挿入してから保存する。
+- **保存の連続**：編集、保存、編集、保存（間に`reload`を挟む）、編集してから元に戻す、ステップごとに保存する長いランダムウォーク。
 
-### 5.5 Reading the code
+### 5.5 コードを読む
 
-Read the notation definitions and look for asymmetries between them: a
-character the writer does not escape although the reader gives it meaning,
-a writing style the reader does not accept, an attribute the parser keeps
-but the writer drops, a plugin that fixes states only on some transaction
-paths. Then write the probe that proves it. A hypothesis without a
-reproducing probe is not a finding.
+記法定義を読み、定義同士の食い違いを探してください。読み込み側は意味を与えるのに書き出し側がエスケープしない文字、読み込み側が受けつけない書き方、解析側は保持するのに書き出し側が落とす属性、一部のトランザクション経路でしか状態を直さないプラグイン、などです。見つけたら、それを証明するプローブを書いてください。再現するプローブのない仮説は所見ではありません。
 
-## 6. From violation to finding
+## 6. 違反から所見へ
 
-### 6.1 Triage: is it a bug?
+### 6.1 選別：それはバグか
 
-Report a violation only after checking:
+違反を報告するのは、次を確かめてからにしてください：
 
-1. **Reproducible.** It replays with `pnpm bug-hunt run`, and the status is
-   `violations`, not `invalid-probe` or `unsupported`.
-2. **Not a known limitation.** Search `tests/cases/*.cases.ts` for `fails:`
-   reasons, and the difference list in `tests/vfm-html.test.ts`. If it is an
-   instance of one, still report it, but fill `knownLimitation` and set the
-   severity it deserves.
-3. **Judged against VFM, not against micromark.** For meaning (emphasis,
-   math, ruby, raw HTML), compare `html.vfm` with what the user sees in the
-   editor (`doc`, `html.editor`). Put the rendering in
-   `expected.evidence` as `{ "kind": "vfm-render", "markdown": …, "html": … }`.
-4. **Reachable.** States reached by typing, key presses or commands with
-   well-typed arguments rate higher than states reached only by inserting
-   hand-built JSON. Rate a crash from a schema-invalid `insertContent` lowest.
-5. **Not a duplicate.** Group by `oracle` + `area` + `hypothesis`. Report a
-   new finding only when the probe exercises a different cause. Otherwise
-   list it in `related`.
+1. **再現できる。** `pnpm bug-hunt run`で再生でき、ステータスが`invalid-probe`や`unsupported`ではなく`violations`である。
+2. **既知の制限ではない。** `tests/cases/*.cases.ts`の`fails:`の理由と、`tests/vfm-html.test.ts`の違いの一覧を検索する。そのどれかに当てはまる場合も報告はするが、`knownLimitation`を埋め、ふさわしい重大度をつける。
+3. **micromarkではなくVFMを基準に判断している。** 意味（強調、数式、ルビ、生のHTML）については、`html.vfm`と、ユーザーがエディタで見るもの（`doc`、`html.editor`）を比べる。描画結果は`expected.evidence`に`{ "kind": "vfm-render", "markdown": …, "html": … }`として入れる。
+4. **到達できる。** 入力、キー操作、型の正しい引数でのコマンドで到達できる状態は、手で組み立てたJSONを挿入しなければ到達できない状態より高く評価する。スキーマに反する`insertContent`による例外は最も低く評価する。
+5. **重複していない。** `oracle`＋`area`＋`hypothesis`でまとめる。プローブが別の原因を突いている場合にだけ新しい所見とし、そうでなければ`related`に挙げる。
 
-### 6.2 Minimize
+### 6.2 最小化
 
-Run `pnpm bug-hunt minimize probe.json --oracle <name>` for automatic
-oracles. It drops steps, blocks and characters while the oracle still
-fires. You cannot shrink `expectation` findings automatically, because the
-expected output would have to shrink with them. Shrink those by hand, and
-re-run after every cut. A finding's probe must be minimal: removing any
-step, block or character should make it pass.
+自動のオラクルには`pnpm bug-hunt minimize probe.json --oracle <name>`を実行してください。オラクルが反応し続ける限り、ステップ、ブロック、文字を取り除きます。`expectation`の所見は、期待する出力も一緒に縮めなければならないので、自動では縮められません。手で縮め、削るたびに実行し直してください。所見のプローブは最小でなければなりません。どのステップ、ブロック、文字を取り除いても、通るようになるはずです。
 
-### 6.3 Write the finding
+### 6.3 所見を書く
 
-Write one file per bug, `bug-hunt/work/findings/<id>.json`, conforming to
-`#/$defs/finding` in `schema.json`:
+バグ1つにつき1ファイル、`bug-hunt/work/findings/<id>.json`を、`schema.json`の`#/$defs/finding`に従って書いてください：
 
 ```json
 {
@@ -352,7 +198,7 @@ Write one file per bug, `bug-hunt/work/findings/<id>.json`, conforming to
   "probe": { "given": "「‸」\n", "steps": ["**太字**"] },
   "expected": {
     "markdown": "「**太字**‸」\n",
-    "rationale": "Why that output is right, citing the guarantee in §3 or VFM's reading.",
+    "rationale": "その出力が正しい理由。§3の保証かVFMの解釈を根拠として挙げる。",
     "evidence": [{ "kind": "vfm-render", "markdown": "…", "html": "…" }]
   },
   "area": { "notations": ["strong"], "files": ["src/markdown/notations/commonmark.ts"] },
@@ -364,63 +210,32 @@ Write one file per bug, `bug-hunt/work/findings/<id>.json`, conforming to
 }
 ```
 
-Rules:
+規則：
 
-- `probe.expect` stays out of the probe. The expectation is
-  `expected.markdown`, and `verify` replays the probe against it. For
-  automatic oracles, set `expected.markdown` to the correct save anyway
-  (usually the save without the defect), because it becomes the case's
-  `expect`.
-- `title` is one English sentence about what the user experiences, and
-  becomes the case name. `hypothesis` reads like a case's `fails` reason.
-- Severity: `data-loss` (text or meaning disappears from the file),
-  `corruption` (bytes change outside the edit, invalid documents, unstable
-  saves), `crash` (throws or hangs), `save-blocked` (reachable states that
-  cannot be saved), `security` (`unsafe-dom`), `wrong-result` (an input rule,
-  key or command does the wrong thing but nothing is lost), `minor`
-  (cosmetic source differences).
-- `confidence`: `high` if an objective oracle fires or a metamorphic
-  relation breaks; `medium` if it rests on VFM evidence; `low` if it rests
-  on your reading of intent.
+- プローブに`probe.expect`は入れません。期待値は`expected.markdown`で、`verify`はそれに対してプローブを再生します。自動のオラクルの場合も、`expected.markdown`には正しい保存結果（たいていは欠陥のない保存結果）を入れてください。これがケースの`expect`になります。
+- `title`は、ユーザーが体験することを書いた英語の1文で、ケースの名前になります。`hypothesis`はケースの`fails`の理由のように英語で書きます。テストケースが英語で書かれているためです。`rationale`は日本語でもかまいません。
+- 重大度：`data-loss`（テキストや意味がファイルから失われる）、`corruption`（編集していない部分のバイトが変わる、ドキュメントが不正になる、保存が安定しない）、`crash`（例外、終わらない）、`save-blocked`（到達できるのに保存できない状態）、`security`（`unsafe-dom`）、`wrong-result`（入力ルール、キー、コマンドの動きが間違っているが何も失われない）、`minor`（ソースの見た目だけの違い）。
+- `confidence`：客観的なオラクルが反応したか、メタモルフィック関係が破れた場合は`high`、VFMの証拠に基づく場合は`medium`、意図の解釈に基づく場合は`low`。
 
-When you finish, also write:
+作業を終えるときは、次も書いてください：
 
-- `bug-hunt/work/report.json`, from
-  `pnpm bug-hunt verify --out bug-hunt/work/report.json`. Every finding must
-  be `valid` and in state `reproduced`.
-- `bug-hunt/work/session.json`:
-  `{ "schema": "vivliostyle-pub/editor-bug-hunt-session@1", "agent": …,
-  "commit": …, "areas": […], "probesRun": n, "seeds": […],
-  "needsBrowser": [{ "probe": …, "why": … }], "harnessIssues": n }`.
-- `bug-hunt/work/harness-issues.jsonl`, if any: one
-  `{ "probe": …, "oracle": …, "why": … }` per line for verdicts you believe
-  the harness gets wrong.
+- `pnpm bug-hunt verify --out bug-hunt/work/report.json`で作る`bug-hunt/work/report.json`。すべての所見が`valid`で、状態が`reproduced`でなければなりません。
+- `bug-hunt/work/session.json`：`{ "schema": "vivliostyle-pub/editor-bug-hunt-session@1", "agent": …, "commit": …, "areas": […], "probesRun": n, "seeds": […], "needsBrowser": [{ "probe": …, "why": … }], "harnessIssues": n }`。
+- ハーネスが判定を誤っていると思うものがあれば`bug-hunt/work/harness-issues.jsonl`。1行に1つ、`{ "probe": …, "oracle": …, "why": … }`を書きます。
 
-## 7. Downstream pipeline (for operators and fixing agents)
+## 7. その後のパイプライン（オペレーターと修正担当のエージェント向け）
 
-1. **Hunt.** One or more agents, each with its own areas and ID prefix,
-   write `work/findings/*.json`.
-2. **Gate.** `pnpm bug-hunt verify --expect-reproduced --out report.json`
-   rejects invalid or non-reproducing findings, and marks duplicates by
-   fingerprint.
-3. **Triage.** Sort by severity, then confidence. A human decides on
-   `expectation` findings that rest on intent.
-4. **Pin.** `pnpm bug-hunt case <finding>` prints an editor case with
-   `fails:` set. Add it to the fitting suite in `tests/cases/` (it must fail
-   at first, as the root guide requires), and finish any `select` steps by
-   hand.
-5. **Fix.** A fixing agent changes `src/` until the case passes, then
-   removes `fails`. It never changes the expected markdown to match the
-   code.
-6. **Close.** `verify` reports the finding as `fixed`. Re-run the hunter's
-   batch to look for regressions.
+1. **探索。** 1つ以上のエージェントが、それぞれ自分の領域とIDの接頭辞を持ち、`work/findings/*.json`を書く。
+2. **関門。** `pnpm bug-hunt verify --expect-reproduced --out report.json`が、不正な所見と再現しない所見を退け、重複をフィンガープリントで印づける。
+3. **選別。** 重大度、次に確信度の順に並べる。意図に基づく`expectation`の所見は人間が判断する。
+4. **固定。** `pnpm bug-hunt case <finding>`が、`fails:`つきのエディタのケースを出力する。それを`tests/cases/`の合うスイートに加え（ルートのガイドのとおり、最初は失敗しなければならない）、`select`のステップは手で仕上げる。
+5. **修正。** 修正担当のエージェントがケースが通るまで`src/`を変え、`fails`を取り除く。コードに合わせて期待するMarkdownを変えることは決してしない。
+6. **完了。** `verify`がその所見を`fixed`と報告する。探索者のバッチを実行し直して、退行がないか確かめる。
 
-## 8. Checklist before you stop
+## 8. 終える前のチェックリスト
 
-- [ ] Every finding replays: `verify` shows `valid: true` and `state: reproduced`.
-- [ ] Every probe is minimal and has no `expect`. `expected.markdown` and
-      `rationale` are filled in, with VFM evidence where meaning is involved.
-- [ ] Known limitations are marked and duplicates are merged.
-- [ ] You wrote nothing outside `bug-hunt/work/`.
-- [ ] `session.json` lists the areas you covered, the seeds you used, and
-      what needs a real browser.
+- [ ] どの所見も再生できる：`verify`が`valid: true`と`state: reproduced`を示す。
+- [ ] どのプローブも最小で、`expect`を持たない。`expected.markdown`と`rationale`が埋まっていて、意味に関わるものにはVFMの証拠がある。
+- [ ] 既知の制限には印がつき、重複はまとめてある。
+- [ ] `bug-hunt/work/`の外には何も書いていない。
+- [ ] `session.json`に、受け持った領域、使ったシード、実際のブラウザが必要なものが書いてある。
