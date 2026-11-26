@@ -880,6 +880,10 @@ export async function runProbe(input: unknown): Promise<Verdict> {
     return verdict;
   } finally {
     driver.destroy();
+    // TipTap reports deletions from timers that hold their transaction, and
+    // with it the whole editor; a loop of probes that never yields to them
+    // keeps every editor it made.
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 }
 

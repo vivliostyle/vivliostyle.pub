@@ -418,6 +418,8 @@ function corpusFlag(flags: Flags): Corpus {
   return corpus as Corpus;
 }
 
+const WORKER_HEAP_LIMIT = 1024 * 1024 * 1024;
+
 /** Runs generated probes until the deadline, one JSON line per event. */
 async function fuzzWorker(flags: Flags): Promise<number> {
   const options = {
@@ -433,6 +435,10 @@ async function fuzzWorker(flags: Flags): Promise<number> {
     index < max && Date.now() < deadline;
     index++
   ) {
+    // Whatever still leaks, a fresh worker starts from the next probe.
+    if (process.memoryUsage().heapUsed > WORKER_HEAP_LIMIT) {
+      break;
+    }
     // Written before the probe runs, so a probe that never returns is known.
     // A caret mark in the middle of syntax changes how it parses, which
     // says nothing about the editor: put it somewhere else.
