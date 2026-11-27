@@ -23,3 +23,11 @@ export function serializeDoc(editor: Editor, doc: ProseMirrorNode): string {
     throw error;
   }
 }
+
+/**
+ * Saves the document as the editor does while it is edited: what is written
+ * becomes the baseline the next save is compared with.
+ */
+export function saveMarkdown(editor: Editor): void {
+  setMarkdownBaseline(editor, getMarkdown(editor));
+}

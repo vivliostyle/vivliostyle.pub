@@ -42,7 +42,10 @@ export const rawNotation = defineNotation({
   name: 'raw',
   extensions: [RawBlock, RawInline],
   nodes: {
-    [RAW_BLOCK]: (node) => node.textContent,
+    // Blank lines at its edges would end the block and be read as part of
+    // the separator, which a later save keeps beside the rewritten block.
+    [RAW_BLOCK]: (node) =>
+      node.textContent.replace(/^(?:[ \t]*\n)+|(?:\n[ \t]*)+$/g, ''),
   },
   marks: {
     [RAW_INLINE]: { open: '', close: '', verbatim: true },
