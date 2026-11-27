@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/core';
 
 import {
+  CROSS_REFERENCE,
   codeBlockAttributes,
   codeBlockCaption,
   findSelectedCodeBlock,
@@ -45,7 +46,8 @@ import { isInCodeBlock, splitKeywords } from './utils';
 const isTextSelection = (editor: Editor) =>
   !isInCodeBlock(editor) &&
   !selectedNodeOf(editor.state, 'math') &&
-  !selectedNodeOf(editor.state, 'footnoteReference');
+  !selectedNodeOf(editor.state, 'footnoteReference') &&
+  !selectedNodeOf(editor.state, CROSS_REFERENCE);
 
 registerEditorMenuCommand({
   id: 'insert.ruby',

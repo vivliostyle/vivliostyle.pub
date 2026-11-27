@@ -24,6 +24,7 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
   editorMenuConfig,
+  filterVisibleEntries,
   flattenCommands,
   resolveMenuEntries,
 } from '../../libs/editor/menu/config';
@@ -56,8 +57,11 @@ export function TriggerMenu() {
     return menu ? resolveMenuEntries(menu.items, 'trigger') : [];
   }, [configSnap.triggers, menuId]);
   const filtered = useMemo(
-    () => filterMenuEntries(entries, query),
-    [entries, query],
+    () =>
+      editor
+        ? filterVisibleEntries(filterMenuEntries(entries, query), editor)
+        : [],
+    [editor, entries, query],
   );
   const commands = useMemo(() => flattenCommands(filtered), [filtered]);
   const visible = session !== null && commands.length > 0;

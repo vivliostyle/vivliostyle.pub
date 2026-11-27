@@ -78,6 +78,18 @@ describe('the boundaries of inline nodes with content', () => {
     expect(widgets(state).map((it) => it.pos)).toEqual([8, 12]);
   });
 
+  it('stand on both sides of an element declared to hold phrasing', () => {
+    const state = stateOf('a<span class="footnote">注</span>b');
+    expect(state.doc.firstChild?.child(1).type.name).toBe('htmlFootnote');
+    expect(widgets(state).map((it) => it.pos)).toEqual([2, 5]);
+    expect(
+      crossing(
+        state.apply(state.tr.setSelection(TextSelection.create(state.doc, 4))),
+        true,
+      ),
+    ).toBe(5);
+  });
+
   it('are not part of the document', () => {
     const state = stateOf('a^[注]b');
     expect(state.doc.textContent).toBe('a注b');

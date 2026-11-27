@@ -609,8 +609,11 @@ function withoutTags(text: string): string {
 
 export interface DocumentId {
   id: string;
-  /** What has the id: a heading, a figure, an image in text or code. */
-  kind: 'heading' | 'figure' | 'image' | 'code';
+  /**
+   * What has the id: a heading, a figure, an image in text, code, or an
+   * element a definition declares, see `declaredElementOf`.
+   */
+  kind: 'heading' | 'figure' | 'image' | 'code' | 'element';
   pos: number;
   node: ProseMirrorNode;
   /** The id was given in the markdown, rather than made of a heading. */
@@ -676,9 +679,9 @@ export function codeBlockAttributes(info: unknown): InlineAttributes | null {
 }
 
 /**
- * The ids VFM gives the document's headings, figures, images and code, in
- * the order of the document: a heading's own id, or one made of its text,
- * numbered where it repeats.
+ * The ids VFM gives the document's headings, figures, images and code, and
+ * those of declared elements, in the order of the document: a heading's own
+ * id, or one made of its text, numbered where it repeats.
  */
 export function documentIds(doc: ProseMirrorNode): DocumentId[] {
   const ids: DocumentId[] = [];
@@ -727,8 +730,13 @@ export function documentIds(doc: ProseMirrorNode): DocumentId[] {
         }
         return false;
       }
-      default:
+      default: {
+        const { id } = node.attrs;
+        if (node.type.spec.htmlElement && typeof id === 'string' && id) {
+          ids.push({ id, kind: 'element', pos, node, explicit: true });
+        }
         return true;
+      }
     }
   });
   return ids;

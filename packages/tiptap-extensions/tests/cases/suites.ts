@@ -1,4 +1,5 @@
 import type { CaseSuite } from '../../testing/vitest';
+import { htmlElementSuites } from './html-elements.cases';
 import { inputSuites } from './input.cases';
 import { markdownSuites } from './markdown.cases';
 import { savingSuites } from './saving.cases';
@@ -9,6 +10,7 @@ export const suites: CaseSuite[] = [
   ...markdownSuites,
   ...vfmSuites,
   ...vfmBlockSuites,
+  ...htmlElementSuites,
   ...inputSuites,
   ...savingSuites,
 ];

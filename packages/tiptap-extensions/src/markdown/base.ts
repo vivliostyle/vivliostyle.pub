@@ -1,6 +1,6 @@
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
-import type { InlineSource, ParsedBody } from './parse';
+import type { ElementSource, InlineSource, ParsedBody } from './parse';
 import { stripPrefixes } from './source';
 
 /**
@@ -19,6 +19,8 @@ export interface BaseNode {
    * that read it knows. Otherwise the writer finds the pieces in `text`.
    */
   inline?(): InlineSource | null;
+  /** How the HTML elements it was read from were written, see `ParsedBody`. */
+  elements?(): readonly ElementSource[] | null;
 }
 
 export interface BaseContent {
@@ -58,6 +60,7 @@ function baseNodeOf(
     ]),
     content: () => contentOf(parsed, node),
     inline: () => parsed.inlines.get(node) ?? null,
+    elements: () => parsed.elements.get(node) ?? null,
   };
 }
 

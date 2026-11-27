@@ -3,11 +3,8 @@ import { Underline } from '@tiptap/extension-underline';
 import type { Mark } from '@tiptap/pm/model';
 import remarkGfm from 'remark-gfm';
 
-import {
-  declareNotation,
-  defineNotation,
-  type NotationDefinition,
-} from '../notation';
+import { declareNotation } from '../declare';
+import { defineNotation, type NotationDefinition } from '../notation';
 
 // VFM renders strikethrough as `del`, which themes style.
 const PubStrike = Strike.extend({

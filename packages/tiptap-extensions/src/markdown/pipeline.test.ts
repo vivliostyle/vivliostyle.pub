@@ -2,11 +2,13 @@ import { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { documentHtml } from '../../testing/html';
 import {
   readsBackAs,
   unexplainedDifferences,
 } from '../../testing/markdown-properties';
 import { PubExtensions } from '../index';
+import { declareNotation, type NotationDeclaration } from './declare';
 import {
   currentNotations,
   getMarkdown,
@@ -16,7 +18,7 @@ import {
   setMarkdownBaseline,
   upgradeDocumentNotations,
 } from './extension';
-import { declareNotation, defineNotation } from './notation';
+import { defineNotation } from './notation';
 import { vfmNotations } from './notations/vfm/notations';
 import { MarkdownWriteError } from './write';
 
@@ -677,25 +679,25 @@ describe('declared HTML elements', () => {
           notations: [
             declareNotation({
               kind: 'htmlMark',
-              name: 'tcy',
-              mark: 'tcy',
+              name: 'combined',
+              mark: 'combined',
               tag: 'span',
-              match: { class: 'tcy' },
+              match: { class: 'tate' },
             }),
             declareNotation({
               kind: 'htmlMark',
               name: 'note',
               mark: 'note',
               tag: 'span',
-              match: { class: 'footnote' },
+              match: { class: 'annotation' },
               capture: ['id'],
             }),
             declareNotation({
               kind: 'htmlBlock',
-              name: 'sidenote',
-              node: 'sidenote',
+              name: 'sideBox',
+              node: 'sideBox',
               tag: 'aside',
-              match: { class: 'sidenote' },
+              match: { class: 'side-box' },
             }),
           ],
         }),
@@ -708,28 +710,271 @@ describe('declared HTML elements', () => {
   it('reads tags around phrasing as marks with their attributes', () => {
     const editor = withElements();
     editor.commands.setMarkdown(
-      'a <span class="tcy">12</span> b <span class="footnote" id="n1">注</span>\n',
+      'a <span class="tate">12</span> b <span class="annotation" id="n1">注</span>\n',
     );
     expect(editor.state.doc.toString()).toBe(
-      'doc(paragraph("a ", tcy("12"), " b ", note("注")))',
+      'doc(paragraph("a ", combined("12"), " b ", note("注")))',
     );
     expect(editor.state.doc.firstChild?.lastChild?.marks[0]?.attrs).toEqual({
       id: 'n1',
     });
     expect(getMarkdown(editor, { baseline: '' })).toBe(
-      'a <span class="tcy">12</span> b <span class="footnote" id="n1">注</span>',
+      'a <span class="tate">12</span> b <span class="annotation" id="n1">注</span>',
+    );
+  });
+
+  it('does not end an element at the closing tag of one inside it', () => {
+    const editor = withElements();
+    const markdown =
+      'a <span class="annotation" id="n1">x <span class="y">z</span> w</span> b\n';
+    editor.commands.setMarkdown(markdown);
+    const texts: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.isText && node.marks.some((it) => it.type.name === 'note')) {
+        texts.push(node.text ?? '');
+      }
+    });
+    expect(texts.join('')).toBe('x <span class="y">z</span> w');
+    appendTo(editor, 'b', '!');
+    expect(getMarkdown(editor)).toBe(markdown.replace(' b\n', ' b!\n'));
+  });
+
+  it('reads character references in the attributes it keeps', () => {
+    const editor = withElements();
+    editor.commands.setMarkdown(
+      '<span class="annotation" id="a&amp;b">注</span>\n',
+    );
+    expect(editor.state.doc.firstChild?.firstChild?.marks[0]?.attrs).toEqual({
+      id: 'a&b',
+    });
+    expect(getMarkdown(editor, { baseline: '' })).toBe(
+      '<span class="annotation" id="a&amp;b">注</span>',
     );
   });
 
   it('reads an element around blocks as a node', () => {
     const editor = withElements();
     const markdown =
-      '<aside class="sidenote">\n\n**側注**\n\n</aside>\n\nafter\n';
+      '<aside class="side-box">\n\n**側注**\n\n</aside>\n\nafter\n';
     editor.commands.setMarkdown(markdown);
     expect(editor.state.doc.toString()).toBe(
-      'doc(sidenote(paragraph(bold("側注"))), paragraph("after"))',
+      'doc(sideBox(paragraph(bold("側注"))), paragraph("after"))',
     );
     appendTo(editor, '側注', '!');
     expect(getMarkdown(editor)).toBe(markdown.replace('側注', '側注!'));
+  });
+
+  // As a definition of the user's could come, from data.
+  const declarations: NotationDeclaration[] = JSON.parse(`[
+    {
+      "kind": "htmlInline",
+      "name": "remark",
+      "tag": "span",
+      "classes": ["remark"],
+      "keepOtherAttributes": true
+    },
+    {
+      "kind": "htmlAtom",
+      "name": "anchor",
+      "tag": "a",
+      "match": { "data-x": "1" },
+      "capture": ["href"],
+      "require": ["href"]
+    },
+    {
+      "kind": "htmlTextblock",
+      "name": "lead",
+      "tag": "p",
+      "classes": ["lead"],
+      "capture": ["id"]
+    }
+  ]`);
+
+  function withDeclared(): Editor {
+    editor = new Editor({
+      element: null,
+      extensions: [
+        PubExtensions.configure({
+          notations: declarations.map((it) => declareNotation(it)),
+        }),
+      ],
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    return editor;
+  }
+
+  it('reads tags around phrasing as a node, keeping other attributes', () => {
+    const editor = withDeclared();
+    const markdown =
+      'a<span title="t" class="x remark">注 *強調*</span><span class="remark">二</span>\n';
+    editor.commands.setMarkdown(markdown);
+    expect(editor.state.doc.toString()).toBe(
+      'doc(paragraph("a", remark("注 ", italic("強調")), remark("二")))',
+    );
+    expect(editor.state.doc.firstChild?.child(1).attrs).toEqual({
+      otherAttributes: { class: 'x', title: 't' },
+    });
+    appendTo(editor, '二', '!');
+    expect(getMarkdown(editor)).toBe(markdown.replace(/\n$/, '!\n'));
+    expect(getMarkdown(editor, { baseline: '' })).toBe(
+      'a<span class="remark x" title="t">注 *強調*</span><span class="remark">二</span>!',
+    );
+  });
+
+  it('reads an empty element as a node of its own', () => {
+    const editor = withDeclared();
+    editor.commands.setMarkdown(
+      'a<a data-x="1" href="#t"></a> <a data-x="1"></a> <a data-x="1" href="#t">x</a> <a data-x="2" href="#t"></a>\n',
+    );
+    expect(editor.state.doc.toString()).toBe(
+      'doc(paragraph("a", anchor, " ", rawInline("<a data-x=\\"1\\"></a>"), " ", rawInline("<a data-x=\\"1\\" href=\\"#t\\">"), "x", rawInline("</a>"), " ", rawInline("<a data-x=\\"2\\" href=\\"#t\\"></a>")))',
+    );
+  });
+
+  it('reads an HTML block holding text as a textblock', () => {
+    const editor = withDeclared();
+    editor.commands.setMarkdown(
+      '<p class="lead" id="l">*a* &amp; &lt;b> \\x</p>\n\n<p class="lead" title="t">y</p>\n',
+    );
+    expect(editor.state.doc.toString()).toBe(
+      'doc(lead("*a* & <b> \\\\x"), rawBlock("<p class=\\"lead\\" title=\\"t\\">y</p>"))',
+    );
+    expect(editor.state.doc.firstChild?.attrs).toEqual({ id: 'l' });
+    expect(getMarkdown(editor, { baseline: '' })).toBe(
+      '<p class="lead" id="l">*a* &amp; &lt;b> \\x</p>\n\n<p class="lead" title="t">y</p>',
+    );
+  });
+
+  it('reads an element both of two declarations match as the more specific one', () => {
+    editor = new Editor({
+      element: null,
+      extensions: [
+        PubExtensions.configure({
+          notations: [
+            declareNotation({
+              kind: 'htmlInline',
+              name: 'plainBox',
+              tag: 'span',
+              classes: ['box'],
+            }),
+            declareNotation({
+              kind: 'htmlInline',
+              name: 'wideBox',
+              tag: 'span',
+              classes: ['box', 'wide'],
+              keepOtherAttributes: true,
+            }),
+          ],
+        }),
+      ],
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    editor.commands.setMarkdown(
+      '<span class="box">a</span><span class="wide box">b</span>',
+    );
+    expect(editor.state.doc.toString()).toBe(
+      'doc(paragraph(plainBox("a"), wideBox("b")))',
+    );
+  });
+
+  it.each([
+    [
+      { kind: 'htmlInline', name: 'x', tag: 'script' },
+      'cannot be of a <script> element',
+    ],
+    [
+      { kind: 'htmlBlock', name: 'x', tag: 'iframe' },
+      'cannot be of a <iframe> element',
+    ],
+    [
+      { kind: 'htmlInline', name: 'x', tag: 'div' },
+      'cannot be of a <div> element',
+    ],
+    [
+      { kind: 'htmlBlock', name: 'x', tag: 'span' },
+      'cannot be of a <span> element',
+    ],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', capture: ['onclick'] },
+      'names an attribute',
+    ],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', match: { style: 'a' } },
+      'names an attribute',
+    ],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', classes: ['a b'] },
+      'has a class',
+    ],
+    [{ kind: 'htmlMark', name: 'x y', tag: 'span' }, 'has a name'],
+    [
+      { kind: 'htmlMark', name: 'x', tag: 'span', require: ['id'] },
+      'requires an attribute',
+    ],
+    [
+      { kind: 'htmlBlock', name: 'x', tag: 'div', content: 'block+; x' },
+      'has content',
+    ],
+  ] as const)('refuses to declare %j', (declaration, message) => {
+    expect(() =>
+      declareNotation(declaration as unknown as NotationDeclaration),
+    ).toThrow(message);
+  });
+
+  it.each([
+    ['a type of the standard syntax', 'paragraph'],
+    ['a type of another declaration', 'combined'],
+  ])('refuses declarations of %s', (_, type) => {
+    expect(
+      () =>
+        new Editor({
+          element: null,
+          extensions: [
+            PubExtensions.configure({
+              notations: [
+                declareNotation({
+                  kind: 'htmlMark',
+                  name: 'combined',
+                  tag: 'span',
+                  classes: ['a'],
+                }),
+                declareNotation({
+                  kind: 'htmlInline',
+                  name: 'other',
+                  node: type,
+                  tag: 'span',
+                  classes: ['b'],
+                }),
+              ],
+            }),
+          ],
+        }),
+    ).toThrow(/both make/);
+  });
+
+  it('reads the editor’s element back before the rules of other nodes', () => {
+    const editor = withDeclared();
+    const rules = (type: string) =>
+      (editor.schema.nodes[type]?.spec.parseDOM ?? []).map((rule) => ({
+        tag: 'tag' in rule ? rule.tag : undefined,
+        priority: rule.priority ?? 50,
+      }));
+    expect(rules('remark')[0]).toEqual({
+      tag: 'span[data-pub-element="remark"]',
+      priority: 100,
+    });
+    expect(
+      documentHtml(
+        parseMarkdown(
+          editor,
+          'a<span class="remark" role="doc-footnote">n</span>',
+        ).doc,
+      ),
+    ).toBe(
+      '<p>a<span role="doc-footnote" class="remark" data-pub-element="remark">n</span></p>',
+    );
+    expect(
+      Math.max(...rules('inlineFootnote').map((it) => it.priority)),
+    ).toBeLessThan(100);
   });
 });

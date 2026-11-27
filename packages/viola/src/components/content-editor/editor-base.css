@@ -107,6 +107,38 @@
     font-size: 0.7em;
   }
 
+  /* A cross-reference is empty: its text is the theme's ::before, a
+     placeholder on screen. Its target follows it, so it shows and can be
+     selected also where the theme has no rule for it. */
+  & a[data-ref] {
+    background-color: color-mix(
+      in srgb,
+      var(--muted-foreground) 12%,
+      transparent
+    );
+    border-radius: 2px;
+    padding-inline: 0.1em;
+  }
+
+  & a[data-ref]::after {
+    color: var(--muted-foreground);
+    content: attr(href);
+    font-size: 0.7em;
+  }
+
+  & a[data-ref][data-missing] {
+    text-decoration: underline wavy var(--destructive);
+  }
+
+  & a[data-ref][data-missing]::after {
+    color: var(--destructive);
+    content: attr(href) " " var(--content-editor-reference-missing);
+  }
+
+  & a[data-ref].ProseMirror-selectednode {
+    outline: 2px solid var(--ring);
+  }
+
   /* A hidden heading is still edited. */
   & :is(h1, h2, h3, h4, h5, h6)[hidden] {
     display: block;

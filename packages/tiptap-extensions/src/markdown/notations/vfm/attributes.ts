@@ -315,7 +315,7 @@ export function isAttributeName(name: string): boolean {
 // editor behaves. The data attributes and classes of the editor's own
 // rendering would make pasted HTML read as its other nodes.
 const RENDERED = /^(?:id|class|lang|dir|title|role|hidden|aria-[a-z-]+)$/;
-const OWN_DATA = /^data-(?:pm|raw|math|mark|type|language)/;
+const OWN_DATA = /^data-(?:pm|raw|math|mark|type|language|pub)/;
 const OWN_CLASSES = new Set(['footnote-ref', 'footnote', 'math']);
 const RENDERED_BY_ELEMENT: Record<string, ReadonlySet<string>> = {
   img: new Set(['width', 'height']),

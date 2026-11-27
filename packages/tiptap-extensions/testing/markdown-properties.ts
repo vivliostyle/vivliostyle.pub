@@ -310,7 +310,9 @@ export function checkMarkdownProperties(
         const detail = `${name} block ${block.index}`;
         const tr = editor.state.tr;
         apply(tr);
-        const { doc } = tr;
+        // As the editor holds it, after its plugins, which keep it in a state
+        // its markdown can hold.
+        const { doc } = editor.state.applyTransaction(tr).state;
         const result = write(editor, doc);
         if ('error' in result) {
           violations.push({
@@ -528,6 +530,40 @@ export const VFM_INSERTS = [
   '[[toc]]',
   '[ ] ',
   '![i](i.png)',
+];
+
+/** The markup of themes, written as HTML, and characters that end it. */
+export const HTML_ELEMENT_FRAGMENTS = [
+  '本文<span class="footnote">注の**強調**と[l](u)</span>です',
+  '図<a data-ref="fig" href="#f1"></a>と<a href="#s" data-ref="sec"></a>。',
+  'a<span class="x footnote" id="n">注 <span class="tcy">1</span></span>b',
+  '<div class="note">\n\n**md**\n\n</div>',
+  '<aside class="sidenote" id="sn-1">\n\n傍注 *強調*\n\n</aside>',
+  // Text after the math: two display maths side by side have no markdown,
+  // a limit of VFM's syntax that the cases record.
+  '<div class="equation" id="eq1">\n\n$$\nx\n$$ (1)\n\n</div>',
+  '<div class="theorem">\n\n定理。\n\n二段落目\n\n</div>',
+  '<p class="fig-caption" id="c">図の題 &amp; *x*</p>',
+  '<figure class="tbl" id="t1">\n\n<figcaption>表</figcaption>\n\n| a |\n| - |\n| 1 |\n\n</figure>',
+  '<span class="tcy">12</span>月<span class="sesame">圏点</span>',
+  '> 引用<span class="footnote">注</span>',
+  '- 項目<a data-ref="fig" href="#f"></a>\n- <span class="footnote">注</span>',
+  '<span class="footnote">文頭の注</span>と続き',
+];
+export const HTML_ELEMENT_INSERTS = [
+  'X',
+  '<',
+  '>',
+  '&',
+  '"',
+  '*',
+  '#',
+  '\n',
+  '</span>',
+  '<span class="footnote">',
+  '<a data-ref="fig" href="#x"></a>',
+  '&amp;',
+  '[',
 ];
 
 /** A seeded pseudo-random number generator, so a failure can be replayed. */

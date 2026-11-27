@@ -10,10 +10,13 @@ import {
 import { FileMediaHandler } from './file-media-handler';
 import { imageExtensions } from './images';
 import { InlineBoundaries } from './inline-boundaries';
+import { HtmlElementCommands } from './markdown/declare';
 import { PubMarkdown, type PubMarkdownOptions } from './markdown/extension';
 import type { NotationDefinition } from './markdown/notation';
 import { commonMarkNotations } from './markdown/notations/commonmark';
 import { gfmNotations, htmlMarkNotations } from './markdown/notations/gfm';
+import { themeBaseElementNotations } from './markdown/notations/html-elements/theme-base';
+import { allThemeElementNotations } from './markdown/notations/html-elements/themes';
 import { rawNotation } from './markdown/notations/raw';
 import {
   VFM_2_SYNTAX,
@@ -41,6 +44,11 @@ export {
   serializeCustomDragPayload,
 } from './custom-drag-handler';
 export {
+  type DeclaredElement,
+  declaredElementOf,
+  OTHER_ATTRIBUTES,
+} from './markdown/declare';
+export {
   currentNotations,
   type DocumentRecord,
   getMarkdown,
@@ -51,6 +59,11 @@ export {
   upgradeDocumentNotations,
 } from './markdown/extension';
 export type { NotationDefinition } from './markdown/notation';
+export {
+  CROSS_REFERENCE,
+  knownIds,
+  referencedId,
+} from './markdown/notations/html-elements/cross-reference';
 export {
   formatAttributes,
   type InlineAttributes,
@@ -154,12 +167,15 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
           ...gfmNotations({ singleTilde: vfm.singleTildeStrikethrough }),
           ...htmlMarkNotations,
           ...vfmNotations(vfm),
+          ...themeBaseElementNotations,
+          ...allThemeElementNotations(),
           rawNotation,
           ...(this.options.notations ?? []),
         ],
         documentRecord: this.options.documentRecord,
         onSetMarkdown: this.options.onSetMarkdown,
       }),
+      HtmlElementCommands,
       Dropcursor.configure({}),
       Gapcursor.configure({}),
       ChainSafeClearNodes,

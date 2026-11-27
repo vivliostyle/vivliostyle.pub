@@ -1,23 +1,44 @@
-import type { Mark, Node as ProseMirrorNode, Schema } from '@tiptap/pm/model';
+import {
+  type ContentMatch,
+  Fragment,
+  type Mark,
+  type NodeType,
+  type Node as ProseMirrorNode,
+  type Schema,
+} from '@tiptap/pm/model';
 import { decodeString } from 'micromark-util-decode-string';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 
+import {
+  decodeHtml,
+  isEndTag,
+  readEndTag,
+  readStartTag,
+  tagBalance,
+} from './html';
 import { childrenOf, type UnknownMdastNode } from './mdast';
 import {
   type EscapeRule,
   type FromMarkdownHandler,
   type FromMarkdownResult,
   type HtmlElementSpec,
+  matchOpeningTag,
   type NotationDefinition,
   type ParseContext,
-  readTagAttributes,
   type StyleSpec,
 } from './notation';
 import { type LinePrefix, stripPrefixes } from './source';
 
 export const RAW_BLOCK = 'rawBlock';
 export const RAW_INLINE = 'rawInline';
+
+const BLOCK_KINDS: readonly HtmlElementSpec['kind'][] = ['block'];
+const INLINE_KINDS: readonly HtmlElementSpec['kind'][] = [
+  'mark',
+  'inline',
+  'atom',
+];
 
 /** Where a node of a parsed document was written in the source. */
 export interface SourceRange {
@@ -62,7 +83,84 @@ export interface ParsedBody {
   ranges: WeakMap<ProseMirrorNode, SourceRange>;
   /** Where the content of the textblocks in `ranges` was written. */
   inlines: WeakMap<ProseMirrorNode, InlineSource>;
+  /**
+   * The tags of the HTML elements a node was read from: of a block or
+   * textblock element itself, or of the elements in a textblock's content,
+   * in the order they open.
+   */
+  elements: WeakMap<ProseMirrorNode, readonly ElementSource[]>;
   styles: ReadonlyMap<string, string>;
+}
+
+/** How an HTML element read as a mark or node was written. */
+export interface ElementSource {
+  /** The mark or node type. */
+  type: string;
+  /** The attributes it was read with, as JSON. */
+  attrs: string;
+  open: string;
+  close: string;
+  /** For a textblock, its content as written. */
+  inner?: string;
+  /** For a block, what is between its tags and its first and last block. */
+  lead?: string;
+  trail?: string;
+}
+
+/**
+ * How specific a spec is: an element both of two specs match is the one of
+ * the spec with more conditions.
+ */
+function specificity(spec: HtmlElementSpec): number {
+  return (
+    (spec.classes?.length ?? 0) +
+    Object.keys(spec.match ?? {}).length +
+    (spec.require?.length ?? 0)
+  );
+}
+
+/**
+ * Of the candidates, the one of the most specific spec, or null where specs
+ * of different types are as specific.
+ */
+function mostSpecific<T extends { spec: HtmlElementSpec }>(
+  candidates: readonly T[],
+): T | null {
+  let best: T[] = [];
+  for (const candidate of candidates) {
+    const level = specificity(candidate.spec);
+    const top = best[0] ? specificity(best[0].spec) : -1;
+    if (level > top) {
+      best = [candidate];
+    } else if (level === top) {
+      best.push(candidate);
+    }
+  }
+  const [first] = best;
+  return first && best.every((it) => it.spec.type === first.spec.type)
+    ? first
+    : null;
+}
+
+/** Whether a node of `parent` can hold one of `type` somewhere. */
+function canHold(parent: NodeType, type: NodeType): boolean {
+  const seen = new Set<ContentMatch>();
+  const queue = [parent.contentMatch];
+  while (queue.length > 0) {
+    const match = queue.pop() as ContentMatch;
+    if (seen.has(match)) {
+      continue;
+    }
+    seen.add(match);
+    for (let i = 0; i < match.edgeCount; i++) {
+      const edge = match.edge(i);
+      if (edge.type === type) {
+        return true;
+      }
+      queue.push(edge.next);
+    }
+  }
+  return false;
 }
 
 function rangeOf(node: UnknownMdastNode): { start: number; end: number } {
@@ -72,48 +170,6 @@ function rangeOf(node: UnknownMdastNode): { start: number; end: number } {
     throw new Error(`The ${node.type} node has no position`);
   }
   return { start, end };
-}
-
-/** The attributes an opening tag gives the spec's mark or node, or null. */
-function matchOpeningTag(
-  value: string,
-  spec: HtmlElementSpec,
-): Record<string, unknown> | null {
-  const tag = value.trim().match(/^<([A-Za-z][\w-]*)(\s[^>]*)?>$/);
-  if (!tag || tag[1].toLowerCase() !== spec.tag.toLowerCase()) {
-    return null;
-  }
-  const attributes = readTagAttributes(tag[2] ?? '');
-  for (const [name, expected] of Object.entries(spec.match ?? {})) {
-    if (attributes[name] !== expected) {
-      return null;
-    }
-  }
-  const known = new Set([
-    ...Object.keys(spec.match ?? {}),
-    ...(spec.capture ?? []),
-  ]);
-  const others = Object.entries(attributes).filter(
-    ([name]) => !known.has(name),
-  );
-  if (others.length > 0 && !spec.rest) {
-    return null;
-  }
-  return {
-    ...Object.fromEntries(
-      (spec.capture ?? []).map((name) => [name, attributes[name] ?? null]),
-    ),
-    ...(spec.rest &&
-      others.length > 0 && {
-        [spec.rest]: Object.fromEntries(
-          others.map(([name, value]) => [name, decodeString(value)]),
-        ),
-      }),
-  };
-}
-
-function isClosingTag(value: string | undefined, spec: HtmlElementSpec) {
-  return value?.trim().toLowerCase() === `</${spec.tag.toLowerCase()}>`;
 }
 
 const ASCII_PUNCTUATION = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~';
@@ -212,12 +268,94 @@ function placeTransformed(node: UnknownMdastNode, body: string): void {
   });
 }
 
+/**
+ * Where raw blocks among the children of `container` are the tags of a
+ * declared block element around the blocks between them, which reading
+ * their markdown makes that element of: by the indices of the two tags, and
+ * the element.
+ */
+export function rawBlockElements(
+  container: ProseMirrorNode,
+  specs: readonly HtmlElementSpec[],
+): { from: number; to: number; node: ProseMirrorNode }[] {
+  const children: ProseMirrorNode[] = [];
+  container.forEach((child) => {
+    children.push(child);
+  });
+  const rawText = (index: number) =>
+    children[index]?.type.name === RAW_BLOCK
+      ? children[index].textContent
+      : null;
+  const { schema } = container.type;
+  const found: { from: number; to: number; node: ProseMirrorNode }[] = [];
+  for (let from = 0; from < children.length; from++) {
+    const text = rawText(from);
+    if (text === null) {
+      continue;
+    }
+    const candidates = specs.flatMap((spec) => {
+      const type = schema.nodes[spec.type];
+      const attrs =
+        spec.kind === 'block' && type ? matchOpeningTag(text, spec) : null;
+      if (!attrs || !type) {
+        return [];
+      }
+      const name = spec.tag.toLowerCase();
+      let depth = 0;
+      for (let to = from + 1; to < children.length; to++) {
+        const between = rawText(to);
+        if (between === null) {
+          continue;
+        }
+        if (depth === 0 && isEndTag(between, name)) {
+          return [{ spec, attrs, type, to }];
+        }
+        const balance = tagBalance(between, name);
+        if (!balance || depth + balance.low < 0) {
+          return [];
+        }
+        depth += balance.depth;
+      }
+      return [];
+    });
+    const best = mostSpecific(candidates);
+    if (!best) {
+      continue;
+    }
+    const node = best.type.createAndFill(
+      best.attrs,
+      children.slice(from + 1, best.to),
+    );
+    if (
+      node &&
+      (best.type.isInGroup('block') || canHold(container.type, best.type)) &&
+      container.canReplace(from, best.to + 1, Fragment.from(node))
+    ) {
+      found.push({ from, to: best.to, node });
+      from = best.to;
+    }
+  }
+  return found;
+}
+
 class Converter {
   private prefixes: LinePrefix[] = [];
   private marks: readonly Mark[] = [];
   readonly ranges = new WeakMap<ProseMirrorNode, SourceRange>();
   readonly inlineSources = new WeakMap<ProseMirrorNode, InlineSource>();
+  readonly elements = new WeakMap<ProseMirrorNode, readonly ElementSource[]>();
   private readonly context: ParseContext;
+  /** The elements of the textblock's content being converted. */
+  private inlineElements: ElementSource[] | null = null;
+  private lastElements: {
+    parent: UnknownMdastNode | undefined;
+    list: ElementSource[];
+  } | null = null;
+  /**
+   * The declared element whose blocks are being converted, the document at
+   * the top level, or null in a container of other syntax.
+   */
+  private blockParent: NodeType | null = null;
   /** How deep the phrasing being converted is; 1 is a textblock's own. */
   private inlineDepth = 0;
   /** Units `literal` found in the text node being converted at depth 1. */
@@ -273,6 +411,7 @@ class Converter {
   }
 
   root(root: UnknownMdastNode): ProseMirrorNode {
+    this.blockParent = this.schema.topNodeType;
     const doc = this.schema.topNodeType.createAndFill(
       null,
       this.blocks(root, true),
@@ -320,7 +459,15 @@ class Converter {
     parent: UnknownMdastNode,
     topLevel = false,
   ): ProseMirrorNode[] {
-    return this.blockList(childrenOf(parent), topLevel);
+    const parentType = this.blockParent;
+    if (!topLevel) {
+      this.blockParent = null;
+    }
+    try {
+      return this.blockList(childrenOf(parent), topLevel);
+    } finally {
+      this.blockParent = parentType;
+    }
   }
 
   private blockList(
@@ -333,25 +480,65 @@ class Converter {
       const result: ProseMirrorNode[] = [];
       for (let index = 0; index < children.length; index++) {
         const child = children[index];
-        const element = this.htmlElementAt(children, index, 'block');
+        const element = this.htmlElementAt(children, index, BLOCK_KINDS);
+        const textblock = element ? null : this.htmlTextblock(child);
         let nodes: readonly ProseMirrorNode[];
         let last = child;
         if (element) {
           const type = this.schema.nodes[element.spec.type];
-          const content = this.blockList(
-            children.slice(index + 1, element.close),
-            false,
-          );
-          const node = type?.createAndFill(element.attrs, content);
+          const parentType = this.blockParent;
+          this.blockParent = type ?? null;
+          let content: ProseMirrorNode[];
+          try {
+            content = this.blockList(
+              children.slice(index + 1, element.close),
+              false,
+            );
+          } finally {
+            this.blockParent = parentType;
+          }
+          const node =
+            type && this.canPlace(type)
+              ? type.createAndFill(element.attrs, content)
+              : null;
           nodes = node ? [node] : this.block(child);
-          if (node) {
+          if (node && type) {
             last = children[element.close];
+            const between = (from: UnknownMdastNode, to: UnknownMdastNode) =>
+              stripPrefixes(
+                this.body.slice(rangeOf(from).end, rangeOf(to).start),
+                this.prefixes,
+              );
+            const inner = children.slice(index + 1, element.close);
+            this.elements.set(node, [
+              {
+                type: type.name,
+                attrs: JSON.stringify(node.attrs),
+                open: this.source(child),
+                close: this.source(last),
+                lead: between(child, inner[0] ?? last),
+                trail:
+                  inner.length > 0 ? between(inner.at(-1) ?? child, last) : '',
+              },
+            ]);
             index = element.close;
           }
+        } else if (textblock) {
+          nodes = [textblock];
         } else {
           this.lastInlines = null;
+          this.lastElements = null;
           nodes = this.block(child);
           const inlines = this.lastInlines as Converter['lastInlines'];
+          const elements = this.lastElements as Converter['lastElements'];
+          if (
+            nodes.length === 1 &&
+            nodes[0].isTextblock &&
+            elements?.parent === child &&
+            elements.list.length > 0
+          ) {
+            this.elements.set(nodes[0], elements.list);
+          }
           if (
             nodes.length === 1 &&
             nodes[0].isTextblock &&
@@ -415,20 +602,21 @@ class Converter {
     const own = this.inlineDepth === 1;
     let units: InlineUnit[] | null = [];
     let size = 0;
+    const outerElements = this.inlineElements;
+    if (own) {
+      this.inlineElements = [];
+    }
     try {
       const nodes: ProseMirrorNode[] = [];
       for (let index = 0; index < children.length; index++) {
         const child = children[index];
         const first = index;
-        const element = this.htmlElementAt(children, index, 'mark');
-        const type = element && this.schema.marks[element.spec.type];
+        const element = this.htmlElementAt(children, index, INLINE_KINDS);
+        const made = element && this.inlineElement(children, index, element);
         let converted: readonly ProseMirrorNode[];
         this.textUnits = null;
-        if (element && type) {
-          converted = this.withMarks(
-            type.create(element.attrs).addToSet(this.marks),
-            () => this.inlines(children.slice(index + 1, element.close)),
-          );
+        if (element && made) {
+          converted = made;
           index = element.close;
         } else {
           converted = this.inline(child);
@@ -465,18 +653,37 @@ class Converter {
       if (own && units) {
         this.lastInlines = { parent, units, size };
       }
+      if (own && this.inlineElements) {
+        this.lastElements = { parent, list: this.inlineElements };
+      }
       return nodes;
     } finally {
       this.inInline = wasInline;
       this.inlineDepth = depth;
       this.textUnits = null;
+      if (own) {
+        this.inlineElements = outerElements;
+      }
     }
   }
 
+  /** Whether a declared block can be where the blocks being read are. */
+  private canPlace(type: NodeType): boolean {
+    return (
+      type.isInGroup('block') ||
+      (this.blockParent !== null && canHold(this.blockParent, type))
+    );
+  }
+
+  /**
+   * The element of a spec of one of `kinds` that the HTML node at `index`
+   * opens, and the index of the node that closes it. Of specs that match, the
+   * most specific is taken, and none where it is not clear which.
+   */
   private htmlElementAt(
     children: readonly UnknownMdastNode[],
     index: number,
-    kind: HtmlElementSpec['kind'],
+    kinds: readonly HtmlElementSpec['kind'][],
   ):
     | { spec: HtmlElementSpec; attrs: Record<string, unknown>; close: number }
     | undefined {
@@ -485,34 +692,175 @@ class Converter {
       return undefined;
     }
     const value = child.value;
+    const candidates: {
+      spec: HtmlElementSpec;
+      attrs: Record<string, unknown>;
+      close: number;
+    }[] = [];
     for (const spec of this.htmlElements) {
-      if (spec.kind !== kind) {
+      if (!kinds.includes(spec.kind)) {
         continue;
       }
       const attrs = matchOpeningTag(value, spec);
       if (!attrs) {
         continue;
       }
-      let depth = 0;
-      for (let close = index + 1; close < children.length; close++) {
-        const candidate = children[close];
-        if (candidate.type !== 'html') {
-          continue;
-        }
-        if (isClosingTag(candidate.value, spec)) {
-          if (depth === 0) {
-            return { spec, attrs, close };
-          }
-          depth--;
-        } else if (
-          candidate.value &&
-          matchOpeningTag(candidate.value, { ...spec, match: {}, capture: [] })
-        ) {
-          depth++;
-        }
+      const close = this.closingIndex(children, index, spec);
+      if (close !== -1) {
+        candidates.push({ spec, attrs, close });
       }
     }
-    return undefined;
+    return mostSpecific(candidates) ?? undefined;
+  }
+
+  /**
+   * The index of the HTML node that is the end tag of the element opened at
+   * `index`, counting the tags of the same name in the HTML between, or -1
+   * where they cannot be paired.
+   */
+  private closingIndex(
+    children: readonly UnknownMdastNode[],
+    index: number,
+    spec: HtmlElementSpec,
+  ): number {
+    const name = spec.tag.toLowerCase();
+    if (spec.kind === 'atom') {
+      const next = children[index + 1];
+      return next?.type === 'html' && isEndTag(next.value, name)
+        ? index + 1
+        : -1;
+    }
+    let depth = 0;
+    for (let close = index + 1; close < children.length; close++) {
+      const candidate = children[close];
+      if (candidate.type !== 'html' || candidate.value === undefined) {
+        continue;
+      }
+      if (depth === 0 && isEndTag(candidate.value, name)) {
+        return close;
+      }
+      const balance = tagBalance(candidate.value, name);
+      if (!balance || depth + balance.low < 0) {
+        return -1;
+      }
+      depth += balance.depth;
+    }
+    return -1;
+  }
+
+  /** The content a mark or an inline node of an element makes, or null. */
+  private inlineElement(
+    children: readonly UnknownMdastNode[],
+    index: number,
+    element: {
+      spec: HtmlElementSpec;
+      attrs: Record<string, unknown>;
+      close: number;
+    },
+  ): readonly ProseMirrorNode[] | null {
+    const { spec, attrs, close } = element;
+    const inner = () => children.slice(index + 1, close);
+    const source: ElementSource = {
+      type: spec.type,
+      attrs: '',
+      open: this.source(children[index]),
+      close: this.source(children[close]),
+    };
+    const record = (made: Record<string, unknown>) => {
+      source.attrs = JSON.stringify(made);
+    };
+    const list = this.inlineElements;
+    const at = list?.length ?? 0;
+    list?.push(source);
+    const drop = () => {
+      list?.splice(at, list.length - at);
+      return null;
+    };
+    const inLink = this.marks.some((mark) => mark.type.name === 'link');
+    if (spec.kind === 'mark') {
+      const type = this.schema.marks[spec.type];
+      // One inside another of its type would merge with it, so it is kept
+      // as written.
+      if (!type || this.marks.some((mark) => mark.type === type)) {
+        return drop();
+      }
+      const mark = type.create(attrs);
+      record(mark.attrs);
+      return this.withMarks(mark.addToSet(this.marks), () =>
+        this.inlines(inner()),
+      );
+    }
+    const type = this.schema.nodes[spec.type];
+    // VFM's HTML has no link inside a link, which a browser splits.
+    if (!type || (spec.kind === 'atom' && inLink)) {
+      return drop();
+    }
+    const content =
+      spec.kind === 'atom'
+        ? []
+        : this.withMarks([], () => this.inlines(inner()));
+    const holdsLink = content.some((it) =>
+      it.marks.some((mark) => mark.type.name === 'link'),
+    );
+    if (!type.validContent(Fragment.from(content)) || (inLink && holdsLink)) {
+      return drop();
+    }
+    const node = type.create(attrs, content, this.marks);
+    record(node.attrs);
+    return [node];
+  }
+
+  /**
+   * The textblock of an element that is one HTML block holding text alone,
+   * which markdown does not read, or null.
+   */
+  private htmlTextblock(node: UnknownMdastNode): ProseMirrorNode | null {
+    if (node.type !== 'html' || node.value === undefined) {
+      return null;
+    }
+    const source = this.source(node);
+    const value = source.trim();
+    const offset = source.indexOf(value);
+    const tag = readStartTag(value, 0);
+    if (!tag) {
+      return null;
+    }
+    const closeAt = value.lastIndexOf('</');
+    const end = closeAt === -1 ? null : readEndTag(value, closeAt);
+    if (!end || end.end !== value.length || end.name !== tag.name) {
+      return null;
+    }
+    const inner = value.slice(tag.end, closeAt);
+    const text = inner.includes('<') ? null : decodeHtml(inner);
+    if (text === null) {
+      return null;
+    }
+    const candidates = this.htmlElements.flatMap((spec) => {
+      const type = this.schema.nodes[spec.type];
+      const attrs =
+        spec.kind === 'textblock' && type && this.canPlace(type)
+          ? matchOpeningTag(value.slice(0, tag.end), spec)
+          : null;
+      return attrs && type ? [{ spec, attrs, type }] : [];
+    });
+    const found = mostSpecific(candidates);
+    if (!found) {
+      return null;
+    }
+    const made = found.type.create(
+      found.attrs,
+      text ? this.schema.text(text) : null,
+    );
+    this.elements.set(made, [
+      {
+        type: found.type.name,
+        attrs: JSON.stringify(made.attrs),
+        open: source.slice(0, offset + tag.end),
+        close: source.slice(offset + closeAt),
+        inner,
+      },
+    ]);
+    return made;
   }
 
   private inline(node: UnknownMdastNode): readonly ProseMirrorNode[] {
@@ -701,7 +1049,7 @@ function tallyStyles(
 
 export class MarkdownParser {
   private readonly handlers = new Map<string, FromMarkdownHandler[]>();
-  private readonly htmlElements: HtmlElementSpec[];
+  readonly htmlElements: readonly HtmlElementSpec[];
   private readonly meaningful: ReadonlySet<string>;
   private readonly styleSpecs = new Map<string, StyleSpec>();
   private readonly processor;
@@ -769,6 +1117,7 @@ export class MarkdownParser {
       doc: converter.root(root),
       ranges: converter.ranges,
       inlines: converter.inlineSources,
+      elements: converter.elements,
       styles: tallyStyles(root, body, this.styleSpecs),
     };
   }

@@ -4,6 +4,7 @@ import { isWritableFootnoteLabel } from '@v/tiptap-extensions';
 import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
+import { PAGE_FOOTNOTE } from '../../../libs/editor/styled-elements';
 import {
   hasFootnoteDefinition,
   nextFootnoteLabel,
@@ -11,8 +12,39 @@ import {
 } from '../../../libs/editor/vfm';
 import { dismissPanel, PanelForm } from './panel-form';
 
-/** Inserts a note where it is written. */
-export function FootnotePanel({ editor, close }: EditorMenuPanelProps) {
+/** Inserts a note where it is written, as VFM's `^[…]`. */
+export function FootnotePanel(props: EditorMenuPanelProps) {
+  return (
+    <NotePanel
+      {...props}
+      insert={(text) =>
+        props.editor.chain().focus().setInlineFootnote(text).run()
+      }
+    />
+  );
+}
+
+/** Inserts a note as the theme's `span.footnote`, at the foot of the page. */
+export function PageFootnotePanel(props: EditorMenuPanelProps) {
+  return (
+    <NotePanel
+      {...props}
+      insert={(text) =>
+        props.editor
+          .chain()
+          .focus()
+          .setHtmlElement(PAGE_FOOTNOTE, null, text)
+          .run()
+      }
+    />
+  );
+}
+
+function NotePanel({
+  editor,
+  close,
+  insert,
+}: EditorMenuPanelProps & { insert: (text: string) => void }) {
   const textRef = useRef<HTMLInputElement>(null);
 
   const apply = () => {
@@ -21,7 +53,7 @@ export function FootnotePanel({ editor, close }: EditorMenuPanelProps) {
       dismissPanel({ editor, close });
       return;
     }
-    editor.chain().focus().setInlineFootnote(text).run();
+    insert(text);
     close();
   };
 
