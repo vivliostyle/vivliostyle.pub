@@ -100,6 +100,25 @@ describe('runCase', () => {
     ).rejects.toThrow('Could not break');
   });
 
+  it('returns a step that makes ProseMirror throw as a mismatch', async () => {
+    const [mismatch, ...rest] = await runOnNode({
+      given: 'a‸',
+      steps: [
+        run('resolve outside the document', (editor) => {
+          editor.state.doc.resolve(-1);
+        }),
+      ],
+      expect: 'a‸',
+    });
+    expect(rest).toEqual([]);
+    expect(mismatch).toMatchObject({
+      label: 'resolve outside the document throws',
+    });
+    expect(mismatch && 'error' in mismatch && mismatch.error).toBeInstanceOf(
+      RangeError,
+    );
+  });
+
   it('throws for more than two marks', async () => {
     await expect(runOnNode({ given: 'a‸b‸c‸' })).rejects.toThrow('at most two');
   });
