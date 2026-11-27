@@ -19,7 +19,12 @@ import {
 } from 'react';
 import { useDebounce } from 'react-use';
 
-import { PubExtensions } from '@v/tiptap-extensions';
+import {
+  getMarkdown,
+  MathTypesetting,
+  PubExtensions,
+  setMarkdownBaseline,
+} from '@v/tiptap-extensions';
 import { cn } from '@v/ui/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@v/ui/tabs';
 import CodeEditor from '../../../../components/code-editor';
@@ -32,6 +37,7 @@ import { SelectionToolbar } from '../../../../components/content-editor/selectio
 import { TriggerMenu } from '../../../../components/content-editor/trigger-menu';
 import { createObjectUrlImageSaver } from '../../../../libs/editor/image-saver';
 import { insertImageFiles } from '../../../../libs/editor/insert-image';
+import { temmlTypesetter } from '../../../../libs/editor/math-typesetter';
 import { createEditorMenuExtensions } from '../../../../libs/editor/menu/extensions';
 
 type AstTabType = 'tree' | 'html' | 'json';
@@ -84,6 +90,7 @@ export function RichEditorPane() {
           insertImageFiles({ editor, files });
         },
       }),
+      MathTypesetting.configure({ typesetter: temmlTypesetter }),
       Placeholder.configure({
         placeholder: 'Start typing...',
       }),
@@ -97,7 +104,13 @@ export function RichEditorPane() {
       });
     },
     onUpdate: useCallback(() => {
-      setContentInEditor(editor.getMarkdown());
+      try {
+        const markdown = getMarkdown(editor);
+        setMarkdownBaseline(editor, markdown);
+        setContentInEditor(markdown);
+      } catch (error) {
+        console.error(error);
+      }
     }, []),
   });
 
@@ -115,7 +128,7 @@ export function RichEditorPane() {
     if (contentInEditor === context.markdown) {
       return;
     }
-    editor.commands.setContent(context.markdown, { contentType: 'markdown' });
+    editor.commands.setMarkdown(context.markdown);
     setTimeout(cancel, deferMs - 1);
 
     context.onEditorAstChange?.(editor.getJSON());

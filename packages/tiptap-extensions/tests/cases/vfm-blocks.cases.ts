@@ -1,0 +1,1550 @@
+import type { Editor } from '@tiptap/core';
+import { NodeSelection } from '@tiptap/pm/state';
+
+import {
+  currentNotations,
+  setDocumentNotations,
+} from '../../src/markdown/extension';
+import { vfmNotations } from '../../src/markdown/notations/vfm/notations';
+import { press, run, type Step } from '../../testing/steps';
+import type { CaseSuite } from '../../testing/vitest';
+
+// The definitions this set of syntax added to those the inline syntax came
+// with: a document recorded without them was made before.
+const BLOCK_NOTATIONS = new Set([
+  'paragraphContinuation',
+  'headingAttributes',
+  'sectionEnd',
+  'shortcode',
+  'taskList',
+  'imageAlt',
+  'footnoteDefinition',
+  'inlineImage',
+]);
+
+const recordInlineEra = run(
+  'record the document as made before block VFM syntax',
+  (editor: Editor) => {
+    setDocumentNotations(
+      editor,
+      currentNotations(editor)
+        .split(' ')
+        .filter((entry) => !BLOCK_NOTATIONS.has(entry.split('@')[0] ?? ''))
+        .join(' '),
+    );
+  },
+);
+
+const VFM = new Set(vfmNotations().map((it) => it.name));
+
+const recordWithoutVfm = run(
+  'record the document as made without VFM',
+  (editor: Editor) => {
+    setDocumentNotations(
+      editor,
+      currentNotations(editor)
+        .split(' ')
+        .filter((entry) => !VFM.has(entry.split('@')[0] ?? ''))
+        .join(' '),
+    );
+  },
+);
+
+/** Inserts text at the selection without input rules. */
+function insert(text: string): Step {
+  return run(`insert ${JSON.stringify(text)}`, (editor) => {
+    editor.view.dispatch(editor.state.tr.insertText(text));
+  });
+}
+
+// What ProseMirror dispatches for pasted text, which the node driver cannot
+// paste: paste rules look for the meta.
+const paste = (text: string) =>
+  run(`paste ${JSON.stringify(text)} as text`, (editor: Editor) => {
+    editor.view.dispatch(
+      editor.state.tr.insertText(text).setMeta('uiEvent', 'paste'),
+    );
+  });
+
+function selectNode(name: string): Step {
+  return run(`select the ${name}`, (editor) => {
+    let at = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (at === -1 && node.type.name === name) {
+        at = pos;
+      }
+    });
+    editor.view.dispatch(
+      editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, at)),
+    );
+  });
+}
+
+function command(label: string, apply: (editor: Editor) => boolean): Step {
+  return run(label, (editor) => {
+    if (!apply(editor)) {
+      throw new Error(`Could not ${label}`);
+    }
+  });
+}
+
+function refused(label: string, apply: (editor: Editor) => boolean): Step {
+  return run(`not ${label}`, (editor) => {
+    if (apply(editor)) {
+      throw new Error(`Could ${label}`);
+    }
+  });
+}
+
+const SHORTCODE_LINES =
+  'VFM 2 reads a shortcode up to `]]` on a later line too; the editor only reads one on a line';
+
+export const vfmBlockSuites: CaseSuite[] = [
+  {
+    title: 'VFM paragraphs',
+    cases: [
+      {
+        name: 'an ATX heading right after a paragraph is more of its lines',
+        given: 'text\n# H\n{#id} more',
+        doc: 'doc(paragraph("text\\n", rawInline("# H"), "\\n{#id} more"))',
+      },
+      {
+        name: 'after a blank line it is a heading',
+        given: 'text\n\n# H',
+        doc: 'doc(paragraph("text"), heading("H"))',
+      },
+      {
+        name: 'lazily in a quote, a list item or a note',
+        given: '> a\n# H\n\n- b\n#\n\n[^1]: c\n## d',
+        doc: 'doc(blockquote(paragraph("a\\n", rawInline("# H"))), bulletList(listItem(paragraph("b\\n", rawInline("#")))), footnoteDefinition(paragraph("c\\n", rawInline("## d"))))',
+      },
+      {
+        name: 'a setext heading of more lines is a paragraph',
+        given: 'a\nb\n===\nc',
+        doc: 'doc(paragraph("a\\nb\\n", rawInline("==="), "\\nc"))',
+      },
+      {
+        name: 'one with a thematic break under it is a paragraph before it',
+        given: 'a\nb\n---',
+        doc: 'doc(paragraph("a\\nb"), horizontalRule)',
+      },
+      {
+        name: 'display math with a line of an equals sign',
+        given: '$$\na\n=\nb$$',
+        doc: 'doc(paragraph("$$\\na\\n", rawInline("="), "\\nb$$"))',
+      },
+      {
+        name: 'a setext heading of one line stays one',
+        given: 'a\n===',
+        doc: 'doc(heading("a"))',
+      },
+      {
+        name: 'fenced code right after a paragraph',
+        given: 'text\n```\nx\n```',
+        doc: 'doc(paragraph("text\\n", rawInline("```\\nx\\n```")))',
+        fails:
+          'VFM 2 reads fenced code right after a paragraph as more of its lines, where a code span can take it; the editor keeps the code block, as lines of raw markdown in a paragraph would not survive editing',
+      },
+      {
+        name: 'editing the paragraph',
+        given: 'text‸\n# H',
+        steps: ['X'],
+        expect: 'textX‸\n# H',
+      },
+      {
+        name: 'a heading made of lines is written on one',
+        given: 'a\nb‸',
+        steps: [
+          command('make a heading', (editor) =>
+            editor.commands.setNode('heading', { level: 2 }),
+          ),
+        ],
+        expect: '## a<br>b‸',
+      },
+    ],
+  },
+  {
+    title: 'VFM heading attributes',
+    cases: [
+      { name: 'id and class', given: '# 見出し {#id .cls}' },
+      {
+        name: 'the attributes are the heading’s',
+        given: '# H1 {#id .cls key=val}',
+        json: [
+          {
+            type: 'heading',
+            attrs: {
+              level: 1,
+              attributes: { id: 'id', class: 'cls', key: 'val' },
+            },
+            content: [{ type: 'text', text: 'H1' }],
+          },
+        ],
+      },
+      {
+        name: 'on the next line',
+        given: '# H1\n{.blk}\n\npara',
+        doc: 'doc(heading("H1"), paragraph("para"))',
+        json: [
+          { type: 'heading', attrs: { attributes: { class: 'blk' } } },
+          { type: 'paragraph' },
+        ],
+      },
+      {
+        name: 'on the next line, before more lines of a paragraph',
+        given: '# H\n{#x}\npara',
+        doc: 'doc(heading("H"), paragraph("para"))',
+      },
+      {
+        name: 'on the next line in a quote',
+        given: '> # H\n> {.q}',
+        doc: 'doc(blockquote(heading("H")))',
+      },
+      {
+        name: 'after a blank line it is a paragraph',
+        given: '# H1\n\n{.blk}',
+        doc: 'doc(heading("H1"), paragraph("{.blk}"))',
+      },
+      { name: 'hidden', given: '# 隠す {hidden}' },
+      {
+        name: 'without space before them',
+        given: '# H{#x}',
+        json: [{ type: 'heading', attrs: { attributes: { id: 'x' } } }],
+      },
+      {
+        name: 'before the closing sequence',
+        given: '## D {#x} ##',
+        json: [
+          {
+            type: 'heading',
+            attrs: { closingSequence: ' ##', attributes: { id: 'x' } },
+          },
+        ],
+      },
+      {
+        name: 'after hashes that are no closing sequence then',
+        given: '## D ## {#x}',
+        doc: 'doc(heading("D ##"))',
+        json: [
+          {
+            type: 'heading',
+            attrs: { closingSequence: null, attributes: { id: 'x' } },
+          },
+        ],
+      },
+      {
+        name: 'after an element they stay text, as in VFM',
+        given: '# Heading *test* {#foo}',
+        doc: 'doc(heading("Heading ", italic("test"), " {#foo}"))',
+      },
+      {
+        name: 'after text following an element',
+        given: '# *b* c {#x}',
+        doc: 'doc(heading(italic("b"), " c"))',
+      },
+      {
+        name: 'right after an element they are the element’s',
+        given: '# Heading *test*{#foo}',
+        json: [
+          {
+            type: 'heading',
+            attrs: { attributes: null },
+            content: [
+              { type: 'text', text: 'Heading ' },
+              {
+                type: 'text',
+                text: 'test',
+                marks: [
+                  { type: 'italic', attrs: { attributes: { id: 'foo' } } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'the last of two',
+        given: '# a {#x} {.y}',
+        doc: 'doc(heading("a {#x}"))',
+      },
+      {
+        name: 'a quoted value',
+        given: '# H {key="a b" .c}',
+        json: [
+          {
+            type: 'heading',
+            attrs: { attributes: { class: 'c', key: 'a b' } },
+          },
+        ],
+      },
+      {
+        name: 'escaped braces are text',
+        given: '# a \\{#x}',
+        doc: 'doc(heading("a {#x}"))',
+      },
+      {
+        name: 'not on a setext heading',
+        given: 'Setext {#s}\n===',
+        doc: 'doc(heading("Setext {#s}"))',
+      },
+      {
+        name: 'Japanese text and id',
+        given: '# 第一章　はじめに {#はじめに}',
+        json: [{ type: 'heading', attrs: { attributes: { id: 'はじめに' } } }],
+      },
+      {
+        name: 'on the next line after attributes of its own, dropped as in VFM',
+        given: '# H1 {.a}\n{.b}',
+        doc: 'doc(heading("H1"))',
+        json: [{ type: 'heading', attrs: { attributes: { class: 'a' } } }],
+      },
+      ...[
+        ['after an escape', '# C\\# {#cs}', 'doc(heading("C# {#cs}"))'],
+        [
+          'after an escaped backslash',
+          '# a\\\\ {#id}',
+          'doc(heading("a\\\\ {#id}"))',
+        ],
+        ['after a reference', '# a &copy;{#id}', 'doc(heading("a ©{#id}"))'],
+        [
+          'after brackets',
+          '# 参考 [1] {#refs}',
+          'doc(heading("参考 [1] {#refs}"))',
+        ],
+        ['with an escape in them', '# H {title="a\\"b"}'],
+        [
+          'with a reference in them',
+          '# H {title=a&amp;b}',
+          'doc(heading("H {title=a&b}"))',
+        ],
+      ].map(([what, given, doc]) => ({
+        name: `${what} they are text, as in VFM`,
+        given: given ?? '',
+        doc,
+        json: [{ type: 'heading', attrs: { attributes: null } }],
+      })),
+      {
+        name: 'after text that follows an escape or brackets',
+        given: '# a\\*b {#x}\n\n# a [b]c {#y}\n\n# a [[b]] {#z}',
+        json: [
+          { type: 'heading', attrs: { attributes: { id: 'x' } } },
+          { type: 'heading', attrs: { attributes: { id: 'y' } } },
+          { type: 'heading', attrs: { attributes: { id: 'z' } } },
+        ],
+      },
+      {
+        name: 'the last braces only',
+        given: '# a {#x title="{"}',
+        doc: 'doc(heading("a {#x title=\\""))',
+      },
+      {
+        name: 'on the next line, read as written',
+        given: '# C\\#\n{title=a&amp;b}',
+        doc: 'doc(heading("C#"))',
+        json: [
+          { type: 'heading', attrs: { attributes: { title: 'a&amp;b' } } },
+        ],
+      },
+      {
+        name: 'on the next line with text after them',
+        given: '# H\n{#id} x',
+        doc: 'doc(heading("H"), paragraph(" x"))',
+        json: [{ type: 'heading', attrs: { attributes: { id: 'id' } } }, {}],
+      },
+      {
+        name: 'on the next line in a quote, before more lines',
+        given: '> # H\n> {#id}\n> body',
+        doc: 'doc(blockquote(heading("H"), paragraph("body")))',
+      },
+      {
+        name: 'on the next line in an item whose marker is alone, they are text',
+        given: '-\n  # H\n  {#z}',
+        doc: 'doc(bulletList(listItem(paragraph, heading("H"), paragraph("{#z}"))))',
+      },
+      {
+        name: 'on the next line, the closing sequence opens a section all the same',
+        given: '# H #\n{#id}',
+        json: [
+          {
+            type: 'heading',
+            attrs: { closingSequence: null, attributes: { id: 'id' } },
+          },
+        ],
+      },
+      {
+        name: 'editing the text keeps them',
+        given: '# 見出‸ {#id}',
+        steps: ['し'],
+        expect: '# 見出し‸ {#id}',
+      },
+      {
+        name: 'editing the text keeps them on the next line',
+        given: '## 見出‸\n{#id}',
+        steps: ['し'],
+        expect: '## 見出し‸\n{#id}',
+      },
+      {
+        name: 'setting them',
+        given: '# 見出し‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'a', class: 'b c' }),
+          ),
+        ],
+        expect: '# 見出し {#a .b .c}',
+      },
+      {
+        name: 'setting them on a heading that ends with an element',
+        given: '# 見出し *強調*‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'a' }),
+          ),
+        ],
+        expect: '# 見出し *強調*\n{#a}',
+      },
+      ...[
+        ['brackets', '# a [b]‸', { id: 'z' }, '# a [b]\n{#z}'],
+        ['a bare reference', '# a &copy‸', { id: 'z' }, '# a &copy\n{#z}'],
+        ['an escaped character', '# a\\*‸', { id: 'x' }, '# a\\*\n{#x}'],
+        ['', '# H‸', { title: 'a"b' }, '# H\n{title="a\\"b"}'],
+        ['', '# H‸', { title: 'a&amp;b' }, '# H\n{title=a&amp;b}'],
+        ['', '# H‸', { title: '[x]' }, '# H\n{title=[x]}'],
+      ].map(([what, given, attributes, expect]) => ({
+        name: what
+          ? `setting them after ${what} puts them on the next line`
+          : `setting ${JSON.stringify(attributes)} puts them on the next line`,
+        given: String(given),
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes(
+              attributes as Record<string, string>,
+            ),
+          ),
+        ],
+        expect: String(expect),
+      })),
+      {
+        name: 'setting them after an ampersand',
+        given: '# Q&‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '# Q& {#x}',
+      },
+      {
+        name: 'setting them on the first heading of an item',
+        given: '- # *H*‸',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'z' }),
+          ),
+        ],
+        expect: '- # *H*\n  {#z}',
+      },
+      {
+        name: 'setting them before a closing sequence',
+        given: '## D‸ ##',
+        steps: [
+          command('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '## D {#x} ##',
+      },
+      {
+        name: 'none that would have to go on the next line of a heading with a closing sequence',
+        given: '## *D*‸ ##',
+        steps: [
+          refused('set the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'x' }),
+          ),
+        ],
+        expect: '## *D* ##',
+      },
+      {
+        name: 'taking away those on the next line keeps the heading ATX',
+        given: '# H‸\n{#id}\ntext',
+        steps: [
+          command('take the attributes away', (editor) =>
+            editor.commands.setHeadingAttributes(null),
+          ),
+        ],
+        expect: '# H\ntext',
+      },
+      {
+        name: 'editing another heading keeps headings ATX',
+        given: '# A\n{#a}\n\n# B‸',
+        steps: ['X'],
+        expect: '# A\n{#a}\n\n# BX‸',
+      },
+      {
+        name: 'changing them keeps where they are written',
+        given: '# 見出し‸\n{#a}',
+        steps: [
+          command('change the attributes', (editor) =>
+            editor.commands.setHeadingAttributes({ id: 'b' }),
+          ),
+        ],
+        expect: '# 見出し\n{#b}',
+      },
+      {
+        name: 'taking them away',
+        given: '# 見出し‸ {#a}',
+        steps: [
+          command('take the attributes away', (editor) =>
+            editor.commands.setHeadingAttributes(null),
+          ),
+        ],
+        expect: '# 見出し',
+      },
+      {
+        name: 'none that cannot be written',
+        given: '# 見出し‸',
+        steps: [
+          refused('set attributes with a line break', (editor) =>
+            editor.commands.setHeadingAttributes({ title: 'a\nb' }),
+          ),
+        ],
+        expect: '# 見出し',
+      },
+      {
+        name: 'typed at the end of a heading',
+        given: '# 見出し‸',
+        steps: [' {#id .cls}'],
+        expect: '# 見出し {#id .cls}',
+        json: [
+          {
+            type: 'heading',
+            attrs: { attributes: { id: 'id', class: 'cls' } },
+            content: [{ type: 'text', text: '見出し' }],
+          },
+        ],
+      },
+      {
+        name: 'braces inserted without the input rule are escaped',
+        given: '# 見出し‸',
+        steps: [insert(' {#id}')],
+        expect: '# 見出し \\{#id}',
+      },
+      {
+        name: 'typed in a document recorded before them, they stay text',
+        given: '# 見出し‸',
+        steps: [recordInlineEra, ' {#id}'],
+        expect: '# 見出し {#id}‸',
+        doc: 'doc(heading("見出し {#id}"))',
+      },
+    ],
+  },
+  {
+    title: 'VFM section ends',
+    cases: [
+      {
+        name: 'a line of hashes ends the section',
+        given: '# A\n\ntext\n\n#\n\nafter',
+        doc: 'doc(heading("A"), paragraph("text"), sectionEnd, paragraph("after"))',
+      },
+      {
+        name: 'its level',
+        given: '# A\n\n## B\n\n##\n\nx',
+        json: [
+          { type: 'heading' },
+          { type: 'heading' },
+          { type: 'sectionEnd', attrs: { level: 2 } },
+          { type: 'paragraph' },
+        ],
+      },
+      { name: 'one that ends nothing', given: '#\n\nafter' },
+      {
+        name: 'an empty heading with a closing sequence is a heading',
+        given: '# #',
+        doc: 'doc(heading)',
+      },
+      { name: 'in a quote', given: '> #' },
+      {
+        name: 'an empty heading is saved as one',
+        given: '‸',
+        steps: ['# '],
+        expect: '#',
+        doc: 'doc(heading)',
+      },
+      {
+        name: 'Enter after hashes alone',
+        given: '‸',
+        steps: ['##', press('Enter')],
+        expect: '##',
+        doc: 'doc(sectionEnd, paragraph)',
+      },
+      {
+        name: 'inserting one',
+        given: '# A\n\ntext‸',
+        steps: [
+          command('insert a section end', (editor) =>
+            editor.commands.insertSectionEnd(1),
+          ),
+        ],
+        expect: '# A\n\ntext\n\n#',
+      },
+      {
+        name: 'hashes in a paragraph are escaped',
+        given: '‸',
+        steps: [insert('#')],
+        expect: '\\#',
+      },
+      {
+        name: 'Enter after hashes in a document recorded before them',
+        given: '‸',
+        steps: [recordInlineEra, '##', press('Enter'), 'x'],
+        expect: '## x‸',
+      },
+    ],
+  },
+  {
+    title: 'VFM footnote definitions',
+    cases: [
+      { name: 'a definition', given: '本文[^1]\n\n[^1]: 注の本文' },
+      {
+        name: 'a definition is a node',
+        given: '[^note]: 注',
+        doc: 'doc(footnoteDefinition(paragraph("注")))',
+        json: [{ type: 'footnoteDefinition', attrs: { label: 'note' } }],
+      },
+      {
+        name: 'paragraphs',
+        given: 'a[^1]\n\n[^1]: p1\n\n    p2',
+        doc: 'doc(paragraph("a", footnoteReference), footnoteDefinition(paragraph("p1"), paragraph("p2")))',
+      },
+      {
+        name: 'a paragraph indented less is not the note’s',
+        given: 'a[^1]\n\n[^1]: p1\n\n  p2',
+        doc: 'doc(paragraph("a", footnoteReference), footnoteDefinition(paragraph("p1")), paragraph("p2"))',
+      },
+      {
+        name: 'a list and code',
+        given: '[^1]:\n    - x\n    - y\n\n    ```js\n    code\n    ```',
+        doc: 'doc(footnoteDefinition(bulletList(listItem(paragraph("x")), listItem(paragraph("y"))), codeBlock("code")))',
+      },
+      {
+        name: 'a lazy line',
+        given: '[^1]: line1\nlazy',
+        doc: 'doc(footnoteDefinition(paragraph("line1\\nlazy")))',
+      },
+      {
+        name: 'in a quote',
+        given: '> a[^1]\n>\n> [^1]: 引用の中',
+        doc: 'doc(blockquote(paragraph("a", footnoteReference), footnoteDefinition(paragraph("引用の中"))))',
+      },
+      {
+        name: 'in a list item',
+        given: '- a[^1]\n\n  [^1]: 項目の中',
+        doc: 'doc(bulletList(listItem(paragraph("a", footnoteReference), footnoteDefinition(paragraph("項目の中")))))',
+      },
+      {
+        name: 'one interrupting a paragraph is more of its lines',
+        given: 'a[^1]\ntext\n[^1]: def',
+        doc: 'doc(paragraph("a", footnoteReference, "\\ntext\\n", rawInline("[^1]: def")))',
+      },
+      {
+        name: 'one right after another is a definition of its own',
+        given: '本文[^1]と[^2]。\n\n[^1]: 注一\n[^2]: 注二',
+        doc: 'doc(paragraph("本文", footnoteReference, "と", footnoteReference, "。"), footnoteDefinition(paragraph("注一")), footnoteDefinition(paragraph("注二")))',
+      },
+      {
+        name: 'one right after another’s list',
+        given: '[^1]:\n    - x\n[^2]: two',
+        doc: 'doc(footnoteDefinition(bulletList(listItem(paragraph("x")))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'one right after another in a quote',
+        given: '> [^1]: one\n[^2]: two',
+        doc: 'doc(blockquote(footnoteDefinition(paragraph("one"))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'one right after another in a list item',
+        given: '- [^1]: one‸\n[^2]: two',
+        steps: ['X'],
+        expect: '- [^1]: oneX‸\n[^2]: two',
+        doc: 'doc(bulletList(listItem(paragraph, footnoteDefinition(paragraph("oneX")))), footnoteDefinition(paragraph("two")))',
+      },
+      {
+        name: 'a thematic break right after one',
+        given: 'a[^1]\n\n[^1]: one\n---',
+        doc: 'doc(paragraph("a", footnoteReference), heading("[^1]: one"))',
+        fails:
+          'VFM 2 reads the line of the definition and the break under it as a setext heading, as it tries one before a definition; micromark reads the definition and a thematic break',
+      },
+      {
+        name: 'one indented into another is more of its lines',
+        given: '[^1]: one\n    [^2]: two',
+        doc: 'doc(footnoteDefinition(paragraph("one\\n", rawInline("[^2]: two"))))',
+      },
+      {
+        name: 'editing one right before another',
+        given: '本文[^1]と[^2]。\n\n[^1]: ‸注一\n[^2]: 注二',
+        steps: ['X'],
+        expect: '本文[^1]と[^2]。\n\n[^1]: X‸注一\n[^2]: 注二',
+      },
+      {
+        name: 'one of paragraphs interrupting a paragraph is kept as written',
+        given: 'a\n[^1]: x\n\n    b',
+        doc: 'doc(paragraph("a"), rawBlock("[^1]: x\\n\\n    b"))',
+      },
+      {
+        name: 'inline syntax in it',
+        given: '[^1]: *強調* $x$ {漢字|かんじ}^[注の注]',
+        doc: 'doc(footnoteDefinition(paragraph(italic("強調"), " ", math, " ", ruby("漢字"), inlineFootnote("注の注"))))',
+      },
+      {
+        name: 'two with one label',
+        given: 'a[^1]\n\n[^1]: def\n\n[^1]: dup',
+      },
+      {
+        name: 'editing one',
+        given: '[^1]: 注の‸\n\n    二段落目',
+        steps: ['本文'],
+        expect: '[^1]: 注の本文‸\n\n    二段落目',
+      },
+      {
+        name: 'editing its second paragraph',
+        given: '[^1]: 注\n\n    二段落‸',
+        steps: ['目'],
+        expect: '[^1]: 注\n\n    二段落目‸',
+      },
+      {
+        name: 'a line break typed into it',
+        given: '[^1]: 一行目‸',
+        steps: [press('Enter'), '二'],
+        expect: '[^1]: 一行目\n\n    二‸',
+      },
+      {
+        name: 'adding a definition',
+        given: '本文[^2]‸',
+        steps: [
+          command('add the definition', (editor) =>
+            editor.commands.insertFootnoteDefinition('2', '注の本文'),
+          ),
+        ],
+        expect: '本文[^2]\n\n[^2]: 注の本文',
+      },
+      {
+        name: 'no second definition of a label',
+        given: '本文[^1]‸\n\n[^1]: 注',
+        steps: [
+          refused('add another definition', (editor) =>
+            editor.commands.insertFootnoteDefinition('1', 'x'),
+          ),
+        ],
+        expect: '本文[^1]\n\n[^1]: 注',
+      },
+      {
+        name: 'relabelling a definition',
+        given: '[^1]: 注‸',
+        steps: [
+          command('relabel the definition', (editor) =>
+            editor.commands.setFootnoteDefinitionLabel('a'),
+          ),
+        ],
+        expect: '[^a]: 注',
+      },
+      {
+        // A list item has to start with a paragraph.
+        name: 'typed as the first paragraph of a list item, it stays text',
+        given: '- ‸',
+        steps: ['[^1]: 項目の注'],
+        expect: '- \\[^1]: 項目の注‸',
+        doc: 'doc(bulletList(listItem(paragraph("[^1]: 項目の注"))))',
+      },
+      {
+        name: 'a pasted definition',
+        given: '‸',
+        steps: [paste('[^1]: 貼り付けた注')],
+        expect: '[^1]: 貼り付けた注‸',
+        doc: 'doc(footnoteDefinition(paragraph("貼り付けた注")))',
+      },
+      {
+        name: 'typed in a document recorded before them, it stays text',
+        given: '本文[^1]‸',
+        steps: [recordInlineEra, press('Enter'), '[^1]: 注の本文'],
+        expect: '本文[^1]\n\n\\[^1]: 注の本文‸',
+        doc: 'doc(paragraph("本文", footnoteReference), paragraph("[^1]: 注の本文"))',
+      },
+      {
+        name: 'no definition is added to a document made without VFM',
+        given: '本文‸',
+        steps: [
+          recordWithoutVfm,
+          refused('add a definition', (editor) =>
+            editor.commands.insertFootnoteDefinition('1'),
+          ),
+        ],
+        expect: '本文',
+      },
+    ],
+  },
+  {
+    title: 'VFM shortcodes',
+    cases: [
+      { name: 'a table of contents', given: '# A\n\n[[toc]]\n\n## B' },
+      {
+        // VFM writes an empty element for it, which the editor has no use for.
+        name: 'a table of contents is kept as written',
+        given: '[[toc]]',
+        doc: 'doc(rawBlock("[[toc]]"))',
+      },
+      {
+        name: 'in a quote',
+        given: '> [[toc]]',
+        doc: 'doc(blockquote(rawBlock("[[toc]]")))',
+      },
+      {
+        name: 'with spaces and attributes',
+        given: '[[ toc a=1 ]]',
+        doc: 'doc(rawBlock("[[ toc a=1 ]]"))',
+      },
+      {
+        name: 'other shortcodes, which VFM removes, are kept as written',
+        given: '[[TOC]]\n\n[[foo bar=1]]',
+        doc: 'doc(rawBlock("[[TOC]]"), rawBlock("[[foo bar=1]]"))',
+      },
+      {
+        name: 'after text it is text',
+        given: 'text [[toc]]',
+        doc: 'doc(paragraph("text [[toc]]"))',
+      },
+      {
+        name: 'indented it is text',
+        given: '  [[toc]]',
+        doc: 'doc(paragraph("[[toc]]"))',
+      },
+      {
+        name: 'it cannot interrupt a paragraph',
+        given: 'text\n[[toc]]',
+        doc: 'doc(paragraph("text\\n[[toc]]"))',
+      },
+      {
+        name: 'escaped it is text',
+        given: '\\[[toc]]',
+        doc: 'doc(paragraph("[[toc]]"))',
+      },
+      {
+        name: 'text after it on its line is a paragraph',
+        given: '[[toc]] text *em*',
+        doc: 'doc(rawBlock("[[toc]]"), paragraph("text ", italic("em")))',
+      },
+      {
+        name: 'text after another shortcode, which VFM removes',
+        given: '[[注]] は本文\n\n> [[foo]] x',
+        doc: 'doc(rawBlock("[[注]]"), paragraph("は本文"), blockquote(rawBlock("[[foo]]"), paragraph("x")))',
+      },
+      {
+        name: 'a blank one is text',
+        given: '[[ ]]\n\n[[]]',
+        doc: 'doc(paragraph("[[ ]]"), paragraph("[[]]"))',
+      },
+      {
+        name: 'one that ends on a later line',
+        given: '[[foo\nbar]] c',
+        doc: 'doc(rawBlock("[[foo\\nbar]]"), paragraph("c"))',
+        fails: SHORTCODE_LINES,
+      },
+      {
+        name: 'a link around a reference that starts a paragraph is no shortcode',
+        given: 'a‸[[^1]](u)',
+        steps: [press('Backspace')],
+        expect: '[[^1]{}](u)',
+        doc: 'doc(paragraph(link(footnoteReference)))',
+      },
+      {
+        name: 'editing the text after it',
+        given: '[[toc]] text‸',
+        steps: ['X'],
+        expect: '[[toc]] textX‸',
+      },
+      {
+        name: 'text typed as one with text after it is escaped',
+        given: '‸',
+        steps: [insert('[[toc]] text')],
+        expect: '\\[[toc]\\] text‸',
+      },
+      {
+        name: 'text typed as another with text after it is escaped',
+        given: '‸',
+        steps: [insert('[[注]] は本文')],
+        expect: '\\[[注]\\] は本文‸',
+      },
+      {
+        name: 'typed alone in a paragraph it is text',
+        given: '‸',
+        steps: ['[[toc]]', 'x'],
+        expect: '\\[[toc]\\]x‸',
+        doc: 'doc(paragraph("[[toc]]x"))',
+      },
+      {
+        name: 'text inserted as one is escaped',
+        given: '‸',
+        steps: [insert('[[toc]]')],
+        expect: '\\[[toc]\\]',
+      },
+      {
+        // To the document's definitions it is text, which needs no escape.
+        name: 'typed in a document recorded before it, it stays text',
+        given: '‸',
+        steps: [recordInlineEra, '[[toc]]'],
+        expect: '[[toc]]‸',
+        doc: 'doc(paragraph("[[toc]]"))',
+      },
+    ],
+  },
+  {
+    title: 'GFM task lists',
+    cases: [
+      { name: 'tasks', given: '- [ ] task\n- [x] done' },
+      {
+        name: 'a task is a list item with a checkbox',
+        given: '- [ ] task\n- [x] done\n- item',
+        json: [
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                attrs: { checked: false },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'task' }],
+                  },
+                ],
+              },
+              { type: 'listItem', attrs: { checked: true } },
+              { type: 'listItem', attrs: { checked: null } },
+            ],
+          },
+        ],
+      },
+      { name: 'an upper-case x', given: '- [X] up' },
+      {
+        name: 'an empty task',
+        given: '- [ ] \n- b',
+        json: [
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                attrs: { checked: false },
+                content: [{ type: 'paragraph' }],
+              },
+              { type: 'listItem', attrs: { checked: null } },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'no space after the checkbox is no task',
+        given: '- [ ]',
+        doc: 'doc(bulletList(listItem(paragraph("[ ]"))))',
+      },
+      { name: 'an ordered list', given: '1. [ ] a\n2. [x] b' },
+      { name: 'more paragraphs', given: '- [ ] a\n\n  para' },
+      { name: 'nested', given: '- [ ] a\n  - [x] b' },
+      {
+        name: 'an escaped checkbox is text',
+        given: '- \\[ ] esc',
+        json: [
+          {
+            type: 'bulletList',
+            content: [{ type: 'listItem', attrs: { checked: null } }],
+          },
+        ],
+      },
+      {
+        name: 'a checkbox that ends its line is text, as in VFM',
+        given: '- [x]\n  text\n- [ ]\n  b',
+        doc: 'doc(bulletList(listItem(paragraph(rawInline("[x]"), "\\ntext")), listItem(paragraph(rawInline("[ ]"), "\\nb"))))',
+      },
+      {
+        name: 'editing the text after a checkbox that ends its line',
+        given: '- [x]\n  text‸',
+        steps: ['X'],
+        expect: '- [x]\n  textX‸',
+      },
+      {
+        name: 'a heading after the checkbox',
+        given: '- [x] # h',
+        doc: 'doc(bulletList(listItem(paragraph, heading("h"))))',
+        fails:
+          'VFM 2 reads a block after the checkbox; micromark reads the rest of the line as text',
+      },
+      {
+        name: 'a quote after the checkbox',
+        given: '- [ ] > q',
+        doc: 'doc(bulletList(listItem(paragraph, blockquote(paragraph("q")))))',
+        fails:
+          'VFM 2 reads a block after the checkbox; micromark reads the rest of the line as text',
+      },
+      {
+        name: 'checking a task',
+        given: '- [ ] ta‸sk',
+        steps: [
+          command('check it', (editor) => editor.commands.setTaskItem(true)),
+        ],
+        expect: '- [x] ta‸sk',
+      },
+      {
+        name: 'checking keeps an upper-case x when unchecking and checking',
+        given: '- [X] ta‸sk',
+        steps: [
+          command('uncheck it', (editor) => editor.commands.setTaskItem(false)),
+        ],
+        expect: '- [ ] ta‸sk',
+      },
+      {
+        name: 'making a task of an item',
+        given: '- ite‸m',
+        steps: [
+          command('make a task', (editor) =>
+            editor.commands.setTaskItem(false),
+          ),
+        ],
+        expect: '- [ ] ite‸m',
+      },
+      {
+        name: 'making an item of a task',
+        given: '- [x] ite‸m',
+        steps: [
+          command('make an item', (editor) =>
+            editor.commands.setTaskItem(null),
+          ),
+        ],
+        expect: '- ite‸m',
+      },
+      {
+        name: 'typing a checkbox at the start of an item',
+        given: '- ‸',
+        steps: ['[ ] やること'],
+        expect: '- [ ] やること‸',
+        json: [
+          {
+            type: 'bulletList',
+            content: [{ type: 'listItem', attrs: { checked: false } }],
+          },
+        ],
+      },
+      {
+        name: 'a new item after a task is a task to do',
+        given: '- [x] 済み‸',
+        steps: [press('Enter'), '次'],
+        expect: '- [x] 済み\n- [ ] 次‸',
+      },
+      {
+        name: 'text like a checkbox in an item is escaped',
+        given: '- ‸',
+        steps: [insert('[ ] not a task')],
+        expect: '- \\[ \\] not a task‸',
+      },
+      {
+        name: 'typed in a document recorded before them, it stays text',
+        given: '- ‸',
+        steps: [recordInlineEra, '[ ] x'],
+        expect: '- \\[ \\] x‸',
+        doc: 'doc(bulletList(listItem(paragraph("[ ] x"))))',
+      },
+    ],
+  },
+  {
+    title: 'VFM figures and images',
+    cases: [
+      { name: 'a figure', given: '![キャプション](fig.png)' },
+      {
+        name: 'a figure is an image block',
+        given: '![cap](a.png "t")',
+        json: [
+          {
+            type: 'image',
+            attrs: { src: 'a.png', alt: 'cap', title: 't' },
+          },
+        ],
+      },
+      {
+        name: 'the caption as written',
+        given: '![cap *em* `c`](a.png)',
+        json: [{ type: 'image', attrs: { alt: 'cap *em* `c`' } }],
+      },
+      {
+        name: 'escapes and references in the caption are read',
+        given: '![a\\]b &amp; c](a.png)',
+        json: [{ type: 'image', attrs: { alt: 'a]b & c' } }],
+      },
+      {
+        name: 'brackets in the caption',
+        given: '![図 [1] の説明](a.png)',
+        json: [{ type: 'image', attrs: { alt: '図 [1] の説明' } }],
+      },
+      { name: 'no caption', given: '![](a.png)', doc: 'doc(image)' },
+      {
+        name: 'attributes',
+        given: '![cap](a.png){width=100 #i .c}',
+        json: [
+          {
+            type: 'image',
+            attrs: { attributes: { id: 'i', class: 'c', width: '100' } },
+          },
+        ],
+      },
+      {
+        name: 'in a quote',
+        given: '> ![cap](a.png)',
+        doc: 'doc(blockquote(image))',
+      },
+      {
+        name: 'in a list item',
+        given: '- ![cap](a.png)',
+        doc: 'doc(bulletList(listItem(paragraph, image)))',
+      },
+      {
+        name: 'an image in text',
+        given: 'text ![cap](a.png) more',
+        doc: 'doc(paragraph("text ", inlineImage, " more"))',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'text ' },
+              { type: 'inlineImage', attrs: { src: 'a.png', alt: 'cap' } },
+              { type: 'text', text: ' more' },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'whitespace around an image keeps it in its paragraph, as in VFM',
+        given: '![a](a.png) \n\n ![b](b.png)\n\n> ![c](c.png) ',
+        doc: 'doc(paragraph(inlineImage), paragraph(inlineImage), blockquote(paragraph(inlineImage)))',
+      },
+      {
+        name: 'a comment after an image',
+        given: '![a](a.png)<!-- c -->',
+        doc: 'doc(image)',
+        fails:
+          'VFM makes a figure of an image with comments alone around it in its paragraph; the editor keeps the paragraph, which holds the comments',
+      },
+      {
+        name: 'an image left alone in its paragraph by another client',
+        given: '前 ‸![a](x.png)',
+        steps: [
+          run('delete the text before it as another client', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr
+                .delete(1, editor.state.selection.from)
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect: '![a](x.png) ',
+        doc: 'doc(paragraph(inlineImage))',
+      },
+      ...(
+        [
+          ['an image in text', 'a ‸![i](i.png)‸ b', 'code', 'a ![i](i.png) b'],
+          ['a reference', 'a ‸[^1]‸ b', 'code', 'a [^1] b'],
+          ['math', 'a ‸$x$‸ b', 'code', 'a $x$ b'],
+          ['math', 'a ‸$x$‸ b', 'link', 'a $x$ b'],
+        ] as const
+      ).map(([what, given, mark, expect]) => ({
+        name: `${what} that another client put ${mark === 'code' ? 'code' : 'a link'} on`,
+        given,
+        steps: [
+          run(`put ${mark} on it as another client`, (editor) => {
+            const { from, to } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr
+                .addMark(
+                  from,
+                  to,
+                  editor.schema.marks[mark].create(
+                    mark === 'link' ? { href: 'u' } : null,
+                  ),
+                )
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect,
+        ...(mark === 'link' && {
+          fails:
+            'VFM reads no math in the text of a link, and the writer does not write the math apart from the link around it, so the save is refused',
+        }),
+      })),
+      {
+        name: 'a ruby whose base another client emptied',
+        given: 'a {‸漢‸|かん} b',
+        steps: [
+          run('empty the base as another client', (editor) => {
+            const { from, to } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr
+                .delete(from, to)
+                .setMeta('y-sync$', { isChangeOrigin: true }),
+            );
+          }),
+        ],
+        expect: 'a  b',
+        fails:
+          'A ruby without a base has no markdown, and only this client takes one away, so the save is refused',
+      },
+      {
+        name: 'editing an image in a paragraph of its own',
+        given: '![a](a.png) \n\nx‸',
+        steps: [
+          selectNode('inlineImage'),
+          run('change the alt text', (editor) => {
+            editor.commands.updateAttributes('inlineImage', { alt: 'b' });
+          }),
+        ],
+        expect: '![b](a.png) \n\nx',
+      },
+      {
+        name: 'an image in a link',
+        given: '[![cap](a.png)](u)',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'inlineImage',
+                marks: [{ type: 'link', attrs: { href: 'u' } }],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'two images in a paragraph',
+        given: '![a](a.png)![b](b.png)\n![c](c.png)',
+        doc: 'doc(paragraph(inlineImage, inlineImage, "\\n", inlineImage))',
+      },
+      {
+        name: 'an image in emphasis',
+        given: '*![cap](a.png)*',
+        doc: 'doc(paragraph(italic(inlineImage)))',
+      },
+      {
+        name: 'an image in text with attributes',
+        given: '本文 ![a](b.png){.c} 続き',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text' },
+              { type: 'inlineImage', attrs: { attributes: { class: 'c' } } },
+              { type: 'text' },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'an image in a heading',
+        given: '# ![icon](i.png) 見出し',
+        doc: 'doc(heading(inlineImage, " 見出し"))',
+      },
+      {
+        name: 'changing the caption',
+        given: '![旧](a.png)\n\n本文‸',
+        steps: [
+          selectNode('image'),
+          run('change the caption', (editor) => {
+            editor.commands.updateAttributes('image', {
+              alt: '新しい [図] \\',
+            });
+          }),
+        ],
+        expect: '![新しい \\[図\\] \\\\](a.png)\n\n本文',
+      },
+      {
+        name: 'emptying the caption',
+        given: '![旧](a.png){#fig}\n\n本文‸',
+        steps: [
+          selectNode('image'),
+          run('empty the caption', (editor) => {
+            editor.commands.updateAttributes('image', { alt: '' });
+          }),
+        ],
+        expect: '![](a.png){#fig}\n\n本文',
+      },
+      {
+        name: 'emptying the alt text of an image in text',
+        given: 'a ![旧](a.png) b‸',
+        steps: [
+          selectNode('inlineImage'),
+          run('empty the alt text', (editor) => {
+            editor.commands.updateAttributes('inlineImage', { alt: '' });
+          }),
+        ],
+        expect: 'a ![](a.png) b',
+      },
+      {
+        name: 'changing the caption keeps the attributes',
+        given: '![旧](a.png){#fig}\n\n本文‸',
+        steps: [
+          selectNode('image'),
+          run('change the caption', (editor) => {
+            editor.commands.updateAttributes('image', { alt: '新' });
+          }),
+        ],
+        expect: '![新](a.png){#fig}\n\n本文',
+      },
+      {
+        name: 'typing an image in text',
+        given: 'これは‸',
+        steps: [' ![a](b.png) です'],
+        expect: 'これは ![a](b.png) です‸',
+        doc: 'doc(paragraph("これは ", inlineImage, " です"))',
+      },
+      {
+        name: 'an image typed alone is a figure',
+        given: '‸',
+        steps: ['![図](a.png)'],
+        expect: '![図](a.png)',
+        doc: 'doc(image)',
+      },
+      {
+        name: 'the text around an image deleted',
+        given: '‸前 ‸![a](b.png)',
+        steps: [press('Backspace')],
+        expect: '![a](b.png)',
+        doc: 'doc(image)',
+      },
+      {
+        name: 'a pasted image in text',
+        given: '本文‸',
+        steps: [paste('と ![図](a.png) と')],
+        expect: '本文と ![図](a.png) と‸',
+        doc: 'doc(paragraph("本文と ", inlineImage, " と"))',
+      },
+      {
+        name: 'code over an image leaves it out',
+        given: '‸a ![i](i.png) b‸',
+        steps: [
+          run('make code', (editor) => {
+            editor.view.dispatch(
+              editor.state.tr.addMark(
+                editor.state.selection.from,
+                editor.state.selection.to,
+                editor.schema.marks.code.create(),
+              ),
+            );
+          }),
+        ],
+        expect: '‸`a `![i](i.png)` b`‸',
+      },
+      {
+        name: 'an image typed into text recorded before images in text',
+        given: 'これは‸',
+        steps: [recordInlineEra, ' ![a](b.png)'],
+        expect: 'これは&#x20;\n\n![a](b.png)',
+        doc: 'doc(paragraph("これは "), image)',
+      },
+    ],
+  },
+  {
+    title: 'VFM code captions',
+    cases: [
+      {
+        name: 'a caption after the language',
+        given: '```js:app.js\nconst a = 1;\n```',
+        json: [{ type: 'codeBlock', attrs: { language: 'js:app.js' } }],
+      },
+      { name: 'a title', given: '```js title="my app.js"\nx\n```' },
+      { name: 'attributes', given: '```js title=a {#cid .cc}\nx\n```' },
+      { name: 'Japanese caption', given: '```py:例.py\nprint(1)\n```' },
+      {
+        name: 'changing the caption after the language',
+        given: '```js:app.js\nx‸\n```',
+        steps: [
+          command('change the caption', (editor) =>
+            editor.commands.setCodeBlockCaption('main.js'),
+          ),
+        ],
+        expect: '```js:main.js\nx‸\n```',
+      },
+      {
+        name: 'changing the title keeps its form',
+        given: '```js title="my app.js" {#c}\nx‸\n```',
+        steps: [
+          command('change the caption', (editor) =>
+            editor.commands.setCodeBlockCaption('新しい 名前'),
+          ),
+        ],
+        expect: '```js title="新しい 名前" {#c}\nx‸\n```',
+      },
+      {
+        name: 'adding a caption',
+        given: '```js\nx‸\n```',
+        steps: [
+          command('add a caption', (editor) =>
+            editor.commands.setCodeBlockCaption('例'),
+          ),
+        ],
+        expect: '```js title=例\nx‸\n```',
+      },
+      {
+        name: 'adding a caption with spaces',
+        given: '```\nx‸\n```',
+        steps: [
+          command('add a caption', (editor) =>
+            editor.commands.setCodeBlockCaption('a b'),
+          ),
+        ],
+        expect: '```text title="a b"\nx‸\n```',
+      },
+      {
+        name: 'taking the caption away',
+        given: '```js:app.js\nx‸\n```',
+        steps: [
+          command('take the caption away', (editor) =>
+            editor.commands.setCodeBlockCaption(''),
+          ),
+        ],
+        expect: '```js\nx‸\n```',
+      },
+      {
+        name: 'no caption with a quotation mark',
+        given: '```js\nx‸\n```',
+        steps: [
+          refused('add the caption', (editor) =>
+            editor.commands.setCodeBlockCaption('a"b'),
+          ),
+        ],
+        expect: '```js\nx‸\n```',
+      },
+      {
+        name: 'editing the code keeps the info string',
+        given: '```js  title="a"   {#c}\nx‸\n```',
+        steps: ['y'],
+        expect: '```js  title="a"   {#c}\nxy‸\n```',
+      },
+      {
+        name: 'typing the fence with a caption',
+        given: '‸',
+        steps: ['```js:app.js', press('Enter'), 'x'],
+        expect: '```js:app.js\nx‸\n```',
+      },
+    ],
+  },
+  {
+    title: 'block VFM pasted into a document recorded before it',
+    cases: [
+      {
+        name: 'a definition is its markdown, raw',
+        given: 'a‸',
+        steps: [
+          recordInlineEra,
+          run('paste a definition', (editor) => {
+            editor.commands.insertContent({
+              type: 'footnoteDefinition',
+              attrs: { label: '1' },
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: '注' }] },
+              ],
+            });
+          }),
+        ],
+        expect: 'a\n\n[^1]: 注',
+        doc: 'doc(paragraph("a"), rawBlock("[^1]: 注"))',
+      },
+      {
+        name: 'a line that ends a section is an empty heading',
+        given: 'a‸',
+        steps: [
+          recordInlineEra,
+          run('paste a section end', (editor) => {
+            editor.commands.insertContent({
+              type: 'sectionEnd',
+              attrs: { level: 2 },
+            });
+          }),
+        ],
+        expect: 'a\n\n##',
+        doc: 'doc(paragraph("a"), heading)',
+      },
+      {
+        name: 'a heading keeps its attributes as text',
+        given: 'a‸',
+        steps: [
+          recordInlineEra,
+          run('paste a heading with attributes', (editor) => {
+            editor.commands.insertContent({
+              type: 'heading',
+              attrs: { level: 2, attributes: { id: 'x' } },
+              content: [{ type: 'text', text: 'H' }],
+            });
+          }),
+        ],
+        expect: 'a\n\n## H {#x}',
+        doc: 'doc(paragraph("a"), heading("H {#x}"))',
+      },
+      {
+        name: 'a task keeps its checkbox, raw',
+        given: '- a‸',
+        steps: [
+          recordInlineEra,
+          run('make the item a task without the command', (editor) => {
+            const { $from } = editor.state.selection;
+            editor.view.dispatch(
+              editor.state.tr.setNodeMarkup($from.before(-1), undefined, {
+                checked: true,
+              }),
+            );
+          }),
+        ],
+        expect: '- [x] a',
+        doc: 'doc(bulletList(listItem(paragraph(rawInline("[x] "), "a"))))',
+      },
+      {
+        name: 'an image in text is its markdown, raw',
+        given: 'a ‸b',
+        steps: [
+          recordInlineEra,
+          run('paste an image in text', (editor) => {
+            editor.commands.insertContent({
+              type: 'inlineImage',
+              attrs: { src: 'i.png', alt: 'i' },
+            });
+          }),
+        ],
+        expect: 'a ![i](i.png)‸b',
+        doc: 'doc(paragraph("a ", rawInline("![i](i.png)"), "b"))',
+      },
+    ],
+  },
+  {
+    title: 'block VFM in a document made without VFM',
+    cases: [
+      {
+        name: 'typed syntax stays text',
+        given: '‸',
+        steps: [recordWithoutVfm, '[[toc]]'],
+        expect: '[[toc]]‸',
+        doc: 'doc(paragraph("[[toc]]"))',
+      },
+      {
+        name: 'commands do nothing',
+        given: '- a‸',
+        steps: [
+          recordWithoutVfm,
+          refused('use a block command', (editor) =>
+            [
+              editor.commands.insertSectionEnd(1),
+              editor.commands.setTaskItem(true),
+              editor.commands.insertFootnoteDefinition('1'),
+            ].some(Boolean),
+          ),
+        ],
+        expect: '- a',
+      },
+    ],
+  },
+];

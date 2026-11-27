@@ -19,6 +19,132 @@
     outline: none;
   }
 
+  /* Markdown the editor has no node for, shown as written. */
+  & [data-raw-block],
+  & [data-raw-inline] {
+    color: var(--muted-foreground);
+  }
+
+  /* A theme centres a figure's content, which for the figure VFM puts around
+     a captioned code block would centre the code too. */
+  & figure > pre,
+  & figure > pre > code {
+    text-align: start;
+  }
+
+  /* Typeset math is edited in its panel, which a click on it opens. */
+  & .math[data-math-view] {
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  & .math[data-math-view]:hover {
+    outline: 1px dashed var(--muted-foreground);
+  }
+  & .math[data-math-view].ProseMirror-selectednode {
+    outline: 2px solid var(--ring);
+  }
+  & .math[data-math-view="pending"] {
+    color: var(--muted-foreground);
+  }
+  & .math[data-math-view="error"] {
+    color: var(--destructive);
+    text-decoration: underline wavy var(--destructive);
+  }
+
+  /* A note is edited where it is written, which a theme's footnote rules do
+     not set apart on screen. */
+  & span.footnote {
+    text-decoration: underline dotted var(--muted-foreground);
+  }
+
+  /* Syntax VFM writes nothing visible for, shown with what it does. Its
+     labels come from the app, in custom properties. */
+  & [data-section-end] {
+    border-block: 1px dashed var(--border);
+    color: var(--muted-foreground);
+    font-size: 0.8em;
+    margin-block: 1em;
+    padding: 0.25em 0.5em;
+  }
+
+  & [data-section-end]::before {
+    content: var(--content-editor-section-end) attr(data-ends)
+      var(--content-editor-section-end-after);
+  }
+
+  & [data-section-end][data-ends-nothing]::before {
+    content: var(--content-editor-section-end-nothing);
+  }
+
+  /* VFM collects definitions at the end; one is edited where it is written. */
+  & .footnote-definition {
+    border-inline-start: 2px solid var(--border);
+    padding-inline-start: 0.75em;
+  }
+
+  & .footnote-definition::before {
+    color: var(--muted-foreground);
+    content: "[^" attr(data-label) "]";
+    font-size: 0.8em;
+  }
+
+  & .footnote-definition[data-unreferenced]::before {
+    content: "[^" attr(data-label) "] "
+      var(--content-editor-footnote-unreferenced);
+  }
+
+  & .footnote-definition[data-duplicate]::before {
+    content: "[^" attr(data-label) "] " var(--content-editor-footnote-duplicate);
+  }
+
+  & .footnote-ref[data-undefined] {
+    text-decoration: underline wavy var(--destructive);
+  }
+
+  & .footnote-ref[data-undefined]::after {
+    color: var(--destructive);
+    content: var(--content-editor-footnote-undefined);
+    font-size: 0.7em;
+  }
+
+  /* A cross-reference is empty: its text is the theme's ::before, a
+     placeholder on screen. Its target follows it, so it shows and can be
+     selected also where the theme has no rule for it. */
+  & a[data-ref] {
+    background-color: color-mix(
+      in srgb,
+      var(--muted-foreground) 12%,
+      transparent
+    );
+    border-radius: 2px;
+    padding-inline: 0.1em;
+  }
+
+  & a[data-ref]::after {
+    color: var(--muted-foreground);
+    content: attr(href);
+    font-size: 0.7em;
+  }
+
+  & a[data-ref][data-missing] {
+    text-decoration: underline wavy var(--destructive);
+  }
+
+  & a[data-ref][data-missing]::after {
+    color: var(--destructive);
+    content: attr(href) " " var(--content-editor-reference-missing);
+  }
+
+  & a[data-ref].ProseMirror-selectednode {
+    outline: 2px solid var(--ring);
+  }
+
+  /* A hidden heading is still edited. */
+  & :is(h1, h2, h3, h4, h5, h6)[hidden] {
+    display: block;
+    opacity: 0.5;
+  }
+
   &:not(.ProseMirror-focused) .is-editor-empty:first-child::before {
     color: var(--muted-foreground);
     content: attr(data-placeholder);

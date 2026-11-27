@@ -1,11 +1,5 @@
 import type { CaseSuite } from '../../testing/vitest';
 
-const ESCAPED_HTML = 'raw HTML is written back escaped';
-const ESCAPED_HTML_BLOCK =
-  'raw HTML is written back escaped, and the blank line after it becomes three';
-const DROPPED_ESCAPE =
-  'the backslash is dropped together with the character it escapes';
-
 export const markdownSuites: CaseSuite[] = [
   {
     title: 'CommonMark blocks',
@@ -28,22 +22,18 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'closing hashes of a heading',
         given: '#### Heading ####',
-        fails: 'the closing sequence is dropped',
       },
       {
         name: 'star bullets',
         given: '* a\n* b',
-        fails: 'bullets are rewritten as "-"',
       },
       {
         name: 'setext heading',
         given: 'Title\n=====',
-        fails: 'rewritten as an ATX heading',
       },
       {
         name: 'two blank lines between blocks',
         given: 'a\n\n\nb',
-        fails: 'blank lines are collapsed',
       },
     ],
   },
@@ -57,17 +47,14 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'underscore emphasis',
         given: 'a _b_ c',
-        fails: 'emphasis is rewritten with "*"',
       },
       {
         name: 'escaped punctuation',
         given: '1\\. not a list',
-        fails: DROPPED_ESCAPE,
       },
       {
         name: 'escaped emphasis',
         given: 'a \\*b\\* c',
-        fails: DROPPED_ESCAPE,
       },
     ],
   },
@@ -79,18 +66,14 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'table',
         given: '| a | b |\n| --- | --- |\n| 1 | 2 |',
-        fails: 'the table is dropped',
       },
       {
         name: 'task list',
         given: '- [ ] task\n- [x] done',
-        fails:
-          'the checkbox is lost and the item text falls out of its paragraph',
       },
       {
         name: 'footnote',
         given: 'text[^1]\n\n[^1]: note',
-        fails: 'the definition becomes the URL of a link on the reference',
       },
     ],
   },
@@ -100,23 +83,19 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'inline element',
         given: 'a <span class="footnote">note</span> b',
-        fails: ESCAPED_HTML,
       },
       {
         name: 'empty inline element',
         given: '<a data-ref="fig" href="#f1"></a> shows it',
-        fails: ESCAPED_HTML,
       },
-      { name: 'line break element', given: 'a<br>b', fails: ESCAPED_HTML },
+      { name: 'line break element', given: 'a<br>b' },
       {
         name: 'block element around markdown',
         given: '<div class="note">\n\n**md** inside\n\n</div>',
-        fails: ESCAPED_HTML_BLOCK,
       },
       {
         name: 'comment',
         given: '<!-- comment -->\n\ntext',
-        fails: ESCAPED_HTML_BLOCK,
       },
     ],
   },
@@ -126,7 +105,6 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'leading YAML block',
         given: '---\ntitle: x\n---\n\n# h',
-        fails: 'frontmatter is dropped from the document',
       },
     ],
   },

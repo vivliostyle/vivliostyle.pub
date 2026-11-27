@@ -24,6 +24,7 @@ import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
   editorMenuConfig,
+  filterVisibleEntries,
   flattenCommands,
   resolveMenuEntries,
 } from '../../libs/editor/menu/config';
@@ -56,8 +57,11 @@ export function TriggerMenu() {
     return menu ? resolveMenuEntries(menu.items, 'trigger') : [];
   }, [configSnap.triggers, menuId]);
   const filtered = useMemo(
-    () => filterMenuEntries(entries, query),
-    [entries, query],
+    () =>
+      editor
+        ? filterVisibleEntries(filterMenuEntries(entries, query), editor)
+        : [],
+    [editor, entries, query],
   );
   const commands = useMemo(() => flattenCommands(filtered), [filtered]);
   const visible = session !== null && commands.length > 0;
@@ -134,7 +138,7 @@ export function TriggerMenu() {
         return;
       }
       const range = getTriggerMenuRange(editor.state);
-      if (!range) {
+      if (!range || !(command.isEnabled?.(editor) ?? true)) {
         return;
       }
       editor.chain().focus().deleteRange(range).run();
@@ -211,6 +215,7 @@ export function TriggerMenu() {
   const renderOption = (command: EditorMenuCommand) => {
     const index = optionIndex++;
     const Icon = command.icon;
+    const enabled = !editor || (command.isEnabled?.(editor) ?? true);
     return (
       // biome-ignore lint/a11y/useKeyWithClickEvents: focus stays in the editor, whose plugin drives the keyboard
       <div
@@ -220,10 +225,12 @@ export function TriggerMenu() {
         }}
         role="option"
         aria-selected={index === currentIndex}
+        aria-disabled={!enabled}
         tabIndex={-1}
         className={cn(
           'flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none',
           index === currentIndex && 'bg-accent text-accent-foreground',
+          !enabled && 'opacity-50',
         )}
         // mousemove rather than mouseenter: the menu often opens under a
         // resting pointer, which must not steal the highlight.

@@ -13,6 +13,9 @@ import { decodeString } from 'micromark-util-decode-string';
 import type { RefractorNode } from 'refractor';
 import refractor from 'refractor';
 
+import { renderedAttributes } from './markdown/notations/vfm/attributes';
+import { codeBlockAttributes } from './markdown/notations/vfm/headings';
+
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     codeBlockInfo: {
@@ -21,6 +24,12 @@ declare module '@tiptap/core' {
        * code block holding the selection.
        */
       setCodeBlockInfo: (infoString: string) => ReturnType;
+      /**
+       * Sets the caption VFM gives the code block holding the selection, or
+       * takes it away with an empty string, keeping the rest of its info
+       * string as written.
+       */
+      setCodeBlockCaption: (caption: string) => ReturnType;
     };
   }
 }
@@ -43,22 +52,8 @@ export function listHighlightLanguages(): string[] {
 
 // A line break would end the fence line early and turn the rest of the info
 // string into markdown outside the code block.
-function toInfoString(value: string | null | undefined): string | null {
+export function toInfoString(value: string | null | undefined): string | null {
   return value?.replace(/[\r\n]+/g, ' ') || null;
-}
-
-// A fence must be longer than any run of its character that could close it
-// early, and a backtick fence cannot carry backticks in its info string.
-function codeFence(infoString: string, code: string): string {
-  const char = infoString.includes('`') ? '~' : '`';
-  const runs = code.match(char === '`' ? /^ {0,3}`+/gm : /^ {0,3}~+/gm);
-  // Not Math.max(...runs): a long enough code block exceeds the engine's
-  // argument limit.
-  let longest = 0;
-  for (const run of runs ?? []) {
-    longest = Math.max(longest, run.trim().length);
-  }
-  return char.repeat(Math.max(3, longest + 1));
 }
 
 /**
@@ -78,6 +73,162 @@ export function resolveVfmLanguage(
   const language = decodeString(word);
   const match = language.match(/^(.+?):(.+)$/);
   return match ? match[1] : language;
+}
+
+interface MetaTitle {
+  value: string;
+  start: number;
+  end: number;
+}
+
+const isBlank = (char: string | undefined) => char === ' ' || char === '\t';
+
+/** The `title=…` or `title="…"` pairs of an info string's meta. */
+function metaTitles(meta: string): MetaTitle[] {
+  const titles: MetaTitle[] = [];
+  const isKeyChar = (char: string | undefined) =>
+    char !== undefined && char !== '"' && char !== '=' && !/\s/.test(char);
+  let index = 0;
+  while (index < meta.length) {
+    if (!isKeyChar(meta[index])) {
+      index++;
+      continue;
+    }
+    const start = index;
+    while (isKeyChar(meta[index])) {
+      index++;
+    }
+    const key = meta.slice(start, index);
+    if (meta[index] !== '=') {
+      continue;
+    }
+    let value: string;
+    let end: number;
+    if (meta[index + 1] === '"') {
+      const close = meta.indexOf('"', index + 2);
+      if (close === -1) {
+        continue;
+      }
+      value = meta.slice(index + 2, close);
+      end = close + 1;
+    } else {
+      end = index + 1;
+      while (
+        end < meta.length &&
+        meta[end] !== '"' &&
+        !/\s/.test(meta[end] ?? '')
+      ) {
+        end++;
+      }
+      value = meta.slice(index + 1, end);
+      if (!value) {
+        continue;
+      }
+    }
+    if (key === 'title') {
+      titles.push({ value, start, end });
+    }
+    index = end;
+  }
+  return titles;
+}
+
+/** The indentation, first word, the blanks after it and the rest. */
+function splitInfo(info: string | null | undefined) {
+  const text = info ?? '';
+  let index = 0;
+  while (isBlank(text[index])) {
+    index++;
+  }
+  const wordStart = index;
+  while (index < text.length && !isBlank(text[index])) {
+    index++;
+  }
+  const spaceStart = index;
+  while (isBlank(text[index])) {
+    index++;
+  }
+  return {
+    indent: text.slice(0, wordStart),
+    word: text.slice(wordStart, spaceStart),
+    space: text.slice(spaceStart, index),
+    meta: text.slice(index),
+  };
+}
+
+/** The language and the title of `lang:title`, as VFM splits them. */
+function languageTitle(
+  word: string,
+): { language: string; title: string } | null {
+  const colon = word.indexOf(':', 1);
+  return colon === -1 || colon === word.length - 1
+    ? null
+    : { language: word.slice(0, colon), title: word.slice(colon + 1) };
+}
+
+/**
+ * The caption VFM puts in a figure around the code block: the title after
+ * `:` in the language (`js:app.js`), or a `title` in the meta, which wins,
+ * or one in its attributes, which wins over both.
+ */
+export function codeBlockCaption(
+  infoString: string | null | undefined,
+  attributes: Record<string, string> | null = null,
+): string | null {
+  const { word, meta } = splitInfo(infoString);
+  if (typeof attributes?.title === 'string') {
+    return attributes.title || null;
+  }
+  // VFM takes the value up to an `=` in it, quoted or not.
+  const title = metaTitles(meta).at(-1);
+  if (title) {
+    return decodeString(title.value.split('=')[0] ?? '') || null;
+  }
+  return languageTitle(decodeString(word))?.title ?? null;
+}
+
+/**
+ * The info string with the caption changed, in the form it is written in,
+ * or null when it cannot be written so.
+ */
+export function withCodeBlockCaption(
+  infoString: string | null | undefined,
+  caption: string,
+  attributes: Record<string, string> | null = null,
+): string | null {
+  if (/["\n\r]/.test(caption) || typeof attributes?.title === 'string') {
+    return null;
+  }
+  const { indent, word, space, meta } = splitInfo(infoString);
+  const titles = metaTitles(meta);
+  const quoted = (value: string) =>
+    /[\s]/.test(value) || !value ? `title="${value}"` : `title=${value}`;
+  // VFM ends a title in the meta at `=`, so only the language holds one
+  // with it, as `js:a=b`, where a title in the meta does not win over it.
+  const bare = !/[\s\\&]/.test(caption);
+  if (caption.includes('=') && (titles.length > 0 || !bare)) {
+    return null;
+  }
+  if (titles.length > 0) {
+    const last = titles[titles.length - 1];
+    const next = caption
+      ? `${meta.slice(0, last.start)}${quoted(caption)}${meta.slice(last.end)}`
+      : `${meta.slice(0, last.start)}${meta.slice(last.end)}`.trim();
+    return `${indent}${word}${next ? `${space || ' '}${next}` : ''}` || null;
+  }
+  const language = languageTitle(word)?.language;
+  if (language !== undefined && (!caption || bare)) {
+    const replaced = `${language}${caption ? `:${caption}` : ''}`;
+    return `${indent}${replaced}${space}${meta}` || null;
+  }
+  if (!caption) {
+    return infoString ?? null;
+  }
+  const lang = language ?? (word || 'text');
+  if (caption.includes('=')) {
+    return `${indent}${lang}:${caption}${space}${meta}`;
+  }
+  return `${indent}${lang}${space || ' '}${meta ? `${meta} ` : ''}${quoted(caption)}`;
 }
 
 /**
@@ -260,31 +411,6 @@ export const CodeBlockPrism = CodeBlock.extend({
     };
   },
 
-  parseMarkdown(token, helpers) {
-    // marked's `lang` is trimmed and has backslash escapes removed, and the
-    // upstream check drops fences indented by one to three spaces.
-    const infoString = token.raw?.match(/^ {0,3}(?:`{3,}|~{3,})(.*)/)?.[1];
-    if (infoString === undefined && token.codeBlockStyle !== 'indented') {
-      return [];
-    }
-    return helpers.createNode(
-      'codeBlock',
-      { language: infoString || null },
-      token.text ? [helpers.createTextNode(token.text)] : [],
-    );
-  },
-
-  renderMarkdown(node, h) {
-    // Also covers values that arrive without setCodeBlockInfo, e.g. over Yjs.
-    const infoString = toInfoString(node.attrs?.language) ?? '';
-    const code = node.content ? h.renderChildren(node.content) : '';
-    const fence = codeFence(infoString, code);
-    // Leading tildes would lengthen a tilde fence instead of starting the
-    // info string; markdown ignores the space.
-    const separator = infoString.startsWith(fence.charAt(0)) ? ' ' : '';
-    return `${fence}${separator}${infoString}\n${code}\n${fence}`;
-  },
-
   addExtensions() {
     return [CodeFenceEnter];
   },
@@ -314,19 +440,63 @@ export const CodeBlockPrism = CodeBlock.extend({
           }
           return true;
         },
+      setCodeBlockCaption:
+        (caption) =>
+        ({ state, tr, dispatch }) => {
+          const block = findSelectedCodeBlock(state);
+          if (!block) {
+            return false;
+          }
+          const info = withCodeBlockCaption(
+            block.node.attrs.language,
+            caption,
+            codeBlockAttributes(block.node.attrs.language),
+          );
+          if (info === null && caption) {
+            return false;
+          }
+          if (dispatch && info !== block.node.attrs.language) {
+            tr.setNodeMarkup(block.pos, undefined, {
+              ...block.node.attrs,
+              language: toInfoString(info),
+            });
+          }
+          return true;
+        },
     };
   },
 
+  // As VFM renders it: the attributes go on the code, and a caption makes a
+  // figure around it.
   renderHTML({ node, HTMLAttributes }) {
     const language = resolveVfmLanguage(node.attrs.language) ?? 'text';
     const languageClass = `language-${language}`;
-    return [
+    const attributes = codeBlockAttributes(node.attrs.language);
+    const rendered = renderedAttributes(attributes);
+    delete rendered.title;
+    const pre = [
       'pre',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         class: languageClass,
       }),
-      ['code', { class: languageClass }, 0],
-    ];
+      [
+        'code',
+        {
+          ...rendered,
+          class: [languageClass, rendered.class].filter(Boolean).join(' '),
+        },
+        0,
+      ],
+    ] as const;
+    const caption = codeBlockCaption(node.attrs.language, attributes);
+    return caption
+      ? [
+          'figure',
+          { class: languageClass },
+          ['figcaption', { contenteditable: 'false' }, caption],
+          pre,
+        ]
+      : pre;
   },
 
   addProseMirrorPlugins() {

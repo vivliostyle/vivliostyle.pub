@@ -5,6 +5,8 @@ import { use, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
+import { m } from '../../generated/paraglide/messages';
+import { setEditorCss } from '../../libs/editor/styled-elements';
 import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
@@ -84,10 +86,48 @@ export function EditorStyleContainer({
   );
 }
 
+function cssString(text: string): string {
+  return `"${text.replace(/["\\]/g, '\\$&').replace(/\n/g, ' ')}"`;
+}
+
+// Read by the editor's CSS, which shows syntax that has no text of its own.
+// The text of the heading a section end ends comes from an attribute, which
+// the CSS puts between the two parts of the message.
+function labelProperties(): React.CSSProperties {
+  const [before = '', after = ''] = m
+    .content_editor_section_end({ heading: '\u0000' })
+    .split('\u0000');
+  return {
+    '--content-editor-section-end': cssString(before),
+    '--content-editor-section-end-after': cssString(after),
+    '--content-editor-section-end-nothing': cssString(
+      m.content_editor_section_end_nothing(),
+    ),
+    '--content-editor-footnote-undefined': cssString(
+      m.content_editor_footnote_undefined(),
+    ),
+    '--content-editor-footnote-unreferenced': cssString(
+      m.content_editor_footnote_unreferenced(),
+    ),
+    '--content-editor-reference-missing': cssString(
+      m.content_editor_reference_missing(),
+    ),
+    '--content-editor-footnote-duplicate': cssString(
+      m.content_editor_footnote_duplicate(),
+    ),
+  } as React.CSSProperties;
+}
+
 export function EditArea() {
   const { editor } = useCurrentEditor();
 
-  return <EditorContent {...{ editor }} className="editor-root" />;
+  return (
+    <EditorContent
+      {...{ editor }}
+      className="editor-root"
+      style={labelProperties()}
+    />
+  );
 }
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {
@@ -98,17 +138,19 @@ export default function ContentEditor({ contentId }: { contentId: ContentId }) {
   const installedTheme =
     themeSnap.installPromise && use(themeSnap.installPromise);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const bundledCss = installedTheme?.bundledCss ?? '';
+  const customCss =
+    themeSnap.bundledStylesheetCss ??
+    themeSnap.stylesheets.map((it) => it.css).join('\n');
+
+  useLayoutEffect(() => {
+    setEditorCss(file.editor, `${bundledCss}\n${customCss}`);
+  }, [file.editor, bundledCss, customCss]);
 
   return (
     <EditorContext.Provider value={{ editor: file.editor }}>
       <div ref={wrapperRef} className="relative h-full">
-        <EditorStyleContainer
-          bundledCss={installedTheme?.bundledCss ?? ''}
-          customCss={
-            themeSnap.bundledStylesheetCss ??
-            themeSnap.stylesheets.map((it) => it.css).join('\n')
-          }
-        >
+        <EditorStyleContainer bundledCss={bundledCss} customCss={customCss}>
           <EditArea />
         </EditorStyleContainer>
         <TriggerMenu />

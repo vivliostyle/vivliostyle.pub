@@ -1,7 +1,7 @@
 import { Editor, type JSONContent } from '@tiptap/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from './index';
+import { getMarkdown, PubExtensions } from './index';
 
 let editor: Editor | undefined;
 
@@ -21,7 +21,7 @@ function createEditor(): Editor {
 
 function parse(markdown: string): JSONContent[] | undefined {
   const editor = createEditor();
-  editor.commands.setContent(markdown, { contentType: 'markdown' });
+  editor.commands.setMarkdown(markdown);
   expect(() => editor.state.doc.check()).not.toThrow();
   return editor.getJSON().content;
 }
@@ -29,13 +29,13 @@ function parse(markdown: string): JSONContent[] | undefined {
 function serialize(content: JSONContent[]): string {
   const editor = createEditor();
   editor.commands.setContent({ type: 'doc', content });
-  return editor.getMarkdown();
+  return getMarkdown(editor);
 }
 
 function roundTrip(markdown: string): string {
   const editor = createEditor();
-  editor.commands.setContent(markdown, { contentType: 'markdown' });
-  return editor.getMarkdown();
+  editor.commands.setMarkdown(markdown);
+  return getMarkdown(editor, { baseline: '' });
 }
 
 const text = (value: string): JSONContent => ({ type: 'text', text: value });
@@ -72,7 +72,7 @@ describe('list markdown', () => {
     ['lists in a quote', '> - a\n>   - b'],
     ['a nested list not starting at 1', '- a\n\n  3. b'],
     ['a hard break in a nested item', '- a\n  - b  \n    c'],
-    ['an item without a paragraph', '-\n  > a'],
+    ['an item without a paragraph', '- > a'],
     ['empty items', '1. a\n2.\n3. c'],
   ])('keeps %s as written', (_, markdown) => {
     expect(roundTrip(markdown)).toBe(markdown);
