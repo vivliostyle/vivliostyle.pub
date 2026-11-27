@@ -23,6 +23,9 @@ const createEditor = () =>
 // Every block is edited several ways, each saved and read back.
 const timeout = 60_000;
 
+// The templates are the first manuscripts a user edits, and they show off
+// syntax the editor cases may not cover, so saving them has to keep the
+// same guarantees as the cases do.
 describe('template manuscripts', () => {
   it.each(manuscripts)('%s keeps its guarantees', { timeout }, (path) => {
     const markdown = readFileSync(join(templatesDir, path), 'utf8');
