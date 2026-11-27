@@ -85,6 +85,11 @@ export {
 } from './markdown/notations/vfm/headings';
 export { isWritableMath } from './markdown/notations/vfm/math';
 export {
+  type MathTypesetter,
+  MathTypesetting,
+  type TypesetMath,
+} from './markdown/notations/vfm/math-view';
+export {
   VFM_2_SYNTAX,
   type VfmSyntax,
 } from './markdown/notations/vfm/notations';

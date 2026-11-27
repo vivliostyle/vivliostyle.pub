@@ -25,6 +25,25 @@
     color: var(--muted-foreground);
   }
 
+  /* Typeset math is edited in its panel, which a click on it opens. */
+  & .math[data-math-view] {
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  & .math[data-math-view]:hover {
+    outline: 1px dashed var(--muted-foreground);
+  }
+  & .math[data-math-view].ProseMirror-selectednode {
+    outline: 2px solid var(--ring);
+  }
+  & .math[data-math-view="pending"] {
+    color: var(--muted-foreground);
+  }
+  & .math[data-math-view="error"] {
+    color: var(--destructive);
+    text-decoration: underline wavy var(--destructive);
+  }
+
   /* A note is edited where it is written, which a theme's footnote rules do
      not set apart on screen. */
   & span.footnote {

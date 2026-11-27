@@ -309,6 +309,9 @@ catalogs:
     tailwindcss-animate:
       specifier: 1.0.7
       version: 1.0.7
+    temml:
+      specifier: 0.13.5
+      version: 0.13.5
     tsx:
       specifier: 4.22.0
       version: 4.22.0
@@ -1126,6 +1129,9 @@ importers:
       tar:
         specifier: 7.5.15
         version: 7.5.15
+      temml:
+        specifier: 'catalog:'
+        version: 0.13.5
       valibot:
         specifier: 'catalog:'
         version: 1.4.0(typescript@6.0.3)

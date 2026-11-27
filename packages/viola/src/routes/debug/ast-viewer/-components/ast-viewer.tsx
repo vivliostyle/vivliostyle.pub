@@ -21,6 +21,7 @@ import { useDebounce } from 'react-use';
 
 import {
   getMarkdown,
+  MathTypesetting,
   PubExtensions,
   setMarkdownBaseline,
 } from '@v/tiptap-extensions';
@@ -36,6 +37,7 @@ import { SelectionToolbar } from '../../../../components/content-editor/selectio
 import { TriggerMenu } from '../../../../components/content-editor/trigger-menu';
 import { createObjectUrlImageSaver } from '../../../../libs/editor/image-saver';
 import { insertImageFiles } from '../../../../libs/editor/insert-image';
+import { temmlTypesetter } from '../../../../libs/editor/math-typesetter';
 import { createEditorMenuExtensions } from '../../../../libs/editor/menu/extensions';
 
 type AstTabType = 'tree' | 'html' | 'json';
@@ -88,6 +90,7 @@ export function RichEditorPane() {
           insertImageFiles({ editor, files });
         },
       }),
+      MathTypesetting.configure({ typesetter: temmlTypesetter }),
       Placeholder.configure({
         placeholder: 'Start typing...',
       }),
