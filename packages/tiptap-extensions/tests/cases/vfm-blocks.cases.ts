@@ -15,7 +15,7 @@ const BLOCK_NOTATIONS = new Set([
   'paragraphContinuation',
   'headingAttributes',
   'sectionEnd',
-  'tableOfContents',
+  'shortcode',
   'taskList',
   'imageAlt',
   'footnoteDefinition',
@@ -784,19 +784,24 @@ export const vfmBlockSuites: CaseSuite[] = [
     ],
   },
   {
-    title: 'VFM table of contents',
+    title: 'VFM shortcodes',
     cases: [
       { name: 'a table of contents', given: '# A\n\n[[toc]]\n\n## B' },
-      { name: 'it is a node', given: '[[toc]]', doc: 'doc(tableOfContents)' },
+      {
+        // VFM writes an empty element for it, which the editor has no use for.
+        name: 'a table of contents is kept as written',
+        given: '[[toc]]',
+        doc: 'doc(rawBlock("[[toc]]"))',
+      },
       {
         name: 'in a quote',
         given: '> [[toc]]',
-        doc: 'doc(blockquote(tableOfContents))',
+        doc: 'doc(blockquote(rawBlock("[[toc]]")))',
       },
       {
         name: 'with spaces and attributes',
         given: '[[ toc a=1 ]]',
-        doc: 'doc(tableOfContents)',
+        doc: 'doc(rawBlock("[[ toc a=1 ]]"))',
       },
       {
         name: 'other shortcodes, which VFM removes, are kept as written',
@@ -826,7 +831,7 @@ export const vfmBlockSuites: CaseSuite[] = [
       {
         name: 'text after it on its line is a paragraph',
         given: '[[toc]] text *em*',
-        doc: 'doc(tableOfContents, paragraph("text ", italic("em")))',
+        doc: 'doc(rawBlock("[[toc]]"), paragraph("text ", italic("em")))',
       },
       {
         name: 'text after another shortcode, which VFM removes',
@@ -870,21 +875,11 @@ export const vfmBlockSuites: CaseSuite[] = [
         expect: '\\[[注]\\] は本文‸',
       },
       {
-        name: 'typed alone in a paragraph',
+        name: 'typed alone in a paragraph it is text',
         given: '‸',
         steps: ['[[toc]]', 'x'],
-        expect: '[[toc]]\n\nx‸',
-        doc: 'doc(tableOfContents, paragraph("x"))',
-      },
-      {
-        name: 'inserted',
-        given: '# A‸',
-        steps: [
-          command('insert a table of contents', (editor) =>
-            editor.commands.insertTableOfContents(),
-          ),
-        ],
-        expect: '# A\n\n[[toc]]',
+        expect: '\\[[toc]\\]x‸',
+        doc: 'doc(paragraph("[[toc]]x"))',
       },
       {
         name: 'text inserted as one is escaped',
@@ -1443,18 +1438,6 @@ export const vfmBlockSuites: CaseSuite[] = [
     title: 'block VFM pasted into a document recorded before it',
     cases: [
       {
-        name: 'a table of contents is its markdown as text',
-        given: 'a‸',
-        steps: [
-          recordInlineEra,
-          run('paste a table of contents', (editor) => {
-            editor.commands.insertContent({ type: 'tableOfContents' });
-          }),
-        ],
-        expect: 'a\n\n[[toc]]',
-        doc: 'doc(paragraph("a"), paragraph("[[toc]]"))',
-      },
-      {
         name: 'a definition is its markdown, raw',
         given: 'a‸',
         steps: [
@@ -1554,7 +1537,6 @@ export const vfmBlockSuites: CaseSuite[] = [
           recordWithoutVfm,
           refused('use a block command', (editor) =>
             [
-              editor.commands.insertTableOfContents(),
               editor.commands.insertSectionEnd(1),
               editor.commands.setTaskItem(true),
               editor.commands.insertFootnoteDefinition('1'),

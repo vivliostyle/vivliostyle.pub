@@ -103,7 +103,6 @@ function labelProperties(): React.CSSProperties {
     '--content-editor-section-end-nothing': cssString(
       m.content_editor_section_end_nothing(),
     ),
-    '--content-editor-toc': cssString(m.content_editor_toc()),
     '--content-editor-footnote-undefined': cssString(
       m.content_editor_footnote_undefined(),
     ),

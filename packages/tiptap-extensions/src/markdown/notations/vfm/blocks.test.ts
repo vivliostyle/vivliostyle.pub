@@ -34,7 +34,7 @@ const BLOCK_NOTATIONS = new Set([
   'paragraphContinuation',
   'headingAttributes',
   'sectionEnd',
-  'tableOfContents',
+  'shortcode',
   'taskList',
   'imageAlt',
   'footnoteDefinition',
@@ -231,7 +231,6 @@ describe('a document recorded before the block syntax', () => {
     expect(pipeline.signature).not.toBe(currentNotations(editor));
     expect(
       [
-        editor.can().insertTableOfContents(),
         editor.can().insertSectionEnd(1),
         editor.can().insertFootnoteDefinition('2'),
         editor.can().setHeadingAttributes({ id: 'x' }),

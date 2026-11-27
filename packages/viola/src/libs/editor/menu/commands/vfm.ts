@@ -16,7 +16,6 @@ import {
   SigmaIcon,
   StickyNoteIcon,
   SuperscriptIcon,
-  TableOfContentsIcon,
   TagIcon,
 } from '@v/ui/icon';
 import {
@@ -172,21 +171,6 @@ registerEditorMenuCommand({
   value: (editor) =>
     `[^${String(selectedNodeOf(editor.state, 'footnoteReference')?.attrs.label ?? '')}]`,
   panel: FootnoteReferencePanel,
-});
-
-registerEditorMenuCommand({
-  id: 'insert.toc',
-  surfaces: ['trigger'],
-  label: m.editor_command_insert_toc,
-  keywords: () => [
-    ...splitKeywords(m.editor_command_insert_toc_keywords()),
-    'toc',
-  ],
-  icon: TableOfContentsIcon,
-  isEnabled: (editor) => editor.can().insertTableOfContents(),
-  run: ({ editor }) => {
-    editor.chain().focus().insertTableOfContents().run();
-  },
 });
 
 registerEditorMenuCommand({

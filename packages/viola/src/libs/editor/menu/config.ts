@@ -92,7 +92,6 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
             'insert.page-footnote',
             'insert.footnote-reference',
             'insert.cross-reference',
-            'insert.toc',
             'insert.section-end',
           ],
         },
