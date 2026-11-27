@@ -1,3 +1,4 @@
+import { press } from '../../testing/steps';
 import type { CaseSuite } from '../../testing/vitest';
 
 export const markdownSuites: CaseSuite[] = [
@@ -97,6 +98,14 @@ export const markdownSuites: CaseSuite[] = [
         name: 'comment',
         given: '<!-- comment -->\n\ntext',
       },
+      {
+        name: 'a block typed after an unclosed comment',
+        given: '<!--‸',
+        steps: [press('Mod-Enter'), 'x'],
+        expect: '<!--\n\nx',
+        fails:
+          'Blocks added after a raw block of an unclosed HTML comment stay separate blocks, though the comment takes in everything after it: the save is refused',
+      },
     ],
   },
   {
@@ -105,6 +114,13 @@ export const markdownSuites: CaseSuite[] = [
       {
         name: 'leading YAML block',
         given: '---\ntitle: x\n---\n\n# h',
+      },
+      {
+        name: 'a thematic break that opens the file without closing frontmatter',
+        given: '---',
+        expect: '---',
+        fails:
+          'The thematic break writer turns --- at the start of the document into *** even when the block is unchanged and no later line would close frontmatter',
       },
     ],
   },

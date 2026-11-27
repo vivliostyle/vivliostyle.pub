@@ -161,6 +161,13 @@ export const vfmBlockSuites: CaseSuite[] = [
         ],
         expect: '## a<br>b‸',
       },
+      {
+        name: 'a line of hashes lazily continuing a list item before the next item',
+        given: '- i\n#\n-',
+        expect: '- i\n#\n-',
+        fails:
+          'A line of hashes that VFM reads as a lazy continuation of a list item ends the list in the editor, so the next item starts a new list',
+      },
     ],
   },
   {
@@ -536,6 +543,14 @@ export const vfmBlockSuites: CaseSuite[] = [
         expect: '# 見出し {#id}‸',
         doc: 'doc(heading("見出し {#id}"))',
       },
+      {
+        name: 'typing before empty attributes',
+        given: '# 見‸{}',
+        steps: ['x'],
+        expect: '# 見x‸{}',
+        fails:
+          'The heading writer writes empty attributes as nothing and the inline reuse does not keep their source',
+      },
     ],
   },
   {
@@ -780,6 +795,14 @@ export const vfmBlockSuites: CaseSuite[] = [
           ),
         ],
         expect: '本文',
+      },
+      {
+        name: 'a ruby typed before the attributes of a heading in a definition',
+        given: '[^1]: # n‸ {x}',
+        steps: ['{a|b}'],
+        expect: '[^1]: # n{a|b}‸\n    {x}',
+        fails:
+          'Attributes moved to the next line of a heading are not indented into the footnote definition around it when the block is rewritten, so only a save from scratch reads back',
       },
     ],
   },

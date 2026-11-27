@@ -213,6 +213,13 @@ export const vfmSuites: CaseSuite[] = [
         steps: [press('Backspace')],
         expect: '‸c',
       },
+      {
+        name: 'a bare URL as the base',
+        given: '{http://x|ふ}',
+        expect: '{http://x|ふ}',
+        fails:
+          'A bare URL in the base of a ruby is read as a link that VFM does not make, and no markdown the writer tries reads back with it: the save is refused',
+      },
     ],
   },
   {
@@ -346,6 +353,14 @@ export const vfmSuites: CaseSuite[] = [
           }),
         ],
         expect: 'a$E=mc^2$‸',
+      },
+      {
+        name: 'typing * after math that follows *',
+        given: '*$x$‸',
+        steps: ['*'],
+        expect: '*$x$*‸',
+        fails:
+          'Mark input rules match text in which inline math counts as its source, longer than its size in the document, so the range they compute starts before the textblock',
       },
     ],
   },
@@ -680,6 +695,21 @@ export const vfmSuites: CaseSuite[] = [
           }),
         ],
         expect: 'a[^2]‸',
+      },
+      {
+        name: 'a bare URL in an inline footnote',
+        given: '^[http://x]',
+        expect: '^[http://x]',
+        fails:
+          'A bare URL in an inline footnote is read as a link that VFM does not make, and no markdown the writer tries reads back with it: the save is refused',
+      },
+      {
+        name: 'a space typed after a reference and a colon',
+        given: '[^[]:‸',
+        steps: ['　'],
+        expect: '[^[]:　‸',
+        fails:
+          'The footnote definition input rule computes positions from text in which a footnote reference counts as its source, longer than its size in the document',
       },
     ],
   },

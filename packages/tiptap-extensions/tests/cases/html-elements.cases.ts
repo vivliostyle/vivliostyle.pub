@@ -406,6 +406,23 @@ export const htmlElementSuites: CaseSuite[] = [
         ],
         expect: '**図の題**‸',
       },
+      {
+        name: 'clearing the blocks of a whole document with a table figure',
+        given:
+          '<figure class="tbl">\n\n<figcaption>表‸</figcaption>\n\n</figure>\n',
+        steps: [
+          run('select all', (editor) => {
+            editor.commands.selectAll();
+          }),
+          run('clear nodes', (editor) => {
+            editor.commands.clearNodes();
+          }),
+        ],
+        expect:
+          '<figure class="tbl">\n\n<figcaption>表</figcaption>\n\n</figure>\n',
+        fails:
+          'Lifting blocks out of a table figure moves its caption to where only the figure may hold it, and the commands do not check the result',
+      },
     ],
   },
   {

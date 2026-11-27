@@ -116,6 +116,14 @@ export const inputSuites: CaseSuite[] = [
         steps: [press('Shift-Tab')],
         expect: '- a\n- b‸',
       },
+      {
+        name: 'Enter on a selection from a paragraph into a list item',
+        given: '‸a\n- b‸',
+        steps: [press('Enter')],
+        expect: '',
+        fails:
+          'splitBlock decides whether it can split on the document before deleting the selection, and the split fails once the deletion has changed the structure',
+      },
     ],
   },
   {
@@ -160,6 +168,38 @@ export const inputSuites: CaseSuite[] = [
           }),
         ],
         expect: '1\\. \\*not\\* a list‸',
+      },
+      {
+        name: 'joining paragraphs keeps the soft line breaks',
+        given: 'a\nb‸',
+        steps: [press('Enter'), press('Backspace')],
+        expect: 'a\nb‸',
+        fails:
+          "ProseMirror's join converts the newlines of a joined textblock into the schema's linebreak replacement, so soft breaks become hard breaks",
+      },
+      {
+        name: 'deleting the text of emphasis around a line break',
+        given: 't *a‸\nb*',
+        steps: [
+          press('Backspace'),
+          run('select b', (editor) => {
+            let from: number | undefined;
+            editor.state.doc.descendants((node, pos) => {
+              const index = node.isText ? (node.text ?? '').indexOf('b') : -1;
+              if (from === undefined && index !== -1) {
+                from = pos + index;
+              }
+            });
+            if (from === undefined) {
+              throw new Error('No text holds b');
+            }
+            editor.commands.setTextSelection({ from, to: from + 1 });
+          }),
+          press('Backspace'),
+        ],
+        expect: 't ',
+        fails:
+          'Emphasis of a newline alone is not treated as whitespace at the edges of emphasis that markdown cannot hold: the save is refused',
       },
     ],
   },

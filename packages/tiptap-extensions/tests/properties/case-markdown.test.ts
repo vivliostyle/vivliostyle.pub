@@ -99,6 +99,96 @@ const KNOWN_VIOLATIONS: Record<
     reason:
       'a `---` that comes to open the file would start frontmatter, so it is written as `***`',
   },
+  '<!--': {
+    violations: [
+      { property: 'error', detail: 'inserting a paragraph after block 0' },
+    ],
+    reason:
+      'blocks added after a raw block of an unclosed HTML comment stay separate blocks, though the comment takes in everything after it',
+  },
+  '---': {
+    violations: [
+      { property: 'identity', detail: 'saving the unedited document' },
+    ],
+    reason:
+      'the thematic break writer turns `---` at the start of the document into `***` even when the block is unchanged and no later line would close frontmatter',
+  },
+  '{http://x|ふ}': {
+    violations: [
+      { property: 'identity', detail: 'saving the unedited document' },
+      {
+        property: 'round trip',
+        detail: 'writing the document without a baseline',
+      },
+      { property: 'error', detail: 'making a heading of block 0' },
+      { property: 'error', detail: 'inserting a paragraph after block 0' },
+    ],
+    reason:
+      'a bare URL in the base of a ruby is read as a link that VFM does not make, and no markdown the writer tries reads back with it',
+  },
+  '^[http://x]': {
+    violations: [
+      { property: 'identity', detail: 'saving the unedited document' },
+      {
+        property: 'round trip',
+        detail: 'writing the document without a baseline',
+      },
+      { property: 'error', detail: 'making a heading of block 0' },
+      { property: 'error', detail: 'inserting a paragraph after block 0' },
+    ],
+    reason:
+      'a bare URL in an inline footnote is read as a link that VFM does not make, and no markdown the writer tries reads back with it',
+  },
+  '- i\n#\n-': {
+    violations: [
+      { property: 'identity', detail: 'saving the unedited document' },
+      {
+        property: 'locality',
+        detail: 'appending plain text to block 0, character by character',
+      },
+    ],
+    reason:
+      'a line of hashes that VFM reads as a lazy continuation of a list item ends the list in the editor, so the next item starts a new list',
+  },
+  '[^1]: # n {x}': {
+    violations: [
+      {
+        property: 'regeneration',
+        detail: 'deleting the first character of block 0',
+      },
+      {
+        property: 'regeneration',
+        detail: 'emptying the first textblock of block 0',
+      },
+    ],
+    reason:
+      'attributes moved to the next line of a heading are not indented into the footnote definition around it when the block is rewritten',
+  },
+  'm.co\n\nb': {
+    violations: [
+      { property: 'identity', detail: 'saving the unedited document' },
+      { property: 'locality', detail: 'making a heading of block 1' },
+      { property: 'locality', detail: 'deleting block 1' },
+      { property: 'locality', detail: 'inserting a paragraph after block 1' },
+    ],
+    reason:
+      'the link autolink plugin runs on the transaction that loads the file and links words that GFM does not read as links',
+  },
+  'x\n# [a http://b](c)\n\nd': {
+    violations: [
+      { property: 'identity', detail: 'saving the unedited document' },
+      { property: 'locality', detail: 'making a heading of block 1' },
+      { property: 'locality', detail: 'deleting block 1' },
+      { property: 'locality', detail: 'inserting a paragraph after block 1' },
+    ],
+    reason:
+      'the link autolink plugin links text inside raw inline markdown, which the writer then writes as link syntax around the raw source',
+  },
+  '`a\nb\nc`': {
+    violations: [{ property: 'error', detail: 'making a heading of block 0' }],
+    reason:
+      'an ATX heading is one line, and code has no escapes for its line breaks',
+  },
 };
 
 describe('markdown of every case', () => {
