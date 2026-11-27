@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/core';
 
+import { saveMarkdown } from '../../testing/editor-io';
 import { press, run, type Step } from '../../testing/steps';
 import type { CaseSuite } from '../../testing/vitest';
 
@@ -40,6 +41,21 @@ function appendParagraphs(text: string, count: number): Step {
     editor.view.dispatch(tr);
   });
 }
+
+// A caret mark at the start of a line would keep it from reading as HTML.
+function selectStartOf(name: string): Step {
+  return run(`select the start of the ${name}`, (editor) => {
+    let at = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (at === -1 && node.type.name === name) {
+        at = pos + 1;
+      }
+    });
+    editor.commands.setTextSelection(at);
+  });
+}
+
+const save = run('save', saveMarkdown);
 
 const CJK_FLANKING =
   'CommonMark does not let `**` open after a letter and before `「`, which VFM 2.7.2 does, and the editor has no CJK-friendly emphasis yet';
@@ -269,6 +285,34 @@ export const savingSuites: CaseSuite[] = [
         expect: 'a$$x$$$$y$$‸',
         fails:
           'VFM reads `$$x$$$$y$$` as one math, so no markdown holds two side by side: the save is refused',
+      },
+    ],
+  },
+  {
+    title: 'line breaks at the edges of raw markdown',
+    cases: [
+      {
+        name: 'typing on a line added at the end',
+        given: '<div class="note">‸\n\ntext',
+        steps: [press('Enter'), save, 'x'],
+        expect: '<div class="note">\nx‸\n\ntext',
+      },
+      {
+        name: 'in a quote',
+        given: '> <div class="note">‸\n>\n> text',
+        steps: [press('Enter'), save, 'x'],
+        expect: '> <div class="note">\n> x‸\n>\n> text',
+      },
+      {
+        name: 'a line added at the start and removed',
+        given: 'a‸\n\n<div class="note">',
+        steps: [
+          selectStartOf('rawBlock'),
+          press('Enter'),
+          save,
+          press('Backspace'),
+        ],
+        expect: 'a\n\n<div class="note">',
       },
     ],
   },
