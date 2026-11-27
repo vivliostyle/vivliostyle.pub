@@ -1,3 +1,4 @@
+import { EditorState } from '@tiptap/pm/state';
 import { describe, expect, it } from 'vitest';
 
 import { PubExtensions } from '../src/index';
@@ -46,7 +47,19 @@ describe('runCase', () => {
   });
 
   it('returns an invalid document as a mismatch', async () => {
-    const [mismatch] = await runOnNode({ given: '![cap](a.png){width=100}' });
+    const [mismatch] = await runOnNode({
+      given: 'a‸',
+      steps: [
+        run('put text straight into the document', (editor) => {
+          const { schema } = editor.state;
+          const doc = schema.topNodeType.create(null, schema.text('a'));
+          editor.view.updateState(
+            EditorState.create({ doc, plugins: editor.state.plugins }),
+          );
+        }),
+      ],
+      expect: 'a',
+    });
     expect(mismatch).toMatchObject({ label: 'the document' });
     expect(mismatch && 'error' in mismatch && mismatch.error).toBeInstanceOf(
       RangeError,

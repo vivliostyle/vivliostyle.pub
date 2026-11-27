@@ -2,7 +2,7 @@ import { Editor, type JSONContent } from '@tiptap/core';
 import { VFM } from '@vivliostyle/vfm';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '@v/tiptap-extensions';
+import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
 import { m } from '../../../../generated/paraglide/messages';
 import { getEditorMenuCommand } from '../registry';
 import './code-block';
@@ -21,10 +21,11 @@ function createEditor(content: JSONContent[] | string): Editor {
     extensions: [PubExtensions.configure({})],
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   });
-  editor.commands.setContent(
-    typeof content === 'string' ? content : { type: 'doc', content },
-    typeof content === 'string' ? { contentType: 'markdown' } : {},
-  );
+  if (typeof content === 'string') {
+    editor.commands.setMarkdown(content);
+  } else {
+    editor.commands.setContent({ type: 'doc', content });
+  }
   return editor;
 }
 
@@ -82,7 +83,7 @@ describe('code-block.info', () => {
     const editor = createEditor('```\nconst a = 1;\n```');
     caretIn(editor, 0);
     editor.commands.setCodeBlockInfo('js  title="An example" {#code .lines}');
-    const markdown = editor.getMarkdown();
+    const markdown = getMarkdown(editor);
 
     expect(markdown).toBe(
       '```js  title="An example" {#code .lines}\nconst a = 1;\n```',
@@ -112,6 +113,6 @@ describe('code block markdown', () => {
     '> ```js title=x\n> a\n> ```',
   ])('renders the same in VFM after a round trip: %j', (markdown) => {
     const editor = createEditor(markdown);
-    expect(render(editor.getMarkdown())).toBe(render(markdown));
+    expect(render(getMarkdown(editor))).toBe(render(markdown));
   });
 });

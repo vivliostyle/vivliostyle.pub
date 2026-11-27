@@ -19,7 +19,11 @@ import {
 } from 'react';
 import { useDebounce } from 'react-use';
 
-import { PubExtensions } from '@v/tiptap-extensions';
+import {
+  getMarkdown,
+  PubExtensions,
+  setMarkdownBaseline,
+} from '@v/tiptap-extensions';
 import { cn } from '@v/ui/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@v/ui/tabs';
 import CodeEditor from '../../../../components/code-editor';
@@ -97,7 +101,13 @@ export function RichEditorPane() {
       });
     },
     onUpdate: useCallback(() => {
-      setContentInEditor(editor.getMarkdown());
+      try {
+        const markdown = getMarkdown(editor);
+        setMarkdownBaseline(editor, markdown);
+        setContentInEditor(markdown);
+      } catch (error) {
+        console.error(error);
+      }
     }, []),
   });
 
@@ -115,7 +125,7 @@ export function RichEditorPane() {
     if (contentInEditor === context.markdown) {
       return;
     }
-    editor.commands.setContent(context.markdown, { contentType: 'markdown' });
+    editor.commands.setMarkdown(context.markdown);
     setTimeout(cancel, deferMs - 1);
 
     context.onEditorAstChange?.(editor.getJSON());

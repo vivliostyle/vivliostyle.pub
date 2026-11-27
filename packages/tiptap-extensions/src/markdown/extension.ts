@@ -1,0 +1,316 @@
+import { type Editor, Extension } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+
+import type { NotationDefinition } from './notation';
+import {
+  MarkdownPipeline,
+  notationSignature,
+  type ParsedMarkdown,
+} from './pipeline';
+import { MarkdownWriteError, type WriteResult } from './write';
+
+/** What a document records, outside its content, about how it was made. */
+export interface DocumentRecord {
+  /** See `setDocumentNotations`. */
+  notations: string | null;
+  /** The frontmatter, when it is recorded with the document. */
+  frontmatter?: string | undefined;
+}
+
+export interface PubMarkdownOptions {
+  notations: NotationDefinition[];
+  /**
+   * Reads the document's record each time the document is written, so no
+   * caller can write it without: the record can change at any time, e.g.
+   * through another client.
+   */
+  documentRecord?: ((editor: Editor) => DocumentRecord) | undefined;
+  /** Called after `setMarkdown` has replaced the document. */
+  onSetMarkdown?: ((editor: Editor) => void) | undefined;
+}
+
+export interface PubMarkdownStorage {
+  /**
+   * The markdown the document was last read from or written as. Saving
+   * reuses its source for whatever did not change.
+   */
+  baseline: string;
+  /**
+   * The definitions the document was made with, as a signature, when they
+   * are not the current ones.
+   */
+  documentNotations: string | null;
+  pipelines: Map<string, MarkdownPipeline>;
+  /** The last write that failed, so the same state is not tried again. */
+  failure: {
+    key: readonly unknown[];
+    error: MarkdownWriteError;
+  } | null;
+}
+
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    pubMarkdown: {
+      /** Replaces the document with markdown, which becomes the baseline. */
+      setMarkdown: (
+        markdown: string,
+        options?: { emitUpdate?: boolean },
+      ) => ReturnType;
+    };
+  }
+
+  interface Storage {
+    pubMarkdown: PubMarkdownStorage;
+  }
+}
+
+function storageOf(editor: Editor): PubMarkdownStorage {
+  const storage = editor.storage.pubMarkdown;
+  if (!storage) {
+    throw new Error('The editor has no PubMarkdown extension');
+  }
+  return storage;
+}
+
+function optionsOf(editor: Editor): PubMarkdownOptions {
+  return (
+    editor.extensionManager.extensions.find(
+      (extension) => extension.name === 'pubMarkdown',
+    )?.options ?? { notations: [] }
+  );
+}
+
+function pipelineOf(
+  editor: Editor,
+  notations: readonly NotationDefinition[],
+): MarkdownPipeline {
+  const storage = storageOf(editor);
+  const signature = notationSignature(notations);
+  let pipeline = storage.pipelines.get(signature);
+  if (!pipeline) {
+    pipeline = new MarkdownPipeline(editor.schema, notations);
+    storage.pipelines.set(signature, pipeline);
+  }
+  return pipeline;
+}
+
+/**
+ * The definitions a signature names, each at the version it names, and
+ * whether all of them are there at that version.
+ */
+function notationsOf(
+  editor: Editor,
+  entries: readonly { name: string; version: number }[],
+): { notations: NotationDefinition[]; exact: boolean } {
+  const all = optionsOf(editor).notations;
+  let exact = true;
+  const notations = all.flatMap((notation) => {
+    const entry = entries.find((it) => it.name === notation.name);
+    if (!entry) {
+      return [];
+    }
+    if (entry.version === (notation.version ?? 1)) {
+      return [notation];
+    }
+    const earlier = notation.earlier?.find(
+      (it) => (it.version ?? 1) === entry.version,
+    );
+    exact &&= Boolean(earlier);
+    return [earlier ?? notation];
+  });
+  exact &&= entries.every((entry) =>
+    all.some((notation) => notation.name === entry.name),
+  );
+  return { notations, exact };
+}
+
+function currentPipeline(editor: Editor): MarkdownPipeline {
+  return pipelineOf(editor, optionsOf(editor).notations);
+}
+
+/** The pipeline the editor reads markdown with now. */
+export function markdownPipeline(editor: Editor): MarkdownPipeline {
+  return currentPipeline(editor);
+}
+
+/** The signature of the definitions the editor reads markdown with now. */
+export function currentNotations(editor: Editor): string {
+  return currentPipeline(editor).signature;
+}
+
+/**
+ * The pipeline that writes the document the way it was read: a document
+ * keeps meaning what it meant when it was made.
+ */
+function documentPipeline(
+  editor: Editor,
+  signature: string | null,
+): {
+  pipeline: MarkdownPipeline;
+  approximate: boolean;
+} {
+  if (signature === null || signature === currentNotations(editor)) {
+    return { pipeline: currentPipeline(editor), approximate: false };
+  }
+  const entries = signature.split(' ').map((entry) => {
+    const [name, version] = entry.split('@');
+    return { name, version: version ? Number(version) : 1 };
+  });
+  // A definition that is gone, or no longer there at the version the
+  // document was made with, cannot be brought back: the document is written
+  // with what is there, without rewriting what was not edited.
+  const { notations, exact } = notationsOf(editor, entries);
+  return { pipeline: pipelineOf(editor, notations), approximate: !exact };
+}
+
+export const PubMarkdown = Extension.create<
+  PubMarkdownOptions,
+  PubMarkdownStorage
+>({
+  name: 'pubMarkdown',
+
+  addOptions() {
+    return {
+      notations: [],
+      documentRecord: undefined,
+      onSetMarkdown: undefined,
+    };
+  },
+
+  addStorage() {
+    return {
+      baseline: '',
+      documentNotations: null,
+      pipelines: new Map(),
+      failure: null,
+    };
+  },
+
+  addExtensions() {
+    return this.options.notations.flatMap(
+      (notation) => notation.extensions ?? [],
+    );
+  },
+
+  addCommands() {
+    return {
+      setMarkdown:
+        (markdown, options) =>
+        ({ commands, dispatch, editor }) => {
+          const { doc } = currentPipeline(editor).parse(markdown);
+          const done = commands.setContent(doc.toJSON(), {
+            emitUpdate: options?.emitUpdate ?? true,
+          });
+          if (done && dispatch) {
+            const storage = storageOf(editor);
+            storage.baseline = markdown;
+            storage.documentNotations = null;
+            this.options.onSetMarkdown?.(editor);
+          }
+          return done;
+        },
+    };
+  },
+});
+
+export function parseMarkdown(
+  editor: Editor,
+  markdown: string,
+): ParsedMarkdown {
+  return currentPipeline(editor).parse(markdown);
+}
+
+export interface GetMarkdownOptions {
+  /** Compares with this instead of the stored baseline. */
+  baseline?: string;
+  doc?: ProseMirrorNode;
+  /** Frontmatter written instead of the baseline's. */
+  frontmatter?: string;
+}
+
+/**
+ * The document as markdown, with how it was written. See `getMarkdown`.
+ */
+export function getMarkdownWithResult(
+  editor: Editor,
+  options: GetMarkdownOptions = {},
+): WriteResult {
+  const storage = storageOf(editor);
+  const record = optionsOf(editor).documentRecord?.(editor);
+  if (record) {
+    storage.documentNotations =
+      record.notations === currentNotations(editor) ? null : record.notations;
+  }
+  const { pipeline, approximate } =
+    options.baseline === undefined
+      ? documentPipeline(editor, storage.documentNotations)
+      : { pipeline: currentPipeline(editor), approximate: false };
+  const doc = options.doc ?? editor.state.doc;
+  const baseline = options.baseline ?? storage.baseline;
+  const frontmatter = options.frontmatter ?? record?.frontmatter;
+  const key = [doc, baseline, pipeline, approximate, frontmatter];
+  const { failure } = storage;
+  if (failure?.key.every((it, index) => it === key[index])) {
+    throw failure.error;
+  }
+  try {
+    const result = pipeline.serializeWithResult(doc, {
+      baseline,
+      approximate,
+      ...(frontmatter !== undefined && { frontmatter }),
+    });
+    storage.failure = null;
+    return result;
+  } catch (error) {
+    if (error instanceof MarkdownWriteError) {
+      storage.failure = { key, error };
+    }
+    throw error;
+  }
+}
+
+/**
+ * The document as markdown. Blocks that did not change since the baseline
+ * keep its source, so saving it changes only the lines that were edited.
+ * Throws `MarkdownWriteError` when no markdown reads back as the document;
+ * that markdown must not be saved.
+ */
+export function getMarkdown(
+  editor: Editor,
+  options: GetMarkdownOptions = {},
+): string {
+  return getMarkdownWithResult(editor, options).markdown;
+}
+
+/**
+ * Sets what the document is compared with when it is saved: what was just
+ * written, or the file as it is on disk when the document was restored from
+ * elsewhere rather than read from it.
+ */
+export function setMarkdownBaseline(editor: Editor, markdown: string): void {
+  storageOf(editor).baseline = markdown;
+}
+
+/**
+ * Records which definitions the document was made with, as a signature from
+ * `currentNotations`; `null` means the current ones.
+ */
+export function setDocumentNotations(
+  editor: Editor,
+  signature: string | null,
+): void {
+  storageOf(editor).documentNotations = signature;
+}
+
+/**
+ * Reads the document again with the current definitions, through the
+ * markdown its own definitions write. Syntax added since then takes effect,
+ * and the document is replaced as a whole, so this must run in one client
+ * only.
+ */
+export function upgradeDocumentNotations(editor: Editor): boolean {
+  if (storageOf(editor).documentNotations === null) {
+    return false;
+  }
+  return editor.commands.setMarkdown(getMarkdown(editor));
+}

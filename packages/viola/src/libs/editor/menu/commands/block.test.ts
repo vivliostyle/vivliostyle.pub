@@ -3,7 +3,7 @@ import type { Node } from '@tiptap/pm/model';
 import { VFM } from '@vivliostyle/vfm';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PubExtensions } from '@v/tiptap-extensions';
+import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
 import { getEditorMenuCommand } from '../registry';
 import './block';
 
@@ -186,6 +186,24 @@ describe('block commands', () => {
     expect(command('block.code-block').isEnabled?.(editor)).toBe(false);
     expect(command('block.paragraph').isEnabled?.(editor)).toBe(true);
   });
+
+  it('shows markdown no definition handles as unsupported syntax, not a code block', () => {
+    const editor = createEditor({
+      type: 'rawBlock',
+      content: [{ type: 'text', text: '<!-- x -->' }],
+    });
+    const raw = command('block.raw');
+    expect(raw.isVisible?.(editor)).toBe(true);
+    expect(raw.isActive?.(editor)).toBe(true);
+    expect(raw.isEnabled?.(editor)).toBe(false);
+    expect(command('block.code-block').isActive?.(editor)).toBe(false);
+    expect(command('block.code-block').isEnabled?.(editor)).toBe(true);
+  });
+
+  it('hides the unsupported syntax entry outside such markdown', () => {
+    const editor = createEditor(codeBlock);
+    expect(command('block.raw').isVisible?.(editor)).toBe(false);
+  });
 });
 
 describe('block commands in nested blocks', () => {
@@ -293,7 +311,7 @@ describe('block commands across nesting levels', () => {
           command(id).run?.({ editor, surface: 'selection' }),
         ).not.toThrow();
         expect(() => editor.state.doc.check()).not.toThrow();
-        expect(vfmTexts(editor.getMarkdown())).toEqual(
+        expect(vfmTexts(getMarkdown(editor))).toEqual(
           editorTexts(editor.state.doc),
         );
       });
