@@ -9,7 +9,7 @@ import {
   type Mark,
   type Node as ProseMirrorNode,
 } from '@tiptap/pm/model';
-import type { EditorState } from '@tiptap/pm/state';
+import { type EditorState, TextSelection } from '@tiptap/pm/state';
 
 /** Where the source of an inline node starts and what it is made of. */
 export interface InlineSource {
@@ -143,13 +143,18 @@ function replaceSource(
     return null;
   }
   tr.replaceWith(range.from, to, node.mark(marks));
+  const at = range.from + node.nodeSize;
   if (after && typed) {
-    const at = range.from + node.nodeSize;
     if (after === '\n') {
       tr.split(at);
     } else {
       tr.insertText(after, at);
     }
+  }
+  // After the node, not at the end of its content, which is the same place
+  // on screen.
+  if (typed && after !== '\n') {
+    tr.setSelection(TextSelection.create(tr.doc, at + after.length));
   }
   return undefined;
 }
