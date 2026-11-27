@@ -59,8 +59,7 @@
 
   /* Syntax VFM writes nothing visible for, shown with what it does. Its
      labels come from the app, in custom properties. */
-  & [data-section-end],
-  & [data-toc] {
+  & [data-section-end] {
     border-block: 1px dashed var(--border);
     color: var(--muted-foreground);
     font-size: 0.8em;
@@ -75,10 +74,6 @@
 
   & [data-section-end][data-ends-nothing]::before {
     content: var(--content-editor-section-end-nothing);
-  }
-
-  & [data-toc]::before {
-    content: var(--content-editor-toc);
   }
 
   /* VFM collects definitions at the end; one is edited where it is written. */

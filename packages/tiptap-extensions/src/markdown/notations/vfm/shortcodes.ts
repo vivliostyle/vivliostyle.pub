@@ -1,6 +1,3 @@
-import { InputRule, Node } from '@tiptap/core';
-import { Fragment } from '@tiptap/pm/model';
-import { TextSelection } from '@tiptap/pm/state';
 import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown';
 import { codes } from 'micromark-util-symbol';
 import type {
@@ -11,10 +8,7 @@ import type {
   TokenizeContext,
 } from 'micromark-util-types';
 
-import { hasDocumentNotation } from '../../extension';
-import type { UnknownMdastNode } from '../../mdast';
 import {
-  currentNode,
   enterNode,
   isLineEnding,
   syntaxPlugin,
@@ -22,25 +16,12 @@ import {
 } from '../../micromark';
 import { defineNotation } from '../../notation';
 
-declare module '@tiptap/core' {
-  interface Commands<ReturnType> {
-    tableOfContents: {
-      /** Inserts `[[toc]]` in place of the selection. */
-      insertTableOfContents: () => ReturnType;
-    };
-  }
-}
-
 const types = {
   shortcode: tokenType('vfmShortcode'),
   space: tokenType('vfmShortcodeSpace'),
   rest: tokenType('vfmShortcodeRest'),
   text: tokenType('chunkText'),
 };
-
-interface ShortcodeMdast extends UnknownMdastNode {
-  identifier: string;
-}
 
 function isSpace(code: Code): boolean {
   return (
@@ -140,7 +121,7 @@ const shortcode: Construct = {
 const shortcodeFromMarkdown: FromMarkdownExtension = {
   enter: {
     [types.shortcode](token) {
-      enterNode(this, { type: 'shortcode', identifier: '' }, token);
+      enterNode(this, { type: 'shortcode' }, token);
     },
     [types.rest](token) {
       enterNode(this, { type: 'paragraph', children: [] }, token);
@@ -148,8 +129,6 @@ const shortcodeFromMarkdown: FromMarkdownExtension = {
   },
   exit: {
     [types.shortcode](token) {
-      const inner = this.sliceSerialize(token).slice(2, -2).trim();
-      currentNode(this).identifier = inner.split(/\s+/)[0] ?? '';
       this.exit(token);
     },
     [types.rest](token) {
@@ -158,89 +137,16 @@ const shortcodeFromMarkdown: FromMarkdownExtension = {
   },
 };
 
-export const TableOfContents = Node.create({
-  name: 'tableOfContents',
-  group: 'block',
-  atom: true,
-
-  parseHTML() {
-    return [{ tag: 'div[data-toc]' }];
-  },
-
-  renderText() {
-    return '[[toc]]';
-  },
-
-  // VFM writes an empty element where the table goes; the attribute only
-  // lets the editor show it.
-  renderHTML() {
-    return ['div', { 'data-toc': '' }];
-  },
-
-  addCommands() {
-    return {
-      insertTableOfContents:
-        () =>
-        ({ editor, commands }) =>
-          hasDocumentNotation(editor, this.name) &&
-          commands.insertContent({ type: this.name }),
-    };
-  },
-
-  addInputRules() {
-    return [
-      new InputRule({
-        find: /^\[\[toc\]\]$/,
-        handler: ({ state, range }) => {
-          const $from = state.doc.resolve(range.from);
-          const { paragraph } = state.schema.nodes;
-          const parent = $from.node(-1);
-          const index = $from.index(-1);
-          if (
-            !paragraph ||
-            !hasDocumentNotation(this.editor, this.name) ||
-            $from.parent.type !== paragraph ||
-            $from.parentOffset !== 0 ||
-            range.to !== $from.end() ||
-            !parent.canReplace(
-              index,
-              index + 1,
-              Fragment.from([this.type.create(), paragraph.create()]),
-            )
-          ) {
-            return null;
-          }
-          const { tr } = state;
-          const start = $from.before();
-          tr.replaceWith(start, $from.after(), [
-            this.type.create(),
-            paragraph.create(),
-          ]);
-          tr.setSelection(TextSelection.create(tr.doc, start + 2));
-        },
-      }),
-    ];
-  },
-});
-
-export const tableOfContentsNotation = defineNotation({
-  name: 'tableOfContents',
+// VFM removes every shortcode but `[[toc]]`, for which it writes an empty
+// element. No definition handles them, so they are kept as written, and text
+// that would read as one is escaped.
+export const shortcodeNotation = defineNotation({
+  name: 'shortcode',
   version: 1,
-  extensions: [TableOfContents],
   remarkPlugins: [
     syntaxPlugin(
       { flow: { [codes.leftSquareBracket]: shortcode } },
       shortcodeFromMarkdown,
     ),
   ],
-  fromMarkdown: {
-    // VFM removes other shortcodes, which are kept as written.
-    shortcode: (node, context) =>
-      (node as ShortcodeMdast).identifier === 'toc'
-        ? context.schema.nodes.tableOfContents?.create()
-        : undefined,
-  },
-  nodes: {
-    tableOfContents: () => '[[toc]]',
-  },
 });

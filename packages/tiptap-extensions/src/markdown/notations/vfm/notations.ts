@@ -7,8 +7,8 @@ import { headingAttributesNotation, sectionEndNotation } from './headings';
 import { mathNotation } from './math';
 import { paragraphContinuationNotation } from './paragraphs';
 import { rubyNotation } from './ruby';
+import { shortcodeNotation } from './shortcodes';
 import { taskListNotation } from './task-list';
-import { tableOfContentsNotation } from './toc';
 
 /**
  * Where versions of VFM read the same markdown differently. VFM after 2
@@ -42,7 +42,7 @@ export function vfmNotations(
     paragraphContinuationNotation,
     headingAttributesNotation,
     sectionEndNotation,
-    tableOfContentsNotation,
+    shortcodeNotation,
     taskListNotation,
     ...(syntax.imageAltSource ? [imageAltNotation] : []),
     rubyNotation,

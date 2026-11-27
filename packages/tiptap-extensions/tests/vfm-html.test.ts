@@ -621,16 +621,17 @@ const comparisons: Record<string, Comparison[]> = {
       },
     },
   ],
-  'VFM table of contents': [
+  'VFM shortcodes': [
     { markdown: 'text [[toc]]' },
     { markdown: '[[ ]]\n\n[[]]\n\ntext\n[[toc]]' },
     {
       markdown: '[[toc]] text *em*',
       differs: {
         vfm: '<div></div><p> text <em>em</em></p>',
-        editor: '<div data-toc=""></div><p>text <em>em</em></p>',
+        editor:
+          '<pre data-raw-block=""><code>[[toc]]</code></pre><p>text <em>em</em></p>',
         reason:
-          'The attribute lets the editor show where the table of contents goes, which VFM leaves empty.',
+          'VFM writes an empty element for `[[toc]]`; the editor keeps it as written.',
       },
     },
     {
@@ -647,9 +648,9 @@ const comparisons: Record<string, Comparison[]> = {
       markdown: '[[toc]]',
       differs: {
         vfm: '<div></div>',
-        editor: '<div data-toc=""></div>',
+        editor: '<pre data-raw-block=""><code>[[toc]]</code></pre>',
         reason:
-          'The attribute lets the editor show where the table of contents goes, which VFM leaves empty.',
+          'VFM writes an empty element for `[[toc]]`; the editor keeps it as written.',
       },
     },
     {

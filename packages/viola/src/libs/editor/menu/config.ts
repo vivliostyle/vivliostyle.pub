@@ -84,7 +84,6 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
             'insert.math',
             'insert.footnote',
             'insert.footnote-reference',
-            'insert.toc',
             'insert.section-end',
           ],
         },
