@@ -43,22 +43,8 @@ export function listHighlightLanguages(): string[] {
 
 // A line break would end the fence line early and turn the rest of the info
 // string into markdown outside the code block.
-function toInfoString(value: string | null | undefined): string | null {
+export function toInfoString(value: string | null | undefined): string | null {
   return value?.replace(/[\r\n]+/g, ' ') || null;
-}
-
-// A fence must be longer than any run of its character that could close it
-// early, and a backtick fence cannot carry backticks in its info string.
-function codeFence(infoString: string, code: string): string {
-  const char = infoString.includes('`') ? '~' : '`';
-  const runs = code.match(char === '`' ? /^ {0,3}`+/gm : /^ {0,3}~+/gm);
-  // Not Math.max(...runs): a long enough code block exceeds the engine's
-  // argument limit.
-  let longest = 0;
-  for (const run of runs ?? []) {
-    longest = Math.max(longest, run.trim().length);
-  }
-  return char.repeat(Math.max(3, longest + 1));
 }
 
 /**
@@ -258,31 +244,6 @@ export const CodeBlockPrism = CodeBlock.extend({
           language ? { 'data-language': language } : {},
       },
     };
-  },
-
-  parseMarkdown(token, helpers) {
-    // marked's `lang` is trimmed and has backslash escapes removed, and the
-    // upstream check drops fences indented by one to three spaces.
-    const infoString = token.raw?.match(/^ {0,3}(?:`{3,}|~{3,})(.*)/)?.[1];
-    if (infoString === undefined && token.codeBlockStyle !== 'indented') {
-      return [];
-    }
-    return helpers.createNode(
-      'codeBlock',
-      { language: infoString || null },
-      token.text ? [helpers.createTextNode(token.text)] : [],
-    );
-  },
-
-  renderMarkdown(node, h) {
-    // Also covers values that arrive without setCodeBlockInfo, e.g. over Yjs.
-    const infoString = toInfoString(node.attrs?.language) ?? '';
-    const code = node.content ? h.renderChildren(node.content) : '';
-    const fence = codeFence(infoString, code);
-    // Leading tildes would lengthen a tilde fence instead of starting the
-    // info string; markdown ignores the space.
-    const separator = infoString.startsWith(fence.charAt(0)) ? ' ' : '';
-    return `${fence}${separator}${infoString}\n${code}\n${fence}`;
   },
 
   addExtensions() {

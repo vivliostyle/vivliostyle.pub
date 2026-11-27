@@ -6,7 +6,15 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 
 import type { SyncProvider } from '@v/sync-client';
-import { PubExtensions } from '@v/tiptap-extensions';
+import {
+  currentNotations,
+  type DocumentRecord,
+  getMarkdown,
+  MarkdownWriteError,
+  PubExtensions,
+  parseMarkdown,
+  setMarkdownBaseline,
+} from '@v/tiptap-extensions';
 import type { ProjectId } from '../stores/proxies/project';
 import { debounce } from './debounce';
 import { createSandboxImageSaver } from './editor/image-saver';
@@ -18,6 +26,12 @@ import { type EditorSyncContext, startEditorSync } from './editor-sync';
 import type { SandboxFile } from './sandbox/file';
 
 export type { EditorSyncContext } from './editor-sync';
+
+// Shared with the document, outside it: the definitions its content was read
+// with and the frontmatter.
+const MARKDOWN_META = 'markdown';
+const NOTATIONS_KEY = 'notations';
+const FRONTMATTER_KEY = 'frontmatter';
 
 function editorPersistenceKey(projectId: ProjectId, filename: string): string {
   return `viola:editor:${projectId}:${filename}`;
@@ -40,6 +54,7 @@ export async function setupEditor({
   initialFile,
   sync,
   onSave,
+  onSaveError,
   writeFile,
 }: {
   projectId: ProjectId;
@@ -48,6 +63,8 @@ export async function setupEditor({
   initialFile?: SandboxFile;
   sync?: EditorSyncContext;
   onSave: (content: { markdown: string; summary: string }) => void;
+  /** Called when saving starts failing, and when it works again. */
+  onSaveError?: (failing: boolean) => void;
   writeFile: (path: string, file: SandboxFile) => void;
 }) {
   const fileDir = filename ? dirname(filename) : '';
@@ -56,7 +73,35 @@ export async function setupEditor({
     basePath = undefined;
   }
 
+  // The file on disk is what saving compares the document with, also when
+  // the document comes from IndexedDB or the server instead of the file.
+  const markdown = (await initialFile?.text()) ?? '';
   const doc = new Y.Doc();
+  const meta = doc.getMap<string>(MARKDOWN_META);
+  const hasContent = () => doc.getXmlFragment('default').length > 0;
+  const recordMarkdown = (editor: Editor, markdown?: string) => {
+    doc.transact(() => {
+      const notations = currentNotations(editor);
+      if (meta.get(NOTATIONS_KEY) !== notations) {
+        meta.set(NOTATIONS_KEY, notations);
+      }
+      if (markdown !== undefined) {
+        const { frontmatter } = parseMarkdown(editor, markdown);
+        // An empty record removes the file's frontmatter, so it is only
+        // made by removing recorded frontmatter, not by a file without any.
+        const recorded = meta.get(FRONTMATTER_KEY);
+        if (recorded !== frontmatter && (frontmatter || recorded)) {
+          meta.set(FRONTMATTER_KEY, frontmatter);
+        }
+      }
+    });
+  };
+  // Read on every write, by the extension: IndexedDB, the server and other
+  // clients can change the record at any time.
+  const documentRecord = (): DocumentRecord => ({
+    notations: meta.get(NOTATIONS_KEY) ?? null,
+    frontmatter: meta.get(FRONTMATTER_KEY),
+  });
   // Editor state is persisted to IndexedDB keyed by a stable project + file
   // path. contentId is regenerated on every load, so it cannot serve as the
   // persistence key.
@@ -64,12 +109,31 @@ export async function setupEditor({
     ? new IndexeddbPersistence(editorPersistenceKey(projectId, filename), doc)
     : undefined;
 
+  let failed = false;
   const saveContent = debounce(
     (editor: Editor) => {
-      onSave({
-        markdown: editor.getMarkdown(),
-        summary: getEditorSummary(editor),
-      });
+      let markdown: string;
+      try {
+        markdown = getMarkdown(editor);
+      } catch (error) {
+        // Saving it would change what the file means; the file keeps its
+        // last good state, and the next edit tries again.
+        if (error instanceof MarkdownWriteError) {
+          if (!failed) {
+            failed = true;
+            console.error(error);
+            onSaveError?.(true);
+          }
+          return;
+        }
+        throw error;
+      }
+      if (failed) {
+        failed = false;
+        onSaveError?.(false);
+      }
+      setMarkdownBaseline(editor, markdown);
+      onSave({ markdown, summary: getEditorSummary(editor) });
     },
     1000,
     { trailing: true },
@@ -86,6 +150,9 @@ export async function setupEditor({
       onFilePaste: (editor, files) => {
         insertImageFiles({ editor, files });
       },
+      onSetMarkdown: (editor) =>
+        recordMarkdown(editor, editor.storage.pubMarkdown.baseline),
+      documentRecord,
       onDrop: (editor, payload, pos) => {
         switch (payload.type) {
           case 'asset':
@@ -115,6 +182,8 @@ export async function setupEditor({
     },
   });
 
+  setMarkdownBaseline(editor, markdown);
+
   let syncProvider: SyncProvider | undefined;
   editor.on('destroy', () => {
     saveContent.cancel();
@@ -138,13 +207,14 @@ export async function setupEditor({
       filename,
     });
   }
-  if (doc.getXmlFragment('default').length === 0) {
-    const markdown = (await initialFile?.text())?.trim();
-    if (markdown) {
-      editor.commands.setContent(markdown, {
-        contentType: 'markdown',
-        emitUpdate: false,
-      });
+  // Content without the record was read by an earlier editor and means
+  // nothing certain now, so it is read from the file anew.
+  const unrecorded = hasContent() && meta.get(NOTATIONS_KEY) === undefined;
+  if (!hasContent() || unrecorded) {
+    if (markdown.trim() || unrecorded) {
+      editor.commands.setMarkdown(markdown, { emitUpdate: false });
+    } else {
+      recordMarkdown(editor, markdown);
     }
   }
 

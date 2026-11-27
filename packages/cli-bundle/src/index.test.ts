@@ -37,6 +37,15 @@ const expectedExports = [
 
 const readBundle = () => fs.readFileSync(bundlePath, 'utf8');
 
+// Parsing the bundle, which is megabytes, takes seconds on a busy runner,
+// so it is parsed once, with time for it.
+const PARSE_TIMEOUT = 60_000;
+let parsed: ReturnType<typeof parseAst> | undefined;
+const parseBundle = () => {
+  parsed ??= parseAst(readBundle(), { lang: 'js' }, 'index.js');
+  return parsed;
+};
+
 describe('cli-bundle build artifact', () => {
   it('emits dist/index.js with non-trivial size', () => {
     const stat = fs.statSync(bundlePath);
@@ -47,14 +56,14 @@ describe('cli-bundle build artifact', () => {
     expect(fs.existsSync(dtsPath)).toBe(true);
   });
 
-  it('parses as valid JavaScript', () => {
-    const program = parseAst(readBundle(), { lang: 'js' }, 'index.js');
+  it('parses as valid JavaScript', { timeout: PARSE_TIMEOUT }, () => {
+    const program = parseBundle();
     expect(program.type).toBe('Program');
     expect(program.body.length).toBeGreaterThan(0);
   });
 
-  it('re-exports the expected public API', () => {
-    const program = parseAst(readBundle(), { lang: 'js' }, 'index.js');
+  it('re-exports the expected public API', { timeout: PARSE_TIMEOUT }, () => {
+    const program = parseBundle();
     const exported = new Set<string>();
     for (const stmt of program.body) {
       if (stmt.type === 'ExportNamedDeclaration') {

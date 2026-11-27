@@ -6,7 +6,7 @@ import refractor from 'refractor';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { flattenRefractorNodes, resolveVfmLanguage } from './code-block-prism';
-import { PubExtensions } from './index';
+import { getMarkdown, PubExtensions } from './index';
 
 describe('resolveVfmLanguage', () => {
   it('returns the language as-is', () => {
@@ -131,7 +131,7 @@ describe('setCodeBlockInfo', () => {
     expect(editor.state.doc.textContent).toBe(code);
     expect(editor.state.selection.from).toBe(5);
     expect(highlightedTexts(editor)).toContain('const');
-    expect(editor.getMarkdown()).toBe(`\`\`\`js  title="a b"\n${code}\n\`\`\``);
+    expect(getMarkdown(editor)).toBe(`\`\`\`js  title="a b"\n${code}\n\`\`\``);
     expect(undoDepth(editor.state)).toBe(1);
 
     editor.commands.undo();
@@ -172,7 +172,7 @@ describe('setCodeBlockInfo', () => {
       8,
     );
     editor.commands.setCodeBlockInfo('js title=a.js');
-    expect(editor.getMarkdown()).toBe(
+    expect(getMarkdown(editor)).toBe(
       `- a\n\n  \`\`\`js title=a.js\n  ${code}\n  \`\`\``,
     );
   });
@@ -198,7 +198,7 @@ describe('info strings with line breaks', () => {
 
   it('are written on the fence line', () => {
     const editor = createEditor([codeBlock({ language: injected })], 2);
-    expect(editor.getMarkdown()).toBe(
+    expect(getMarkdown(editor)).toBe(
       `\`\`\`js <img src=x onerror=alert(1)> # heading\n${code}\n\`\`\``,
     );
   });

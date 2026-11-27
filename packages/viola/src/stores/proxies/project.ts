@@ -216,6 +216,12 @@ export class Project {
       initialFile,
       sync,
       onSave: (content) => this.saveContentFile(contentId, content),
+      onSaveError: (failing) => {
+        const file = this.content.files.get(contentId);
+        if (file) {
+          file.saveFailed = failing;
+        }
+      },
       writeFile: (path, file) => {
         sandbox.files[path] = ref(file);
       },

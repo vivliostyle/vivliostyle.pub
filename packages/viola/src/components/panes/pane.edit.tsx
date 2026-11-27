@@ -24,6 +24,7 @@ export const Pane = createPane<EditPaneProperty>({
   content: (props) => (
     <ScrollOverflow>
       <ModeToggle {...props} />
+      <SaveFailure {...props} />
       <Suspense
         fallback={
           <div className="grid size-full place-items-center">
@@ -66,6 +67,21 @@ function ModeToggle({
         {isSource ? m.edit_mode_visual() : m.edit_mode_source()}
       </Button>
     </div>
+  );
+}
+
+function SaveFailure({ contentId }: EditPaneProperty) {
+  const content = useSnapshot($content).value();
+  if (!content?.files.get(contentId)?.saveFailed) {
+    return null;
+  }
+  return (
+    <p
+      role="alert"
+      className="mx-2 mb-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+    >
+      {m.edit_save_failed()}
+    </p>
   );
 }
 
