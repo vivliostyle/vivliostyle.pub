@@ -1108,6 +1108,13 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("本文", inlineFootnote("注")))',
       },
       {
+        name: 'text typed after a note closes goes after it',
+        given: 'を‸',
+        steps: ['^[注です]書く[^1]'],
+        expect: 'を^[注です]書く[^1]‸',
+        doc: 'doc(paragraph("を", inlineFootnote("注です"), "書く", footnoteReference))',
+      },
+      {
         name: 'footnote reference',
         given: '本文‸',
         steps: ['[^1]'],

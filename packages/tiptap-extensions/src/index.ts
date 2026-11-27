@@ -10,6 +10,7 @@ import {
   type CustomDragPayload,
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
+import { InlineBoundaries } from './inline-boundaries';
 import { PubMarkdown, type PubMarkdownOptions } from './markdown/extension';
 import type { NotationDefinition } from './markdown/notation';
 import { commonMarkNotations } from './markdown/notations/commonmark';
@@ -169,6 +170,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       Gapcursor.configure({}),
       ChainSafeClearNodes,
       BlockFormatting,
+      InlineBoundaries,
       FileMediaHandler.configure({
         allowedMimeTypes: IMAGE_MIME_TYPES,
         onDrop: onFileDrop,
