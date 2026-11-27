@@ -37,7 +37,7 @@
   "edit_mode_visual": "Visual",
   "edit_pane_title": "Content Editor",
   "edit_pane_title_with_file": "Content Editor: File {filename}",
-  "edit_save_failed": "Your latest changes are not saved: they cannot be written as Markdown that reads back the same. Undo the last edit, or fix it in the source view.",
+  "edit_save_failed": "Failed to save the Markdown. Undo the last edit, or fix it in the source view.",
   "edit_source_editor_aria": "Markdown source editor",
   "editor_command_attributes": "Attributes",
   "editor_command_blockquote": "Quote",
