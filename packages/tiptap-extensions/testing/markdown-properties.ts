@@ -257,9 +257,13 @@ function lineEnd(text: string, index: number): number {
 function write(
   editor: Editor,
   doc: ProseMirrorNode,
+  baseline?: string,
 ): { markdown: string; strategy: string } | { error: MarkdownWriteError } {
   try {
-    return getMarkdownWithResult(editor, { doc });
+    return getMarkdownWithResult(editor, {
+      doc,
+      ...(baseline !== undefined && { baseline }),
+    });
   } catch (error) {
     if (error instanceof MarkdownWriteError) {
       return { error };
@@ -294,12 +298,18 @@ export function checkMarkdownProperties(
       });
     }
 
-    const generated = getMarkdownWithResult(editor, { baseline: '' });
-    if (!readsBackAs(editor, generated.markdown, original)) {
+    const generated = write(editor, original, '');
+    if (
+      'error' in generated ||
+      !readsBackAs(editor, generated.markdown, original)
+    ) {
       violations.push({
         property: 'round trip',
         detail: 'writing the document without a baseline',
-        actual: String(parseMarkdown(editor, generated.markdown).doc),
+        actual:
+          'error' in generated
+            ? String(generated.error)
+            : String(parseMarkdown(editor, generated.markdown).doc),
         expected: String(original),
       });
     }
@@ -401,7 +411,7 @@ export function checkMarkdownProperties(
   return violations;
 }
 
-const FRAGMENTS = [
+export const FRAGMENTS = [
   'para *em* _em_ **st** `code` text',
   'line one\nline two',
   'Setext\n===',
@@ -452,7 +462,7 @@ const FRAGMENTS = [
   '本文\n![図](a.png)',
   '以下の通り：\n- 項目A',
 ];
-const INSERTS = [
+export const INSERTS = [
   'X',
   '*',
   '_',

@@ -13,7 +13,8 @@
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --project unit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p bug-hunt",
+    "bug-hunt": "node bug-hunt/bin.mjs"
   },
   "devDependencies": {
     "@tiptap/core": "catalog:",
@@ -38,6 +39,7 @@
     "@tiptap/extensions": "catalog:",
     "@tiptap/pm": "catalog:",
     "@types/mdast": "4.0.4",
+    "@types/node": "catalog:",
     "@types/refractor": "3.4.1",
     "@v/config": "workspace:*",
     "@vivliostyle/vfm": "catalog:",

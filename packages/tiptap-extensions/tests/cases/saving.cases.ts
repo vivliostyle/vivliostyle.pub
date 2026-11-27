@@ -122,6 +122,20 @@ export const savingSuites: CaseSuite[] = [
         steps: [insert('www.example.com を参照')],
         expect: '詳細はwww.example.com を参照',
       },
+      {
+        name: 'a word GFM does not link that ends a block',
+        given: 'm.co\n\nb',
+        expect: 'm.co\n\nb',
+        fails:
+          'The link autolink plugin runs on the transaction that loads the file and links words that GFM does not read as links',
+      },
+      {
+        name: 'a URL in raw markdown',
+        given: 'x\n# [a http://b](c)\n\nd',
+        expect: 'x\n# [a http://b](c)\n\nd',
+        fails:
+          'The link autolink plugin links text inside raw inline markdown, which the writer then writes as link syntax around the raw source',
+      },
     ],
   },
   {
@@ -191,6 +205,14 @@ export const savingSuites: CaseSuite[] = [
         given: '以下の通り：\n- 項目A‸',
         steps: ['X'],
         expect: '以下の通り：\n- 項目AX‸',
+      },
+      {
+        name: 'a line break left right after a hard break',
+        given: 'a  \n‸b‸\n<s>',
+        steps: [press('Backspace')],
+        expect: 'a  \n&#xA;‸<s>',
+        fails:
+          'A newline right after a hard break is written as a plain line break, which makes a blank line, and the read-back comparison misses the blocks it splits into',
       },
     ],
   },
@@ -282,6 +304,14 @@ export const savingSuites: CaseSuite[] = [
         expect: 'a`x\n- y‸`c',
         fails:
           'The line after the break starts a list, which can interrupt a paragraph, and code has no escapes: the save is refused',
+      },
+      {
+        name: 'deleting its middle line',
+        given: '`a\n‸b‸\nc`',
+        steps: [press('Backspace')],
+        expect: '`a\nc`',
+        fails:
+          'Nothing keeps a blank line out of a code mark, and code spans can hold neither a blank line nor an escape for one: the save is refused',
       },
     ],
   },

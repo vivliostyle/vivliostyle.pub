@@ -18,6 +18,7 @@ export default defineConfig({
             'src/**/*.test.ts',
             'testing/**/*.test.ts',
             'tests/*.test.ts',
+            'bug-hunt/**/*.test.ts',
           ],
         },
       },

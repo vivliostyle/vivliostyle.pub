@@ -52,7 +52,7 @@ export interface EditorCase {
 /** Where the editor does not do what a case expects. */
 export type Mismatch =
   | { label: string; actual: unknown; expected: unknown }
-  | { label: string; error: RangeError };
+  | { label: string; error: Error };
 
 export function stepsOf(testCase: EditorCase): Step[] {
   return (testCase.steps ?? []).map(toStep);
@@ -120,7 +120,7 @@ function invalidDocument(label: string, check: () => void): Mismatch[] {
   }
 }
 
-function loadSelectingMarks(editor: Editor, given: string): void {
+export function loadSelectingMarks(editor: Editor, given: string): void {
   const marks = countSelectionMarks(given);
   if (marks === 0) {
     loadMarkdown(editor, given);
@@ -168,6 +168,15 @@ export async function runCase(
     try {
       await driver.perform(step);
     } catch (cause) {
+      // ProseMirror throws these when the editor builds a bad transaction or
+      // document; anything else is taken for a mistake in the case. The
+      // types of prosemirror-transform leave `TransformError` out.
+      if (
+        cause instanceof RangeError ||
+        (cause instanceof Error && cause.name === 'TransformError')
+      ) {
+        return [{ label: `${describeStep(step)} throws`, error: cause }];
+      }
       throw new Error(`Could not ${describeStep(step)}`, { cause });
     }
   }

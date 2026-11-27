@@ -1,0 +1,34 @@
+{
+  "schema": "vivliostyle-pub/editor-finding@1",
+  "id": "F-example-lazy-continuation",
+  "title": "Typing in a lazy continuation line of a quote adds the quote's prefix to it",
+  "oracle": "expectation",
+  "severity": "minor",
+  "category": "serialize",
+  "probe": {
+    "given": "# t\n\n> a\nla‸zy\n\nend\n",
+    "steps": ["X"]
+  },
+  "expected": {
+    "markdown": "# t\n\n> a\nlaXzy\n\nend\n",
+    "rationale": "Only the edited characters should change in the source. The line without `>` is a lazy continuation of the quote's paragraph in CommonMark and in VFM, so it reads the same without the prefix the save adds.",
+    "evidence": [
+      {
+        "kind": "vfm-render",
+        "markdown": "> a\nlaXzy\n",
+        "html": "<blockquote>\n<p>a\nlaXzy</p>\n</blockquote>"
+      }
+    ]
+  },
+  "area": {
+    "notations": ["blockquote"],
+    "files": ["src/markdown/inline-reuse.ts"]
+  },
+  "knownLimitation": {
+    "file": "tests/cases/saving.cases.ts",
+    "reason": "A rewritten paragraph gives its lazy lines the prefix of the container"
+  },
+  "confidence": "high",
+  "hypothesis": "A rewritten paragraph gives its lazy lines the prefix of the container",
+  "found": { "by": "example", "harnessVersion": 1 }
+}
