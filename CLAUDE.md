@@ -161,6 +161,15 @@ Tests (`src/index.test.ts`) validate the build artifact, not behavior: they pars
 - **Agent guidance lives only in this file.** No `.cursor/rules`, `.cursorrules`, or `.github/copilot-instructions.md` exist — `AGENTS.md` is a symlink to `CLAUDE.md` so every agent reads the same source. If you need to extend the guide, edit `CLAUDE.md`.
 - **Write agent guidance that survives code changes.** In this file and in `.claude/rules/`, state a rule by the role and structure it governs, not by the code that follows it today. Don't cite specific variables, functions, classes or files as examples. After a rename or a refactor, such an example points at code that no longer exists, and nothing flags it. Directory names are fine when the rule is about that layout, and so are third-party library APIs. When a rule needs an example, describe the situation in words (e.g. "several fields that change together") instead of naming the symbol.
 
+## Editor behaviour tests
+
+`@v/tiptap-extensions` pins the editor's behaviour down as data, in `tests/cases/`. The framework that runs them is in `testing/`, outside `src/`.
+
+- A case gives the markdown the document is loaded from, the steps applied to it (typed text, key presses, editor commands) and the markdown it is saved as. A caret mark in the markdown stands for the selection, so a case reads like what the user sees. Add a case there instead of a one-off test that builds an editor by hand.
+- The cases run in `pnpm test` against a headless editor in Node. Its driver calls the hooks a view would call, so it covers keymaps and input rules. A case whose steps it cannot perform, such as paste, IME composition or caret movement, is skipped.
+- Write a behaviour the editor lacks as the case it should be, with the reason it fails. Such a case is required to differ from what it expects, so once a change makes it pass, remove the reason. A mistake in the case itself fails it all the same. Never bend the expected markdown to match what the editor does now.
+- The framework loads and saves markdown through a single module, so swapping the markdown conversion layer means changing that module, not the cases.
+
 ## Internationalization (i18n)
 
 The host React UI (`@v/viola`) is localized with **[inlang Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)** (compiler-based, tree-shakeable). The CLI worker / iframe (`@v/cli-bundle`, the Vivliostyle CLI itself) is out of scope.

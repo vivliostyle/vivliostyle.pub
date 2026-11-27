@@ -7,6 +7,7 @@
   "exports": {
     "./package.json": "./package.json",
     ".": "./src/index.ts",
+    "./testing/*": "./testing/*.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
