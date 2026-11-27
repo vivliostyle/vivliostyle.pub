@@ -16,7 +16,11 @@ import { commonMarkNotations } from './markdown/notations/commonmark';
 import { gfmNotations, htmlMarkNotations } from './markdown/notations/gfm';
 import { rawNotation } from './markdown/notations/raw';
 
-export { type BlockFormat, getBlockFormat } from './block-format';
+export {
+  type BlockFormat,
+  getBlockFormat,
+  type SelectedBlockFormat,
+} from './block-format';
 export {
   findSelectedCodeBlock,
   listHighlightLanguages,

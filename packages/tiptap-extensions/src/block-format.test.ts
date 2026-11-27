@@ -9,7 +9,11 @@ import {
 import type { Node } from '@tiptap/pm/model';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type BlockFormat, getBlockFormat } from './block-format';
+import {
+  type BlockFormat,
+  getBlockFormat,
+  type SelectedBlockFormat,
+} from './block-format';
 import { getMarkdown, PubExtensions } from './index';
 
 const editors: Editor[] = [];
@@ -38,6 +42,7 @@ const names: Record<string, string> = {
   blockquote: 'bq',
   paragraph: 'p',
   codeBlock: 'code',
+  rawBlock: 'raw',
   horizontalRule: 'hr',
 };
 
@@ -186,6 +191,8 @@ describe('setBlockFormat', () => {
       'bullet-list',
       'ul(li(p(x)), li(p(a)), li(p(y)))',
     ],
+    // Markdown no definition handles is not a code block, so it can become one.
+    ['<!-- x -->', '<!-- x -->', 'code-block', 'code(<!-- x -->)'],
   ])('%j, %s → %s', (markdown, selection, format, expected) => {
     const editor = convert(markdown, selection, format);
     expect(outline(editor.state.doc)).toBe(expected);
@@ -221,7 +228,7 @@ describe('setBlockFormat', () => {
 });
 
 describe('getBlockFormat', () => {
-  it.each<[string, string, BlockFormat | null]>([
+  it.each<[string, string, SelectedBlockFormat | null]>([
     [depth3, '*', 'bullet-list'],
     [depth3, 'c', 'bullet-list'],
     ['1. a\n   - b', 'a', 'ordered-list'],
@@ -231,6 +238,9 @@ describe('getBlockFormat', () => {
     ['> a', 'a', 'blockquote'],
     ['> ## a', 'a', 'heading-2'],
     ['- a\n\n  ```\n  b\n  ```', 'b', 'code-block'],
+    ['<!-- x -->', '<!-- x -->', 'raw'],
+    ['> <!-- x -->', '<!-- x -->', 'raw'],
+    ['<!-- x -->\n\nb', '<!-- x -->..b', null],
   ])('%j, %s → %s', (markdown, selection, expected) => {
     const editor = createEditor(markdown);
     const [first = '', last] = selection.split('..');
@@ -288,6 +298,13 @@ describe('keyboard shortcuts', () => {
     editor.commands.setTextSelection(textPosition(editor, text));
     press(editor, key);
     expect(outline(editor.state.doc)).toBe(expected);
+  });
+
+  it('turns markdown no definition handles into a code block on Mod-Alt-c', () => {
+    const editor = createEditor('<!-- x -->');
+    editor.commands.setTextSelection(textPosition(editor, '<!-- x -->'));
+    press(editor, 'Mod-Alt-c');
+    expect(outline(editor.state.doc)).toBe('code(<!-- x -->)');
   });
 
   it('joins a later block of a list item into the one before on Backspace', () => {

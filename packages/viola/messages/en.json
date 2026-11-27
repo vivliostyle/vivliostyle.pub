@@ -49,6 +49,7 @@
   "editor_command_ordered_list_keywords": "numbered ordered list",
   "editor_command_paragraph": "Text",
   "editor_command_paragraph_keywords": "paragraph plain text",
+  "editor_command_raw_block": "Unsupported syntax",
   "editor_command_strike": "Strikethrough",
   "editor_command_underline": "Underline",
   "image_toolbar_alt_aria": "Alt text",
