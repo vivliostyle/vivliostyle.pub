@@ -27,6 +27,7 @@ export const defaultEditorMenuConfig: EditorMenuConfig = {
           'block.bullet-list',
           'block.ordered-list',
           'block.code-block',
+          'block.raw',
         ],
       },
       'code-block.info',
