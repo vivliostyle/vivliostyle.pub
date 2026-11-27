@@ -1,3 +1,5 @@
+import temmlUrl from 'temml/dist/temml.mjs?url';
+
 import type { MathTypesetter } from '@v/tiptap-extensions';
 
 /**
@@ -7,7 +9,11 @@ import type { MathTypesetter } from '@v/tiptap-extensions';
  */
 export const temmlTypesetter: MathTypesetter = {
   load: async () => {
-    const { default: temml } = await import('temml');
+    // Loaded as the file it ships as: bundling it rewrites the lone
+    // surrogates in its lexer's pattern, and every control word then fails.
+    const { default: temml }: typeof import('temml') = await import(
+      /* @vite-ignore */ temmlUrl
+    );
     return (latex, display) => {
       const element = document.createElement('span');
       // VFM trims the LaTeX before it gives it to Temml.
