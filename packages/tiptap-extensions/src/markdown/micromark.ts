@@ -55,6 +55,18 @@ export function syntaxPlugin(
   };
 }
 
+/**
+ * A remark plugin running `transform` on the mdast with the source it was
+ * read from.
+ */
+export function transformPlugin(
+  transform: (tree: UnknownMdastNode, source: string) => void,
+) {
+  return () => (tree: unknown, file: { value: unknown }) => {
+    transform(tree as UnknownMdastNode, String(file.value ?? ''));
+  };
+}
+
 export function isLineEnding(code: Code): boolean {
   return code !== null && code < codes.horizontalTab;
 }

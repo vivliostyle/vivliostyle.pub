@@ -4,6 +4,7 @@ import { type EditorState, NodeSelection } from '@tiptap/pm/state';
 
 import {
   findSelectedInline,
+  footnoteIdentifier,
   hasDocumentNotation,
   type InlineAttributes,
   isAttributeName,
@@ -55,7 +56,10 @@ export function isMathSource(
 function footnoteLabels(doc: ProseMirrorNode): string[] {
   const labels: string[] = [];
   doc.descendants((node) => {
-    if (node.type.name === 'footnoteReference') {
+    if (
+      node.type.name === 'footnoteReference' ||
+      node.type.name === 'footnoteDefinition'
+    ) {
       labels.push(String(node.attrs.label));
     } else if (node.isTextblock && node.type.spec.code) {
       for (const match of node.textContent.matchAll(/^\[\^([^\]\s]+)\]:/gm)) {
@@ -147,4 +151,52 @@ export function setMarkAttributes(
     })
     .run();
   return true;
+}
+
+/** The heading that holds the whole selection. */
+export function selectedHeading(state: EditorState): ProseMirrorNode | null {
+  const { $from, $to } = state.selection;
+  return $from.parent.type.name === 'heading' && $from.sameParent($to)
+    ? $from.parent
+    : null;
+}
+
+/** The innermost list item that holds the selection. */
+export function selectedListItem(state: EditorState): ProseMirrorNode | null {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    const node = $from.node(depth);
+    if (node.type.name === 'listItem') {
+      return node;
+    }
+  }
+  return null;
+}
+
+/** The level of the last heading before the selection at the top level. */
+export function sectionLevelAt(state: EditorState): number {
+  const index = state.selection.$from.index(0);
+  for (let i = index; i >= 0; i--) {
+    const node = state.doc.maybeChild(i);
+    if (node?.type.name === 'heading') {
+      return Number(node.attrs.level) || 1;
+    }
+  }
+  return 1;
+}
+
+/** Whether the document has a definition of the note `label`. */
+export function hasFootnoteDefinition(
+  doc: ProseMirrorNode,
+  label: string,
+): boolean {
+  const id = footnoteIdentifier(label);
+  let found = false;
+  doc.descendants((node) => {
+    found ||=
+      node.type.name === 'footnoteDefinition' &&
+      footnoteIdentifier(String(node.attrs.label ?? '')) === id;
+    return !found;
+  });
+  return found;
 }

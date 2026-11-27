@@ -22,8 +22,9 @@ function inLink(marks: readonly Mark[]): boolean {
 }
 
 /**
- * GitHub Flavored Markdown as VFM reads it. Tables, task list checkboxes and
- * footnote definitions have no definition yet and are kept as raw markdown.
+ * GitHub Flavored Markdown as VFM reads it. Tables have no definition yet
+ * and are kept as raw markdown; task lists and footnote definitions are
+ * the VFM bundle's.
  */
 export function gfmNotations({
   singleTilde,

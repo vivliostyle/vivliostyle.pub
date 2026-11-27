@@ -1,9 +1,14 @@
 import { type Editor, Extension } from '@tiptap/core';
-import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
+import {
+  Fragment,
+  type Mark,
+  type Node as ProseMirrorNode,
+} from '@tiptap/pm/model';
 import { Plugin, type Transaction } from '@tiptap/pm/state';
 
-import { changedNodes, isRemote } from './changes';
+import { changedNodes, isRemote, markLoading } from './changes';
 import type { NotationDefinition } from './notation';
+import { RAW_INLINE } from './parse';
 import {
   MarkdownPipeline,
   notationSignature,
@@ -186,7 +191,7 @@ function documentPipeline(
  * they lack.
  */
 function documentWrites(editor: Editor): {
-  writer: MarkdownPipeline['writer'];
+  pipeline: MarkdownPipeline;
   lostAttributes: ReadonlySet<string>;
 } | null {
   const storage = storageOf(editor);
@@ -202,14 +207,76 @@ function documentWrites(editor: Editor): {
       .notations.filter((it) => !kept.has(it.name))
       .flatMap((it) => it.attributes ?? []),
   );
-  return { writer: pipeline.writer, lostAttributes };
+  return { pipeline, lostAttributes };
+}
+
+function childrenOfNode(node: ProseMirrorNode): ProseMirrorNode[] {
+  const children: ProseMirrorNode[] = [];
+  node.forEach((child) => {
+    children.push(child);
+  });
+  return children;
+}
+
+/**
+ * What the markdown the editor writes of a node means to the document's
+ * definitions, so that VFM reads it as the node all the same: an inline
+ * node is that markdown kept raw, and a block is what the definitions read
+ * of it, where the syntax they lack is raw or text written back as it is.
+ */
+function asDocumentReads(
+  editor: Editor,
+  documentPipeline: MarkdownPipeline,
+  node: ProseMirrorNode,
+  parent: ProseMirrorNode,
+): ProseMirrorNode[] | null {
+  const { schema } = editor;
+  const { paragraph } = schema.nodes;
+  const raw = schema.marks[RAW_INLINE];
+  const wrapper = node.isInline
+    ? paragraph
+    : schema.topNodeType.contentMatch.matchType(node.type)
+      ? null
+      : parent.type;
+  try {
+    const doc = schema.topNodeType.create(
+      null,
+      wrapper
+        ? wrapper.create(
+            wrapper === parent.type ? parent.attrs : null,
+            node.isInline ? node.mark([]) : node,
+          )
+        : node,
+    );
+    const { markdown } = currentPipeline(editor).serializeWithResult(doc, {
+      baseline: '',
+    });
+    if (node.isInline) {
+      const text = markdown.trim();
+      return raw && text
+        ? [schema.text(text, raw.create().addToSet(node.marks))]
+        : null;
+    }
+    const read = documentPipeline.parse(markdown).doc;
+    if (!wrapper) {
+      return childrenOfNode(read);
+    }
+    const [only, ...rest] = childrenOfNode(read);
+    return only?.type === wrapper && rest.length === 0
+      ? childrenOfNode(only)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Turns what the document's definitions cannot write into what they can,
- * wherever this client changed the document, as by pasting HTML: an inline
- * node becomes its content or its text, a mark is taken off, and an
- * attribute of a definition the document lacks is cleared.
+ * wherever this client changed the document, as by pasting HTML: a node,
+ * or one with an attribute of a definition the document lacks, becomes
+ * what they read of its markdown, and a mark is taken off or loses the
+ * attribute. Where that does not fit, a node becomes its content or its
+ * text, and the attribute is cleared.
  */
 function dissolveUnwritable(editor: Editor): Plugin {
   return new Plugin({
@@ -221,18 +288,23 @@ function dissolveUnwritable(editor: Editor): Plugin {
       if (!writes) {
         return null;
       }
-      const { writer, lostAttributes } = writes;
-      const lost = (attrs: Record<string, unknown>) =>
-        [...lostAttributes].filter((name) => attrs[name] != null);
-      const cleared = (attrs: Record<string, unknown>) => ({
+      const { pipeline, lostAttributes } = writes;
+      const { writer } = pipeline;
+      const lost = (type: string, attrs: Record<string, unknown>) =>
+        Object.keys(attrs).filter(
+          (name) =>
+            attrs[name] != null &&
+            (lostAttributes.has(name) || lostAttributes.has(`${type}:${name}`)),
+        );
+      const cleared = (type: string, attrs: Record<string, unknown>) => ({
         ...attrs,
-        ...Object.fromEntries(lost(attrs).map((name) => [name, null])),
+        ...Object.fromEntries(lost(type, attrs).map((name) => [name, null])),
       });
       const { tr } = state;
       const found = changedNodes(
         state.doc,
         transactions,
-        (node) => !node.isBlock,
+        (node) => node !== state.doc,
       );
       for (const { pos } of found) {
         const node = tr.doc.nodeAt(pos);
@@ -242,16 +314,44 @@ function dissolveUnwritable(editor: Editor): Plugin {
         for (const mark of node.marks) {
           if (!writer.writesMark(mark.type.name)) {
             removeMark(tr, pos, node, mark);
-          } else if (lost(mark.attrs).length > 0) {
+          } else if (lost(mark.type.name, mark.attrs).length > 0) {
             removeMark(tr, pos, node, mark);
-            addMark(tr, pos, node, mark.type.create(cleared(mark.attrs)));
+            addMark(
+              tr,
+              pos,
+              node,
+              mark.type.create(cleared(mark.type.name, mark.attrs)),
+            );
           }
         }
         const current = tr.doc.nodeAt(pos) ?? node;
-        if (!current.isText && !writer.writesNode(current.type.name)) {
-          tr.replaceWith(pos, pos + current.nodeSize, contentOf(current));
-        } else if (!current.isText && lost(current.attrs).length > 0) {
-          tr.setNodeMarkup(pos, undefined, cleared(current.attrs));
+        const type = current.type.name;
+        const unwritable = !current.isText && !writer.writesNode(type);
+        if (
+          current.isText ||
+          (!unwritable && lost(type, current.attrs).length === 0)
+        ) {
+          continue;
+        }
+        const $pos = tr.doc.resolve(pos);
+        const index = $pos.index();
+        const fits = (content: readonly ProseMirrorNode[] | null) =>
+          content !== null &&
+          $pos.parent.canReplace(index, index + 1, Fragment.from(content));
+        const read = asDocumentReads(editor, pipeline, current, $pos.parent);
+        if (fits(read)) {
+          tr.replaceWith(pos, pos + current.nodeSize, read ?? []);
+          continue;
+        }
+        if (unwritable) {
+          const content = current.isBlock
+            ? blockContentOf(current)
+            : contentOf(current);
+          if (fits(content)) {
+            tr.replaceWith(pos, pos + current.nodeSize, content);
+          }
+        } else {
+          tr.setNodeMarkup(pos, undefined, cleared(type, current.attrs));
         }
       }
       return tr.docChanged ? tr : null;
@@ -283,6 +383,26 @@ function addMark(
   } else {
     tr.addNodeMark(pos, mark);
   }
+}
+
+/**
+ * A block as the blocks it holds, or as a paragraph of its text: a block
+ * that is markdown of its own, like a table of contents, is that markdown.
+ */
+function blockContentOf(node: ProseMirrorNode): ProseMirrorNode[] {
+  const { paragraph } = node.type.schema.nodes;
+  if (!node.isLeaf && !node.inlineContent) {
+    const children: ProseMirrorNode[] = [];
+    node.forEach((child) => {
+      children.push(child);
+    });
+    return children;
+  }
+  if (node.inlineContent && paragraph) {
+    return [paragraph.create(null, node.content)];
+  }
+  const [text] = contentOf(node);
+  return paragraph ? [paragraph.create(null, text ?? null)] : [];
 }
 
 /** An inline node as the content it holds, or as its text. */
@@ -343,7 +463,8 @@ export const PubMarkdown = Extension.create<
     return {
       setMarkdown:
         (markdown, options) =>
-        ({ commands, dispatch, editor }) => {
+        ({ commands, dispatch, editor, tr }) => {
+          markLoading(tr);
           const { doc } = currentPipeline(editor).parse(markdown);
           const done = commands.setContent(doc.toJSON(), {
             emitUpdate: options?.emitUpdate ?? true,

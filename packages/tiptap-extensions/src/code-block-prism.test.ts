@@ -284,6 +284,7 @@ describe('opening fence typed in a paragraph', () => {
     expect(editor.getJSON().content?.[0].content).toEqual([
       {
         type: 'listItem',
+        attrs: { checked: null },
         content: [
           paragraph('a'),
           { type: 'codeBlock', attrs: { language: 'js' } },

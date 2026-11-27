@@ -204,6 +204,33 @@ function attributesOf(items: readonly Item[]): InlineAttributes {
   };
 }
 
+/**
+ * The attributes of the `{…}` that starts at `start` in `text`, and where it
+ * ends, or null when no attributes start there.
+ */
+export function attributesAt(
+  text: string,
+  start: number,
+): { attributes: InlineAttributes; end: number } | null {
+  if (text[start] !== '{') {
+    return null;
+  }
+  const scanner = new AttributeScanner();
+  for (let index = start + 1; index < text.length; index++) {
+    if (text[index] === '\n') {
+      return null;
+    }
+    const result = scanner.step(text[index]);
+    if (result === 'fail') {
+      return null;
+    }
+    if (result === 'close') {
+      return { attributes: attributesOf(scanner.items), end: index + 1 };
+    }
+  }
+  return null;
+}
+
 /** The attributes `{…}` holds, or null when it is not attributes. */
 export function parseAttributes(source: string): InlineAttributes | null {
   if (!source.startsWith('{')) {
@@ -445,7 +472,7 @@ const ATTRIBUTED_MARKS: Record<string, string> = {
   link: 'link',
 };
 
-const ATTRIBUTED_NODES = ['image', 'footnoteReference'];
+const ATTRIBUTED_NODES = ['image', 'inlineImage', 'footnoteReference'];
 
 const ATTRIBUTED_TYPES = [
   ...Object.values(ATTRIBUTED_MARKS),
@@ -462,6 +489,14 @@ export function takesAttributes(
   adjacent: WriteContext['adjacent'],
 ): boolean {
   const last = before?.slice(-1);
+  // A URL the writer encloses in angle brackets is an autolink, whatever
+  // the marks say.
+  if (
+    before &&
+    /<[A-Za-z][A-Za-z0-9+.-]*:[^\s<>]*>$|<[^\s<>@]+@[^\s<>]+>$/.test(before)
+  ) {
+    return true;
+  }
   if (!adjacent || !last || !/[)\]`*_~]/.test(last)) {
     return false;
   }
@@ -563,10 +598,12 @@ export const InlineAttributesExtension = Extension.create({
     });
     return [
       {
-        types: ATTRIBUTED_TYPES.filter((type) => type !== 'image'),
+        types: ATTRIBUTED_TYPES.filter(
+          (type) => type !== 'image' && type !== 'inlineImage',
+        ),
         attributes: attributes(),
       },
-      { types: ['image'], attributes: attributes('img') },
+      { types: ['image', 'inlineImage'], attributes: attributes('img') },
     ];
   },
 });
@@ -595,6 +632,16 @@ export const inlineAttributesNotation = defineNotation({
         attributedMark(mark),
       ]),
     ),
+    image: (node, _, next) => {
+      const { attributes } = node as AttributedMdast;
+      return attributes
+        ? mapNodes(next(), (it) =>
+            it.type.name === 'inlineImage'
+              ? it.type.create({ ...it.attrs, attributes }, null, it.marks)
+              : it,
+          )
+        : next();
+    },
     paragraph: (node, _, next) => {
       const result = next();
       const [only] = node.children;
@@ -621,7 +668,16 @@ export const inlineAttributesNotation = defineNotation({
   },
   nodes: {
     image: (node, _, next) => next() + written(node),
-    footnoteReference: (node, _, next) => next() + written(node),
+    inlineImage: {
+      decorates: true,
+      write: (node, _, next) => next() + written(node),
+    },
+    // `{}` keeps a reference in a link at the start of a line, as in
+    // `[[^1]{}](u)`, from closing the `[[…]]` that VFM removes as a shortcode.
+    footnoteReference: (node, context, next) =>
+      next() +
+      (written(node) ||
+        (`${context.lineBefore ?? ''}[`.startsWith('[[') ? '{}' : '')),
   },
   marks: Object.fromEntries(
     Object.values(ATTRIBUTED_MARKS).map((name) => [name, decorate]),

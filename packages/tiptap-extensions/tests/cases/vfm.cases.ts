@@ -22,8 +22,6 @@ const recordWithoutVfm = run(
   },
 );
 
-const PLAIN_TEXT = 'kept as plain text';
-
 // What ProseMirror dispatches for pasted text, which the node driver cannot
 // paste: paste rules look for the meta.
 const paste = (text: string) =>
@@ -361,11 +359,10 @@ export const vfmSuites: CaseSuite[] = [
         json: [
           {
             type: 'heading',
-            attrs: { level: 1, id: 'id', class: 'cls' },
+            attrs: { level: 1, attributes: { id: 'id', class: 'cls' } },
             content: [{ type: 'text', text: '見出し' }],
           },
         ],
-        fails: PLAIN_TEXT,
       },
       {
         name: 'image attributes',
@@ -553,7 +550,7 @@ export const vfmSuites: CaseSuite[] = [
       {
         name: 'footnote reference and definition',
         given: '脚注[^1]です。\n\n[^1]: 本文',
-        doc: 'doc(paragraph("脚注", footnoteReference, "です。"), rawBlock("[^1]: 本文"))',
+        doc: 'doc(paragraph("脚注", footnoteReference, "です。"), footnoteDefinition(paragraph("本文")))',
       },
       {
         name: 'a reference without a definition',
@@ -986,7 +983,7 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a{漢字|かんじ}と$x$ と^[注]"))',
       },
       {
-        name: 'pasted syntax becomes what the document can hold',
+        name: 'pasted syntax is kept as its markdown, raw',
         given: 'a‸b',
         steps: [
           recordWithoutVfm,
@@ -1004,8 +1001,8 @@ export const vfmSuites: CaseSuite[] = [
             ]),
           ]),
         ],
-        expect: 'a漢字$x$[^1]注**強調**‸b',
-        doc: 'doc(paragraph("a漢字$x$[^1]注", bold("強調"), "b"))',
+        expect: 'a{漢字|かんじ}$x$[^1]^[注]**強調**‸b',
+        doc: 'doc(paragraph("a", rawInline("{漢字|かんじ}$x$[^1]^[注]"), bold("強調"), "b"))',
       },
       {
         name: 'commands do nothing',
@@ -1122,13 +1119,18 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("本文", footnoteReference))',
       },
       {
-        // A definition has no node yet: typed into a paragraph it stays text,
-        // instead of the reference node that would hide its label.
-        name: 'a reference typed at the start of a paragraph stays text',
+        name: 'a definition typed at the start of a paragraph',
         given: '本文[^1]‸',
         steps: [press('Enter'), '[^1]: 注の本文'],
-        expect: '本文[^1]\n\n\\[^1]: 注の本文‸',
-        doc: 'doc(paragraph("本文", footnoteReference), paragraph("[^1]: 注の本文"))',
+        expect: '本文[^1]\n\n[^1]: 注の本文‸',
+        doc: 'doc(paragraph("本文", footnoteReference), footnoteDefinition(paragraph("注の本文")))',
+      },
+      {
+        name: 'a reference typed at the start of a paragraph',
+        given: '‸',
+        steps: ['[^1] から'],
+        expect: '[^1] から‸',
+        doc: 'doc(paragraph(footnoteReference, " から"))',
       },
       {
         name: 'nothing while composing',

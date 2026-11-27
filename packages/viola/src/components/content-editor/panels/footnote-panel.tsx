@@ -4,7 +4,11 @@ import { isWritableFootnoteLabel } from '@v/tiptap-extensions';
 import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
-import { nextFootnoteLabel, selectedNodeOf } from '../../../libs/editor/vfm';
+import {
+  hasFootnoteDefinition,
+  nextFootnoteLabel,
+  selectedNodeOf,
+} from '../../../libs/editor/vfm';
 import { dismissPanel, PanelForm } from './panel-form';
 
 /** Inserts a note where it is written. */
@@ -39,12 +43,16 @@ export function FootnotePanel({ editor, close }: EditorMenuPanelProps) {
   );
 }
 
-/** Inserts a reference to a note defined elsewhere, or changes its label. */
+/**
+ * Inserts a reference to a note, with its definition at the end of the
+ * document when it has none, or changes the label of a reference.
+ */
 export function FootnoteReferencePanel({
   editor,
   close,
 }: EditorMenuPanelProps) {
   const labelRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLInputElement>(null);
   const [reference] = useState(() =>
     selectedNodeOf(editor.state, 'footnoteReference'),
   );
@@ -54,6 +62,12 @@ export function FootnoteReferencePanel({
       : nextFootnoteLabel(editor.state.doc),
   );
   const [invalid, setInvalid] = useState(false);
+  // Only a new reference gets a definition with it, where the document can
+  // hold one.
+  const [definable] = useState(
+    () =>
+      !reference && editor.can().insertFootnoteDefinition(initialLabel, 'x'),
+  );
 
   const apply = () => {
     const label = labelRef.current?.value ?? '';
@@ -65,7 +79,11 @@ export function FootnoteReferencePanel({
       setInvalid(true);
       return;
     }
-    if (!editor.chain().focus().setFootnoteReference(label).run()) {
+    const chain = editor.chain().focus().setFootnoteReference(label);
+    if (definable && !hasFootnoteDefinition(editor.state.doc, label)) {
+      chain.insertFootnoteDefinition(label, textRef.current?.value.trim());
+    }
+    if (!chain.run()) {
       setInvalid(true);
       return;
     }
@@ -90,6 +108,14 @@ export function FootnoteReferencePanel({
         className="h-7 w-40"
         onChange={() => setInvalid(false)}
       />
+      {definable && (
+        <Input
+          ref={textRef}
+          placeholder={m.footnote_panel_definition_placeholder()}
+          aria-label={m.footnote_panel_definition_aria()}
+          className="h-7 w-64"
+        />
+      )}
     </PanelForm>
   );
 }

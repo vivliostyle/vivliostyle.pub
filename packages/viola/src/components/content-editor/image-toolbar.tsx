@@ -15,7 +15,10 @@ const IMAGE_TOOLBAR_OFFSET_VAR = '--image-toolbar-offset';
 interface ImageState {
   from: number;
   to: number;
+  /** A figure, or an image in text. */
+  type: 'image' | 'inlineImage';
   alt: string;
+  src: string;
 }
 
 interface ImageToolbarProps {
@@ -27,14 +30,17 @@ function getSelectedImage(editor: Editor): ImageState | null {
   if (!(sel instanceof NodeSelection)) {
     return null;
   }
-  if (sel.node.type.name !== 'image') {
+  const type = sel.node.type.name;
+  if (type !== 'image' && type !== 'inlineImage') {
     return null;
   }
-  const alt = sel.node.attrs.alt;
+  const { alt, src } = sel.node.attrs;
   return {
     from: sel.from,
     to: sel.to,
+    type,
     alt: typeof alt === 'string' ? alt : '',
+    src: typeof src === 'string' ? src : '',
   };
 }
 
@@ -42,6 +48,7 @@ export function ImageToolbar({ containerRef }: ImageToolbarProps) {
   const { editor } = useCurrentEditor();
   const [state, setState] = useState<ImageState | null>(null);
   const altInputRef = useRef<HTMLInputElement>(null);
+  const srcInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!editor) {
@@ -81,26 +88,31 @@ export function ImageToolbar({ containerRef }: ImageToolbarProps) {
   }, [editor, state]);
   const rect = useContainerRelativeRect(containerRef, imageDom);
 
-  const handleAltBlur = useCallback(() => {
-    if (!editor || !altInputRef.current || !state) {
-      return;
-    }
-    const value = altInputRef.current.value;
-    const current = getSelectedImage(editor);
-    if (
-      !current ||
-      current.from !== state.from ||
-      current.to !== state.to ||
-      current.alt === value
-    ) {
-      return;
-    }
-    editor
-      .chain()
-      .updateAttributes('image', { alt: value })
-      .setNodeSelection(state.from)
-      .run();
-  }, [editor, state]);
+  const handleBlur = useCallback(
+    (name: 'alt' | 'src') => {
+      const input = name === 'alt' ? altInputRef.current : srcInputRef.current;
+      if (!editor || !input || !state) {
+        return;
+      }
+      const { value } = input;
+      const current = getSelectedImage(editor);
+      if (
+        !current ||
+        current.from !== state.from ||
+        current.to !== state.to ||
+        current[name] === value ||
+        (name === 'src' && !value)
+      ) {
+        return;
+      }
+      editor
+        .chain()
+        .updateAttributes(current.type, { [name]: value })
+        .setNodeSelection(state.from)
+        .run();
+    },
+    [editor, state],
+  );
 
   const handleDelete = useCallback(() => {
     if (!editor) {
@@ -145,13 +157,30 @@ export function ImageToolbar({ containerRef }: ImageToolbarProps) {
         className="inline-flex items-center gap-1 rounded-md border bg-popover p-1 shadow-md"
       >
         <Input
-          key={`${state.from}-${state.to}`}
+          key={`alt-${state.from}-${state.to}`}
           ref={altInputRef}
           defaultValue={state.alt}
-          onBlur={handleAltBlur}
-          placeholder={m.image_toolbar_alt_placeholder()}
+          onBlur={() => handleBlur('alt')}
+          placeholder={
+            state.type === 'image'
+              ? m.image_toolbar_alt_placeholder()
+              : m.image_toolbar_inline_alt_placeholder()
+          }
           className="h-7 w-48"
-          aria-label={m.image_toolbar_alt_aria()}
+          aria-label={
+            state.type === 'image'
+              ? m.image_toolbar_alt_aria()
+              : m.image_toolbar_inline_alt_aria()
+          }
+        />
+        <Input
+          key={`src-${state.from}-${state.to}`}
+          ref={srcInputRef}
+          defaultValue={state.src}
+          onBlur={() => handleBlur('src')}
+          placeholder={m.image_toolbar_src_placeholder()}
+          className="h-7 w-48"
+          aria-label={m.image_toolbar_src_aria()}
         />
         <Button
           type="button"

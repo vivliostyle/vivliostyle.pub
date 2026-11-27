@@ -1,7 +1,5 @@
-import { type Editor, Extension, mergeAttributes } from '@tiptap/core';
-import { Image } from '@tiptap/extension-image';
+import { type Editor, Extension } from '@tiptap/core';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
-import { join } from 'pathe';
 
 import { BlockFormatting } from './block-format';
 import { ChainSafeClearNodes } from './clear-nodes';
@@ -10,6 +8,7 @@ import {
   type CustomDragPayload,
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
+import { imageExtensions } from './images';
 import { InlineBoundaries } from './inline-boundaries';
 import { PubMarkdown, type PubMarkdownOptions } from './markdown/extension';
 import type { NotationDefinition } from './markdown/notation';
@@ -28,9 +27,11 @@ export {
   type SelectedBlockFormat,
 } from './block-format';
 export {
+  codeBlockCaption,
   findSelectedCodeBlock,
   listHighlightLanguages,
   resolveVfmLanguage,
+  withCodeBlockCaption,
 } from './code-block-prism';
 export {
   type AssetDragPayload,
@@ -62,7 +63,18 @@ export {
   type FoundNode,
   findSelectedInline,
 } from './markdown/notations/vfm/commands';
+export {
+  footnoteIdentifier,
+  footnoteStatus,
+} from './markdown/notations/vfm/footnote-definitions';
 export { isWritableFootnoteLabel } from './markdown/notations/vfm/footnotes';
+export {
+  codeBlockAttributes,
+  type DocumentId,
+  documentIds,
+  headingText,
+  sectionEnds,
+} from './markdown/notations/vfm/headings';
 export { isWritableMath } from './markdown/notations/vfm/math';
 export {
   type MathTypesetter,
@@ -74,6 +86,7 @@ export {
   type VfmSyntax,
 } from './markdown/notations/vfm/notations';
 export { isWritableRubyText } from './markdown/notations/vfm/ruby';
+export { slug } from './markdown/notations/vfm/slug';
 export { MarkdownWriteError } from './markdown/write';
 
 export const IMAGE_MIME_TYPES = [
@@ -117,11 +130,6 @@ declare module '@tiptap/core' {
   }
 }
 
-// Matches absolute URLs that should bypass the in-app /vivliostyle/* prefix:
-// any explicit scheme (http:, https:, blob:, data:, file:, ...) or a
-// protocol-relative URL.
-const ABSOLUTE_URL_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
-
 export const PubExtensions = Extension.create<PubExtensionConfig>({
   name: 'pubExtensions',
 
@@ -136,31 +144,13 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
     const { basePath, onFileDrop, onFilePaste, onDrop } = this.options;
     const vfm = this.options.vfm ?? VFM_2_SYNTAX;
 
-    const image = Image.extend({
-      addStorage() {
-        return { basePath };
-      },
-      renderHTML({ HTMLAttributes }) {
-        const { src, ...rest } = HTMLAttributes;
-        let resolvedSrc = src;
-        if (src && !ABSOLUTE_URL_RE.test(src)) {
-          resolvedSrc = join('/vivliostyle', this.storage.basePath ?? '', src);
-        }
-        return [
-          'img',
-          mergeAttributes(this.options.HTMLAttributes, {
-            ...rest,
-            src: resolvedSrc,
-          }),
-        ];
-      },
-    }).configure({});
+    const { image, inlineImage } = imageExtensions(basePath);
 
     return [
       // The schema comes from the notation definitions.
       PubMarkdown.configure({
         notations: [
-          ...commonMarkNotations({ image }),
+          ...commonMarkNotations({ image, inlineImage }),
           ...gfmNotations({ singleTilde: vfm.singleTildeStrikethrough }),
           ...htmlMarkNotations,
           ...vfmNotations(vfm),

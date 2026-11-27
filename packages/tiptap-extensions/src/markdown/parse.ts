@@ -749,8 +749,11 @@ export class MarkdownParser {
 
   /** Parses markdown without frontmatter, with `\n` line endings. */
   parseBody(body: string): ParsedBody {
+    // Transforms get the source, for syntax decided by what is written
+    // around a node, such as whitespace that micromark leaves out of it.
     const root: UnknownMdastNode = this.processor.runSync(
       this.processor.parse(body),
+      body,
     );
     separateSiblings(root, body);
     placeTransformed(root, body);

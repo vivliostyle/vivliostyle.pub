@@ -5,6 +5,7 @@ import { use, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSnapshot } from 'valtio';
 
+import { m } from '../../generated/paraglide/messages';
 import { $content, $theme } from '../../stores/accessors';
 import type { ContentId } from '../../stores/proxies/content';
 import editorBaseCss from './editor-base.css?inline';
@@ -84,10 +85,45 @@ export function EditorStyleContainer({
   );
 }
 
+function cssString(text: string): string {
+  return `"${text.replace(/["\\]/g, '\\$&').replace(/\n/g, ' ')}"`;
+}
+
+// Read by the editor's CSS, which shows syntax that has no text of its own.
+// The text of the heading a section end ends comes from an attribute, which
+// the CSS puts between the two parts of the message.
+function labelProperties(): React.CSSProperties {
+  const [before = '', after = ''] = m
+    .content_editor_section_end({ heading: '\u0000' })
+    .split('\u0000');
+  return {
+    '--content-editor-section-end': cssString(before),
+    '--content-editor-section-end-after': cssString(after),
+    '--content-editor-section-end-nothing': cssString(
+      m.content_editor_section_end_nothing(),
+    ),
+    '--content-editor-footnote-undefined': cssString(
+      m.content_editor_footnote_undefined(),
+    ),
+    '--content-editor-footnote-unreferenced': cssString(
+      m.content_editor_footnote_unreferenced(),
+    ),
+    '--content-editor-footnote-duplicate': cssString(
+      m.content_editor_footnote_duplicate(),
+    ),
+  } as React.CSSProperties;
+}
+
 export function EditArea() {
   const { editor } = useCurrentEditor();
 
-  return <EditorContent {...{ editor }} className="editor-root" />;
+  return (
+    <EditorContent
+      {...{ editor }}
+      className="editor-root"
+      style={labelProperties()}
+    />
+  );
 }
 
 export default function ContentEditor({ contentId }: { contentId: ContentId }) {

@@ -47,12 +47,21 @@ export interface WrittenFormOptions {
   /** Marks whose delimiters push whitespace at their edges outside. */
   flanking: ReadonlySet<string>;
   /**
+   * Marks written around a run of text only, like code: markdown reads an
+   * inline node under one without it.
+   */
+  textOnly?: ReadonlySet<string>;
+  /**
    * What a raw block's text reads as on its own, when that is not the raw
    * block itself, i.e. the text was edited into other markdown.
    */
   readRaw?: (text: string) => ProseMirrorNode[] | null;
   /** The attributes as the markdown holds them, see `NodeWriter`. */
   attrsOf?: (node: ProseMirrorNode) => Record<string, unknown>;
+  /** See `NodeWriter.writtenAs`. */
+  writtenAs?: (
+    node: ProseMirrorNode,
+  ) => { type: string; attrs: Record<string, unknown> } | null;
   /**
    * A top-level block as markdown with every character that could mean
    * something escaped, so that only its raw markdown means anything.
@@ -152,6 +161,10 @@ export class WrittenForm {
   }
 
   private form(node: ProseMirrorNode, read: boolean): WrittenNode {
+    const as = this.options.writtenAs?.(node);
+    if (as) {
+      return { type: as.type, attrs: JSON.stringify(as.attrs) };
+    }
     const attrs = JSON.stringify(this.options.attrsOf?.(node) ?? node.attrs);
     if (node.isTextblock) {
       return { type: node.type.name, attrs, runs: this.runs(node, read) };
@@ -189,7 +202,12 @@ export class WrittenForm {
     const chars: Char[] = [];
     textblock.forEach((child) => {
       const raw = Boolean(rawInline?.isInSet(child.marks));
-      const marks = child.marks
+      const held = child.isText
+        ? child.marks
+        : child.marks.filter(
+            (mark) => !this.options.textOnly?.has(mark.type.name),
+          );
+      const marks = held
         .filter((mark) => mark.type !== rawInline)
         .map((mark) => JSON.stringify(mark.toJSON()));
       if (!child.isText) {
@@ -203,9 +221,13 @@ export class WrittenForm {
             }
           : null;
         // Markdown has no marks for a line break, e.g. code cannot hold one.
+        const atom = child.mark(lineBreak ? [] : held).toJSON();
         chars.push({
           atom: JSON.stringify(
-            content ?? (lineBreak ? child.mark([]).toJSON() : child.toJSON()),
+            content ??
+              (this.options.attrsOf && atom.attrs
+                ? { ...atom, attrs: this.options.attrsOf(child) }
+                : atom),
           ),
           lineBreak,
           marks: lineBreak ? [] : marks,

@@ -496,6 +496,13 @@ export const VFM_FRAGMENTS = [
   '> {引用|いんよう}の$y$^[注]',
   '*a $b* c$ と [a {b](u)|c}',
   'これは「重要」です。{漢字|かんじ}',
+  '# 見出し {#sec .cls}\n## 小見出し\n{.blk}',
+  '## 節を開かない ##\n#',
+  '[^1]: 定義\n\n    二段落目\n\n本文[^1]',
+  '[[toc]]',
+  '- [ ] 未完了\n- [x] 完了',
+  '![図の説明](fig.png){#fig}\n本文 ![a](b.png) 続き',
+  '```js:app.js\nconst a = 1;\n```\n```py title="a b" {#c}\nx\n```',
 ];
 export const VFM_INSERTS = [
   'X',
@@ -516,6 +523,11 @@ export const VFM_INSERTS = [
   '^[n]',
   '[^9]',
   '{.c}',
+  '{#x}',
+  '#',
+  '[[toc]]',
+  '[ ] ',
+  '![i](i.png)',
 ];
 
 /** A seeded pseudo-random number generator, so a failure can be replayed. */

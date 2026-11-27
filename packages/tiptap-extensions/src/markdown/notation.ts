@@ -129,7 +129,22 @@ export interface NodeWriter {
    * The attributes as markdown holds them, when the writer normalises them:
    * a document and the one read back from its markdown are compared by these.
    */
-  writtenAttrs?: (attrs: Record<string, unknown>) => Record<string, unknown>;
+  writtenAttrs?: (
+    attrs: Record<string, unknown>,
+    node: ProseMirrorNode,
+  ) => Record<string, unknown>;
+  /**
+   * The writer only adds to the one registered before it, so without one
+   * the definition writes no such node.
+   */
+  decorates?: boolean;
+  /**
+   * The node markdown reads the node's markdown as, when it is another one,
+   * as an empty heading is read as the end of a section.
+   */
+  writtenAs?: (
+    node: ProseMirrorNode,
+  ) => { type: string; attrs: Record<string, unknown> } | null;
   /**
    * The marker of a list written as `source`. Two adjacent lists of one type
    * with the same marker would be read as a single list.
@@ -303,7 +318,8 @@ export interface NotationDefinition {
   escapes?: EscapeRule[];
   /**
    * The attributes this definition writes on the nodes and marks of others,
-   * which a document whose definitions lack it cannot keep.
+   * which a document whose definitions lack it cannot keep: by name, or as
+   * `type:name` where other definitions write the name on other types.
    */
   attributes?: readonly string[];
 }
