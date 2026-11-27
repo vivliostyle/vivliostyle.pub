@@ -9,6 +9,8 @@ import { wrapRangeInList } from '@tiptap/pm/schema-list';
 import type { EditorState, Selection, Transaction } from '@tiptap/pm/state';
 import { canJoin, findWrapping, liftTarget } from '@tiptap/pm/transform';
 
+import { RAW_BLOCK } from './markdown/parse';
+
 export type BlockFormat =
   | 'paragraph'
   | `heading-${1 | 2 | 3 | 4 | 5 | 6}`
@@ -16,6 +18,12 @@ export type BlockFormat =
   | 'bullet-list'
   | 'ordered-list'
   | 'code-block';
+
+/**
+ * What a block reads as: a format, or `raw` for markdown no definition
+ * handles, which no format turns a block into.
+ */
+export type SelectedBlockFormat = BlockFormat | 'raw';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -63,10 +71,13 @@ function isQuotedParagraph($inner: ResolvedPos): boolean {
 // A list item reads as its list and a quoted paragraph as a quote, since those
 // wrappers are what the format menu replaces; headings and code blocks keep
 // their own format wherever they are nested.
-function formatAt($inner: ResolvedPos): BlockFormat | null {
+function formatAt($inner: ResolvedPos): SelectedBlockFormat | null {
   const node = $inner.parent;
-  if (node.type.spec.code) {
+  if (node.type.name === formatNodeNames['code-block']) {
     return 'code-block';
+  }
+  if (node.type.name === RAW_BLOCK) {
+    return 'raw';
   }
   if (node.type.name === 'heading') {
     return `heading-${node.attrs.level}` as BlockFormat;
@@ -100,9 +111,9 @@ function selectedTextblocks(selection: Selection): number[] {
  * The format shared by every selected block, or null when they differ. Unlike
  * `$from`/`$to`, this also sees the blocks inside an `AllSelection`.
  */
-export function getBlockFormat(state: EditorState): BlockFormat | null {
+export function getBlockFormat(state: EditorState): SelectedBlockFormat | null {
   const { doc, selection } = state;
-  let format: BlockFormat | null = null;
+  let format: SelectedBlockFormat | null = null;
   for (const pos of selectedTextblocks(selection)) {
     const current = formatAt(doc.resolve(pos));
     if (!current || (format && current !== format)) {

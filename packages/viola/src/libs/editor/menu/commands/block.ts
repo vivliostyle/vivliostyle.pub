@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 
 import { type BlockFormat, getBlockFormat } from '@v/tiptap-extensions';
 import {
+  FileQuestionMarkIcon,
   Heading1Icon,
   Heading2Icon,
   Heading3Icon,
@@ -127,4 +128,16 @@ registerBlockCommand({
   ],
   icon: SquareCodeIcon,
   shortcut: 'Mod-Alt-c',
+});
+
+// Only shows what the selection is, so the dropdown names markdown the editor
+// cannot read instead of passing it off as one of the formats above.
+registerEditorMenuCommand({
+  id: 'block.raw',
+  surfaces: ['selection'],
+  label: m.editor_command_raw_block,
+  icon: FileQuestionMarkIcon,
+  isActive: (editor) => getBlockFormat(editor.state) === 'raw',
+  isEnabled: () => false,
+  isVisible: (editor) => getBlockFormat(editor.state) === 'raw',
 });

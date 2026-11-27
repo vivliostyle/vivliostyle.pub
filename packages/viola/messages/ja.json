@@ -65,6 +65,7 @@
   "editor_command_ordered_list_keywords": "番号 ばんごう リスト りすと",
   "editor_command_paragraph": "本文",
   "editor_command_paragraph_keywords": "本文 ほんぶん 段落 だんらく テキスト",
+  "editor_command_raw_block": "未対応の記法",
   "editor_command_ruby": "ルビ",
   "editor_command_strike": "取り消し線",
   "editor_command_underline": "下線",
