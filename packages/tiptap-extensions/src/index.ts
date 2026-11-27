@@ -24,7 +24,11 @@ import {
   vfmNotations,
 } from './markdown/notations/vfm/notations';
 
-export { type BlockFormat, getBlockFormat } from './block-format';
+export {
+  type BlockFormat,
+  getBlockFormat,
+  type SelectedBlockFormat,
+} from './block-format';
 export {
   codeBlockCaption,
   findSelectedCodeBlock,

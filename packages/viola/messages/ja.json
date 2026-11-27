@@ -120,6 +120,7 @@
   "editor_command_page_footnote": "ページ脚注（テーマ）",
   "editor_command_paragraph": "本文",
   "editor_command_paragraph_keywords": "本文 ほんぶん 段落 だんらく テキスト",
+  "editor_command_raw_block": "未対応の記法",
   "editor_command_ruby": "ルビ",
   "editor_command_sesame": "圏点",
   "editor_command_sidenote": "傍注",
