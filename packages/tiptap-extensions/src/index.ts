@@ -10,11 +10,17 @@ import {
   type CustomDragPayload,
 } from './custom-drag-handler';
 import { FileMediaHandler } from './file-media-handler';
+import { InlineBoundaries } from './inline-boundaries';
 import { PubMarkdown, type PubMarkdownOptions } from './markdown/extension';
 import type { NotationDefinition } from './markdown/notation';
 import { commonMarkNotations } from './markdown/notations/commonmark';
 import { gfmNotations, htmlMarkNotations } from './markdown/notations/gfm';
 import { rawNotation } from './markdown/notations/raw';
+import {
+  VFM_2_SYNTAX,
+  type VfmSyntax,
+  vfmNotations,
+} from './markdown/notations/vfm/notations';
 
 export {
   type BlockFormat,
@@ -37,12 +43,37 @@ export {
   currentNotations,
   type DocumentRecord,
   getMarkdown,
+  hasDocumentNotation,
   parseMarkdown,
   setDocumentNotations,
   setMarkdownBaseline,
   upgradeDocumentNotations,
 } from './markdown/extension';
 export type { NotationDefinition } from './markdown/notation';
+export {
+  formatAttributes,
+  type InlineAttributes,
+  isAttributeName,
+  isRenderedAttribute,
+  parseAttributes,
+  writableAttributes,
+} from './markdown/notations/vfm/attributes';
+export {
+  type FoundNode,
+  findSelectedInline,
+} from './markdown/notations/vfm/commands';
+export { isWritableFootnoteLabel } from './markdown/notations/vfm/footnotes';
+export { isWritableMath } from './markdown/notations/vfm/math';
+export {
+  type MathTypesetter,
+  MathTypesetting,
+  type TypesetMath,
+} from './markdown/notations/vfm/math-view';
+export {
+  VFM_2_SYNTAX,
+  type VfmSyntax,
+} from './markdown/notations/vfm/notations';
+export { isWritableRubyText } from './markdown/notations/vfm/ruby';
 export { MarkdownWriteError } from './markdown/write';
 
 export const IMAGE_MIME_TYPES = [
@@ -68,7 +99,9 @@ export interface PubExtensionConfig {
   onSetMarkdown?: (editor: Editor) => void;
   /** See `PubMarkdownOptions.documentRecord`. */
   documentRecord?: PubMarkdownOptions['documentRecord'];
-  /** Syntax added on top of CommonMark and GFM. */
+  /** How the VFM version the project is built with reads markdown. */
+  vfm?: VfmSyntax | undefined;
+  /** Syntax added on top of CommonMark, GFM and VFM. */
   notations?: NotationDefinition[];
 }
 
@@ -101,6 +134,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
 
   addExtensions() {
     const { basePath, onFileDrop, onFilePaste, onDrop } = this.options;
+    const vfm = this.options.vfm ?? VFM_2_SYNTAX;
 
     const image = Image.extend({
       addStorage() {
@@ -127,8 +161,9 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       PubMarkdown.configure({
         notations: [
           ...commonMarkNotations({ image }),
-          ...gfmNotations,
+          ...gfmNotations({ singleTilde: vfm.singleTildeStrikethrough }),
           ...htmlMarkNotations,
+          ...vfmNotations(vfm),
           rawNotation,
           ...(this.options.notations ?? []),
         ],
@@ -139,6 +174,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       Gapcursor.configure({}),
       ChainSafeClearNodes,
       BlockFormatting,
+      InlineBoundaries,
       FileMediaHandler.configure({
         allowedMimeTypes: IMAGE_MIME_TYPES,
         onDrop: onFileDrop,

@@ -7,6 +7,7 @@ import { childrenOf, type UnknownMdastNode } from './mdast';
 import {
   type EscapeRule,
   type FromMarkdownHandler,
+  type FromMarkdownResult,
   type HtmlElementSpec,
   type NotationDefinition,
   type ParseContext,
@@ -92,12 +93,23 @@ function matchOpeningTag(
     ...Object.keys(spec.match ?? {}),
     ...(spec.capture ?? []),
   ]);
-  if (Object.keys(attributes).some((name) => !known.has(name))) {
+  const others = Object.entries(attributes).filter(
+    ([name]) => !known.has(name),
+  );
+  if (others.length > 0 && !spec.rest) {
     return null;
   }
-  return Object.fromEntries(
-    (spec.capture ?? []).map((name) => [name, attributes[name] ?? null]),
-  );
+  return {
+    ...Object.fromEntries(
+      (spec.capture ?? []).map((name) => [name, attributes[name] ?? null]),
+    ),
+    ...(spec.rest &&
+      others.length > 0 && {
+        [spec.rest]: Object.fromEntries(
+          others.map(([name, value]) => [name, decodeString(value)]),
+        ),
+      }),
+  };
 }
 
 function isClosingTag(value: string | undefined, spec: HtmlElementSpec) {
@@ -282,17 +294,26 @@ class Converter {
   }
 
   private handle(node: UnknownMdastNode): readonly ProseMirrorNode[] | null {
-    for (const handler of this.handlers.get(node.type) ?? []) {
-      const result = handler(node, this.context);
-      if (result === undefined) {
-        continue;
+    const handlers = this.handlers.get(node.type) ?? [];
+    const from = (start: number): FromMarkdownResult => {
+      for (let index = start; index < handlers.length; index++) {
+        const result = handlers[index](node, this.context, () =>
+          from(index + 1),
+        );
+        if (result !== undefined) {
+          return result;
+        }
       }
-      if (result === null) {
-        return [];
-      }
-      return Array.isArray(result) ? result : [result as ProseMirrorNode];
+      return undefined;
+    };
+    const result = from(0);
+    if (result === undefined) {
+      return null;
     }
-    return null;
+    if (result === null) {
+      return [];
+    }
+    return Array.isArray(result) ? result : [result as ProseMirrorNode];
   }
 
   private blocks(

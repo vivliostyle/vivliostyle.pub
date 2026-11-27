@@ -5,6 +5,7 @@ import './block';
 import './code-block';
 import './format';
 import './insert';
+import './vfm';
 
 registerEditorMenuGroupLabel('basic', m.trigger_menu_group_basic);
 registerEditorMenuGroupLabel('list', m.trigger_menu_group_list);

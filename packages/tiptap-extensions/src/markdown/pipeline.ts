@@ -48,7 +48,10 @@ export class MarkdownPipeline {
   readonly signature: string;
   private readonly cache = new Map<string, ParsedBody>();
 
-  constructor(schema: Schema, notations: readonly NotationDefinition[]) {
+  constructor(
+    schema: Schema,
+    readonly notations: readonly NotationDefinition[],
+  ) {
     this.parser = new MarkdownParser(schema, notations);
     this.writer = new MarkdownWriter(this.parser, notations);
     this.signature = notationSignature(notations);

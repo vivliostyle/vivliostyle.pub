@@ -43,8 +43,16 @@ export interface ParseContext {
   within<T>(prefix: LinePrefix, convert: () => T): T;
 }
 
+/**
+ * `next` converts the node as the definition registered before this one
+ * would, so a definition can adjust another's result instead of replacing it.
+ */
 type Handler<Node> = {
-  bivarianceHack(node: Node, context: ParseContext): FromMarkdownResult;
+  bivarianceHack(
+    node: Node,
+    context: ParseContext,
+    next: () => FromMarkdownResult,
+  ): FromMarkdownResult;
 }['bivarianceHack'];
 
 export type FromMarkdownHandler = Handler<UnknownMdastNode>;
@@ -72,6 +80,14 @@ export interface WriteContext {
   readonly base: BaseNode | null;
   /** For an inline node, what is written on its line before it. */
   readonly lineBefore?: string;
+  /**
+   * For an inline node written right after other content, with no delimiter
+   * or whitespace between: that content, and its marks that end there.
+   */
+  readonly adjacent?: {
+    node: ProseMirrorNode;
+    endingMarks: readonly Mark[];
+  } | null;
   /** The markdown of a textblock's content, with `data` for its writers. */
   inline(node: ProseMirrorNode, data?: Record<string, unknown>): string;
   /**
@@ -133,6 +149,8 @@ export interface MarkToMarkdown {
    * the element as the mark too.
    */
   html?: string;
+  /** The attributes the HTML element is written with. */
+  htmlAttributes?: (mark: Mark) => Record<string, string>;
   /** The text under the mark is written as is. */
   verbatim?: boolean;
   /** Writes a whole run of text under the mark, delimiters included. */
@@ -143,6 +161,12 @@ export interface MarkToMarkdown {
    */
   implied?: (run: InlineRun, context: WriteContext) => boolean;
 }
+
+/**
+ * Changes how the definition registered before this one writes a mark, e.g.
+ * to add something after its closing delimiter.
+ */
+export type MarkDecorator = (previous: MarkToMarkdown) => MarkToMarkdown;
 
 export interface InlineRun {
   node: ProseMirrorNode;
@@ -195,6 +219,11 @@ export interface HtmlElementSpec {
   match?: Record<string, string>;
   /** Attributes the opening tag may have, kept as the type's attributes. */
   capture?: string[];
+  /**
+   * The attribute of the type that keeps the tag's other attributes, by
+   * name. Without it, a tag with other attributes is not the element.
+   */
+  rest?: string;
 }
 
 /**
@@ -233,12 +262,14 @@ function escapeAttribute(value: string): string {
 export function openingTag(
   spec: Pick<HtmlElementSpec, 'tag' | 'match' | 'capture'>,
   attrs: Readonly<Record<string, unknown>>,
+  others: Readonly<Record<string, string>> = {},
 ): string {
   const parts = [
     ...Object.entries(spec.match ?? {}),
     ...(spec.capture ?? []).flatMap((name) =>
       typeof attrs[name] === 'string' ? [[name, attrs[name] as string]] : [],
     ),
+    ...Object.entries(others),
   ].map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`);
   return `<${spec.tag}${parts.join('')}>`;
 }
@@ -267,9 +298,14 @@ export interface NotationDefinition {
   fromMarkdown?: FromMarkdownHandlers;
   htmlElements?: HtmlElementSpec[];
   nodes?: Record<string, NodeToMarkdown | NodeWriter>;
-  marks?: Record<string, MarkToMarkdown>;
+  marks?: Record<string, MarkToMarkdown | MarkDecorator>;
   styles?: Record<string, StyleSpec>;
   escapes?: EscapeRule[];
+  /**
+   * The attributes this definition writes on the nodes and marks of others,
+   * which a document whose definitions lack it cannot keep.
+   */
+  attributes?: readonly string[];
 }
 
 export function defineNotation(

@@ -33,7 +33,7 @@ export function PanelButton({
 
 export interface PanelFormProps extends EditorMenuPanelProps {
   /** Focused on mount. */
-  initialFocusRef: RefObject<HTMLInputElement | null>;
+  initialFocusRef: RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
   /** Selected in that field on mount, instead of its whole value. */
   initialSelection?: { from: number; to: number };
   submitLabel: string;

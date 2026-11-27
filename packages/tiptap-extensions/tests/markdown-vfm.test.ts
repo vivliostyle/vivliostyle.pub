@@ -89,7 +89,16 @@ describe('saved markdown as VFM reads it', () => {
   it('keeps math and ruby next to an edit', () => {
     const markdown = '式 $x^2$ を示す。{漢字|かんじ}\n';
     const editor = load(markdown);
-    insertAfter(editor, 'x^2', ' + \\alpha_1');
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'math') {
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            latex: 'x^2 + \\alpha_1',
+          }),
+        );
+      }
+    });
     insertAfter(editor, 'を示す', '（価格*1、送料*2）');
     expect(html(getMarkdown(editor))).toBe(
       html('式 $x^2 + \\alpha_1$ を示す（価格\\*1、送料\\*2）。{漢字|かんじ}'),

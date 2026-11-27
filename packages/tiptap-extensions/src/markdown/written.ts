@@ -194,10 +194,18 @@ export class WrittenForm {
         .map((mark) => JSON.stringify(mark.toJSON()));
       if (!child.isText) {
         const lineBreak = child.type.spec.linebreakReplacement === true;
+        // Inline content, like a textblock's, holds what its markdown holds.
+        const content = child.inlineContent
+          ? {
+              type: child.type.name,
+              attrs: this.options.attrsOf?.(child) ?? child.attrs,
+              runs: this.runs(child, read),
+            }
+          : null;
         // Markdown has no marks for a line break, e.g. code cannot hold one.
         chars.push({
           atom: JSON.stringify(
-            lineBreak ? child.mark([]).toJSON() : child.toJSON(),
+            content ?? (lineBreak ? child.mark([]).toJSON() : child.toJSON()),
           ),
           lineBreak,
           marks: lineBreak ? [] : marks,
@@ -212,8 +220,9 @@ export class WrittenForm {
     if (read) {
       this.findAutolinks(textblock, chars);
     }
+    // Only a textblock's content cannot start or end with a line break.
     const isBreak = (it: Char | undefined) =>
-      it?.char === '\n' || Boolean(it?.lineBreak);
+      !textblock.isInline && (it?.char === '\n' || Boolean(it?.lineBreak));
     // Raw markdown at the edges of a textblock may start or end with
     // whitespace, which markdown does not keep there.
     const isEdgeSpace = (it: Char | undefined) =>

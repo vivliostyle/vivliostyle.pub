@@ -1,6 +1,11 @@
 import type { Editor } from '@tiptap/core';
 import type { EditorState, Selection } from '@tiptap/pm/state';
-import { AllSelection, PluginKey, TextSelection } from '@tiptap/pm/state';
+import {
+  AllSelection,
+  NodeSelection,
+  PluginKey,
+  TextSelection,
+} from '@tiptap/pm/state';
 import { useCurrentEditor, useEditorState } from '@tiptap/react';
 import { BubbleMenu, type BubbleMenuProps } from '@tiptap/react/menus';
 import type React from 'react';
@@ -45,8 +50,14 @@ function sendToolbarMeta(
   );
 }
 
-function hasTextSelection(state: EditorState): boolean {
+// Inline nodes without text of their own, whose commands the toolbar holds.
+const SELECTABLE_INLINE_NODES = new Set(['math', 'footnoteReference']);
+
+function hasToolbarSelection(state: EditorState): boolean {
   const { selection } = state;
+  if (selection instanceof NodeSelection) {
+    return SELECTABLE_INLINE_NODES.has(selection.node.type.name);
+  }
   if (
     selection.empty ||
     !(selection instanceof TextSelection || selection instanceof AllSelection)
@@ -105,7 +116,7 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         !pointerDownRef.current &&
         !dismissedRef.current &&
         triggerMenuState.session?.editor !== target &&
-        hasTextSelection(state) &&
+        hasToolbarSelection(state) &&
         filterVisibleEntries(entriesRef.current, target).length > 0
       );
     },

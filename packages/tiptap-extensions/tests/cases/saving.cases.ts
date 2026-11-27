@@ -168,13 +168,9 @@ export const savingSuites: CaseSuite[] = [
     cases: [
       {
         name: 'math and ruby next to an edit',
-        given: '式 $x^2‸$ を示す。{漢字|かんじ}',
-        steps: [
-          insert(' + \\alpha_1'),
-          insertAfter('を示す', '（価格*1、送料*2）'),
-        ],
-        expect:
-          '式 $x^2 + \\alpha_1$ を示す（価格\\*1、送料\\*2）。{漢字|かんじ}',
+        given: '式 $x^2$ を‸示す。{漢字|かんじ}',
+        steps: [insertAfter('を示す', '（価格*1、送料*2）')],
+        expect: '式 $x^2$ を示す（価格\\*1、送料\\*2）。{漢字|かんじ}',
       },
       {
         name: 'underscores typed next to math',
@@ -232,7 +228,7 @@ export const savingSuites: CaseSuite[] = [
         name: 'a typed backslash is escaped only before punctuation',
         given: 'a‸',
         steps: [insert(' \\alpha C:\\dir \\{x\\}')],
-        expect: 'a \\alpha C:\\dir \\\\{x\\\\}‸',
+        expect: 'a \\alpha C:\\dir \\\\\\{x\\\\}‸',
       },
     ],
   },
