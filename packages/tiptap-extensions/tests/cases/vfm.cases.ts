@@ -156,14 +156,12 @@ export const vfmSuites: CaseSuite[] = [
         given: 'a‸{漢字|かんじ}b',
         steps: [press('ArrowRight'), 'X'],
         expect: 'a{漢X‸字|かんじ}b',
-        only: 'browser',
       },
       {
         name: 'one press of the left arrow steps into the base',
         given: 'a{漢字|かんじ}‸b',
         steps: [press('ArrowLeft'), 'X'],
         expect: 'a{漢X‸字|かんじ}b',
-        only: 'browser',
       },
       {
         name: 'a pipe typed into the base is escaped',
@@ -200,7 +198,6 @@ export const vfmSuites: CaseSuite[] = [
           }),
         ],
         expect: '{漢字|カンジ}',
-        only: 'browser',
       },
       {
         name: 'making a ruby of the selection',
@@ -659,14 +656,12 @@ export const vfmSuites: CaseSuite[] = [
         given: 'x^[a‸] y',
         steps: [press('ArrowRight'), 'b'],
         expect: 'x^[a] b‸y',
-        only: 'browser',
       },
       {
         name: 'one press of the left arrow steps out of a note',
         given: 'x^[‸a] y',
         steps: [press('ArrowLeft'), 'b'],
         expect: 'b‸x^[a] y',
-        only: 'browser',
       },
       {
         name: 'line breaks at the end of a note',

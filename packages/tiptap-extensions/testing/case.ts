@@ -1,10 +1,11 @@
 import type { Editor, JSONContent } from '@tiptap/core';
 
-import type {
-  BrowserEngine,
-  DriverName,
-  DriverTarget,
-  EditorDriver,
+import {
+  type BrowserEngine,
+  type DriverName,
+  type DriverTarget,
+  type EditorDriver,
+  UnsupportedStep,
 } from './driver';
 import { loadMarkdown, serializeDoc } from './editor-io';
 import {
@@ -168,6 +169,9 @@ export async function runCase(
     try {
       await driver.perform(step);
     } catch (cause) {
+      if (cause instanceof UnsupportedStep) {
+        throw cause;
+      }
       throw new Error(`Could not ${describeStep(step)}`, { cause });
     }
   }

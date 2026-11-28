@@ -25,4 +25,11 @@ export interface EditorDriver extends DriverTarget {
   destroy(): void;
 }
 
+/**
+ * What `perform` throws for a step that turns out to need what the
+ * environment lacks, such as the browser moving the caret. The case is
+ * skipped.
+ */
+export class UnsupportedStep extends Error {}
+
 export type DriverFactory = () => EditorDriver | Promise<EditorDriver>;

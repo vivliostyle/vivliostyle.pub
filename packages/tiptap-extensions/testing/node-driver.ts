@@ -2,7 +2,7 @@ import { Editor, type Extensions } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import type { EditorProps, EditorView } from '@tiptap/pm/view';
 
-import type { EditorDriver } from './driver';
+import { type EditorDriver, UnsupportedStep } from './driver';
 import type { Step } from './steps';
 
 // `Mod` is Cmd or Ctrl depending on the OS the tests run on, by the same test
@@ -30,6 +30,12 @@ const CARET_KEYS = new Set([
   'End',
   'PageUp',
   'PageDown',
+]);
+
+const LAYOUT_METHODS = new Set([
+  'coordsAtPos',
+  'posAtCoords',
+  'endOfTextblock',
 ]);
 
 interface KeyPress {
@@ -67,13 +73,6 @@ export function toKeyEvent(shortcut: string): KeyPress {
   return { event, hasModifier: held.size > 0 };
 }
 
-function caretKeyOf(step: Step): boolean {
-  return (
-    step.kind === 'press' &&
-    CARET_KEYS.has(step.key.split(/-(?!$)/).at(-1) ?? '')
-  );
-}
-
 function graphemes(text: string): string[] {
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   return Array.from(segmenter.segment(text), ({ segment }) => segment);
@@ -83,7 +82,7 @@ function graphemes(text: string): string[] {
  * Drives a headless editor by calling the hooks a view would call, in the
  * order the view calls them. There is no DOM, so it covers keymaps and input
  * rules but nothing the browser does on its own: paste, composition, caret
- * movement.
+ * movement. A caret key that no handler takes skips the case.
  */
 export function createNodeDriver(
   extensions: Extensions,
@@ -99,7 +98,22 @@ export function createNodeDriver(
   editor.view.updateState(
     editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
   );
-  const view: EditorView = editor.view;
+  // The headless view throws for anything only a mounted view has. Its DOM
+  // is given as an element outside any document, and a handler that asks
+  // for layout gives the case up, as caret movement does.
+  const view: EditorView = new Proxy(editor.view, {
+    get: (target, key) => {
+      if (key === 'dom') {
+        return {};
+      }
+      if (typeof key === 'string' && LAYOUT_METHODS.has(key)) {
+        return () => {
+          throw new UnsupportedStep(`There is no layout for view.${key}`);
+        };
+      }
+      return Reflect.get(target, key);
+    },
+  });
 
   // Like EditorView.someProp: the view's own props come before the plugins'.
   function someProp<K extends keyof EditorProps>(
@@ -181,6 +195,11 @@ export function createNodeDriver(
       deleteNatively(key);
       return;
     }
+    if (CARET_KEYS.has(key)) {
+      throw new UnsupportedStep(
+        `Only a browser moves the caret for ${shortcut}`,
+      );
+    }
     throw new Error(`No keymap handles ${shortcut}`);
   }
 
@@ -188,9 +207,7 @@ export function createNodeDriver(
     name: 'node',
     editor,
     supports(step: Step) {
-      return (
-        step.kind !== 'paste' && step.kind !== 'compose' && !caretKeyOf(step)
-      );
+      return step.kind !== 'paste' && step.kind !== 'compose';
     },
     async perform(step: Step) {
       switch (step.kind) {

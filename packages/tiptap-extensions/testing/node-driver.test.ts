@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { PubExtensions } from '../src/index';
 import { type EditorCase, runCase } from './case';
+import { UnsupportedStep } from './driver';
 import { createNodeDriver, toKeyEvent } from './node-driver';
 import { press } from './steps';
 
@@ -66,12 +67,23 @@ describe('createNodeDriver', () => {
     ).toEqual([]);
   });
 
-  it('skips keys that move the caret', () => {
-    const driver = createNodeDriver(extensions);
-    expect(driver.supports(press('ArrowLeft'))).toBe(false);
-    expect(driver.supports(press('Shift-End'))).toBe(false);
-    expect(driver.supports(press('Enter'))).toBe(true);
-    driver.destroy();
+  it('presses a key that moves the caret when a handler takes it', async () => {
+    expect(
+      await outcome({
+        given: 'a‸^[b]',
+        steps: [press('ArrowRight'), 'c'],
+        expect: 'a^[bc‸]',
+      }),
+    ).toEqual([]);
+  });
+
+  it('gives up on a key that moves the caret when no handler takes it', async () => {
+    await expect(
+      outcome({ given: 'a‸b', steps: [press('ArrowRight')], expect: 'ab‸' }),
+    ).rejects.toBeInstanceOf(UnsupportedStep);
+    await expect(
+      outcome({ given: 'a‸b', steps: [press('Shift-End')], expect: 'a‸b‸' }),
+    ).rejects.toBeInstanceOf(UnsupportedStep);
   });
 
   it('types a character key without modifiers', async () => {
