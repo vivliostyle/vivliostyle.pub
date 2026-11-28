@@ -164,6 +164,30 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'a{漢X‸字|かんじ}b',
       },
       {
+        name: 'Backspace right after a ruby takes off the last character of its base',
+        given: 'a{漢字|かんじ}‸b',
+        steps: [press('Backspace')],
+        expect: 'a{漢|かんじ}‸b',
+      },
+      {
+        name: 'Delete right before a ruby takes off the first character of its base',
+        given: 'a‸{漢字|かんじ}b',
+        steps: [press('Delete')],
+        expect: 'a‸{字|かんじ}b',
+      },
+      {
+        name: 'Backspace right after a ruby takes off its only character with the ruby',
+        given: 'a{漢|かん}‸b',
+        steps: [press('Backspace')],
+        expect: 'a‸b',
+      },
+      {
+        name: 'Backspace right after a ruby takes off a whole grapheme',
+        given: 'a{漢👍🏽|かん}‸b',
+        steps: [press('Backspace')],
+        expect: 'a{漢|かん}‸b',
+      },
+      {
         name: 'a pipe typed into the base is escaped',
         given: '{a‸b|c}',
         steps: ['|'],
@@ -257,6 +281,12 @@ export const vfmSuites: CaseSuite[] = [
             ],
           },
         ],
+      },
+      {
+        name: 'Backspace right after inline math takes it off whole',
+        given: 'a$x^2$‸b',
+        steps: [press('Backspace')],
+        expect: 'a‸b',
       },
       {
         name: 'editing next to inline math keeps the escapes in it',
@@ -663,6 +693,54 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'b‸x^[a] y',
       },
       {
+        name: 'Backspace right after a note takes off its last character',
+        given: 'x^[ab]‸ y',
+        steps: [press('Backspace')],
+        expect: 'x^[a]‸ y',
+      },
+      {
+        name: 'Delete right before a note takes off its first character',
+        given: 'x‸^[ab] y',
+        steps: [press('Delete')],
+        expect: 'x‸^[b] y',
+      },
+      {
+        name: 'Backspace right after a note takes off a line break at its end',
+        given: '本文^[注\\\n]‸です。',
+        steps: [press('Backspace')],
+        expect: '本文^[注]‸です。',
+      },
+      {
+        name: 'Backspace right after a note takes off a ruby in it a character at a time',
+        given: 'x^[a{漢字|かんじ}]‸ y',
+        steps: [press('Backspace')],
+        expect: 'x^[a{漢|かんじ}]‸ y',
+      },
+      {
+        name: 'Backspace right after a note takes off its only character with the note',
+        given: 'x^[a]‸ y',
+        steps: [press('Backspace')],
+        expect: 'x‸ y',
+      },
+      {
+        name: 'Delete right before a note takes off its only character with the note',
+        given: 'x‸^[a] y',
+        steps: [press('Delete')],
+        expect: 'x‸ y',
+      },
+      {
+        name: 'Backspace right after a note takes off a ruby that is all it holds with the note',
+        given: 'x^[{漢|かん}]‸ y',
+        steps: [press('Backspace')],
+        expect: 'x‸ y',
+      },
+      {
+        name: 'Backspace right after an empty note takes it off',
+        given: 'x^[]‸ y',
+        steps: [press('Backspace')],
+        expect: 'x‸ y',
+      },
+      {
         name: 'line breaks at the end of a note',
         given: '本文^[注‸]です。',
         steps: [press('Shift-Enter'), press('Shift-Enter')],
@@ -1059,6 +1137,12 @@ export const vfmSuites: CaseSuite[] = [
         steps: ['{漢字|かんじ}'],
         expect: '{漢字|かんじ}‸',
         doc: 'doc(paragraph(ruby("漢字")))',
+      },
+      {
+        name: 'Backspace right after typing a ruby turns it back into what was typed',
+        given: '‸',
+        steps: ['{漢字|かんじ}', press('Backspace')],
+        expect: '\\{漢字\\|かんじ}‸',
       },
       {
         name: 'ruby after text',

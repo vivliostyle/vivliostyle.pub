@@ -194,17 +194,109 @@ function stepPast(
   return edge + (forward ? first.nodeSize : -first.nodeSize);
 }
 
+/**
+ * What Backspace or Delete takes off right outside an inline node with
+ * content: the character inside it nearest the caret, as though the node
+ * were plain text, or the whole node when that is all it holds. The browser
+ * would delete the whole node with the boundary next to it.
+ */
+export function deletionInside(
+  state: EditorState,
+  forward: boolean,
+): { from: number; to: number } | null {
+  const { selection } = state;
+  if (!(selection instanceof TextSelection) || !selection.$cursor) {
+    return null;
+  }
+  const $cursor = selection.$cursor;
+  let pos = $cursor.pos;
+  let node = forward ? $cursor.nodeAfter : $cursor.nodeBefore;
+  if (!node || !hasInlineContent(node)) {
+    return null;
+  }
+  while (node && hasInlineContent(node)) {
+    if (node.content.size === 0) {
+      return wholeIfEmptied(state.doc, range(pos, node.nodeSize, forward));
+    }
+    pos += forward ? 1 : -1;
+    const $pos = state.doc.resolve(pos);
+    node = forward ? $pos.nodeAfter : $pos.nodeBefore;
+  }
+  if (!node) {
+    return null;
+  }
+  let size = node.nodeSize;
+  if (node.isText) {
+    const segments = graphemes(node.text ?? '');
+    size = ((forward ? segments.at(0) : segments.at(-1)) ?? '').length;
+  }
+  return wholeIfEmptied(state.doc, range(pos, size, forward));
+}
+
+function wholeIfEmptied(
+  doc: ProseMirrorNode,
+  deleted: { from: number; to: number },
+): { from: number; to: number } {
+  let { from, to } = deleted;
+  for (;;) {
+    const $from = doc.resolve(from);
+    if (
+      !hasInlineContent($from.parent) ||
+      from !== $from.start() ||
+      to !== $from.end()
+    ) {
+      return { from, to };
+    }
+    from = $from.before();
+    to = $from.after();
+  }
+}
+
+function range(
+  pos: number,
+  size: number,
+  forward: boolean,
+): { from: number; to: number } {
+  return forward
+    ? { from: pos, to: pos + size }
+    : { from: pos - size, to: pos };
+}
+
 function graphemes(text: string): string[] {
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   return Array.from(segmenter.segment(text), ({ segment }) => segment);
 }
 
 /**
- * Keeps the caret right after an inline node with content out of it, and
- * lets one press of an arrow move it into or out of the node.
+ * Keeps the caret right after an inline node with content out of it, lets
+ * one press of an arrow move it into or out of the node, and lets Backspace
+ * and Delete from outside take off one character of it.
  */
 export const InlineBoundaries = Extension.create({
   name: 'inlineBoundaries',
+
+  addKeyboardShortcuts() {
+    const deleteInside = (forward: boolean) => () =>
+      this.editor.commands.first(({ commands }) => [
+        // As the core keymap would, which only gets the key after this.
+        () => commands.undoInputRule(),
+        () =>
+          commands.command(({ state, tr, dispatch }) => {
+            const found = deletionInside(state, forward);
+            if (!found) {
+              return false;
+            }
+            if (dispatch) {
+              tr.delete(found.from, found.to).scrollIntoView();
+            }
+            return true;
+          }),
+      ]);
+    return {
+      Backspace: deleteInside(false),
+      Delete: deleteInside(true),
+    };
+  },
 
   addProseMirrorPlugins() {
     return [boundaryPlugin()];
