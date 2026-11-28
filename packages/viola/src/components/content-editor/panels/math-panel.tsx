@@ -5,39 +5,24 @@ import { Checkbox } from '@v/ui/checkbox';
 import { Label } from '@v/ui/label';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../../generated/paraglide/messages';
+import { openMathForm } from '../../../libs/editor/menu/forms';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
-import { isMathSource, selectedNodeOf } from '../../../libs/editor/vfm';
-import { dismissPanel, PanelForm } from './panel-form';
+import { PanelForm, settlePanel } from './panel-form';
 
 export function MathPanel({ editor, close }: EditorMenuPanelProps) {
   const sourceRef = useRef<HTMLTextAreaElement>(null);
   const displayId = useId();
-  const [math] = useState(() => selectedNodeOf(editor.state, 'math'));
-  const [initial] = useState(() => ({
-    latex: String(math?.attrs.latex ?? ''),
-    display: Boolean(math?.attrs.display),
-  }));
+  const [panel] = useState(() => openMathForm(editor));
+  const { initial } = panel;
   const [display, setDisplay] = useState(initial.display);
   const [invalid, setInvalid] = useState(false);
 
   const apply = () => {
-    const latex = sourceRef.current?.value ?? '';
-    if (
-      !latex ||
-      (math && latex === initial.latex && display === initial.display)
-    ) {
-      dismissPanel({ editor, close });
-      return;
-    }
-    if (!isMathSource(editor, latex, display)) {
-      setInvalid(true);
-      return;
-    }
-    if (!editor.chain().focus().setMath({ latex, display }).run()) {
-      setInvalid(true);
-      return;
-    }
-    close();
+    const outcome = panel.apply({
+      latex: sourceRef.current?.value ?? '',
+      display,
+    });
+    settlePanel({ editor, close }, outcome, () => setInvalid(true));
   };
 
   // Display math can span lines, so only Enter on its own submits.

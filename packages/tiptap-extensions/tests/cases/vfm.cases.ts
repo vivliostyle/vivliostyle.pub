@@ -5,6 +5,7 @@ import {
   setDocumentNotations,
 } from '../../src/markdown/extension';
 import { vfmNotations } from '../../src/markdown/notations/vfm/notations';
+import { attributedMarkOf, setMarkAttributes } from '../../src/operations/vfm';
 import { press, run } from '../../testing/steps';
 import type { CaseSuite } from '../../testing/vitest';
 
@@ -270,8 +271,53 @@ export const vfmSuites: CaseSuite[] = [
             editor.commands.setRuby('かんじ');
           }),
         ],
-        expect: 'a {漢字|かんじ} b',
+        expect: 'a {‸漢字‸|かんじ} b',
         doc: 'doc(paragraph("a ", ruby("漢字"), " b"))',
+      },
+      {
+        name: 'no ruby of a selection that holds a ruby',
+        given: '‸a {漢字|かんじ} b‸',
+        steps: [
+          run('make a ruby', (editor) => {
+            if (editor.commands.setRuby('x')) {
+              throw new Error('The ruby was made');
+            }
+          }),
+        ],
+        expect: '‸a {漢字|かんじ} b‸',
+      },
+      {
+        name: 'making a ruby again changes its text',
+        given: 'a ‸漢字‸ b',
+        steps: [
+          run('make a ruby', (editor) => {
+            editor.commands.setRuby('かんじ');
+          }),
+          run('make a ruby', (editor) => {
+            editor.commands.setRuby('カンジ');
+          }),
+        ],
+        expect: 'a {‸漢字‸|カンジ} b',
+      },
+      {
+        name: 'inserting a ruby',
+        given: 'a‸ b',
+        steps: [
+          run('insert a ruby', (editor) => {
+            editor.commands.insertRuby({ base: '漢字', rubyText: 'かんじ' });
+          }),
+        ],
+        expect: 'a{漢字|かんじ}‸ b',
+      },
+      {
+        name: 'changing the ruby text of a ruby selected around it',
+        given: 'a ‸{漢字|かんじ}‸ b',
+        steps: [
+          run('set the ruby text', (editor) => {
+            editor.commands.setRuby('カンジ');
+          }),
+        ],
+        expect: 'a ‸{漢字|カンジ}‸ b',
       },
       {
         name: 'removing a ruby keeps its base',
@@ -328,6 +374,26 @@ export const vfmSuites: CaseSuite[] = [
         given: '$$x$$a‸$y$',
         steps: [press('Backspace')],
         expect: '$$x$$<!---->$y$',
+      },
+      {
+        name: 'changing math selected around it',
+        given: 'a ‸$x$‸ b',
+        steps: [
+          run('set the math', (editor) => {
+            editor.commands.setMath({ latex: 'y', display: false });
+          }),
+        ],
+        expect: 'a $y$ b',
+      },
+      {
+        name: 'inserting display math',
+        given: '‸',
+        steps: [
+          run('insert math', (editor) => {
+            editor.commands.setMath({ latex: 'x^2', display: true });
+          }),
+        ],
+        expect: '$$x^2$$‸',
       },
       {
         name: 'math inserted right after math is written after an empty comment',
@@ -491,6 +557,19 @@ export const vfmSuites: CaseSuite[] = [
   {
     title: 'VFM attributes',
     cases: [
+      {
+        name: 'attributes given to a link',
+        given: 'a [‸b‸](u) c',
+        steps: [
+          run('give the link attributes', (editor) => {
+            const target = attributedMarkOf(editor.state);
+            if (!target || !setMarkAttributes(editor, target, { class: 'x' })) {
+              throw new Error('The attributes were not given');
+            }
+          }),
+        ],
+        expect: 'a ‸[b](u){.x}‸ c',
+      },
       { name: 'heading attributes', given: '# 見出し {#id .cls}' },
       {
         name: 'heading attributes are attributes',
@@ -920,7 +999,131 @@ export const vfmSuites: CaseSuite[] = [
             editor.commands.setInlineFootnote();
           }),
         ],
-        expect: 'a ^[note] b',
+        expect: 'a ^[‸note‸] b',
+      },
+      {
+        name: 'making a note of the selection and taking it off again',
+        given: 'a ‸note‸ b',
+        steps: [
+          run('make a note', (editor) => {
+            editor.commands.setInlineFootnote();
+          }),
+          run('take the note off', (editor) => {
+            editor.commands.unsetInlineFootnote();
+          }),
+        ],
+        expect: 'a ‸note‸ b',
+      },
+      {
+        name: 'toggling a note of the selection twice',
+        given: 'a ‸note‸ b',
+        steps: [
+          run('toggle a note', (editor) => {
+            editor.commands.toggleInlineFootnote();
+          }),
+          run('toggle a note', (editor) => {
+            editor.commands.toggleInlineFootnote();
+          }),
+        ],
+        expect: 'a ‸note‸ b',
+      },
+      {
+        name: 'toggling a note of part of a note takes the note off',
+        given: 'a ^[n‸ot‸e] b',
+        steps: [
+          run('toggle a note', (editor) => {
+            editor.commands.toggleInlineFootnote();
+          }),
+        ],
+        expect: 'a n‸ot‸e b',
+      },
+      {
+        name: 'no note toggled at a caret',
+        given: 'a ‸b',
+        steps: [
+          run('toggle a note', (editor) => {
+            if (editor.commands.toggleInlineFootnote()) {
+              throw new Error('The note was made');
+            }
+          }),
+        ],
+        expect: 'a ‸b',
+      },
+      {
+        name: 'no note of a selection that holds a note',
+        given: '‸a ^[b] c‸',
+        steps: [
+          run('make a note', (editor) => {
+            if (editor.commands.setInlineFootnote()) {
+              throw new Error('The note was made');
+            }
+          }),
+        ],
+        expect: '‸a ^[b] c‸',
+      },
+      {
+        name: 'no note in a note selected around it',
+        given: 'a ‸^[b]‸ c',
+        steps: [
+          run('make a note', (editor) => {
+            if (editor.commands.setInlineFootnote()) {
+              throw new Error('The note was made');
+            }
+          }),
+        ],
+        expect: 'a ‸^[b]‸ c',
+      },
+      {
+        name: 'taking off a note selected around it',
+        given: 'a ‸^[b]‸ c',
+        steps: [
+          run('take the note off', (editor) => {
+            editor.commands.unsetInlineFootnote();
+          }),
+        ],
+        expect: 'a ‸b‸ c',
+      },
+      {
+        name: 'toggling a note selected around it takes it off',
+        given: 'a ‸^[b]‸ c',
+        steps: [
+          run('toggle a note', (editor) => {
+            editor.commands.toggleInlineFootnote();
+          }),
+        ],
+        expect: 'a ‸b‸ c',
+      },
+      {
+        name: 'no note toggled of a selection that holds a note',
+        given: '‸a ^[b] c‸',
+        steps: [
+          run('toggle a note', (editor) => {
+            if (editor.commands.toggleInlineFootnote()) {
+              throw new Error('The note was toggled');
+            }
+          }),
+        ],
+        expect: '‸a ^[b] c‸',
+      },
+      {
+        name: 'inserting a note with text',
+        given: 'a ‸b',
+        steps: [
+          run('insert a note', (editor) => {
+            editor.commands.setInlineFootnote('n');
+          }),
+        ],
+        expect: 'a ^[n]‸b',
+      },
+      {
+        name: 'changing the label of a reference selected around it',
+        given: 'a‸[^1]‸ b',
+        steps: [
+          run('set the label', (editor) => {
+            editor.commands.setFootnoteReference('x');
+          }),
+        ],
+        expect: 'a[^x] b',
       },
       {
         name: 'inserting a reference',

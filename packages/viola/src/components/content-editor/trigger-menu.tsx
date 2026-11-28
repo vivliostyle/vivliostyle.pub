@@ -19,7 +19,6 @@ import {
 } from 'react';
 import { useSnapshot } from 'valtio';
 
-import { getTriggerMenuRange } from '@v/tiptap-extensions/trigger-menu';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
@@ -28,8 +27,8 @@ import {
   resolveMenuEntries,
 } from '../../libs/editor/menu/config';
 import { filterMenuEntries } from '../../libs/editor/menu/filter';
-import { runEditorMenuCommand } from '../../libs/editor/menu/registry';
 import {
+  executeTriggerCommand,
   setTriggerMenuKeyHandler,
   triggerMenuState,
 } from '../../libs/editor/menu/trigger-state';
@@ -133,16 +132,10 @@ export function TriggerMenu() {
       if (!editor) {
         return;
       }
-      const range = getTriggerMenuRange(editor.state);
-      if (!range || !(command.isEnabled?.(editor) ?? true)) {
-        return;
+      const panel = executeTriggerCommand(editor, command);
+      if (panel) {
+        setPanel(() => panel);
       }
-      editor.chain().focus().deleteRange(range).run();
-      if (command.panel) {
-        setPanel(() => command.panel ?? null);
-        return;
-      }
-      runEditorMenuCommand(command, { editor, surface: 'trigger' });
     },
     [editor],
   );

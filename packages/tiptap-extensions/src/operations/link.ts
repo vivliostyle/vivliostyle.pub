@@ -65,7 +65,7 @@ export function setLinkOnSelection(
   const { state } = editor;
   const { from, to } = state.selection;
   if (text === undefined || text === state.doc.textBetween(from, to)) {
-    editor.chain().focus().setLink({ href }).run();
+    editor.chain().setLink({ href }).run();
     return true;
   }
   let shared: readonly Mark[] | null = null;
@@ -81,7 +81,6 @@ export function setLinkOnSelection(
   const newText = text.trim() || href;
   editor
     .chain()
-    .focus()
     .insertContentAt(
       { from, to },
       {
@@ -99,7 +98,7 @@ export function setLinkOnSelection(
 }
 
 export function removeLinkFromSelection(editor: Editor): void {
-  editor.chain().focus().unsetLink().run();
+  editor.chain().unsetLink().run();
 }
 
 /** Returns false when the Link extension rejects the URL. */
@@ -112,7 +111,6 @@ export function insertLink(
   }
   editor
     .chain()
-    .focus()
     .insertContent({
       type: 'text',
       text: text?.trim() || href,

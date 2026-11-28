@@ -3,11 +3,24 @@ import { type ReactNode, type RefObject, useEffect, useState } from 'react';
 
 import { Button, type ButtonProps } from '@v/ui/button';
 import { CheckIcon } from '@v/ui/icon';
+import type { FormOutcome } from '../../../libs/editor/menu/forms';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
 
 export function dismissPanel({ editor, close }: EditorMenuPanelProps) {
   close();
   editor.commands.focus();
+}
+
+export function settlePanel<Invalid extends string>(
+  props: EditorMenuPanelProps,
+  outcome: FormOutcome<Invalid>,
+  setInvalid: (invalid: Invalid) => void,
+): void {
+  if (typeof outcome === 'string') {
+    dismissPanel(props);
+  } else {
+    setInvalid(outcome.invalid);
+  }
 }
 
 export function PanelButton({

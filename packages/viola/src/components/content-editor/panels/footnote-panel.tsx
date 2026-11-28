@@ -1,24 +1,22 @@
 import { useRef, useState } from 'react';
 
-import { isWritableFootnoteLabel } from '@v/tiptap-extensions';
 import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
+import {
+  openFootnoteForm,
+  openFootnoteReferenceForm,
+} from '../../../libs/editor/menu/forms';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
-import { nextFootnoteLabel, selectedNodeOf } from '../../../libs/editor/vfm';
-import { dismissPanel, PanelForm } from './panel-form';
+import { PanelForm, settlePanel } from './panel-form';
 
 /** Inserts a note where it is written. */
 export function FootnotePanel({ editor, close }: EditorMenuPanelProps) {
   const textRef = useRef<HTMLInputElement>(null);
+  const [panel] = useState(() => openFootnoteForm(editor));
 
   const apply = () => {
-    const text = textRef.current?.value ?? '';
-    if (!text) {
-      dismissPanel({ editor, close });
-      return;
-    }
-    editor.chain().focus().setInlineFootnote(text).run();
-    close();
+    const outcome = panel.apply({ text: textRef.current?.value ?? '' });
+    settlePanel({ editor, close }, outcome, () => {});
   };
 
   return (
@@ -45,31 +43,13 @@ export function FootnoteReferencePanel({
   close,
 }: EditorMenuPanelProps) {
   const labelRef = useRef<HTMLInputElement>(null);
-  const [reference] = useState(() =>
-    selectedNodeOf(editor.state, 'footnoteReference'),
-  );
-  const [initialLabel] = useState(() =>
-    reference
-      ? String(reference.attrs.label ?? '')
-      : nextFootnoteLabel(editor.state.doc),
-  );
+  const [panel] = useState(() => openFootnoteReferenceForm(editor));
+  const { initialLabel } = panel;
   const [invalid, setInvalid] = useState(false);
 
   const apply = () => {
-    const label = labelRef.current?.value ?? '';
-    if (reference && label === initialLabel) {
-      dismissPanel({ editor, close });
-      return;
-    }
-    if (!isWritableFootnoteLabel(label)) {
-      setInvalid(true);
-      return;
-    }
-    if (!editor.chain().focus().setFootnoteReference(label).run()) {
-      setInvalid(true);
-      return;
-    }
-    close();
+    const outcome = panel.apply({ label: labelRef.current?.value ?? '' });
+    settlePanel({ editor, close }, outcome, () => setInvalid(true));
   };
 
   return (

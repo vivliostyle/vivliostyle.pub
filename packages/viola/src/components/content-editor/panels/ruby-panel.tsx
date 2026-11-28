@@ -1,48 +1,35 @@
 import { useRef, useState } from 'react';
 
-import { isWritableRubyText } from '@v/tiptap-extensions';
 import { RemoveFormattingIcon } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
+import { openRubyForm } from '../../../libs/editor/menu/forms';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
-import { selectedRuby } from '../../../libs/editor/vfm';
-import { dismissPanel, PanelButton, PanelForm } from './panel-form';
+import {
+  dismissPanel,
+  PanelButton,
+  PanelForm,
+  settlePanel,
+} from './panel-form';
 
 export function RubyPanel({ editor, close }: EditorMenuPanelProps) {
   const baseRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLInputElement>(null);
-  const [ruby] = useState(() => selectedRuby(editor.state));
-  // With nothing selected there is no base, so the panel asks for one.
-  const [isInsert] = useState(() => !ruby && editor.state.selection.empty);
-  const [initialText] = useState(() =>
-    ruby ? String(ruby.attrs.rubyText ?? '') : '',
-  );
+  const [panel] = useState(() => openRubyForm(editor));
+  const { hasRuby, isInsert, initialText } = panel;
   const [invalid, setInvalid] = useState<'text' | 'place' | null>(null);
 
   const apply = () => {
-    const text = textRef.current?.value ?? '';
-    const base = baseRef.current?.value ?? '';
-    if (!text || (isInsert && !base) || (ruby && text === initialText)) {
-      dismissPanel({ editor, close });
-      return;
-    }
-    if (!isWritableRubyText(text)) {
-      setInvalid('text');
-      return;
-    }
-    const applied = isInsert
-      ? editor.chain().focus().insertRuby({ base, rubyText: text }).run()
-      : editor.chain().focus().setRuby(text).run();
-    if (!applied) {
-      setInvalid('place');
-      return;
-    }
-    close();
+    const outcome = panel.apply({
+      base: baseRef.current?.value,
+      text: textRef.current?.value ?? '',
+    });
+    settlePanel({ editor, close }, outcome, setInvalid);
   };
 
   const remove = () => {
-    editor.chain().focus().unsetRuby().run();
-    close();
+    panel.remove();
+    dismissPanel({ editor, close });
   };
 
   return (
@@ -53,7 +40,7 @@ export function RubyPanel({ editor, close }: EditorMenuPanelProps) {
       submitLabel={m.ruby_panel_apply_aria()}
       onSubmit={apply}
       actions={
-        ruby && (
+        hasRuby && (
           <PanelButton label={m.ruby_panel_remove_aria()} onClick={remove}>
             <RemoveFormattingIcon />
           </PanelButton>

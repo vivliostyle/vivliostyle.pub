@@ -47,6 +47,11 @@ declare module '@tiptap/core' {
       setInlineFootnote: (text?: string) => ReturnType;
       /** Leaves the content of the note the selection is in as text. */
       unsetInlineFootnote: () => ReturnType;
+      /**
+       * Takes off the note the selection is in, or makes a note of the
+       * selected text.
+       */
+      toggleInlineFootnote: () => ReturnType;
     };
   }
 }
@@ -551,6 +556,12 @@ export const InlineFootnote = Node.create({
           dispatch?.(unwrap(tr, found));
           return true;
         },
+      toggleInlineFootnote:
+        () =>
+        ({ state, commands }) =>
+          findSelectedInline(state, this.name)
+            ? commands.unsetInlineFootnote()
+            : !state.selection.empty && commands.setInlineFootnote(),
     };
   },
 

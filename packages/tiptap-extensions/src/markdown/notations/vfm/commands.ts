@@ -16,7 +16,7 @@ export interface FoundNode {
 
 /**
  * The innermost node of the type that holds the selection, or that the
- * selection is.
+ * selection is, whether as a node or as a range around just the node.
  */
 export function findSelectedInline(
   state: EditorState,
@@ -27,6 +27,14 @@ export function findSelectedInline(
     return { pos: selection.from, node: selection.node };
   }
   const { $from, $to } = selection;
+  const after = $from.nodeAfter;
+  if (
+    after?.type.name === name &&
+    $to.pos === $from.pos + after.nodeSize &&
+    $from.sameParent($to)
+  ) {
+    return { pos: $from.pos, node: after };
+  }
   for (let depth = $from.depth; depth > 0; depth--) {
     const node = $from.node(depth);
     if (node.type.name === name) {
@@ -65,8 +73,9 @@ export function findInlineAtCaret(
 
 /**
  * Makes the selected inline content the content of a new node, which takes
- * the marks all of it has. False when the selection is not inline content of
- * one textblock that can hold the node.
+ * the marks all of it has, and selects the content in it. False when the
+ * selection is not inline content of one textblock that can hold the node,
+ * or holds a node of the type already.
  */
 export function wrapSelection(
   state: EditorState,
@@ -95,6 +104,14 @@ export function wrapSelection(
     return false;
   }
   const content = state.doc.slice(from, to).content;
+  let nested = false;
+  content.descendants((node) => {
+    nested ||= node.type === type;
+    return !nested;
+  });
+  if (nested) {
+    return false;
+  }
   if (oneLine) {
     let breaks = false;
     content.descendants((node) => {
@@ -115,6 +132,8 @@ export function wrapSelection(
       to,
       type.create(attrs, withoutMarks(content, marks), marks),
     );
+    // Left around the node, the selection would show the command as off.
+    tr.setSelection(TextSelection.create(tr.doc, from + 1, to + 1));
   }
   return true;
 }

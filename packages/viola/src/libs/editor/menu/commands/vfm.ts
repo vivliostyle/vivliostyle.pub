@@ -2,6 +2,11 @@ import type { Editor } from '@tiptap/core';
 
 import { findSelectedInline, hasDocumentNotation } from '@v/tiptap-extensions';
 import {
+  attributedMarkOf,
+  selectedNodeOf,
+  selectedRuby,
+} from '@v/tiptap-extensions/operations/vfm';
+import {
   LanguagesIcon,
   SigmaIcon,
   StickyNoteIcon,
@@ -16,7 +21,6 @@ import {
 import { MathPanel } from '../../../../components/content-editor/panels/math-panel';
 import { RubyPanel } from '../../../../components/content-editor/panels/ruby-panel';
 import { m } from '../../../../generated/paraglide/messages';
-import { attributedMarkOf, selectedNodeOf, selectedRuby } from '../../vfm';
 import { registerEditorMenuCommand } from '../registry';
 import { isInCodeBlock, splitKeywords } from './utils';
 
@@ -101,17 +105,10 @@ registerEditorMenuCommand({
   icon: StickyNoteIcon,
   isActive: (editor) =>
     findSelectedInline(editor.state, 'inlineFootnote') !== null,
-  isEnabled: (editor) =>
-    editor.can().unsetInlineFootnote() || editor.can().setInlineFootnote(),
+  isEnabled: (editor) => editor.can().toggleInlineFootnote(),
   isVisible: isTextSelection,
   run: ({ editor }) => {
-    const chain = editor.chain().focus();
-    if (findSelectedInline(editor.state, 'inlineFootnote')) {
-      chain.unsetInlineFootnote();
-    } else {
-      chain.setInlineFootnote();
-    }
-    chain.run();
+    editor.chain().focus().toggleInlineFootnote().run();
   },
 });
 

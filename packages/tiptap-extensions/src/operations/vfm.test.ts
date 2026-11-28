@@ -2,7 +2,7 @@ import { Editor } from '@tiptap/core';
 import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { getMarkdown, PubExtensions } from '@v/tiptap-extensions';
+import { getMarkdown, PubExtensions } from '../index';
 import {
   attributedMarkOf,
   isMathSource,

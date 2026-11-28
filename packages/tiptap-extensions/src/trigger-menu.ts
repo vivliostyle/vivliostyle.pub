@@ -192,6 +192,19 @@ export function getTriggerMenuRange(
   );
 }
 
+/**
+ * Deletes the trigger and the query typed after it, where the command picked
+ * from the menu then applies. False when no menu is open.
+ */
+export function deleteTriggerQuery(editor: Editor): boolean {
+  const range = getTriggerMenuRange(editor.state);
+  if (!range) {
+    return false;
+  }
+  editor.commands.deleteRange(range);
+  return true;
+}
+
 function toMatch(view: EditorView, active: ActiveTrigger): TriggerMenuMatch {
   const resolved = resolveActiveTrigger(
     active,
@@ -285,10 +298,12 @@ export const TriggerMenu = Extension.create<TriggerMenuOptions>({
       if (!match) {
         return null;
       }
+      // Counted back from the caret: the window's text skips the tokens
+      // around an inline node with content, so its offsets are no positions.
       return {
         menuId: match.menuId,
         trigger: match.trigger,
-        from: $pos.start() + windowStart + match.offset,
+        from: $pos.pos + typed.length - match.trigger.length,
       } satisfies ActiveTrigger;
     };
 

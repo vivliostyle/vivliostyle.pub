@@ -2,15 +2,14 @@ import { type Editor, getMarkRange } from '@tiptap/core';
 import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { type EditorState, NodeSelection } from '@tiptap/pm/state';
 
+import { hasDocumentNotation, parseMarkdown } from '../markdown/extension';
 import {
-  findInlineAtCaret,
-  hasDocumentNotation,
   type InlineAttributes,
   isAttributeName,
-  isWritableMath,
-  parseMarkdown,
   writableAttributes,
-} from '@v/tiptap-extensions';
+} from '../markdown/notations/vfm/attributes';
+import { findInlineAtCaret } from '../markdown/notations/vfm/commands';
+import { isWritableMath } from '../markdown/notations/vfm/math';
 
 /** The node of one of the types that a node selection selects. */
 export function selectedNodeOf(
@@ -142,7 +141,6 @@ export function setMarkAttributes(
   const next = mark.type.create({ ...mark.attrs, attributes: written });
   editor
     .chain()
-    .focus()
     .command(({ tr }) => {
       tr.removeMark(from, to, mark).addMark(from, to, next);
       return true;

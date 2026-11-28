@@ -1,7 +1,13 @@
 import type { Editor } from '@tiptap/core';
+import type { ComponentType } from 'react';
 import { proxy, ref } from 'valtio';
 
-import type { TriggerMenuMatch } from '@v/tiptap-extensions/trigger-menu';
+import {
+  deleteTriggerQuery,
+  type TriggerMenuMatch,
+} from '@v/tiptap-extensions/trigger-menu';
+import { runEditorMenuCommand } from './registry';
+import type { EditorMenuCommand, EditorMenuPanelProps } from './types';
 
 export interface TriggerMenuSession {
   editor: Editor;
@@ -70,4 +76,23 @@ export function handleTriggerMenuKeyDown(
   event: KeyboardEvent,
 ): boolean {
   return keyHandlers.get(editor)?.(event) ?? false;
+}
+
+/**
+ * Replaces the trigger and its query with what the command does: runs it,
+ * or returns the panel to open at the caret instead. False when the menu is
+ * not open or the command does not apply.
+ */
+export function executeTriggerCommand(
+  editor: Editor,
+  command: EditorMenuCommand,
+): ComponentType<EditorMenuPanelProps> | null | false {
+  if (!(command.isEnabled?.(editor) ?? true) || !deleteTriggerQuery(editor)) {
+    return false;
+  }
+  if (command.panel) {
+    return command.panel;
+  }
+  runEditorMenuCommand(command, { editor, surface: 'trigger' });
+  return null;
 }
