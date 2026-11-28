@@ -91,13 +91,29 @@ describe('arrows over the edges of a note', () => {
       forward,
     );
 
-  it('step into and out of it one position at a time', () => {
+  it('step into it past its first character, and out of it by one position', () => {
     const state = stateOf('a^[注]b');
-    // a|^[注]  ->  a^[|注]  ->  a^[注|]  ->  a^[注]|b
-    expect(move(state, 2, true)).toBe(3);
+    // a|^[注]  ->  a^[注|]  ->  a^[注]|b
+    expect(move(state, 2, true)).toBe(4);
     expect(move(state, 4, true)).toBe(5);
-    expect(move(state, 5, false)).toBe(4);
+    // a^[注]|b  ->  a^[|注]  ->  a|^[注]b
+    expect(move(state, 5, false)).toBe(3);
     expect(move(state, 3, false)).toBe(2);
+  });
+
+  it('step into and out of a ruby with one keypress each', () => {
+    const state = stateOf('a{漢字|かんじ}b');
+    // doc(paragraph("a", ruby("漢字"), "b"))
+    expect(move(state, at(state, '漢'), false)).toBe(at(state, 'a', 1));
+    expect(move(state, at(state, 'a', 1), true)).toBe(at(state, '字'));
+    expect(move(state, at(state, 'b'), false)).toBe(at(state, '字'));
+    expect(move(state, at(state, '字', 1), true)).toBe(at(state, 'b'));
+  });
+
+  it('step over a whole character into a ruby', () => {
+    const state = stateOf('a{𠮷野家|よしのや}b');
+    expect(move(state, at(state, 'a', 1), true)).toBe(at(state, '野'));
+    expect(move(state, at(state, 'b'), false)).toBe(at(state, '家'));
   });
 
   it('leave text alone', () => {

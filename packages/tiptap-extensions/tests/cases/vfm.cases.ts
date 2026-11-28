@@ -152,6 +152,20 @@ export const vfmSuites: CaseSuite[] = [
         expect: '{漢字‸|かんじ}',
       },
       {
+        name: 'one press of the right arrow steps into the base',
+        given: 'a‸{漢字|かんじ}b',
+        steps: [press('ArrowRight'), 'X'],
+        expect: 'a{漢X‸字|かんじ}b',
+        only: 'browser',
+      },
+      {
+        name: 'one press of the left arrow steps into the base',
+        given: 'a{漢字|かんじ}‸b',
+        steps: [press('ArrowLeft'), 'X'],
+        expect: 'a{漢X‸字|かんじ}b',
+        only: 'browser',
+      },
+      {
         name: 'a pipe typed into the base is escaped',
         given: '{a‸b|c}',
         steps: ['|'],

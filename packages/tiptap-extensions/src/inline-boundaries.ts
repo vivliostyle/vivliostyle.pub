@@ -142,7 +142,9 @@ function isHorizontalLtr(view: EditorView): boolean {
 
 /**
  * Where the caret goes when an arrow moves it over the edge of an inline
- * node with content, one position at a time: into it, or out of it.
+ * node with content. Out of the node it goes one position. Into it, it goes
+ * on past the first character as well: the caret looks the same on both
+ * sides of the edge, so stopping there would look like no move.
  */
 export function crossing(state: EditorState, forward: boolean): number | null {
   const { selection } = state;
@@ -159,14 +161,37 @@ export function crossing(state: EditorState, forward: boolean): number | null {
   }
   const next = forward ? $cursor.nodeAfter : $cursor.nodeBefore;
   if (next && hasInlineContent(next)) {
-    return forward ? $cursor.pos + 1 : $cursor.pos - 1;
+    return stepInside(state.doc, $cursor.pos + (forward ? 1 : -1), forward);
   }
   return null;
 }
 
+function stepInside(
+  doc: ProseMirrorNode,
+  edge: number,
+  forward: boolean,
+): number {
+  const $edge = doc.resolve(edge);
+  const first = forward ? $edge.nodeAfter : $edge.nodeBefore;
+  if (!first || hasInlineContent(first)) {
+    return edge;
+  }
+  if (first.isText) {
+    const segments = graphemes(first.text ?? '');
+    const segment = (forward ? segments.at(0) : segments.at(-1)) ?? '';
+    return edge + (forward ? segment.length : -segment.length);
+  }
+  return edge + (forward ? first.nodeSize : -first.nodeSize);
+}
+
+function graphemes(text: string): string[] {
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  return Array.from(segmenter.segment(text), ({ segment }) => segment);
+}
+
 /**
  * Keeps the caret right after an inline node with content out of it, and
- * lets the arrows move it into and out of the node one step at a time.
+ * lets the arrows move it into and out of the node one keypress at a time.
  */
 export const InlineBoundaries = Extension.create({
   name: 'inlineBoundaries',
