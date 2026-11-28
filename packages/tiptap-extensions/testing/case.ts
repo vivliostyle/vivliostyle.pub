@@ -2,6 +2,7 @@ import type { Editor, JSONContent } from '@tiptap/core';
 
 import {
   type BrowserEngine,
+  type ClipboardData,
   type DriverName,
   type DriverTarget,
   type EditorDriver,
@@ -40,6 +41,11 @@ export interface EditorCase {
    * gives, but an array has to list every item.
    */
   json?: readonly JSONContent[];
+  /**
+   * What the clipboard holds after the steps, by MIME type: the HTML and
+   * the plain text the editor copied. Only the types given are compared.
+   */
+  clipboard?: Partial<ClipboardData>;
   /**
    * Why the editor does not behave like this yet. The case then has to fail,
    * so fixing the behaviour without removing the reason is caught. A browser
@@ -200,6 +206,16 @@ export async function runCase(
   if (testCase.json !== undefined) {
     const content = editor.getJSON().content ?? [];
     compare('json', pick(content, testCase.json), testCase.json);
+  }
+  if (testCase.clipboard !== undefined) {
+    if (!driver.clipboard) {
+      throw new UnsupportedStep(`The ${driver.name} driver has no clipboard`);
+    }
+    compare(
+      'clipboard',
+      pick(driver.clipboard(), testCase.clipboard),
+      testCase.clipboard,
+    );
   }
   return mismatches;
 }

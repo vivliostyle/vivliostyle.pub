@@ -9,7 +9,7 @@ import { PubExtensions } from '../src/index';
 import { type EditorCase, runCase } from './case';
 import { UnsupportedStep } from './driver';
 import { createNodeDriver, toKeyEvent } from './node-driver';
-import { press } from './steps';
+import { press, select } from './steps';
 
 const extensions = [PubExtensions.configure({})];
 
@@ -173,5 +173,23 @@ describe('createNodeDriver', () => {
     } finally {
       driver.destroy();
     }
+  });
+});
+
+describe('the select step', () => {
+  it('selects what the marks mark', async () => {
+    expect(
+      await outcome({
+        given: '‸**ab**c',
+        steps: [select('**a‸b**c‸'), 'x'],
+        expect: '**a**x‸',
+      }),
+    ).toEqual([]);
+  });
+
+  it('throws for marks in another document', async () => {
+    await expect(
+      outcome({ given: '‸abc', steps: [select('ab‸')], expect: 'abc' }),
+    ).rejects.toThrow('Could not select');
   });
 });

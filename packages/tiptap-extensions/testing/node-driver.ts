@@ -3,6 +3,7 @@ import { TextSelection } from '@tiptap/pm/state';
 import type { EditorProps, EditorView } from '@tiptap/pm/view';
 
 import { type EditorDriver, UnsupportedStep } from './driver';
+import { selectMarked } from './selection-marks';
 import type { Step } from './steps';
 
 // `Mod` is Cmd or Ctrl depending on the OS the tests run on, by the same test
@@ -81,29 +82,34 @@ function graphemes(text: string): string[] {
 /**
  * Drives a headless editor by calling the hooks a view would call, in the
  * order the view calls them. There is no DOM, so it covers keymaps and input
- * rules but nothing the browser does on its own: paste, composition, caret
- * movement. A caret key that no handler takes skips the case.
+ * rules but nothing the browser does on its own: the clipboard, composition,
+ * caret movement. A caret key that no handler takes skips the case.
  */
 export function createNodeDriver(
   extensions: Extensions,
   editorProps: EditorProps = {},
+  /** Where to mount the view, for a driver with a DOM to build on this one. */
+  element: HTMLElement | null = null,
 ): EditorDriver {
   const editor = new Editor({
-    element: null,
+    element,
     extensions,
     editorProps,
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   });
-  // A headless editor's state has no plugins.
-  editor.view.updateState(
-    editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
-  );
+  if (!element) {
+    // A headless editor's state has no plugins.
+    editor.view.updateState(
+      editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
+    );
+  }
   // The headless view throws for anything only a mounted view has. Its DOM
   // is given as an element outside any document, and a handler that asks
-  // for layout gives the case up, as caret movement does.
+  // for layout gives the case up, as caret movement does. A DOM in Node has
+  // no layout either.
   const view: EditorView = new Proxy(editor.view, {
     get: (target, key) => {
-      if (key === 'dom') {
+      if (key === 'dom' && !element) {
         return {};
       }
       if (typeof key === 'string' && LAYOUT_METHODS.has(key)) {
@@ -227,7 +233,12 @@ export function createNodeDriver(
     name: 'node',
     editor,
     supports(step: Step) {
-      return step.kind !== 'paste' && step.kind !== 'compose';
+      return (
+        step.kind === 'type' ||
+        step.kind === 'press' ||
+        step.kind === 'select' ||
+        step.kind === 'run'
+      );
     },
     async perform(step: Step) {
       switch (step.kind) {
@@ -238,6 +249,9 @@ export function createNodeDriver(
           return;
         case 'press':
           pressKey(step.key);
+          return;
+        case 'select':
+          selectMarked(editor, step.marked);
           return;
         case 'run':
           step.run(editor);

@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core';
 
 import type { Step } from './steps';
 
-export type DriverName = 'node' | 'browser';
+export type DriverName = 'node' | 'dom' | 'browser';
 
 export type BrowserEngine = 'chromium' | 'firefox' | 'webkit';
 
@@ -20,9 +20,17 @@ export interface DriverTarget {
  */
 export interface EditorDriver extends DriverTarget {
   readonly editor: Editor;
+  /** What the last copy or cut put on the clipboard, for a driver that has one. */
+  clipboard?(): ClipboardData | null;
   supports(step: Step): boolean;
   perform(step: Step): Promise<void>;
   destroy(): void;
+}
+
+/** The data of the clipboard by its MIME type. */
+export interface ClipboardData {
+  html: string;
+  text: string;
 }
 
 /**

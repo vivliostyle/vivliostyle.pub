@@ -1,7 +1,9 @@
 import type { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { TextSelection, type Transaction } from '@tiptap/pm/state';
+import { Transform } from '@tiptap/pm/transform';
 
+import { parseMarkdown } from '../src/markdown/extension';
 import { serializeDoc } from './editor-io';
 
 /**
@@ -24,13 +26,9 @@ export function removeSelectionMarks(markdown: string): string {
   return markdown.replaceAll(CARET, '');
 }
 
-/**
- * Removes the marks from the loaded document and selects what they marked.
- * Returns how many marks it found in the document's text.
- */
-export function takeSelectionMarks(editor: Editor): number {
+function markPositions(doc: ProseMirrorNode): number[] {
   const positions: number[] = [];
-  editor.state.doc.descendants((node, pos) => {
+  doc.descendants((node, pos) => {
     if (!node.isText || !node.text) {
       return;
     }
@@ -40,21 +38,62 @@ export function takeSelectionMarks(editor: Editor): number {
       index = node.text.indexOf(CARET, index + CARET.length);
     }
   });
-  if (positions.length === 0) {
-    return 0;
-  }
   if (positions.length > 2) {
     throw new Error(`Expected at most two ${CARET} marks`);
+  }
+  return positions;
+}
+
+/** The anchor and head the marks stand for, once they are taken out. */
+function selectionOf(positions: readonly number[]): [number, number] {
+  const [anchor = 0, end] = positions;
+  return [anchor, end === undefined ? anchor : end - CARET.length];
+}
+
+/**
+ * Removes the marks from the loaded document and selects what they marked.
+ * Returns how many marks it found in the document's text.
+ */
+export function takeSelectionMarks(editor: Editor): number {
+  const positions = markPositions(editor.state.doc);
+  if (positions.length === 0) {
+    return 0;
   }
   const { tr } = editor.state;
   for (const pos of positions.toReversed()) {
     tr.delete(pos, pos + CARET.length);
   }
-  const [anchor, end] = positions;
-  const head = end === undefined ? anchor : end - CARET.length;
+  const [anchor, head] = selectionOf(positions);
   tr.setSelection(TextSelection.create(tr.doc, anchor, head));
   editor.view.dispatch(tr.setMeta('addToHistory', false));
   return positions.length;
+}
+
+/**
+ * Selects what the marks mark in `marked`, which has to read as the
+ * document once the marks are taken out.
+ */
+export function selectMarked(editor: Editor, marked: string): void {
+  const doc = parseMarkdown(editor, marked).doc;
+  const positions = markPositions(doc);
+  if (positions.length === 0) {
+    throw new Error(`\`select\` needs a ${CARET} mark`);
+  }
+  const unmarked = new Transform(doc);
+  for (const pos of positions.toReversed()) {
+    unmarked.delete(pos, pos + CARET.length);
+  }
+  if (!unmarked.doc.eq(editor.state.doc)) {
+    throw new Error(
+      `\`select\` marks ${unmarked.doc}, but the document is ${editor.state.doc}`,
+    );
+  }
+  const [anchor, head] = selectionOf(positions);
+  editor.view.dispatch(
+    editor.state.tr.setSelection(
+      TextSelection.create(editor.state.doc, anchor, head),
+    ),
+  );
 }
 
 // A mark at the edge of formatted text goes outside the formatting, so the
