@@ -14,6 +14,7 @@ import {
   type MarkToMarkdown,
   type NodeWriter,
   type NotationDefinition,
+  openingTag,
   type WriteContext,
 } from './notation';
 import {
@@ -256,7 +257,12 @@ export class MarkdownWriter {
         );
       }
       for (const [name, writer] of Object.entries(notation.marks ?? {})) {
-        this.markWriters.set(name, writer);
+        const previous = this.markWriters.get(name);
+        if (typeof writer !== 'function') {
+          this.markWriters.set(name, writer);
+        } else if (previous) {
+          this.markWriters.set(name, writer(previous));
+        }
       }
     }
     this.escapes = notations.flatMap((notation) => notation.escapes ?? []);
@@ -331,6 +337,10 @@ export class MarkdownWriter {
     styles: ReadonlyMap<string, string>,
     options: WriteBodyOptions,
   ): WriteResult {
+    const unwritable = this.unwritableBlock(doc);
+    if (unwritable !== -1) {
+      throw new MarkdownWriteError('', unwritable);
+    }
     const { check } = options;
     this.definitions = this.definitionsOf(doc);
     this.references = readDefinitions([
@@ -395,6 +405,45 @@ export class MarkdownWriter {
       last?.markdown ?? generated.markdown,
       Math.min(...(last?.differing ?? differing)),
     );
+  }
+
+  /** Whether a definition writes nodes of the type. */
+  writesNode(name: string): boolean {
+    return this.nodeWriters.has(name);
+  }
+
+  /** Whether a definition writes marks of the type. */
+  writesMark(name: string): boolean {
+    return this.markWriters.has(name);
+  }
+
+  /**
+   * The first top-level block holding an inline node or a mark that no
+   * definition writes, as when a document's definitions lack the syntax the
+   * editor made it with, or -1. Leaving it out would lose it unnoticed.
+   */
+  private unwritableBlock(doc: ProseMirrorNode): number {
+    let found = -1;
+    doc.forEach((block, _, index) => {
+      if (found !== -1) {
+        return;
+      }
+      const check = (node: ProseMirrorNode) => {
+        if (
+          node.marks.some((mark) => !this.markWriters.has(mark.type.name)) ||
+          (node.isInline &&
+            !node.isText &&
+            !this.nodeWriters.has(node.type.name))
+        ) {
+          found = index;
+        }
+        return found === -1;
+      };
+      if (check(block)) {
+        block.descendants(check);
+      }
+    });
+    return found;
   }
 
   private writeDocument(
@@ -1035,7 +1084,13 @@ export class MarkdownWriter {
   ): string {
     const writer = this.markWriter(mark);
     if (form === 'html' && writer?.html) {
-      return side === 'open' ? `<${writer.html}>` : `</${writer.html}>`;
+      return side === 'open'
+        ? openingTag(
+            { tag: writer.html, capture: [] },
+            {},
+            writer.htmlAttributes?.(mark),
+          )
+        : `</${writer.html}>`;
     }
     const value = writer?.[side];
     const used =
@@ -1053,9 +1108,13 @@ export class MarkdownWriter {
   ): string {
     const pieces: readonly InlinePiece[] =
       state.reuse && state.widen < 2 && base
-        ? (inlinePieces(textblock, base, state.widen, state.preserve) ?? [
-            { from: 0, to: textblock.content.size },
-          ])
+        ? (inlinePieces(
+            textblock,
+            base,
+            state.widen,
+            state.preserve,
+            (from, to) => this.isImplied(textblock, from, to, context),
+          ) ?? [{ from: 0, to: textblock.content.size }])
         : [{ from: 0, to: textblock.content.size }];
     const start = state.counter.candidates;
     const output = this.composeInline(textblock, pieces, context, state, true);
@@ -1119,6 +1178,28 @@ export class MarkdownWriter {
       implied += output.implied;
     });
     return { text, implied };
+  }
+
+  /** Whether the content is one run whose mark its writer may leave out. */
+  private isImplied(
+    textblock: ProseMirrorNode,
+    from: number,
+    to: number,
+    context: WriteContext,
+  ): boolean {
+    const { node, index, offset } = textblock.childAfter(from);
+    if (!node || offset !== from || offset + node.nodeSize !== to) {
+      return false;
+    }
+    const run = {
+      node,
+      previous: textblock.maybeChild(index - 1) ?? undefined,
+      next: textblock.maybeChild(index + 1) ?? undefined,
+      afterNext: textblock.maybeChild(index + 2) ?? undefined,
+    };
+    return node.marks.some(
+      (mark) => this.markWriter(mark)?.implied?.(run, context) ?? false,
+    );
   }
 
   // A mark left out because markdown reads it into the text anyway, such as a
@@ -1451,11 +1532,12 @@ export class MarkdownWriter {
       const last = index === children.length - 1 && edges.end;
       if (child.isText) {
         let text = child.text ?? '';
-        // A line break can neither start nor end a textblock in markdown.
-        if (first) {
+        // A line break can neither start nor end a textblock in markdown;
+        // the content of an inline node can have one at its edges.
+        if (first && !textblock.isInline) {
           text = text.replace(/^\n+/, '');
         }
-        if (last) {
+        if (last && !textblock.isInline) {
           text = text.replace(/\n+$/, '');
         }
         const runMark = child.marks.find((mark) => this.markWriter(mark)?.run);
@@ -1507,7 +1589,11 @@ export class MarkdownWriter {
             child.marks,
           );
         }
-      } else if (child.type.spec.linebreakReplacement && (first || last)) {
+      } else if (
+        child.type.spec.linebreakReplacement &&
+        (first || last) &&
+        !textblock.isInline
+      ) {
         // A line break can neither start nor end a textblock in markdown.
         content = '';
       } else {
@@ -1518,9 +1604,22 @@ export class MarkdownWriter {
           newline !== -1 || edges.start
             ? preceding.slice(newline + 1)
             : `\u0000${preceding}`;
+        const previous = children[index - 1];
+        const adjacent =
+          previous && opens.length === 0
+            ? {
+                node: previous,
+                endingMarks: previous.marks.filter(
+                  (mark) => !mark.isInSet(child.marks),
+                ),
+              }
+            : null;
         content =
-          writer?.write(child, { ...context, lineBefore: line }, () => '') ??
-          '';
+          writer?.write(
+            child,
+            { ...context, lineBefore: line, adjacent },
+            () => '',
+          ) ?? '';
       }
 
       // Whitespace that markdown would strip at the start or end of a line.

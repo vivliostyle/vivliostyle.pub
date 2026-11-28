@@ -1,4 +1,4 @@
-import { Editor, getSchema } from '@tiptap/core';
+import { Editor, getSchema, Node } from '@tiptap/core';
 import { Code } from '@tiptap/extension-code';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import { Document } from '@tiptap/extension-document';
@@ -254,6 +254,57 @@ describe('TriggerMenu', () => {
     expect(getTriggerMenuRange(editor.state)).toEqual({ from: 1, to: 4 });
     editor.commands.toggleCodeBlock();
     expect(getActiveTrigger(editor.state)).toBeNull();
+    editor.destroy();
+  });
+
+  it('opens right after an inline node with content', () => {
+    const Note = Node.create({
+      name: 'note',
+      group: 'inline',
+      inline: true,
+      content: 'inline*',
+    });
+    const editor = new Editor({
+      element: null,
+      extensions: [
+        Document,
+        Paragraph,
+        Text,
+        Note,
+        TriggerMenu.configure({ getTriggers: () => triggers }),
+      ],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'a' },
+              { type: 'note', content: [{ type: 'text', text: 'n' }] },
+              { type: 'text', text: ' ' },
+            ],
+          },
+        ],
+      },
+    });
+    editor.view.updateState(
+      editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
+    );
+    const end = editor.state.doc.content.size - 1;
+    editor.commands.setTextSelection(end);
+    const plugin = triggerMenuPluginKey.get(editor.state);
+    const handled = plugin?.props.handleTextInput?.call(
+      plugin,
+      editor.view,
+      end,
+      end,
+      '/',
+    );
+    expect(handled).toBe(true);
+    expect(getTriggerMenuRange(editor.state)).toEqual({
+      from: end,
+      to: end + 1,
+    });
     editor.destroy();
   });
 });

@@ -2,7 +2,8 @@ import { Editor, type Extensions } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import type { EditorProps, EditorView } from '@tiptap/pm/view';
 
-import type { EditorDriver } from './driver';
+import { type EditorDriver, UnsupportedStep } from './driver';
+import { selectMarked } from './selection-marks';
 import type { Step } from './steps';
 
 // `Mod` is Cmd or Ctrl depending on the OS the tests run on, by the same test
@@ -30,6 +31,12 @@ const CARET_KEYS = new Set([
   'End',
   'PageUp',
   'PageDown',
+]);
+
+const LAYOUT_METHODS = new Set([
+  'coordsAtPos',
+  'posAtCoords',
+  'endOfTextblock',
 ]);
 
 interface KeyPress {
@@ -67,13 +74,6 @@ export function toKeyEvent(shortcut: string): KeyPress {
   return { event, hasModifier: held.size > 0 };
 }
 
-function caretKeyOf(step: Step): boolean {
-  return (
-    step.kind === 'press' &&
-    CARET_KEYS.has(step.key.split(/-(?!$)/).at(-1) ?? '')
-  );
-}
-
 function graphemes(text: string): string[] {
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   return Array.from(segmenter.segment(text), ({ segment }) => segment);
@@ -82,24 +82,44 @@ function graphemes(text: string): string[] {
 /**
  * Drives a headless editor by calling the hooks a view would call, in the
  * order the view calls them. There is no DOM, so it covers keymaps and input
- * rules but nothing the browser does on its own: paste, composition, caret
- * movement.
+ * rules but nothing the browser does on its own: the clipboard, composition,
+ * caret movement. A caret key that no handler takes skips the case.
  */
 export function createNodeDriver(
   extensions: Extensions,
   editorProps: EditorProps = {},
+  /** Where to mount the view, for a driver with a DOM to build on this one. */
+  element: HTMLElement | null = null,
 ): EditorDriver {
   const editor = new Editor({
-    element: null,
+    element,
     extensions,
     editorProps,
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   });
-  // A headless editor's state has no plugins.
-  editor.view.updateState(
-    editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
-  );
-  const view: EditorView = editor.view;
+  if (!element) {
+    // A headless editor's state has no plugins.
+    editor.view.updateState(
+      editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
+    );
+  }
+  // The headless view throws for anything only a mounted view has. Its DOM
+  // is given as an element outside any document, and a handler that asks
+  // for layout gives the case up, as caret movement does. A DOM in Node has
+  // no layout either.
+  const view: EditorView = new Proxy(editor.view, {
+    get: (target, key) => {
+      if (key === 'dom' && !element) {
+        return {};
+      }
+      if (typeof key === 'string' && LAYOUT_METHODS.has(key)) {
+        return () => {
+          throw new UnsupportedStep(`There is no layout for view.${key}`);
+        };
+      }
+      return Reflect.get(target, key);
+    },
+  });
 
   // Like EditorView.someProp: the view's own props come before the plugins'.
   function someProp<K extends keyof EditorProps>(
@@ -135,13 +155,31 @@ export function createNodeDriver(
 
   // What the browser does with Backspace and Delete when no keymap takes them.
   function deleteNatively(key: 'Backspace' | 'Delete'): void {
-    const { selection, tr } = editor.state;
-    if (!selection.empty) {
-      view.dispatch(tr.deleteSelection());
+    const range = nativeDeletion(key);
+    if (!range) {
       return;
     }
+    const { doc, tr } = editor.state;
+    // The view reads the deletion and the caret from the DOM, and keeps what
+    // was deleted marked as it was for the text typed next.
+    const marks = doc.resolve(range.from).marksAcross(doc.resolve(range.to));
+    tr.delete(range.from, range.to);
+    tr.setSelection(TextSelection.create(tr.doc, range.from));
+    if (marks) {
+      tr.ensureMarks(marks);
+    }
+    view.dispatch(tr);
+  }
+
+  function nativeDeletion(
+    key: 'Backspace' | 'Delete',
+  ): { from: number; to: number } | null {
+    const { selection } = editor.state;
+    if (!selection.empty) {
+      return { from: selection.from, to: selection.to };
+    }
     if (!(selection instanceof TextSelection) || !selection.$cursor) {
-      return;
+      return null;
     }
     const { $cursor } = selection;
     if (key === 'Backspace' && $cursor.parentOffset > 0) {
@@ -149,8 +187,9 @@ export function createNodeDriver(
       const size = before?.isText
         ? (graphemes(before.text ?? '').at(-1)?.length ?? 1)
         : (before?.nodeSize ?? 1);
-      view.dispatch(tr.delete($cursor.pos - size, $cursor.pos));
-    } else if (
+      return { from: $cursor.pos - size, to: $cursor.pos };
+    }
+    if (
       key === 'Delete' &&
       $cursor.parentOffset < $cursor.parent.content.size
     ) {
@@ -158,8 +197,9 @@ export function createNodeDriver(
       const size = after?.isText
         ? (graphemes(after.text ?? '')[0]?.length ?? 1)
         : (after?.nodeSize ?? 1);
-      view.dispatch(tr.delete($cursor.pos, $cursor.pos + size));
+      return { from: $cursor.pos, to: $cursor.pos + size };
     }
+    return null;
   }
 
   function pressKey(shortcut: string): void {
@@ -181,6 +221,11 @@ export function createNodeDriver(
       deleteNatively(key);
       return;
     }
+    if (CARET_KEYS.has(key)) {
+      throw new UnsupportedStep(
+        `Only a browser moves the caret for ${shortcut}`,
+      );
+    }
     throw new Error(`No keymap handles ${shortcut}`);
   }
 
@@ -189,7 +234,10 @@ export function createNodeDriver(
     editor,
     supports(step: Step) {
       return (
-        step.kind !== 'paste' && step.kind !== 'compose' && !caretKeyOf(step)
+        step.kind === 'type' ||
+        step.kind === 'press' ||
+        step.kind === 'select' ||
+        step.kind === 'run'
       );
     },
     async perform(step: Step) {
@@ -201,6 +249,9 @@ export function createNodeDriver(
           return;
         case 'press':
           pressKey(step.key);
+          return;
+        case 'select':
+          selectMarked(editor, step.marked);
           return;
         case 'run':
           step.run(editor);

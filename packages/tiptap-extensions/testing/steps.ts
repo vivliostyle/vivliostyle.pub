@@ -3,6 +3,9 @@ import type { Editor } from '@tiptap/core';
 export type Step =
   | { kind: 'type'; text: string }
   | { kind: 'press'; key: string }
+  | { kind: 'select'; marked: string }
+  | { kind: 'copy' }
+  | { kind: 'cut' }
   | { kind: 'paste'; text?: string; html?: string }
   | { kind: 'compose'; updates: readonly string[]; commit: string }
   | { kind: 'run'; label: string; run: (editor: Editor) => void };
@@ -19,7 +22,25 @@ export function press(key: string): Step {
   return { kind: 'press', key };
 }
 
-export function paste(data: { text?: string; html?: string }): Step {
+/**
+ * Selects what the marks mark in `marked`, the markdown the document is
+ * saved as with the selection written as marks, as in a case's `expect`.
+ */
+export function select(marked: string): Step {
+  return { kind: 'select', marked };
+}
+
+/** Copies the selection as the user does, onto the driver's clipboard. */
+export function copy(): Step {
+  return { kind: 'copy' };
+}
+
+export function cut(): Step {
+  return { kind: 'cut' };
+}
+
+/** Pastes the data, or what the clipboard holds when there is none. */
+export function paste(data: { text?: string; html?: string } = {}): Step {
   return { kind: 'paste', ...data };
 }
 
@@ -49,8 +70,15 @@ export function describeStep(step: Step): string {
       return `type ${JSON.stringify(step.text)}`;
     case 'press':
       return `press ${step.key}`;
+    case 'select':
+      return `select ${JSON.stringify(step.marked)}`;
+    case 'copy':
+    case 'cut':
+      return step.kind;
     case 'paste':
-      return `paste ${JSON.stringify(step.html ?? step.text ?? '')}`;
+      return step.html === undefined && step.text === undefined
+        ? 'paste the clipboard'
+        : `paste ${JSON.stringify(step.html ?? step.text)}`;
     case 'compose':
       return `compose ${JSON.stringify(step.commit)}`;
     case 'run':

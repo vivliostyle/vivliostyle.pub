@@ -11,6 +11,7 @@ import {
   type DocumentRecord,
   getMarkdown,
   MarkdownWriteError,
+  MathTypesetting,
   PubExtensions,
   parseMarkdown,
   setMarkdownBaseline,
@@ -20,6 +21,7 @@ import { debounce } from './debounce';
 import { createSandboxImageSaver } from './editor/image-saver';
 import { insertExistingAsset } from './editor/insert-asset';
 import { insertImageFiles } from './editor/insert-image';
+import { temmlTypesetter } from './editor/math-typesetter';
 import { createEditorMenuExtensions } from './editor/menu/extensions';
 import { YUndoCursorFix } from './editor/y-undo-cursor-fix';
 import { type EditorSyncContext, startEditorSync } from './editor-sync';
@@ -165,6 +167,7 @@ export async function setupEditor({
         }
       },
     }),
+    MathTypesetting.configure({ typesetter: temmlTypesetter }),
     Placeholder.configure({
       placeholder: 'Start typing...',
     }),

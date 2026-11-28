@@ -1,4 +1,4 @@
-import type { AnyExtension } from '@tiptap/core';
+import type { AnyExtension, Attributes } from '@tiptap/core';
 import { Blockquote } from '@tiptap/extension-blockquote';
 import { Bold } from '@tiptap/extension-bold';
 import { BulletList } from '@tiptap/extension-bullet-list';
@@ -16,6 +16,7 @@ import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 import { CodeBlockPrism, toInfoString } from '../../code-block-prism';
 import { PubListKeymap } from '../../list';
+import { parseMarkdown } from '../extension';
 import type { MdastNodeOf } from '../mdast';
 import {
   defineNotation,
@@ -26,6 +27,7 @@ import {
   type WriteContext,
 } from '../notation';
 import { itemPrefix, quotePrefix } from '../source';
+import { autolinkHrefs, linkUrlsPlugin, typedUrlsPlugin } from './link-urls';
 
 function withMark(
   context: ParseContext,
@@ -45,7 +47,11 @@ function delimiter(context: WriteContext, key: string, safe: string) {
 }
 
 /** A link destination, in angle brackets when it could not be read bare. */
-export function linkDestination(url: string): string {
+export function linkDestination(href: string): string {
+  // A destination reads backslash escapes and character references.
+  const url = href
+    .replace(/\\(?=[!-/:-@[-`{-~])/g, '\\\\')
+    .replace(/&(?=#?[A-Za-z0-9]+;)/g, '\\&');
   let depth = 0;
   let balanced = true;
   for (const char of url) {
@@ -632,21 +638,45 @@ export function isBareUrlLink({ node }: InlineRun): boolean {
     return false;
   }
   const [mark] = node.marks;
-  const text = node.text ?? '';
-  const href = mark.attrs.href;
-  if (mark.type.name !== 'link' || mark.attrs.title || /\s/.test(text)) {
-    return false;
-  }
   return (
-    (href === text && /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) ||
-    (href === `http://${text}` && /^www\./i.test(text)) ||
-    (href === `mailto:${text}` && /^[^@]+@[^@]+$/.test(text))
+    mark.type.name === 'link' &&
+    !mark.attrs.title &&
+    autolinkHrefs(node.text ?? '').includes(mark.attrs.href)
   );
 }
 
+// Text is linked as markdown reads it, not as linkify finds links once
+// whitespace follows them.
+const PubLink = Link.extend({
+  // Markdown holds none of these, so HTML pasted from elsewhere must not set
+  // them: the link would differ from what its markdown reads as.
+  addAttributes() {
+    const parent: Attributes = this.parent?.() ?? {};
+    const unread = (name: 'target' | 'rel' | 'class') => ({
+      ...parent[name],
+      parseHTML: () => this.options.HTMLAttributes[name] ?? null,
+    });
+    return {
+      ...parent,
+      target: unread('target'),
+      rel: unread('rel'),
+      class: unread('class'),
+    };
+  },
+
+  addProseMirrorPlugins() {
+    const read = (markdown: string) => parseMarkdown(this.editor, markdown).doc;
+    return [
+      ...(this.parent?.() ?? []),
+      linkUrlsPlugin(this.type, read),
+      typedUrlsPlugin(this.type, read),
+    ];
+  },
+}).configure({ autolink: false });
+
 const linkNotation = defineNotation({
   name: 'link',
-  extensions: [Link],
+  extensions: [PubLink],
   fromMarkdown: {
     link: (node, context) => {
       const marks = withMark(

@@ -64,6 +64,41 @@ export const markdownSuites: CaseSuite[] = [
       { name: 'strikethrough', given: 'a ~~b~~ c' },
       { name: 'bare URL', given: 'see https://example.com now' },
       {
+        name: 'a bare URL is a link',
+        given: 'a https://a.b b',
+        doc: 'doc(paragraph("a ", link("https://a.b"), " b"))',
+      },
+      {
+        name: 'a URL whose domain has no dot is text, as VFM reads it',
+        given: 'a https://example https://localhost:3000 b',
+        doc: 'doc(paragraph("a https://example https://localhost:3000 b"))',
+      },
+      {
+        name: 'a URL whose domain has an empty part is text, as VFM reads it',
+        given: 'a https://a..b https://.a b',
+        doc: 'doc(paragraph("a https://a..b https://.a b"))',
+      },
+      {
+        name: 'a URL whose domain starts with other than ASCII is text, as VFM reads it',
+        given: 'a https://例え.jp b',
+        doc: 'doc(paragraph("a https://例え.jp b"))',
+      },
+      {
+        name: 'a URL whose domain goes on past a dot into other characters is a link, as VFM reads it',
+        given: 'a https://a.例 b',
+        doc: 'doc(paragraph("a ", link("https://a.例"), " b"))',
+      },
+      {
+        name: 'a www address whose domain has one dot is text, as VFM reads it',
+        given: 'a www.a b',
+        doc: 'doc(paragraph("a www.a b"))',
+      },
+      {
+        name: 'a www address in capitals is text, as VFM reads it',
+        given: 'a WWW.a.b b',
+        doc: 'doc(paragraph("a WWW.a.b b"))',
+      },
+      {
         name: 'table',
         given: '| a | b |\n| --- | --- |\n| 1 | 2 |',
       },

@@ -1,10 +1,15 @@
 import { Extension } from '@tiptap/core';
+import { Bold } from '@tiptap/extension-bold';
+import { Document } from '@tiptap/extension-document';
+import { Paragraph } from '@tiptap/extension-paragraph';
+import { Text } from '@tiptap/extension-text';
 import { describe, expect, it } from 'vitest';
 
 import { PubExtensions } from '../src/index';
 import { type EditorCase, runCase } from './case';
+import { UnsupportedStep } from './driver';
 import { createNodeDriver, toKeyEvent } from './node-driver';
-import { press } from './steps';
+import { press, select } from './steps';
 
 const extensions = [PubExtensions.configure({})];
 
@@ -19,6 +24,13 @@ const typeYForX = Extension.create({
         }),
     };
   },
+});
+
+const plain = (text: string) => ({ type: 'text', text });
+const bold = (text: string) => ({ ...plain(text), marks: [{ type: 'bold' }] });
+const paragraph = (...content: object[]) => ({
+  type: 'doc',
+  content: [{ type: 'paragraph', content }],
 });
 
 async function outcome(
@@ -66,12 +78,23 @@ describe('createNodeDriver', () => {
     ).toEqual([]);
   });
 
-  it('skips keys that move the caret', () => {
-    const driver = createNodeDriver(extensions);
-    expect(driver.supports(press('ArrowLeft'))).toBe(false);
-    expect(driver.supports(press('Shift-End'))).toBe(false);
-    expect(driver.supports(press('Enter'))).toBe(true);
-    driver.destroy();
+  it('presses a key that moves the caret when a handler takes it', async () => {
+    expect(
+      await outcome({
+        given: 'a‸^[bd]',
+        steps: [press('ArrowRight'), 'c'],
+        expect: 'a^[bc‸d]',
+      }),
+    ).toEqual([]);
+  });
+
+  it('gives up on a key that moves the caret when no handler takes it', async () => {
+    await expect(
+      outcome({ given: 'a‸b', steps: [press('ArrowRight')], expect: 'ab‸' }),
+    ).rejects.toBeInstanceOf(UnsupportedStep);
+    await expect(
+      outcome({ given: 'a‸b', steps: [press('Shift-End')], expect: 'a‸b‸' }),
+    ).rejects.toBeInstanceOf(UnsupportedStep);
   });
 
   it('types a character key without modifiers', async () => {
@@ -130,5 +153,43 @@ describe('createNodeDriver', () => {
         expect: '‸b',
       }),
     ).toEqual([]);
+  });
+
+  it('keeps the marks of what it deletes for the next text, as a view does', async () => {
+    const driver = createNodeDriver([Document, Paragraph, Text, Bold]);
+    try {
+      const { editor } = driver;
+      editor.commands.setContent(paragraph(bold('a'), plain('b')));
+      editor.commands.setTextSelection(3);
+      await driver.perform(press('Backspace'));
+      expect(editor.state.storedMarks).toEqual([]);
+
+      editor.commands.setContent(paragraph(plain('a'), bold('bc')));
+      editor.commands.setTextSelection(2);
+      await driver.perform(press('Delete'));
+      expect(editor.state.storedMarks?.map((mark) => mark.type.name)).toEqual([
+        'bold',
+      ]);
+    } finally {
+      driver.destroy();
+    }
+  });
+});
+
+describe('the select step', () => {
+  it('selects what the marks mark', async () => {
+    expect(
+      await outcome({
+        given: '‸**ab**c',
+        steps: [select('**a‸b**c‸'), 'x'],
+        expect: '**a**x‸',
+      }),
+    ).toEqual([]);
+  });
+
+  it('throws for marks in another document', async () => {
+    await expect(
+      outcome({ given: '‸abc', steps: [select('ab‸')], expect: 'abc' }),
+    ).rejects.toThrow('Could not select');
   });
 });

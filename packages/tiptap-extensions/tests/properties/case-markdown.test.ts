@@ -9,12 +9,19 @@ import {
 import { removeSelectionMarks } from '../../testing/selection-marks';
 import { suites } from '../cases/suites';
 
-const createEditor = () =>
-  new Editor({
+// With the plugins, which keep nodes in a state their markdown can hold, as
+// in the app: what they change on loading would change the file unedited.
+const createEditor = () => {
+  const editor = new Editor({
     element: null,
     extensions: [PubExtensions.configure({})],
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   });
+  editor.view.updateState(
+    editor.state.reconfigure({ plugins: editor.extensionManager.plugins }),
+  );
+  return editor;
+};
 
 // Violations a case's markdown cannot avoid, with why.
 const KNOWN_VIOLATIONS: Record<

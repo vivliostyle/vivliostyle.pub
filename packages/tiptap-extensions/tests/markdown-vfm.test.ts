@@ -89,7 +89,16 @@ describe('saved markdown as VFM reads it', () => {
   it('keeps math and ruby next to an edit', () => {
     const markdown = '式 $x^2$ を示す。{漢字|かんじ}\n';
     const editor = load(markdown);
-    insertAfter(editor, 'x^2', ' + \\alpha_1');
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'math') {
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            latex: 'x^2 + \\alpha_1',
+          }),
+        );
+      }
+    });
     insertAfter(editor, 'を示す', '（価格*1、送料*2）');
     expect(html(getMarkdown(editor))).toBe(
       html('式 $x^2 + \\alpha_1$ を示す（価格\\*1、送料\\*2）。{漢字|かんじ}'),
@@ -98,6 +107,33 @@ describe('saved markdown as VFM reads it', () => {
       '<ruby>漢字<rt>かんじ</rt></ruby>',
     );
     expect(html(getMarkdown(editor))).toContain('\\(x^2 + \\alpha_1\\)');
+  });
+
+  it('keeps math inserted right after math apart from it', () => {
+    const editor = load('$x$\n');
+    editor.view.dispatch(
+      editor.state.tr.insert(
+        2,
+        editor.state.schema.nodes.math.create({ latex: 'y', display: false }),
+      ),
+    );
+    expect(html(getMarkdown(editor))).toBe(
+      '<p><span class="math inline" data-math-typeset="true">\\(x\\)</span><!----><span class="math inline" data-math-typeset="true">\\(y\\)</span></p>',
+    );
+  });
+
+  it('keeps a ruby inserted right after a link apart from it', () => {
+    const editor = load('[a](u)\n');
+    const { ruby } = editor.state.schema.nodes;
+    editor.view.dispatch(
+      editor.state.tr.insert(
+        2,
+        ruby.create({ rubyText: 'かんじ' }, editor.state.schema.text('漢字')),
+      ),
+    );
+    expect(html(getMarkdown(editor))).toBe(
+      '<p><a href="u">a</a><!----><ruby>漢字<rt>かんじ</rt></ruby></p>',
+    );
   });
 
   it('keeps two line breaks in a row in the paragraph', () => {

@@ -7,7 +7,11 @@ import {
   runCase,
   stepsOf,
 } from './case';
-import type { DriverFactory, DriverTarget } from './driver';
+import {
+  type DriverFactory,
+  type DriverTarget,
+  UnsupportedStep,
+} from './driver';
 
 export interface CaseSuite {
   title: string;
@@ -63,7 +67,16 @@ export function describeCases(
             if (!stepsOf(testCase).every((step) => driver.supports(step))) {
               context.skip();
             }
-            assertOutcome(await runCase(driver, testCase), reason);
+            let mismatches: Mismatch[];
+            try {
+              mismatches = await runCase(driver, testCase);
+            } catch (error) {
+              if (error instanceof UnsupportedStep) {
+                context.skip(error.message);
+              }
+              throw error;
+            }
+            assertOutcome(mismatches, reason);
           } finally {
             driver.destroy();
           }

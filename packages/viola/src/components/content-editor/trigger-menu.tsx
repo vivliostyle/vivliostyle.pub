@@ -19,7 +19,6 @@ import {
 } from 'react';
 import { useSnapshot } from 'valtio';
 
-import { getTriggerMenuRange } from '@v/tiptap-extensions/trigger-menu';
 import { cn } from '@v/ui/lib/utils';
 import { m } from '../../generated/paraglide/messages';
 import {
@@ -28,8 +27,8 @@ import {
   resolveMenuEntries,
 } from '../../libs/editor/menu/config';
 import { filterMenuEntries } from '../../libs/editor/menu/filter';
-import { runEditorMenuCommand } from '../../libs/editor/menu/registry';
 import {
+  executeTriggerCommand,
   setTriggerMenuKeyHandler,
   triggerMenuState,
 } from '../../libs/editor/menu/trigger-state';
@@ -133,16 +132,10 @@ export function TriggerMenu() {
       if (!editor) {
         return;
       }
-      const range = getTriggerMenuRange(editor.state);
-      if (!range) {
-        return;
+      const panel = executeTriggerCommand(editor, command);
+      if (panel) {
+        setPanel(() => panel);
       }
-      editor.chain().focus().deleteRange(range).run();
-      if (command.panel) {
-        setPanel(() => command.panel ?? null);
-        return;
-      }
-      runEditorMenuCommand(command, { editor, surface: 'trigger' });
     },
     [editor],
   );
@@ -211,6 +204,7 @@ export function TriggerMenu() {
   const renderOption = (command: EditorMenuCommand) => {
     const index = optionIndex++;
     const Icon = command.icon;
+    const enabled = !editor || (command.isEnabled?.(editor) ?? true);
     return (
       // biome-ignore lint/a11y/useKeyWithClickEvents: focus stays in the editor, whose plugin drives the keyboard
       <div
@@ -220,10 +214,12 @@ export function TriggerMenu() {
         }}
         role="option"
         aria-selected={index === currentIndex}
+        aria-disabled={!enabled}
         tabIndex={-1}
         className={cn(
           'flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none',
           index === currentIndex && 'bg-accent text-accent-foreground',
+          !enabled && 'opacity-50',
         )}
         // mousemove rather than mouseenter: the menu often opens under a
         // resting pointer, which must not steal the highlight.
@@ -253,7 +249,7 @@ export function TriggerMenu() {
           role="listbox"
           aria-label={m.trigger_menu_listbox_aria()}
           tabIndex={-1}
-          className="z-50 min-w-48 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          className="z-50 min-w-48 overflow-y-auto overscroll-none rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           // Keeps focus (and the IME) in the editor while clicking options.
           onMouseDown={(event) => event.preventDefault()}
         >

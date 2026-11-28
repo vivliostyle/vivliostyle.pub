@@ -3,60 +3,33 @@ import { useRef, useState } from 'react';
 import { UnlinkIcon } from '@v/ui/icon';
 import { Input } from '@v/ui/input';
 import { m } from '../../../generated/paraglide/messages';
-import {
-  getEditableSelectionText,
-  getSelectedLinkHref,
-  insertLink,
-  removeLinkFromSelection,
-  selectionHasLink,
-  setLinkOnSelection,
-} from '../../../libs/editor/link';
+import { openLinkForm } from '../../../libs/editor/menu/forms';
 import type { EditorMenuPanelProps } from '../../../libs/editor/menu/types';
-import { dismissPanel, PanelButton, PanelForm } from './panel-form';
+import {
+  dismissPanel,
+  PanelButton,
+  PanelForm,
+  settlePanel,
+} from './panel-form';
 
 export function LinkPanel({ editor, close }: EditorMenuPanelProps) {
   const urlRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLInputElement>(null);
-  // With nothing selected there is no text to link, so the panel inserts one.
-  const [isInsert] = useState(() => editor.state.selection.empty);
-  const [initialHref] = useState(() => getSelectedLinkHref(editor.state) ?? '');
-  // null hides the text field for selections that can't be retyped as one
-  // string, such as ones spanning paragraphs or containing hard breaks.
-  const [initialText] = useState(() =>
-    isInsert ? '' : getEditableSelectionText(editor.state),
-  );
-  const [hasLink] = useState(() => selectionHasLink(editor.state));
+  const [panel] = useState(() => openLinkForm(editor));
+  const { initialHref, initialText, hasLink } = panel;
   const [invalid, setInvalid] = useState(false);
 
   const removeLink = () => {
-    removeLinkFromSelection(editor);
-    close();
+    panel.remove();
+    dismissPanel({ editor, close });
   };
 
   const apply = () => {
-    const href = urlRef.current?.value.trim() ?? '';
-    if (!href) {
-      if (hasLink) {
-        removeLink();
-      } else {
-        dismissPanel({ editor, close });
-      }
-      return;
-    }
-    const text = textRef.current?.value;
-    const applied = isInsert
-      ? insertLink(editor, { href, text })
-      : setLinkOnSelection(editor, {
-          href,
-          // Left alone, the field holds the text from when the panel opened,
-          // which a collaborator may have edited since.
-          text: text === initialText ? undefined : text,
-        });
-    if (!applied) {
-      setInvalid(true);
-      return;
-    }
-    close();
+    const outcome = panel.apply({
+      href: urlRef.current?.value ?? '',
+      text: textRef.current?.value,
+    });
+    settlePanel({ editor, close }, outcome, () => setInvalid(true));
   };
 
   return (
