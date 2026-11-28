@@ -144,6 +144,36 @@ export const savingSuites: CaseSuite[] = [
         steps: ['https://a.jp'],
         expect: '[本文](https://a.jp)https://a.jp‸',
       },
+      {
+        name: 'a link to its own URL is written bare once what followed it is deleted',
+        given: '[https://example.com](https://example.com)x‸',
+        steps: [press('Backspace')],
+        expect: 'https://example.com',
+      },
+      {
+        name: 'a link to its own URL is written bare once what follows it ends the URL',
+        given: '[https://example.com](https://example.com)x‸y',
+        steps: [press('Backspace'), ' '],
+        expect: 'https://example.com ‸y',
+      },
+      {
+        name: 'a link to its own URL is written bare once what preceded it is deleted',
+        given: 'a‸[https://example.com](https://example.com)',
+        steps: [press('Backspace')],
+        expect: 'https://example.com',
+      },
+      {
+        name: 'a link to its own URL stays a link while what follows it would go into the URL',
+        given: '[https://example.com](https://example.com)x‸y',
+        steps: [press('Backspace')],
+        expect: '[https://example.com](https://example.com)‸y',
+      },
+      {
+        name: 'a link to its own URL stays as written where nothing next to it changes',
+        given: '[https://example.com](https://example.com)‸',
+        steps: [' a'],
+        expect: '[https://example.com](https://example.com) a‸',
+      },
     ],
   },
   {

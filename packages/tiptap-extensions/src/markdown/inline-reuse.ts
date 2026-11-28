@@ -128,13 +128,16 @@ function sharesMark(a: readonly string[], b: readonly string[]): boolean {
  * it has to. `widen` grows what is written anew: 0 is only what changed, 1 a
  * little more around it. Returns `null` when nothing can be reused.
  * `ignoreRaw` matches text whether or not it is raw markdown, for a base
- * read with definitions other than the document's.
+ * read with definitions other than the document's. `implied` tells whether
+ * the content between two offsets is a mark markdown reads into its text by
+ * itself, such as a bare URL.
  */
 export function inlinePieces(
   textblock: ProseMirrorNode,
   base: BaseNode,
   widen: number,
   ignoreRaw = false,
+  implied: (from: number, to: number) => boolean = () => false,
 ): InlinePiece[] | null {
   if (!base.node.isTextblock) {
     return null;
@@ -197,6 +200,19 @@ export function inlinePieces(
     }
   }
   segments.sort((a, b) => a.from - b.from);
+  // Source that writes out such a mark may do so only to keep what was next
+  // to it out of it, so it is written anew where that changed.
+  const neighbourChanged = (segment: Segment) =>
+    (segment.baseFrom > 0 &&
+      (segment.from === 0 ||
+        toNew[segment.baseFrom - 1] !== segment.from - 1)) ||
+    (segment.baseTo < baseAtoms.length && toNew[segment.baseTo] !== segment.to);
+  segments = segments.filter(
+    (segment) =>
+      segment.splittable ||
+      !neighbourChanged(segment) ||
+      !implied(segment.from, segment.to),
+  );
 
   const marks = marksAt(textblock);
   const size = atoms.length;

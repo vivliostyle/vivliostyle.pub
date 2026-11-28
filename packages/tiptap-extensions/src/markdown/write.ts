@@ -1108,9 +1108,13 @@ export class MarkdownWriter {
   ): string {
     const pieces: readonly InlinePiece[] =
       state.reuse && state.widen < 2 && base
-        ? (inlinePieces(textblock, base, state.widen, state.preserve) ?? [
-            { from: 0, to: textblock.content.size },
-          ])
+        ? (inlinePieces(
+            textblock,
+            base,
+            state.widen,
+            state.preserve,
+            (from, to) => this.isImplied(textblock, from, to, context),
+          ) ?? [{ from: 0, to: textblock.content.size }])
         : [{ from: 0, to: textblock.content.size }];
     const start = state.counter.candidates;
     const output = this.composeInline(textblock, pieces, context, state, true);
@@ -1174,6 +1178,28 @@ export class MarkdownWriter {
       implied += output.implied;
     });
     return { text, implied };
+  }
+
+  /** Whether the content is one run whose mark its writer may leave out. */
+  private isImplied(
+    textblock: ProseMirrorNode,
+    from: number,
+    to: number,
+    context: WriteContext,
+  ): boolean {
+    const { node, index, offset } = textblock.childAfter(from);
+    if (!node || offset !== from || offset + node.nodeSize !== to) {
+      return false;
+    }
+    const run = {
+      node,
+      previous: textblock.maybeChild(index - 1) ?? undefined,
+      next: textblock.maybeChild(index + 1) ?? undefined,
+      afterNext: textblock.maybeChild(index + 2) ?? undefined,
+    };
+    return node.marks.some(
+      (mark) => this.markWriter(mark)?.implied?.(run, context) ?? false,
+    );
   }
 
   // A mark left out because markdown reads it into the text anyway, such as a
