@@ -4,7 +4,7 @@ import type { DecorationSet, EditorView } from '@tiptap/pm/view';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { PubExtensions } from './index';
-import { crossing } from './inline-boundaries';
+import { copiedSlice, crossing } from './inline-boundaries';
 import { parseMarkdown } from './markdown/extension';
 
 const editor = new Editor({
@@ -175,5 +175,92 @@ describe('arrows over the edges of a note', () => {
     expect(press('ArrowRight')).toBe(true);
     expect(state.selection.from).toBe(5);
     expect(press('ArrowRight')).toBe(false);
+  });
+});
+
+describe('copying', () => {
+  const copied = (markdown: string, from: number, to: number) => {
+    let state = stateOf(markdown);
+    state = state.apply(
+      state.tr.setSelection(TextSelection.create(state.doc, from, to)),
+    );
+    const slice = copiedSlice(state, state.selection.content());
+    return `${slice.openStart} ${slice.openEnd} ${slice.content}`;
+  };
+
+  it('takes a ruby whole when its whole base is selected', () => {
+    // a{|漢字|}b
+    expect(copied('a{漢字|かんじ}b', 3, 5)).toBe(
+      '1 1 <paragraph(ruby("漢字"))>',
+    );
+  });
+
+  it('takes a note whole when its whole text is selected', () => {
+    // a^[|注*釈*|]b
+    expect(copied('a^[注*釈*]b', 3, 5)).toBe(
+      '1 1 <paragraph(inlineFootnote("注", italic("釈")))>',
+    );
+  });
+
+  it('takes the content of a node it covers in part as text', () => {
+    // a{|漢|字}b
+    expect(copied('a{漢字|かんじ}b', 3, 4)).toBe('1 1 <paragraph("漢")>');
+    // a{漢|字|}b
+    expect(copied('a{漢字|かんじ}b', 4, 5)).toBe('1 1 <paragraph("字")>');
+    // |a{漢|字}b, a{漢|字}b|
+    expect(copied('a{漢字|かんじ}b', 1, 4)).toBe('1 1 <paragraph("a漢")>');
+    expect(copied('a{漢字|かんじ}b', 4, 7)).toBe('1 1 <paragraph("字b")>');
+    // a{漢字|}b|
+    expect(copied('a{漢字|かんじ}b', 5, 7)).toBe('1 1 <paragraph("b")>');
+  });
+
+  it('keeps a node it covers whole inside one it covers in part', () => {
+    // a^[注{|漢字|}]b
+    expect(copied('a^[注{漢字|かんじ}]b', 5, 7)).toBe(
+      '1 1 <paragraph(ruby("漢字"))>',
+    );
+    // a^[注{漢字|かんじ}|]b  ->  a^[|注{漢字|かんじ}|]b
+    expect(copied('a^[注{漢字|かんじ}]b', 4, 8)).toBe(
+      '1 1 <paragraph(ruby("漢字"))>',
+    );
+    // a^[|注{漢字|}]b
+    expect(copied('a^[注{漢字|かんじ}]b', 3, 7)).toBe(
+      '1 1 <paragraph(inlineFootnote("注", ruby("漢字")))>',
+    );
+    // a^[注{漢|字}]b|
+    expect(copied('a^[注{漢字|かんじ}]b', 6, 10)).toBe(
+      '1 1 <paragraph("字b")>',
+    );
+  });
+
+  it('keeps the marks of a node it takes the content of', () => {
+    // *a{漢|字}b*
+    expect(copied('*a{漢字|かんじ}b*', 3, 4)).toBe(
+      '1 1 <paragraph(italic("漢"))>',
+    );
+    // *a{漢|字}b|*
+    expect(copied('*a{漢字|かんじ}b*', 4, 7)).toBe(
+      '1 1 <paragraph(italic("字b"))>',
+    );
+  });
+
+  it('cuts what it copies', () => {
+    let state = stateOf('a^[注釈]b');
+    // a^[|注釈|]b
+    state = state.apply(
+      state.tr.setSelection(TextSelection.create(state.doc, 3, 5)),
+    );
+    const view = {
+      get state() {
+        return state;
+      },
+      dispatch: (tr: Parameters<EditorView['dispatch']>[0]) => {
+        state = state.apply(tr);
+      },
+    } as unknown as EditorView;
+    const cut = boundaries.props.handleDOMEvents?.cut;
+    expect(cut?.call(boundaries, view, {} as ClipboardEvent)).toBe(false);
+    expect(state.selection.from).toBe(2);
+    expect(state.selection.to).toBe(6);
   });
 });

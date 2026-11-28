@@ -1,5 +1,12 @@
 import { Extension } from '@tiptap/core';
-import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
+import {
+  type DOMOutputSpec,
+  DOMSerializer,
+  type Mark,
+  type Node as ProseMirrorNode,
+  type Schema,
+} from '@tiptap/pm/model';
+import { Plugin } from '@tiptap/pm/state';
 import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown';
 import { codes } from 'micromark-util-symbol';
 import type { Effects, State, TokenizeContext } from 'micromark-util-types';
@@ -288,7 +295,7 @@ export function isAttributeName(name: string): boolean {
 // editor behaves. The data attributes and classes of the editor's own
 // rendering would make pasted HTML read as its other nodes.
 const RENDERED = /^(?:id|class|lang|dir|title|role|hidden|aria-[a-z-]+)$/;
-const OWN_DATA = /^data-(?:pm|raw|math|mark|type|language)/;
+const OWN_DATA = /^data-(?:pm|raw|math|mark|type|language|vfm)/;
 const OWN_CLASSES = new Set(['footnote-ref', 'footnote', 'math']);
 const RENDERED_BY_ELEMENT: Record<string, ReadonlySet<string>> = {
   img: new Set(['width', 'height']),
@@ -548,6 +555,79 @@ const decorate: MarkDecorator = (previous) => ({
   }),
 });
 
+// The editor renders only some of the attributes, so copied HTML carries
+// them all in an attribute of its own. HTML from elsewhere brings none.
+const COPIED_ATTRIBUTES = 'data-vfm-attributes';
+
+function copiedAttributes(element: HTMLElement): InlineAttributes | null {
+  const json = element.getAttribute(COPIED_ATTRIBUTES);
+  if (!json) {
+    return null;
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !Object.values(value).every((it) => typeof it === 'string')
+  ) {
+    return null;
+  }
+  const attributes = writableAttributes(value as InlineAttributes);
+  return attributes && Object.keys(attributes).length > 0 ? attributes : null;
+}
+
+function withAttribute(
+  spec: DOMOutputSpec,
+  name: string,
+  value: string,
+): DOMOutputSpec {
+  if (Array.isArray(spec)) {
+    const [tag, first, ...rest] = spec as readonly unknown[];
+    return (
+      typeof first === 'object' &&
+      first !== null &&
+      !Array.isArray(first) &&
+      !('nodeType' in first)
+        ? [tag, { ...first, [name]: value }, ...rest]
+        : [tag, { [name]: value }, ...spec.slice(1)]
+    ) as DOMOutputSpec;
+  }
+  const dom = typeof spec === 'object' && 'dom' in spec ? spec.dom : spec;
+  if (typeof dom === 'object' && 'setAttribute' in dom) {
+    dom.setAttribute(name, value);
+  }
+  return spec;
+}
+
+function clipboardSerializer(schema: Schema): DOMSerializer {
+  const base = DOMSerializer.fromSchema(schema);
+  const copied = (item: Mark | ProseMirrorNode, spec: DOMOutputSpec) => {
+    const { attributes } = item.attrs;
+    return attributes && typeof attributes === 'object'
+      ? withAttribute(spec, COPIED_ATTRIBUTES, JSON.stringify(attributes))
+      : spec;
+  };
+  const nodes = { ...base.nodes };
+  const marks = { ...base.marks };
+  for (const type of ATTRIBUTED_TYPES) {
+    const node = base.nodes[type];
+    const mark = base.marks[type];
+    if (node) {
+      nodes[type] = (it) => copied(it, node(it));
+    }
+    if (mark) {
+      marks[type] = (it, inline) => copied(it, mark(it, inline));
+    }
+  }
+  return new DOMSerializer(nodes, marks);
+}
+
 /** Keeps the attributes on the marks and nodes that can have them. */
 export const InlineAttributesExtension = Extension.create({
   name: 'inlineAttributes',
@@ -556,7 +636,7 @@ export const InlineAttributesExtension = Extension.create({
     const attributes = (element?: string) => ({
       attributes: {
         default: null,
-        parseHTML: () => null,
+        parseHTML: copiedAttributes,
         renderHTML: (attrs: Record<string, unknown>) =>
           renderedAttributes(attrs.attributes, element),
       },
@@ -567,6 +647,14 @@ export const InlineAttributesExtension = Extension.create({
         attributes: attributes(),
       },
       { types: ['image'], attributes: attributes('img') },
+    ];
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: { clipboardSerializer: clipboardSerializer(this.editor.schema) },
+      }),
     ];
   },
 });

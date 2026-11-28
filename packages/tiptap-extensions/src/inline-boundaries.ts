@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core';
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { type Node as ProseMirrorNode, Slice } from '@tiptap/pm/model';
 import {
   type EditorState,
   Plugin,
@@ -151,6 +151,22 @@ function boundaryPlugin(): Plugin<DecorationSet> {
     },
     props: {
       decorations: (state) => key.getState(state),
+      transformCopied: (slice, view) => copiedSlice(view.state, slice),
+      handleDOMEvents: {
+        // The view takes off the selection it cuts, so it is made what
+        // copying takes.
+        cut: (view) => {
+          const range = copiedRange(view.state);
+          if (range) {
+            view.dispatch(
+              view.state.tr.setSelection(
+                TextSelection.create(view.state.doc, range.from, range.to),
+              ),
+            );
+          }
+          return false;
+        },
+      },
       handleKeyDown: (view, event) => {
         if (
           (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
@@ -175,6 +191,88 @@ function boundaryPlugin(): Plugin<DecorationSet> {
       },
     },
   });
+}
+
+/**
+ * The range that copying the selection takes, when it is not the selection.
+ * An end at the inside edge of an inline node with content looks to be
+ * outside the node, and is taken as outside it where the selection covers
+ * all of its content or none of it.
+ */
+function copiedRange(state: EditorState): { from: number; to: number } | null {
+  const { selection, doc } = state;
+  if (!(selection instanceof TextSelection) || selection.empty) {
+    return null;
+  }
+  let { from, to } = selection;
+  for (;;) {
+    const $from = doc.resolve(from);
+    const $to = doc.resolve(to);
+    if (hasInlineContent($from.parent) && $from.pos === $from.end()) {
+      from = $from.after();
+    } else if (
+      hasInlineContent($from.parent) &&
+      $from.pos === $from.start() &&
+      to >= $from.end()
+    ) {
+      from = $from.before();
+    } else if (hasInlineContent($to.parent) && $to.pos === $to.start()) {
+      to = $to.before();
+    } else if (
+      hasInlineContent($to.parent) &&
+      $to.pos === $to.end() &&
+      from <= $to.start()
+    ) {
+      to = $to.after();
+    } else {
+      break;
+    }
+  }
+  return from === selection.from && to === selection.to ? null : { from, to };
+}
+
+/**
+ * What copying the selection takes: an inline node with content goes along
+ * only where the selection covers all of its content, see `copiedRange`. Of
+ * one it covers in part, only that part of the content goes, with the
+ * node's marks. A slice left open into the node would paste as part of the
+ * node it is pasted into, if any, or else as its content alone.
+ */
+export function copiedSlice(state: EditorState, slice: Slice): Slice {
+  const { selection, doc } = state;
+  if (!(selection instanceof TextSelection) || !slice.eq(selection.content())) {
+    return slice;
+  }
+  const { from, to } = copiedRange(state) ?? selection;
+  const partial = new Set<number>();
+  for (const $pos of [doc.resolve(from), doc.resolve(to)]) {
+    for (let depth = $pos.depth; depth > 0; depth--) {
+      if (hasInlineContent($pos.node(depth))) {
+        partial.add($pos.before(depth));
+      }
+    }
+  }
+  if (partial.size === 0) {
+    return from === selection.from && to === selection.to
+      ? slice
+      : doc.slice(from, to, true);
+  }
+  const tr = state.tr;
+  for (const pos of partial) {
+    const start = tr.mapping.map(pos);
+    const node = tr.doc.nodeAt(start);
+    if (!node) {
+      continue;
+    }
+    const end = start + node.nodeSize;
+    tr.step(
+      new ReplaceAroundStep(start, end, start + 1, end - 1, Slice.empty, 0),
+    );
+    for (const mark of node.marks) {
+      tr.addMark(start, start + node.content.size, mark);
+    }
+  }
+  return tr.doc.slice(tr.mapping.map(from), tr.mapping.map(to), true);
 }
 
 // In vertical or right-to-left text the arrows mean other directions, which

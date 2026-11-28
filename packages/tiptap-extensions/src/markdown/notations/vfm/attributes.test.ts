@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { Editor } from '@tiptap/core';
+import type { DOMSerializer, TagParseRule } from '@tiptap/pm/model';
+import { afterAll, describe, expect, it } from 'vitest';
 
+import { PubExtensions } from '../../../index';
 import {
   formatAttributes,
   parseAttributes,
@@ -98,5 +101,75 @@ describe('attributes as written', () => {
     expect(writableAttributes({ k: 'a b\\' })).toBeNull();
     expect(writableAttributes({ k: 'a\nb' })).toBeNull();
     expect(writableAttributes({ class: '', id: 'x' })).toEqual({ id: 'x' });
+  });
+});
+
+describe('attributes on the clipboard', () => {
+  const editor = new Editor({
+    element: null,
+    extensions: [PubExtensions.configure({})],
+    content: { type: 'doc', content: [{ type: 'paragraph' }] },
+  });
+  afterAll(() => {
+    editor.destroy();
+  });
+  const serializer = editor.extensionManager.plugins
+    .map((plugin) => plugin.props.clipboardSerializer)
+    .find(Boolean) as DOMSerializer;
+  const { schema } = editor;
+
+  // An element of the tag with the attributes, as far as parsing reads it.
+  const element = (attrs: Record<string, string>) =>
+    ({
+      getAttribute: (name: string) => attrs[name] ?? null,
+      hasAttribute: (name: string) => name in attrs,
+      style: {},
+    }) as unknown as HTMLElement;
+
+  const readAs = (type: 'bold' | 'link', attrs: Record<string, string>) => {
+    const tag = type === 'bold' ? 'strong' : 'a[href]';
+    const rule = schema.marks[type].spec.parseDOM?.find(
+      (it) => (it as TagParseRule).tag === tag,
+    ) as TagParseRule;
+    const read = rule.getAttrs?.(element(attrs));
+    return read ? (read.attributes ?? null) : null;
+  };
+
+  it('are all carried by copied HTML', () => {
+    const mark = schema.marks.bold.create({
+      attributes: { class: 'x', foo: 'bar' },
+    });
+    const [tag, attrs] = serializer.marks.bold(mark, true) as [
+      string,
+      Record<string, string>,
+    ];
+    expect(tag).toBe('strong');
+    expect(attrs).toMatchObject({
+      class: 'x',
+      'data-vfm-attributes': '{"class":"x","foo":"bar"}',
+    });
+    expect(readAs('bold', attrs)).toEqual({ class: 'x', foo: 'bar' });
+  });
+
+  it('are not added where there are none', () => {
+    const [, attrs] = serializer.marks.link(
+      schema.marks.link.create({ href: 'u' }),
+      true,
+    ) as [string, Record<string, string>];
+    expect(attrs).not.toHaveProperty('data-vfm-attributes');
+  });
+
+  it('are not read from HTML that was not copied from the editor', () => {
+    expect(readAs('bold', { class: 'x', id: 'y' })).toBeNull();
+    expect(
+      readAs('link', { href: 'u', 'data-vfm-attributes': '{"a":1}' }),
+    ).toBeNull();
+    expect(
+      readAs('link', { href: 'u', 'data-vfm-attributes': '{"a"' }),
+    ).toBeNull();
+  });
+
+  it('are kept apart from the attributes the editor renders', () => {
+    expect(renderedAttributes({ 'data-vfm-attributes': '{}' })).toEqual({});
   });
 });
