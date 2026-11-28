@@ -182,11 +182,10 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'x{a&#x7C;|b}‸',
       },
       {
-        name: 'braces typed next to ruby are escaped',
+        name: 'braces typed next to ruby that make no ruby are not escaped',
         given: '{a|b}‸',
-        steps: [' {c|d', press('ArrowRight')],
-        expect: '{a|b} \\{c\\|d‸',
-        only: 'browser',
+        steps: [' {c|d'],
+        expect: '{a|b} {c|d‸',
       },
       {
         name: 'changing the ruby text',
