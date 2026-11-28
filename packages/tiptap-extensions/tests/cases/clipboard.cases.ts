@@ -572,13 +572,132 @@ export const clipboardSuites: CaseSuite[] = [
         steps: [paste({ text: '{漢字|かんじ}と$x$と^[注]と[^1]' })],
         expect: 'あ{漢字|かんじ}と$x$と^[注]と[^1]‸',
       },
+    ],
+  },
+  {
+    title: 'Pasting attributes as plain text',
+    cases: [
       {
-        name: 'attributes',
-        given: 'あ‸',
+        name: 'after strong emphasis',
+        given: '‸',
         steps: [paste({ text: '**太字**{.x}' })],
-        expect: 'あ**太字**{.x}‸',
-        fails:
-          'Attributes have no paste rule, so pasted text keeps the braces as text',
+        expect: '**太字**{.x}‸',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                text: '太字',
+                marks: [
+                  { type: 'bold', attrs: { attributes: { class: 'x' } } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'after emphasis',
+        given: '‸',
+        steps: [paste({ text: '*斜体*{#y}' })],
+        expect: '*斜体*{#y}‸',
+      },
+      {
+        name: 'after inline code',
+        given: '‸',
+        steps: [paste({ text: '`code`{.x}' })],
+        expect: '`code`{.x}‸',
+      },
+      {
+        name: 'after strikethrough',
+        given: '‸',
+        steps: [paste({ text: '~~消し~~{.x}' })],
+        expect: '~~消し~~{.x}‸',
+      },
+      {
+        name: 'after a footnote reference',
+        given: '本文‸\n\n[^1]: 注',
+        steps: [paste({ text: '[^1]{.x}' })],
+        expect: '本文[^1]{.x}‸\n\n[^1]: 注',
+      },
+      {
+        name: 'after several elements',
+        given: '‸',
+        steps: [paste({ text: '**a**{.x} と *b*{#y k="v w"}' })],
+        expect: '**a**{.x} と *b*{#y k="v w"}‸',
+      },
+      {
+        name: 'after an element in the document',
+        given: '**太字**‸',
+        steps: [paste({ text: '{.x}' })],
+        expect: '**太字**{.x}‸',
+        json: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                marks: [
+                  { type: 'bold', attrs: { attributes: { class: 'x' } } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'empty braces give none and go',
+        given: '‸',
+        steps: [paste({ text: '**a**{}b' })],
+        expect: '**a**b‸',
+      },
+      {
+        name: 'braces after an element with attributes stay text',
+        given: '‸',
+        steps: [paste({ text: '**a**{.x}{.y}' })],
+        expect: '**a**{.x}{.y}‸',
+      },
+      {
+        name: 'braces after text stay text',
+        given: '‸',
+        steps: [paste({ text: 'a{.x}' })],
+        expect: 'a{.x}‸',
+      },
+      {
+        name: 'braces after a space stay text',
+        given: '‸',
+        steps: [paste({ text: '**a** {.x}' })],
+        expect: '**a** {.x}‸',
+      },
+      {
+        name: 'braces that are not attributes stay text',
+        given: '‸',
+        steps: [paste({ text: '**a**{=x}' })],
+        expect: '**a**{=x}‸',
+      },
+      {
+        name: 'escaped braces stay text',
+        given: '‸',
+        steps: [paste({ text: '**a**\\{.x}' })],
+        expect: '**a**\\\\\\{.x}‸',
+      },
+      {
+        name: 'braces in code stay code',
+        given: '‸',
+        steps: [paste({ text: '`a{.x}`' })],
+        expect: '`a{.x}`‸',
+      },
+      {
+        name: 'a ruby after an element stays a ruby',
+        given: '‸',
+        steps: [paste({ text: '**a**{漢字|かんじ}' })],
+        expect: '**a**{}{漢字|かんじ}‸',
+      },
+      {
+        name: 'braces stay text in a document whose definitions lack VFM',
+        given: '‸',
+        steps: [recordWithoutVfm, paste({ text: '**a**{.x}' })],
+        expect: '**a**{.x}‸',
+        doc: 'doc(paragraph(bold("a"), "{.x}"))',
       },
     ],
   },

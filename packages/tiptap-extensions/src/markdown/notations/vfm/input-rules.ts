@@ -92,6 +92,18 @@ function locate(
 }
 
 /**
+ * Where the text a paste rule matched is in the document, or null when the
+ * document does not hold it.
+ */
+export function pastedRange(
+  state: EditorState,
+  range: Range,
+  match: ExtendedRegExpMatchArray,
+): Range | null {
+  return holds(state, range, match) ? range : locate(state, range, match);
+}
+
+/**
  * Replaces the source at `range` with the node `build` makes of it. The marks
  * the whole source has go on the node, as reading its markdown puts them.
  */
@@ -105,10 +117,10 @@ function replaceSource(
   const { tr, doc } = state;
   // Inline nodes count as characters in the text a rule matches, but not as
   // positions, so the match only maps onto the document when it holds none.
-  const range = holds(state, given, match)
-    ? given
-    : pasted
-      ? locate(state, given, match)
+  const range = pasted
+    ? pastedRange(state, given, match)
+    : holds(state, given, match)
+      ? given
       : null;
   if (!range) {
     return null;

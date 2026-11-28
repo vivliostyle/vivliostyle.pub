@@ -1,4 +1,4 @@
-import { Extension } from '@tiptap/core';
+import { Extension, PasteRule } from '@tiptap/core';
 import {
   type DOMOutputSpec,
   DOMSerializer,
@@ -11,6 +11,7 @@ import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdow
 import { codes } from 'micromark-util-symbol';
 import type { Effects, State, TokenizeContext } from 'micromark-util-types';
 
+import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
   charOf,
@@ -27,6 +28,7 @@ import {
   type MarkToMarkdown,
   type WriteContext,
 } from '../../notation';
+import { isEscaped, pastedRange } from './input-rules';
 
 /**
  * Attributes of an element, in the order they are written: the id, the
@@ -628,6 +630,105 @@ function clipboardSerializer(schema: Schema): DOMSerializer {
   return new DOMSerializer(nodes, marks);
 }
 
+/**
+ * The element that pasted `{…}` at `pos` would be read as the attributes
+ * of: an attributed node or mark ending right before it that has none yet.
+ * Of marks ending there, the one that starts first, as its element holds
+ * the others.
+ */
+function attributeTarget(
+  doc: ProseMirrorNode,
+  pos: number,
+):
+  | { kind: 'node'; pos: number; node: ProseMirrorNode }
+  | { kind: 'mark'; from: number; mark: Mark }
+  | null {
+  const $pos = doc.resolve(pos);
+  const before = $pos.nodeBefore;
+  if (!before) {
+    return null;
+  }
+  if (ATTRIBUTED_NODES.includes(before.type.name)) {
+    return written(before)
+      ? null
+      : { kind: 'node', pos: pos - before.nodeSize, node: before };
+  }
+  const after = $pos.nodeAfter?.marks ?? [];
+  let found: { kind: 'mark'; from: number; mark: Mark } | null = null;
+  for (const mark of before.marks) {
+    if (
+      !ATTRIBUTED_TYPES.includes(mark.type.name) ||
+      mark.isInSet(after) ||
+      written(mark)
+    ) {
+      continue;
+    }
+    let from = pos;
+    for (let index = $pos.index() - 1; index >= 0; index--) {
+      const child = $pos.parent.child(index);
+      if (!mark.isInSet(child.marks)) {
+        break;
+      }
+      from -= child.nodeSize;
+    }
+    if (!found || from < found.from) {
+      found = { kind: 'mark', from, mark };
+    }
+  }
+  return found;
+}
+
+/**
+ * Pasted `{…}` right after an element that can have attributes becomes its
+ * attributes, as markdown reads it. The rules of the element's own syntax
+ * come first, so the element is there by the time this one runs.
+ */
+function attributesPasteRule(enabled: () => boolean): PasteRule {
+  // A handler that returns null undoes what every rule did to the paste.
+  return new PasteRule({
+    find: /\{[^{}\n\r]*\}/g,
+    handler: ({ state, range: given, match }) => {
+      if (
+        !enabled() ||
+        (match.input !== undefined &&
+          match.index !== undefined &&
+          isEscaped(match.input, match.index))
+      ) {
+        return;
+      }
+      const attributes = parseAttributes(match[0]);
+      const range = attributes && pastedRange(state, given, match);
+      if (!attributes || !range) {
+        return;
+      }
+      const target = attributeTarget(state.doc, range.from);
+      if (!target) {
+        return;
+      }
+      const { tr } = state;
+      tr.delete(range.from, range.to);
+      // `{}` gives none.
+      if (Object.keys(attributes).length === 0) {
+        return;
+      }
+      if (target.kind === 'node') {
+        tr.setNodeMarkup(target.pos, undefined, {
+          ...target.node.attrs,
+          attributes,
+        });
+      } else {
+        const { from, mark } = target;
+        tr.removeMark(from, range.from, mark);
+        tr.addMark(
+          from,
+          range.from,
+          mark.type.create({ ...mark.attrs, attributes }),
+        );
+      }
+    },
+  });
+}
+
 /** Keeps the attributes on the marks and nodes that can have them. */
 export const InlineAttributesExtension = Extension.create({
   name: 'inlineAttributes',
@@ -659,10 +760,25 @@ export const InlineAttributesExtension = Extension.create({
   },
 });
 
+// The paste rules of other extensions have to make the element first, and
+// Tiptap runs the plugins of a lower priority later.
+const InlineAttributesPasteRule = Extension.create({
+  name: 'inlineAttributesPasteRule',
+  priority: 99,
+
+  addPasteRules() {
+    return [
+      attributesPasteRule(() =>
+        hasDocumentNotation(this.editor, 'inlineAttributes'),
+      ),
+    ];
+  },
+});
+
 export const inlineAttributesNotation = defineNotation({
   name: 'inlineAttributes',
   version: 1,
-  extensions: [InlineAttributesExtension],
+  extensions: [InlineAttributesExtension, InlineAttributesPasteRule],
   remarkPlugins: [
     syntaxPlugin(
       {
