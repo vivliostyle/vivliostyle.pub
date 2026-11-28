@@ -115,6 +115,7 @@ const comparisons: Record<string, Comparison[]> = {
     { markdown: 'one\n\ntwo' },
     { markdown: 'line1\nline2' },
     { markdown: 'a *b* **c** `d`' },
+    { markdown: 'https://example https://a..b https://例え.jp www.a WWW.a.b' },
     { markdown: '> quote\n>\n> more' },
     { markdown: 'a\n\n---\n\nb' },
     {

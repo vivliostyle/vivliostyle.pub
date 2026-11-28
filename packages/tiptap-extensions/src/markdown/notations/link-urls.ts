@@ -91,12 +91,30 @@ function changedRanges(mapping: Mapping): { from: number; to: number }[] {
   return ranges;
 }
 
+/** The URL markdown links the whole text to by itself, if it does. */
+function autolinkOf(
+  text: string,
+  type: MarkType,
+  read: (markdown: string) => ProseMirrorNode,
+): string | null {
+  const doc = read(text);
+  const paragraph = doc.childCount === 1 ? doc.firstChild : null;
+  const child = paragraph?.childCount === 1 ? paragraph.firstChild : null;
+  const mark =
+    child?.isText && child.text === text && type.isInSet(child.marks);
+  return mark ? String(mark.attrs.href) : null;
+}
+
 /**
  * Makes a link whose text is its URL, as a bare URL is, follow its text as
- * it is edited, and takes the link off once the text is no URL: in
- * markdown, the text of a bare URL is all there is of its link.
+ * it is edited, and takes the link off once markdown reads the text as no
+ * URL: in markdown, the text of a bare URL is all there is of its link.
+ * `read` reads markdown as the document's definitions do.
  */
-export function linkUrlsPlugin(type: MarkType): Plugin {
+export function linkUrlsPlugin(
+  type: MarkType,
+  read: (markdown: string) => ProseMirrorNode,
+): Plugin {
   return new Plugin({
     appendTransaction: (transactions, oldState, state) => {
       if (!transactions.some((tr) => tr.docChanged && !isRemote(tr))) {
@@ -131,11 +149,13 @@ export function linkUrlsPlugin(type: MarkType): Plugin {
               back.map(link.to, 1),
               link.mark,
             );
-            const kind = autolinkHrefs(before).indexOf(link.mark.attrs.href);
-            if (kind === -1 || before === link.text) {
+            if (
+              before === link.text ||
+              !autolinkHrefs(before).includes(link.mark.attrs.href)
+            ) {
               continue;
             }
-            const href = autolinkHrefs(link.text)[kind];
+            const href = autolinkOf(link.text, type, read);
             if (href === null) {
               tr.removeMark(link.from, link.to, link.mark);
             } else if (href !== link.mark.attrs.href) {
@@ -226,7 +246,7 @@ export function typedUrlsPlugin(
       });
       const head = before.match(/\S*$/)?.[0] ?? '';
       const word = head + (after.match(/^\S*/)?.[0] ?? '');
-      if (!word.includes('.')) {
+      if (!/[.:@]/.test(word)) {
         return null;
       }
       const wordFrom = $cursor.pos - head.length;

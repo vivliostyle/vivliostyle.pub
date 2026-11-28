@@ -652,7 +652,7 @@ const PubLink = Link.extend({
     const read = (markdown: string) => parseMarkdown(this.editor, markdown).doc;
     return [
       ...(this.parent?.() ?? []),
-      linkUrlsPlugin(this.type),
+      linkUrlsPlugin(this.type, read),
       typedUrlsPlugin(this.type, read),
     ];
   },

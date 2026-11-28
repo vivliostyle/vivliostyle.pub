@@ -223,6 +223,13 @@ export const inputSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a ", link("user@example.com"), " b"))',
       },
       {
+        name: 'a URL whose domain has no dot yet stays text',
+        given: 'a ‸ b',
+        steps: ['https://example.'],
+        expect: 'a https://example.‸ b',
+        doc: 'doc(paragraph("a https://example. b"))',
+      },
+      {
         name: 'a domain that markdown does not link stays text',
         given: 'a ‸ b',
         steps: ['example.com'],

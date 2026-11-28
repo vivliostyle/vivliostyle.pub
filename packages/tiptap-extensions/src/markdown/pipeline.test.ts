@@ -601,6 +601,19 @@ describe('saving what an edit can leave in a paragraph', () => {
     );
     expect(savesAsDocument(editor)).toBe(`text${expected}\n`);
   });
+
+  it('writes a link to a URL whose domain has no dot in brackets', () => {
+    const editor = load('a b\n');
+    const { schema } = editor.state;
+    const href = 'https://example';
+    editor.view.dispatch(
+      editor.state.tr.insert(3, [
+        schema.text(href, [schema.marks.link.create({ href })]),
+        schema.text(' '),
+      ]),
+    );
+    expect(savesAsDocument(editor)).toBe(`a [${href}](${href}) b\n`);
+  });
 });
 
 describe('what the document records', () => {
@@ -696,13 +709,38 @@ describe('documents made with an earlier version of GFM', () => {
     setMarkdownBaseline(editor, 'a ~b~ c\n\nedit\n');
     setDocumentNotations(
       editor,
-      currentNotations(editor).replace('gfm@2', 'gfm@1'),
+      currentNotations(editor).replace(/gfm@\d+/, 'gfm@1'),
     );
     appendTo(editor, 'edit', 'ed');
     expect(getMarkdownWithResult(editor)).toEqual({
       markdown: 'a ~b~ c\n\nedited\n',
       strategy: 'reused',
     });
+  });
+
+  it('keep a URL whose domain has no dot as a link written bare', () => {
+    const editor = load('');
+    const { schema } = editor.state;
+    const link = schema.marks.link.create({ href: 'https://example' });
+    editor.commands.setContent(
+      schema.topNodeType
+        .create(null, [
+          schema.nodes.paragraph.create(null, [
+            schema.text('a '),
+            schema.text('https://example', [link]),
+            schema.text(' c'),
+          ]),
+          schema.nodes.paragraph.create(null, schema.text('edit')),
+        ])
+        .toJSON(),
+    );
+    setMarkdownBaseline(editor, 'a https://example c\n\nedit\n');
+    setDocumentNotations(
+      editor,
+      currentNotations(editor).replace(/gfm@\d+/, 'gfm@2'),
+    );
+    appendTo(editor, 'example c', 'd');
+    expect(getMarkdown(editor)).toBe('a https://example cd\n\nedit\n');
   });
 });
 

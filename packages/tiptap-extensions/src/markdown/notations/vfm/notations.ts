@@ -12,11 +12,17 @@ import { rubyNotation } from './ruby';
 export interface VfmSyntax extends FootnoteOptions {
   /** `~a~` is strikethrough, as GFM reads it. VFM 2 reads only `~~a~~`. */
   singleTildeStrikethrough: boolean;
+  /**
+   * A URL or a `www.` address in text is a link only where its domain has a
+   * dot, as VFM 2 reads it. GFM, as micromark reads it, links any domain.
+   */
+  dottedAutolinkDomains: boolean;
 }
 
 /** VFM 2.7, as `@vivliostyle/vfm` 2.7 reads markdown. */
 export const VFM_2_SYNTAX: VfmSyntax = {
   singleTildeStrikethrough: false,
+  dottedAutolinkDomains: true,
   undefinedReferences: true,
   emptyInlineNotes: true,
 };

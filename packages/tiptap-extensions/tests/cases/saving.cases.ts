@@ -236,6 +236,12 @@ export const savingSuites: CaseSuite[] = [
         expect: '本文 a@example.co です',
       },
       {
+        name: 'deleting the dot of its domain takes off its link',
+        given: '本文 https://example.com です‸',
+        steps: [select('.com', 'all'), press('Backspace')],
+        expect: '本文 https://example です',
+      },
+      {
         name: 'editing it into text that is no URL takes off its link',
         given: '本文 https://example.com です‸',
         steps: [select('https://', 'all'), press('Backspace')],

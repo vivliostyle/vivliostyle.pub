@@ -3,10 +3,12 @@ import { Underline } from '@tiptap/extension-underline';
 import type { Mark } from '@tiptap/pm/model';
 import remarkGfm from 'remark-gfm';
 
+import type { MdastNodeOf } from '../mdast';
 import {
   declareNotation,
   defineNotation,
   type NotationDefinition,
+  type ParseContext,
 } from '../notation';
 
 // VFM renders strikethrough as `del`, which themes style.
@@ -21,21 +23,69 @@ function inLink(marks: readonly Mark[]): boolean {
   return marks.some((mark) => mark.type.name === 'link');
 }
 
+// Up to the first character no domain holds, labels separated by dots, of
+// which only the last may be empty, where other characters follow.
+function hasDottedDomain(rest: string): boolean {
+  const domain = rest.match(/^[\w.-]*/)?.[0] ?? '';
+  return /^[\w-]+(?:\.[\w-]+)*\.[\w-]*$/.test(domain);
+}
+
+/**
+ * Whether a link GFM found in text is one VFM finds too: a URL or a `www.`
+ * address whose domain has a dot, where micromark takes any domain.
+ */
+function isDottedAutolink(
+  node: MdastNodeOf<'link'>,
+  context: ParseContext,
+): boolean {
+  // A link made by a transform rather than read is found in text.
+  const written = node.position ? context.source(node) : '';
+  const [child] = node.children;
+  if (
+    /^[[<]/.test(written) ||
+    node.children.length !== 1 ||
+    child?.type !== 'text'
+  ) {
+    return true;
+  }
+  const text = child.value;
+  const scheme = text.match(/^[a-z][a-z0-9+.-]*:\/\//i)?.[0];
+  if (scheme) {
+    return hasDottedDomain(text.slice(scheme.length));
+  }
+  if (/^www\./i.test(text)) {
+    return text.startsWith('www.') && hasDottedDomain(text.slice(4));
+  }
+  return true;
+}
+
 /**
  * GitHub Flavored Markdown as VFM reads it. Tables, task list checkboxes and
  * footnote definitions have no definition yet and are kept as raw markdown.
  */
 export function gfmNotations({
   singleTilde,
+  dottedDomains,
 }: {
   /** `~a~` is strikethrough as well as `~~a~~`. */
   singleTilde: boolean;
+  /** A URL or a `www.` address in text is a link only where its domain has a dot. */
+  dottedDomains: boolean;
 }): NotationDefinition[] {
-  const gfm = (version: number, single: boolean) =>
+  // Versions 1 and 2 linked any domain.
+  const version = (single: boolean, dotted: boolean) =>
+    (single ? 1 : 2) + (dotted ? 2 : 0);
+  const gfm = (single: boolean, dotted: boolean) =>
     defineNotation({
       name: 'gfm',
-      version,
+      version: version(single, dotted),
       remarkPlugins: [[remarkGfm, { singleTilde: single }]],
+      ...(dotted && {
+        fromMarkdown: {
+          link: (node, context, next) =>
+            isDottedAutolink(node, context) ? next() : context.inlines(node),
+        },
+      }),
       escapes: [
         // A row of cells needs pipes.
         { pattern: /\|/g },
@@ -60,9 +110,13 @@ export function gfmNotations({
         },
       ],
     });
+  const current = gfm(singleTilde, dottedDomains);
+  const earlier = [gfm(true, false), gfm(false, false), gfm(true, true)].filter(
+    (it) => (it.version ?? 0) < (current.version ?? 0),
+  );
   return [
-    // Version 1 read `~a~` as strikethrough.
-    singleTilde ? gfm(1, true) : { ...gfm(2, false), earlier: [gfm(1, true)] },
+    // Versions 1 and 3 read `~a~` as strikethrough.
+    earlier.length > 0 ? { ...current, earlier } : current,
     declareNotation(
       {
         kind: 'delimitedMark',

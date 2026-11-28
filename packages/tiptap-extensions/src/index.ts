@@ -163,7 +163,10 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       PubMarkdown.configure({
         notations: [
           ...commonMarkNotations({ image }),
-          ...gfmNotations({ singleTilde: vfm.singleTildeStrikethrough }),
+          ...gfmNotations({
+            singleTilde: vfm.singleTildeStrikethrough,
+            dottedDomains: vfm.dottedAutolinkDomains,
+          }),
           ...htmlMarkNotations,
           ...vfmNotations(vfm),
           rawNotation,
