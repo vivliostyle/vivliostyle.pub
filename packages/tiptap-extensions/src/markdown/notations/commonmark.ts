@@ -1,4 +1,4 @@
-import type { AnyExtension } from '@tiptap/core';
+import type { AnyExtension, Attributes } from '@tiptap/core';
 import { Blockquote } from '@tiptap/extension-blockquote';
 import { Bold } from '@tiptap/extension-bold';
 import { BulletList } from '@tiptap/extension-bullet-list';
@@ -648,6 +648,22 @@ export function isBareUrlLink({ node }: InlineRun): boolean {
 // Text is linked as markdown reads it, not as linkify finds links once
 // whitespace follows them.
 const PubLink = Link.extend({
+  // Markdown holds none of these, so HTML pasted from elsewhere must not set
+  // them: the link would differ from what its markdown reads as.
+  addAttributes() {
+    const parent: Attributes = this.parent?.() ?? {};
+    const unread = (name: 'target' | 'rel' | 'class') => ({
+      ...parent[name],
+      parseHTML: () => this.options.HTMLAttributes[name] ?? null,
+    });
+    return {
+      ...parent,
+      target: unread('target'),
+      rel: unread('rel'),
+      class: unread('class'),
+    };
+  },
+
   addProseMirrorPlugins() {
     const read = (markdown: string) => parseMarkdown(this.editor, markdown).doc;
     return [

@@ -152,6 +152,7 @@ function boundaryPlugin(): Plugin<DecorationSet> {
     props: {
       decorations: (state) => key.getState(state),
       transformCopied: (slice, view) => copiedSlice(view.state, slice),
+      transformPasted: closedAtInlineNodes,
       handleDOMEvents: {
         // The view takes off the selection it cuts, so it is made what
         // copying takes.
@@ -273,6 +274,29 @@ export function copiedSlice(state: EditorState, slice: Slice): Slice {
     }
   }
   return tr.doc.slice(tr.mapping.map(from), tr.mapping.map(to), true);
+}
+
+/**
+ * The slice with every inline node with content at its edges closed. HTML
+ * without the editor's context is read as open as it can be, and a node
+ * open at the start would paste as its content alone. What the editor
+ * copies has none open.
+ */
+export function closedAtInlineNodes(slice: Slice): Slice {
+  const closed = (open: number, first: boolean) => {
+    let node = first ? slice.content.firstChild : slice.content.lastChild;
+    let depth = 0;
+    while (depth < open && node && !hasInlineContent(node)) {
+      depth++;
+      node = first ? node.firstChild : node.lastChild;
+    }
+    return depth;
+  };
+  const openStart = closed(slice.openStart, true);
+  const openEnd = closed(slice.openEnd, false);
+  return openStart === slice.openStart && openEnd === slice.openEnd
+    ? slice
+    : new Slice(slice.content, openStart, openEnd);
 }
 
 // In vertical or right-to-left text the arrows mean other directions, which

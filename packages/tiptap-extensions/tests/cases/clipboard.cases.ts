@@ -1,8 +1,15 @@
-import { copy, cut, paste, select } from '../../testing/steps';
+import type { Editor } from '@tiptap/core';
+
+import { copy, cut, paste, run, select } from '../../testing/steps';
 import type { CaseSuite } from '../../testing/vitest';
+import { recordWithoutVfm } from './vfm.cases';
 
 const RUBY_HTML =
   '<ruby><span>漢字</span><rt contenteditable="false">かんじ</rt></ruby>';
+
+const selectImage = run('select the image', (editor: Editor) => {
+  editor.commands.setNodeSelection(0);
+});
 
 export const clipboardSuites: CaseSuite[] = [
   {
@@ -226,6 +233,115 @@ export const clipboardSuites: CaseSuite[] = [
     ],
   },
   {
+    title: 'Pasting VFM where it cannot be',
+    cases: [
+      {
+        name: 'a ruby pasted into code ends the code',
+        given: '‸{漢字|かんじ}‸と`code`',
+        steps: [copy(), select('{漢字|かんじ}と`co‸de`'), paste()],
+        expect: '{漢字|かんじ}と`co`{}{漢字|かんじ}‸`de`',
+      },
+      {
+        name: 'a ruby pasted into a ruby is its base',
+        given: '‸{漢字|かんじ}‸と{仮名|かな}',
+        steps: [copy(), select('{漢字|かんじ}と{仮‸名|かな}'), paste()],
+        expect: '{漢字|かんじ}と{仮漢字‸名|かな}',
+      },
+      {
+        name: 'a ruby pasted into a link ends the link',
+        given: '‸{漢字|かんじ}‸と[link](https://example.com)',
+        steps: [
+          copy(),
+          select('{漢字|かんじ}と[li‸nk](https://example.com)'),
+          paste(),
+        ],
+        expect:
+          '{漢字|かんじ}と[li](https://example.com){}{漢字|かんじ}‸[nk](https://example.com)',
+      },
+      {
+        name: 'a note pasted into code ends the code',
+        given: 'あ‸^[注釈]‸と`code`',
+        steps: [copy(), select('あ^[注釈]と`co‸de`'), paste()],
+        expect: 'あ^[注釈]と`co`^[注釈]‸`de`',
+      },
+      {
+        name: 'a note pasted into a link ends the link',
+        given: 'あ‸^[注釈]‸と[link](https://example.com)',
+        steps: [
+          copy(),
+          select('あ^[注釈]と[li‸nk](https://example.com)'),
+          paste(),
+        ],
+        expect:
+          'あ^[注釈]と[li](https://example.com)^[注釈]‸[nk](https://example.com)',
+      },
+      {
+        name: 'a reference pasted into code ends the code',
+        given: 'あ‸[^1]‸と`code`\n\n[^1]: 注',
+        steps: [copy(), select('あ[^1]と`co‸de`\n\n[^1]: 注'), paste()],
+        expect: 'あ[^1]と`co`[^1]‸`de`\n\n[^1]: 注',
+      },
+      {
+        name: 'a reference pasted into a link ends the link',
+        given: 'あ‸[^1]‸と[link](https://example.com)\n\n[^1]: 注',
+        steps: [
+          copy(),
+          select('あ[^1]と[li‸nk](https://example.com)\n\n[^1]: 注'),
+          paste(),
+        ],
+        expect:
+          'あ[^1]と[li](https://example.com)[^1]‸[nk](https://example.com)\n\n[^1]: 注',
+      },
+      {
+        name: 'math pasted into code ends the code',
+        given: '‸$x$‸と`code`',
+        steps: [copy(), select('$x$と`co‸de`'), paste()],
+        expect: '$x$と`co`$x$‸`de`',
+      },
+      {
+        name: 'math pasted into a link ends the link',
+        given: '‸$x$‸と[link](https://example.com)',
+        steps: [copy(), select('$x$と[li‸nk](https://example.com)'), paste()],
+        expect: '$x$と[li](https://example.com)$x$‸[nk](https://example.com)',
+      },
+    ],
+  },
+  {
+    title: 'Pasting VFM into other VFM',
+    cases: [
+      {
+        name: 'a note pasted into a ruby stays in it',
+        given: 'あ‸^[注釈]‸と{漢字|かんじ}',
+        steps: [copy(), select('あ^[注釈]と{漢‸字|かんじ}'), paste()],
+        expect: 'あ^[注釈]と{漢^[注釈]‸字|かんじ}',
+      },
+      {
+        name: 'a reference pasted into a ruby stays in it',
+        given: 'あ‸[^1]‸と{漢字|かんじ}\n\n[^1]: 注',
+        steps: [copy(), select('あ[^1]と{漢‸字|かんじ}\n\n[^1]: 注'), paste()],
+        expect: 'あ[^1]と{漢[^1]‸字|かんじ}\n\n[^1]: 注',
+      },
+      {
+        name: 'math pasted into a ruby stays in it',
+        given: '‸$x$‸と{漢字|かんじ}',
+        steps: [copy(), select('$x$と{漢‸字|かんじ}'), paste()],
+        expect: '$x$と{漢$x$‸字|かんじ}',
+      },
+      {
+        name: 'a ruby pasted at the end of a note goes after it',
+        given: '‸{漢字|かんじ}‸と^[注]',
+        steps: [copy(), select('{漢字|かんじ}と^[注‸]'), paste()],
+        expect: '{漢字|かんじ}と^[注]{漢字|かんじ}‸',
+      },
+      {
+        name: 'math pasted at the end of a note goes after it',
+        given: '‸$x$‸と^[注]',
+        steps: [copy(), select('$x$と^[注‸]'), paste()],
+        expect: '$x$と^[注]$x$‸',
+      },
+    ],
+  },
+  {
     title: 'Copying attributes',
     cases: [
       {
@@ -269,10 +385,33 @@ export const clipboardSuites: CaseSuite[] = [
           '[リンク](https://example.com){#id title="a b"}と[リンク](https://example.com){#id title="a b"}‸',
       },
       {
+        name: 'a link with attributes pasted into a link ends the link',
+        given: '‸[a](https://a.example){.x}‸と[link](https://example.com)',
+        steps: [
+          copy(),
+          select('[a](https://a.example){.x}と[li‸nk](https://example.com)'),
+          paste(),
+        ],
+        expect:
+          '[a](https://a.example){.x}と[li](https://example.com)[a](https://a.example){.x}‸[nk](https://example.com)',
+      },
+      {
         name: 'the attributes of a footnote reference are copied',
         given: 'あ‸[^1]{.x}‸い\n\n[^1]: 注',
         steps: [copy(), select('あ[^1]{.x}い‸\n\n[^1]: 注'), paste()],
         expect: 'あ[^1]{.x}い[^1]{.x}‸\n\n[^1]: 注',
+      },
+      {
+        name: 'the attributes of an image are copied, and its path',
+        given: '![画像](a.png){.x width=10 foo=bar}\n\nあ‸',
+        steps: [
+          selectImage,
+          copy(),
+          select('![画像](a.png){.x width=10 foo=bar}\n\nあ‸'),
+          paste(),
+        ],
+        expect:
+          '![画像](a.png){.x width=10 foo=bar}\n\nあ\n\n![画像](a.png){.x width=10 foo=bar}',
       },
       {
         name: 'quoted values are copied',
@@ -296,6 +435,177 @@ export const clipboardSuites: CaseSuite[] = [
         steps: [copy(), select('**太字**{.x}と**別‸**'), paste()],
         expect:
           '<strong class="x">太字</strong>と<strong>別</strong><strong class="x">太字</strong>‸',
+      },
+    ],
+  },
+  {
+    title: 'Pasting HTML from elsewhere',
+    cases: [
+      {
+        name: 'a ruby',
+        given: 'あ‸',
+        steps: [paste({ html: '<ruby>漢字<rt>かんじ</rt></ruby>い' })],
+        expect: 'あ{漢字|かんじ}い‸',
+      },
+      {
+        name: 'a ruby at the end',
+        given: 'あ‸',
+        steps: [paste({ html: 'い<ruby>漢字<rt>かんじ</rt></ruby>' })],
+        expect: 'あい{漢字|かんじ}‸',
+      },
+      {
+        name: 'a ruby with fallback parentheses',
+        given: '‸',
+        steps: [
+          paste({
+            html: '<ruby>漢字<rp>(</rp><rt>かんじ</rt><rp>)</rp></ruby>',
+          }),
+        ],
+        expect: '{漢字|かんじ}‸',
+      },
+      {
+        name: 'a ruby text for each character',
+        given: '‸',
+        steps: [paste({ html: '<ruby>日<rt>に</rt>本<rt>ほん</rt></ruby>' })],
+        expect: '{日|に}{本|ほん}‸',
+      },
+      {
+        name: 'a ruby without ruby text is its base',
+        given: '‸',
+        steps: [paste({ html: '<ruby>漢字</ruby>' })],
+        expect: '漢字‸',
+      },
+      {
+        name: 'a ruby whose ruby text has no markdown is its base',
+        given: '‸',
+        steps: [paste({ html: '<ruby>a<rt>b}c</rt></ruby>' })],
+        expect: 'a‸',
+      },
+      {
+        name: 'a note',
+        given: 'あ‸',
+        steps: [paste({ html: '<span class="footnote">注</span>い' })],
+        expect: 'あ^[注]い‸',
+      },
+      {
+        name: 'a footnote reference',
+        given: '‸',
+        steps: [
+          paste({
+            html: '<p>本文<a class="footnote-ref" href="#fn1"><sup>1</sup></a></p>',
+          }),
+        ],
+        expect: '本文[^1]‸',
+      },
+      {
+        name: 'a footnote reference whose label has no markdown is a link',
+        given: '‸',
+        steps: [
+          paste({
+            html: '<p>本文<a class="footnote-ref" href="#fn1">a b</a></p>',
+          }),
+        ],
+        expect: '本文[a b](#fn1)‸',
+      },
+      {
+        name: 'math',
+        given: '‸',
+        steps: [
+          paste({
+            html: '<span class="math inline" data-math-typeset="true">\\(x\\)</span>',
+          }),
+        ],
+        expect: '$x$‸',
+      },
+      {
+        name: 'display math',
+        given: '‸',
+        steps: [
+          paste({
+            html: '<p><span class="math display" data-math-typeset="true">$$x$$</span></p>',
+          }),
+        ],
+        expect: '$$x$$‸',
+      },
+      {
+        name: 'math not typeset by VFM is text',
+        given: '‸',
+        steps: [paste({ html: '<span class="math inline">\\(x\\)</span>' })],
+        expect: '\\\\\\(x\\\\\\)‸',
+      },
+      {
+        name: 'emphasis brings no attributes',
+        given: 'あ‸',
+        steps: [
+          paste({ html: '<strong class="x" id="y" data-z="1">太字</strong>' }),
+        ],
+        expect: 'あ**太字**‸',
+      },
+      {
+        name: 'a link brings what markdown can hold',
+        given: '‸',
+        steps: [
+          paste({
+            html: '<a href="https://example.com" class="c" target="_self" rel="x" title="t">a</a>',
+          }),
+        ],
+        expect: '[a](https://example.com "t")‸',
+      },
+      {
+        name: 'an image brings what markdown can hold',
+        given: '‸',
+        steps: [
+          paste({
+            html: '<img src="https://example.com/a.png" alt="a" class="x" width="10">',
+          }),
+        ],
+        expect: '![a](https://example.com/a.png)',
+      },
+    ],
+  },
+  {
+    title: 'Pasting VFM as plain text',
+    cases: [
+      {
+        name: 'ruby, math and notes',
+        given: 'あ‸',
+        steps: [paste({ text: '{漢字|かんじ}と$x$と^[注]と[^1]' })],
+        expect: 'あ{漢字|かんじ}と$x$と^[注]と[^1]‸',
+      },
+      {
+        name: 'attributes',
+        given: 'あ‸',
+        steps: [paste({ text: '**太字**{.x}' })],
+        expect: 'あ**太字**{.x}‸',
+        fails:
+          'Attributes have no paste rule, so pasted text keeps the braces as text',
+      },
+    ],
+  },
+  {
+    title: 'Pasting VFM into a document whose definitions lack it',
+    cases: [
+      {
+        name: 'pasted HTML becomes what the document can hold',
+        given: 'あ‸',
+        steps: [
+          recordWithoutVfm,
+          paste({
+            html: `<p>${RUBY_HTML}<span class="math inline" data-math-typeset="true">\\(x\\)</span><span class="footnote">注</span><strong data-vfm-attributes="{&quot;class&quot;:&quot;x&quot;}">太字</strong></p>`,
+          }),
+        ],
+        expect: 'あ漢字$x$注**太字**‸',
+      },
+    ],
+  },
+  {
+    title: 'Copying raw markdown',
+    cases: [
+      {
+        name: 'raw markdown stays raw',
+        given: '‸<span>a</span>‸と',
+        steps: [copy(), select('<span>a</span>と‸'), paste()],
+        expect: '<span>a</span>と<span>a</span>‸',
       },
     ],
   },

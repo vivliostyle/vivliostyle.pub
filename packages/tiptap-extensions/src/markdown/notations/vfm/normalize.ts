@@ -1,4 +1,4 @@
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { Node as ProseMirrorNode, ResolvedPos } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
 
 import { changedNodes, isRemote } from '../../changes';
@@ -15,8 +15,8 @@ function contentHas(node: ProseMirrorNode, name: string): boolean {
 /**
  * Keeps nodes of a type in a state their markdown can hold, where the
  * transactions changed the document: the marks markdown cannot put on them
- * are taken off, and a node without content is removed when it has to have
- * some.
+ * are taken off, a node without content is removed when it has to have
+ * some, and one inside a node it cannot be in becomes its content.
  */
 export function inlineNodeRules(
   name: string,
@@ -24,11 +24,13 @@ export function inlineNodeRules(
     marks = [],
     unlessInContent = [],
     needsContent = false,
+    notInside = [],
   }: {
     marks?: readonly string[];
     /** Marks the node cannot have where its content has them too. */
     unlessInContent?: readonly string[];
     needsContent?: boolean;
+    notInside?: readonly string[];
   },
 ): Plugin {
   return new Plugin({
@@ -42,9 +44,18 @@ export function inlineNodeRules(
         transactions,
         (node) => node.type.name === name,
       );
-      for (const { pos, node } of found) {
+      for (const { pos: before } of found) {
+        const pos = tr.mapping.map(before);
+        const node = tr.doc.nodeAt(pos);
+        if (node?.type.name !== name) {
+          continue;
+        }
         if (needsContent && node.childCount === 0) {
           tr.delete(pos, pos + node.nodeSize);
+          continue;
+        }
+        if (isInside(tr.doc.resolve(pos), notInside)) {
+          tr.replaceWith(pos, pos + node.nodeSize, contentWithMarks(node));
           continue;
         }
         for (const mark of node.marks) {
@@ -60,4 +71,25 @@ export function inlineNodeRules(
       return tr.docChanged ? tr : null;
     },
   });
+}
+
+function isInside($pos: ResolvedPos, names: readonly string[]): boolean {
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    if (names.includes($pos.node(depth).type.name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function contentWithMarks(node: ProseMirrorNode): ProseMirrorNode[] {
+  const children: ProseMirrorNode[] = [];
+  node.forEach((child) => {
+    children.push(
+      child.mark(
+        node.marks.reduce((set, mark) => mark.addToSet(set), child.marks),
+      ),
+    );
+  });
+  return children;
 }

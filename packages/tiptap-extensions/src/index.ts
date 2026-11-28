@@ -1,7 +1,12 @@
-import { type Editor, Extension, mergeAttributes } from '@tiptap/core';
+import {
+  type Attributes,
+  type Editor,
+  Extension,
+  mergeAttributes,
+} from '@tiptap/core';
 import { Image } from '@tiptap/extension-image';
 import { Dropcursor, Gapcursor } from '@tiptap/extensions';
-import { join } from 'pathe';
+import { join, relative } from 'pathe';
 
 import { BlockFormatting } from './block-format';
 import { ChainSafeClearNodes } from './clear-nodes';
@@ -141,6 +146,28 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
     const image = Image.extend({
       addStorage() {
         return { basePath };
+      },
+      addAttributes() {
+        const parent: Attributes = this.parent?.() ?? {};
+        return {
+          ...parent,
+          // Markdown holds no size but in the attributes after the image.
+          width: { ...parent.width, parseHTML: () => null },
+          height: { ...parent.height, parseHTML: () => null },
+          src: {
+            ...parent.src,
+            // What the editor copies is rendered with the path it shows.
+            parseHTML: (element) => {
+              const src = element.getAttribute('src');
+              return src?.startsWith('/vivliostyle/')
+                ? relative(
+                    join('/vivliostyle', this.storage.basePath ?? ''),
+                    src,
+                  )
+                : src;
+            },
+          },
+        };
       },
       renderHTML({ HTMLAttributes }) {
         const { src, ...rest } = HTMLAttributes;

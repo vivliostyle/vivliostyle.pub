@@ -9,7 +9,7 @@ import { press, run } from '../../testing/steps';
 import type { CaseSuite } from '../../testing/vitest';
 
 const VFM = new Set(vfmNotations().map((it) => it.name));
-const recordWithoutVfm = run(
+export const recordWithoutVfm = run(
   'record the document as made without VFM',
   (editor: Editor) => {
     setDocumentNotations(

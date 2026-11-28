@@ -30,7 +30,8 @@ export const RawInline = Mark.create({
   inclusive: false,
 
   parseHTML() {
-    return [{ tag: 'code[data-raw-inline]' }];
+    // Before inline code, which the element is otherwise.
+    return [{ tag: 'code[data-raw-inline]', priority: 60 }];
   },
 
   renderHTML() {

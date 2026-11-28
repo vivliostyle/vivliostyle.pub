@@ -248,6 +248,9 @@ export const Ruby = Node.create({
           return base;
         },
       },
+      // Of a ruby that cannot be one, only the base is text.
+      { tag: 'rt', ignore: true },
+      { tag: 'rp', ignore: true },
     ];
   },
 
@@ -332,12 +335,13 @@ export const Ruby = Node.create({
   },
 
   // A ruby without a base has no markdown, so it goes with its last
-  // character, and code cannot hold a ruby.
+  // character, and code cannot hold a ruby. VFM reads no ruby in a ruby.
   addProseMirrorPlugins() {
     return [
       inlineNodeRules(this.name, {
         marks: ['code'],
         needsContent: true,
+        notInside: [this.name],
       }),
       new Plugin({ props: { transformPastedHTML: splitRubies } }),
       new Plugin({ props: { decorations: selectedRubies } }),
