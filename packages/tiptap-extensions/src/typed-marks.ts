@@ -66,17 +66,19 @@ export const TypedMarks = Extension.create({
           if (state.storedMarks && last && keepsDeletedMarks(last)) {
             return state.tr.setStoredMarks(null);
           }
-          const { selection } = state;
+          const typing = transactions.find(typesAtCaret);
           if (
             state.storedMarks ||
-            !(selection instanceof TextSelection) ||
-            !selection.$cursor ||
-            !transactions.some(typesAtCaret)
+            !typing ||
+            !(state.selection instanceof TextSelection) ||
+            !state.selection.$cursor
           ) {
             return null;
           }
-          const typed = selection.$cursor.nodeBefore?.marks;
-          return typed && !Mark.sameSet(typed, selection.$cursor.marks())
+          // As typed, before any plugin marked it, such as a link it makes.
+          const $typed = typing.doc.resolve(typing.selection.head);
+          const typed = $typed.nodeBefore?.marks;
+          return typed && !Mark.sameSet(typed, $typed.marks())
             ? state.tr.setStoredMarks(typed)
             : null;
         },

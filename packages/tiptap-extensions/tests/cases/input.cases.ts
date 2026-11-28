@@ -185,6 +185,59 @@ export const inputSuites: CaseSuite[] = [
     ],
   },
   {
+    title: 'typing a URL',
+    cases: [
+      {
+        name: 'becomes a link once markdown reads it as one',
+        given: 'a ‸ b',
+        steps: ['https://example.com'],
+        expect: 'a https://example.com b',
+        doc: 'doc(paragraph("a ", link("https://example.com"), " b"))',
+      },
+      {
+        name: 'its link takes in what is typed after it',
+        given: 'a ‸ b',
+        steps: ['https://example.com/path?q=1'],
+        expect: 'a https://example.com/path?q=1 b',
+        doc: 'doc(paragraph("a ", link("https://example.com/path?q=1"), " b"))',
+      },
+      {
+        name: 'punctuation typed after it stays out of its link',
+        given: 'a ‸ b',
+        steps: ['https://example.com.'],
+        expect: 'a https://example.com. b',
+        doc: 'doc(paragraph("a ", link("https://example.com"), ". b"))',
+      },
+      {
+        name: 'a www address becomes a link',
+        given: 'a ‸ b',
+        steps: ['www.example.com'],
+        expect: 'a www.example.com b',
+        doc: 'doc(paragraph("a ", link("www.example.com"), " b"))',
+      },
+      {
+        name: 'an email address becomes a link',
+        given: 'a ‸ b',
+        steps: ['user@example.com'],
+        expect: 'a user@example.com b',
+        doc: 'doc(paragraph("a ", link("user@example.com"), " b"))',
+      },
+      {
+        name: 'a domain that markdown does not link stays text',
+        given: 'a ‸ b',
+        steps: ['example.com'],
+        expect: 'a example.com‸ b',
+        doc: 'doc(paragraph("a example.com b"))',
+      },
+      {
+        name: 'in inline code stays text',
+        given: 'a `x‸y`',
+        steps: ['https://example.com'],
+        expect: 'a `xhttps://example.com‸y`',
+      },
+    ],
+  },
+  {
     title: 'lists',
     cases: [
       {

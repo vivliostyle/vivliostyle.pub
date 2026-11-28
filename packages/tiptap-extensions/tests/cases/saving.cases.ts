@@ -212,6 +212,12 @@ export const savingSuites: CaseSuite[] = [
         expect: '本文 https://exaZmple.com です',
       },
       {
+        name: 'typing into its domain keeps it one link',
+        given: '本文 https://example.com です‸',
+        steps: [select('https://example.co'), 'X'],
+        expect: '本文 https://example.coXm です',
+      },
+      {
         name: 'replacing part of it edits its link',
         given: '本文 https://example.com です‸',
         steps: [select('https', 'all'), 'http'],

@@ -16,6 +16,7 @@ import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 import { CodeBlockPrism, toInfoString } from '../../code-block-prism';
 import { PubListKeymap } from '../../list';
+import { parseMarkdown } from '../extension';
 import type { MdastNodeOf } from '../mdast';
 import {
   defineNotation,
@@ -26,7 +27,7 @@ import {
   type WriteContext,
 } from '../notation';
 import { itemPrefix, quotePrefix } from '../source';
-import { autolinkHrefs, linkUrlsPlugin } from './link-urls';
+import { autolinkHrefs, linkUrlsPlugin, typedUrlsPlugin } from './link-urls';
 
 function withMark(
   context: ParseContext,
@@ -644,11 +645,18 @@ export function isBareUrlLink({ node }: InlineRun): boolean {
   );
 }
 
+// Text is linked as markdown reads it, not as linkify finds links once
+// whitespace follows them.
 const PubLink = Link.extend({
   addProseMirrorPlugins() {
-    return [...(this.parent?.() ?? []), linkUrlsPlugin(this.type)];
+    const read = (markdown: string) => parseMarkdown(this.editor, markdown).doc;
+    return [
+      ...(this.parent?.() ?? []),
+      linkUrlsPlugin(this.type),
+      typedUrlsPlugin(this.type, read),
+    ];
   },
-});
+}).configure({ autolink: false });
 
 const linkNotation = defineNotation({
   name: 'link',
