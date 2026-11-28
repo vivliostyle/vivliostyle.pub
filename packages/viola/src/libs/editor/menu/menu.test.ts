@@ -396,29 +396,32 @@ const suites: CaseSuite[] = [
         expect: '$$x^2$$‸',
       },
       {
-        name: 'a note',
-        given: 'a ‸b',
-        steps: [...slash('note', 'insert.footnote', { text: 'n' })],
-        expect: 'a ^[n]‸b',
+        name: 'a link',
+        given: 'a‸',
+        steps: [
+          ' ',
+          ...slash('link', 'insert.link', {
+            href: 'https://example.com',
+            text: 'b',
+          }),
+        ],
+        expect: 'a [b](https://example.com)‸',
       },
       {
-        name: 'no note in a note',
-        given: 'a ^[n‸m] b',
+        name: 'no note',
+        given: 'a‸',
         steps: [
           type(' /note'),
-          run('see the note disabled', (editor) => {
-            if (command('insert.footnote').isEnabled?.(editor)) {
-              throw new Error('insert.footnote is enabled in a note');
+          run('see no note listed', (editor) => {
+            const listed = listedCommands(editor) ?? [];
+            for (const id of ['insert.footnote', 'insert.footnote-reference']) {
+              if (listed.includes(command(id))) {
+                throw new Error(`The menu lists ${id}`);
+              }
             }
           }),
         ],
-        expect: 'a ^[n /note‸m] b',
-      },
-      {
-        name: 'a reference with the next label',
-        given: 'a[^1] ‸b',
-        steps: [...slash('reference', 'insert.footnote-reference', {})],
-        expect: 'a[^1] [^2]‸b',
+        expect: 'a /note‸',
       },
       {
         name: 'a link',
