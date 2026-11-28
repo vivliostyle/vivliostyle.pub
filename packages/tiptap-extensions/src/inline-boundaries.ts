@@ -7,7 +7,10 @@ import {
   TextSelection,
   type Transaction,
 } from '@tiptap/pm/state';
+import { ReplaceAroundStep, ReplaceStep } from '@tiptap/pm/transform';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
+
+import { typesAtCaret } from './typed-marks';
 
 /** An inline node that holds text, such as a note written in the line. */
 export function hasInlineContent(node: ProseMirrorNode): boolean {
@@ -41,6 +44,28 @@ function boundariesIn(
     }
   });
   return found;
+}
+
+/**
+ * Where the caret at the position rests: out of each inline node with
+ * content whose inside edge it is at, since the caret looks the same right
+ * outside. Only an empty node keeps the caret, where its content is typed.
+ */
+export function restingPlace(doc: ProseMirrorNode, pos: number): number {
+  let $pos = doc.resolve(pos);
+  for (;;) {
+    const { parent } = $pos;
+    if (!hasInlineContent(parent) || parent.content.size === 0) {
+      return $pos.pos;
+    }
+    if ($pos.parentOffset === 0) {
+      $pos = doc.resolve($pos.before());
+    } else if ($pos.parentOffset === parent.content.size) {
+      $pos = doc.resolve($pos.after());
+    } else {
+      return $pos.pos;
+    }
+  }
 }
 
 /** The textblocks the transaction changed, in the document it ends with. */
@@ -99,6 +124,31 @@ function boundaryPlugin(): Plugin<DecorationSet> {
         return next;
       },
     },
+    // Typing goes on where it went, so that text typed into an empty node
+    // stays in it past the first character.
+    appendTransaction: (transactions, _, state) => {
+      const { selection } = state;
+      if (
+        !(selection instanceof TextSelection) ||
+        !selection.$cursor ||
+        transactions.some(typesAtCaret) ||
+        !transactions.some(
+          (tr) =>
+            tr.selectionSet ||
+            tr.steps.some(
+              (step) =>
+                step instanceof ReplaceStep ||
+                step instanceof ReplaceAroundStep,
+            ),
+        )
+      ) {
+        return null;
+      }
+      const pos = restingPlace(state.doc, selection.head);
+      return pos === selection.head
+        ? null
+        : state.tr.setSelection(TextSelection.create(state.doc, pos));
+    },
     props: {
       decorations: (state) => key.getState(state),
       handleKeyDown: (view, event) => {
@@ -144,8 +194,7 @@ function isHorizontalLtr(view: EditorView): boolean {
  * Where the caret goes when an arrow moves it over the edge of an inline
  * node with content, into it or out of it. It goes on past the character on
  * the other side as well: the caret looks the same on both sides of the
- * edge, so stopping there would look like no move. The edge on the other
- * side is where an arrow coming back the other way stops.
+ * edge, so stopping there would look like no move.
  */
 export function crossing(state: EditorState, forward: boolean): number | null {
   const { selection } = state;
@@ -157,21 +206,34 @@ export function crossing(state: EditorState, forward: boolean): number | null {
   const atEdge = forward
     ? $cursor.parentOffset === parent.content.size
     : $cursor.parentOffset === 0;
+  const next = forward ? $cursor.nodeAfter : $cursor.nodeBefore;
+  let target: number;
   if (atEdge && hasInlineContent(parent)) {
-    return stepPast(
+    target = stepPast(
       state.doc,
       forward ? $cursor.after() : $cursor.before(),
       forward,
     );
+  } else if (next && hasInlineContent(next)) {
+    target = stepPast(state.doc, $cursor.pos + (forward ? 1 : -1), forward);
+  } else if (next && hasInlineContent(parent)) {
+    const step = $cursor.pos + (forward ? 1 : -1) * stepSize(next, forward);
+    target = restingPlace(state.doc, step);
+    return target === step ? null : target;
+  } else {
+    return null;
   }
-  const next = forward ? $cursor.nodeAfter : $cursor.nodeBefore;
-  if (next && hasInlineContent(next)) {
-    return stepPast(state.doc, $cursor.pos + (forward ? 1 : -1), forward);
-  }
-  return null;
+  return restingPlace(state.doc, target);
 }
 
-// Past a line break the caret would be on the next line.
+function stepSize(node: ProseMirrorNode, forward: boolean): number {
+  if (!node.isText) {
+    return node.nodeSize;
+  }
+  const segments = graphemes(node.text ?? '');
+  return ((forward ? segments.at(0) : segments.at(-1)) ?? '').length;
+}
+
 function stepPast(
   doc: ProseMirrorNode,
   edge: number,
@@ -179,19 +241,13 @@ function stepPast(
 ): number {
   const $edge = doc.resolve(edge);
   const first = forward ? $edge.nodeAfter : $edge.nodeBefore;
-  if (
-    !first ||
-    hasInlineContent(first) ||
-    first.type === doc.type.schema.linebreakReplacement
-  ) {
+  if (!first) {
     return edge;
   }
-  if (first.isText) {
-    const segments = graphemes(first.text ?? '');
-    const segment = (forward ? segments.at(0) : segments.at(-1)) ?? '';
-    return edge + (forward ? segment.length : -segment.length);
+  if (hasInlineContent(first)) {
+    return stepPast(doc, edge + (forward ? 1 : -1), forward);
   }
-  return edge + (forward ? first.nodeSize : -first.nodeSize);
+  return edge + (forward ? 1 : -1) * stepSize(first, forward);
 }
 
 /**
@@ -268,9 +324,9 @@ function graphemes(text: string): string[] {
 }
 
 /**
- * Keeps the caret right after an inline node with content out of it, lets
- * one press of an arrow move it into or out of the node, and lets Backspace
- * and Delete from outside take off one character of it.
+ * Keeps the caret at the edges of an inline node with content out of it,
+ * lets one press of an arrow move it into or out of the node, and lets
+ * Backspace and Delete from outside take off one character of it.
  */
 export const InlineBoundaries = Extension.create({
   name: 'inlineBoundaries',

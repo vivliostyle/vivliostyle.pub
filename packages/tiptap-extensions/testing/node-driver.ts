@@ -154,10 +154,11 @@ export function createNodeDriver(
       return;
     }
     const { doc, tr } = editor.state;
-    // The view reads the deletion from the DOM and keeps what was deleted
-    // marked as it was for the text typed next.
+    // The view reads the deletion and the caret from the DOM, and keeps what
+    // was deleted marked as it was for the text typed next.
     const marks = doc.resolve(range.from).marksAcross(doc.resolve(range.to));
     tr.delete(range.from, range.to);
+    tr.setSelection(TextSelection.create(tr.doc, range.from));
     if (marks) {
       tr.ensureMarks(marks);
     }

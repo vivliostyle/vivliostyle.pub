@@ -3,7 +3,7 @@ import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { type EditorState, NodeSelection } from '@tiptap/pm/state';
 
 import {
-  findSelectedInline,
+  findInlineAtCaret,
   hasDocumentNotation,
   type InlineAttributes,
   isAttributeName,
@@ -23,9 +23,9 @@ export function selectedNodeOf(
     : null;
 }
 
-/** The ruby the selection is in, or that it is. */
+/** The ruby the selection is in, that it is, or that is next to the caret. */
 export function selectedRuby(state: EditorState): ProseMirrorNode | null {
-  return findSelectedInline(state, 'ruby')?.node ?? null;
+  return findInlineAtCaret(state, 'ruby')?.node ?? null;
 }
 
 /**

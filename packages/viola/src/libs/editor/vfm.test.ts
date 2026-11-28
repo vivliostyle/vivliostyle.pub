@@ -76,6 +76,12 @@ describe('selected VFM nodes', () => {
     expect(selectedRuby(editor.state)?.attrs.rubyText).toBe('かんじ');
   });
 
+  it('finds a ruby of one character right before the caret', () => {
+    const editor = load('a{漢|かん}b');
+    selectText(editor, 'b', 0);
+    expect(selectedRuby(editor.state)?.attrs.rubyText).toBe('かん');
+  });
+
   it('finds selected math', () => {
     const editor = load('a $x$ b');
     editor.view.dispatch(

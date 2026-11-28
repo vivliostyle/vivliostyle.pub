@@ -147,9 +147,21 @@ export const vfmSuites: CaseSuite[] = [
       },
       {
         name: 'editing the base',
-        given: '{漢‸|かんじ}',
-        steps: ['字'],
-        expect: '{漢字‸|かんじ}',
+        given: '{漢‸字|かんじ}',
+        steps: ['の'],
+        expect: '{漢の‸字|かんじ}',
+      },
+      {
+        name: 'a caret put at the end of the base rests after the ruby',
+        given: 'a{漢字‸|かんじ}b',
+        steps: ['X'],
+        expect: 'a{漢字|かんじ}X‸b',
+      },
+      {
+        name: 'a caret put at the start of the base rests before the ruby',
+        given: 'a{‸漢字|かんじ}b',
+        steps: ['X'],
+        expect: 'aX‸{漢字|かんじ}b',
       },
       {
         name: 'one press of the right arrow steps into the base',
@@ -162,6 +174,24 @@ export const vfmSuites: CaseSuite[] = [
         given: 'a{漢字|かんじ}‸b',
         steps: [press('ArrowLeft'), 'X'],
         expect: 'a{漢X‸字|かんじ}b',
+      },
+      {
+        name: 'one press of the right arrow from the last character of the base steps out of the ruby',
+        given: 'a{漢‸字|かんじ}b',
+        steps: [press('ArrowRight'), 'X'],
+        expect: 'a{漢字|かんじ}X‸b',
+      },
+      {
+        name: 'one press of the left arrow from the first character of the base steps out of the ruby',
+        given: 'a{漢‸字|かんじ}b',
+        steps: [press('ArrowLeft'), 'X'],
+        expect: 'aX‸{漢字|かんじ}b',
+      },
+      {
+        name: 'one press of the right arrow steps over a ruby of one character',
+        given: 'a‸{漢|かん}b',
+        steps: [press('ArrowRight'), 'X'],
+        expect: 'a{漢|かん}X‸b',
       },
       {
         name: 'Backspace right after a ruby takes off the last character of its base',
@@ -221,6 +251,16 @@ export const vfmSuites: CaseSuite[] = [
           }),
         ],
         expect: '{漢字|カンジ}',
+      },
+      {
+        name: 'changing the ruby text right after the ruby',
+        given: '{漢|かん}‸',
+        steps: [
+          run('set the ruby text', (editor) => {
+            editor.commands.setRuby('カン');
+          }),
+        ],
+        expect: '{漢|カン}‸',
       },
       {
         name: 'making a ruby of the selection',
@@ -676,21 +716,57 @@ export const vfmSuites: CaseSuite[] = [
       },
       {
         name: 'editing a note',
-        given: 'x^[a‸] y',
+        given: 'x^[a‸c] y',
         steps: ['b'],
+        expect: 'x^[ab‸c] y',
+      },
+      {
+        name: 'text typed into an empty note stays in it',
+        given: 'x^[‸] y',
+        steps: ['ab'],
         expect: 'x^[ab‸] y',
       },
       {
-        name: 'one press of the right arrow steps out of a note',
-        given: 'x^[a‸] y',
-        steps: [press('ArrowRight'), 'b'],
-        expect: 'x^[a] b‸y',
+        name: 'a caret put at the end of a note rests after it',
+        given: '本文^[注の*内容*‸]が続く。',
+        steps: ['X'],
+        expect: '本文^[注の*内容*]X‸が続く。',
       },
       {
-        name: 'one press of the left arrow steps out of a note',
-        given: 'x^[‸a] y',
-        steps: [press('ArrowLeft'), 'b'],
-        expect: 'b‸x^[a] y',
+        name: 'a caret put at the start of a note rests before it',
+        given: '本文^[‸注の*内容*]が続く。',
+        steps: ['X'],
+        expect: '本文X‸^[注の*内容*]が続く。',
+      },
+      {
+        name: 'one press of the right arrow from the last character of a note steps out of it',
+        given: '本文^[注の*内‸容*]が続く。',
+        steps: [press('ArrowRight'), 'X'],
+        expect: '本文^[注の*内容*]X‸が続く。',
+      },
+      {
+        name: 'one press of the left arrow from the first character of a note steps out of it',
+        given: '本文^[注‸の*内容*]が続く。',
+        steps: [press('ArrowLeft'), 'X'],
+        expect: '本文X‸^[注の*内容*]が続く。',
+      },
+      {
+        name: 'one press of the left arrow steps into a note past its last character',
+        given: '本文^[注の*内容*]‸が続く。',
+        steps: [press('ArrowLeft'), 'X'],
+        expect: '本文^[注の*内X‸容*]が続く。',
+      },
+      {
+        name: 'Delete of the last character of a note leaves the caret after it',
+        given: 'x^[ab‸c] y',
+        steps: [press('Delete'), 'd'],
+        expect: 'x^[ab]d‸ y',
+      },
+      {
+        name: 'Backspace of the first character of a note leaves the caret before it',
+        given: 'x^[a‸bc] y',
+        steps: [press('Backspace'), 'd'],
+        expect: 'xd‸^[bc] y',
       },
       {
         name: 'Backspace right after a note takes off its last character',
@@ -742,8 +818,8 @@ export const vfmSuites: CaseSuite[] = [
       },
       {
         name: 'line breaks at the end of a note',
-        given: '本文^[注‸]です。',
-        steps: [press('Shift-Enter'), press('Shift-Enter')],
+        given: '本文^[注‸X]です。',
+        steps: [press('Shift-Enter'), press('Shift-Enter'), press('Delete')],
         expect: '本文^[注  \n\\\n]です。',
         doc: 'doc(paragraph("本文", inlineFootnote("注", hardBreak, hardBreak), "です。"))',
       },
@@ -754,9 +830,9 @@ export const vfmSuites: CaseSuite[] = [
       },
       {
         name: 'a bracket typed into a note is escaped',
-        given: 'x^[a‸] y',
+        given: 'x^[a‸b] y',
         steps: [']'],
-        expect: 'x^[a\\]‸] y',
+        expect: 'x^[a\\]‸b] y',
       },
       {
         name: 'a parenthesis typed after a reference is escaped',

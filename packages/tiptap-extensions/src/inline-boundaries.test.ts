@@ -91,49 +91,59 @@ describe('arrows over the edges of a note', () => {
       forward,
     );
 
-  it('step into and out of it past the character beyond the edge', () => {
+  it('step over a note of one character as over the character', () => {
     const state = stateOf('a^[注]b');
-    // a|^[注]b  ->  a^[注|]b  ->  a^[注]b|
-    expect(move(state, 2, true)).toBe(4);
-    expect(move(state, 4, true)).toBe(6);
-    // a^[注]|b  ->  a^[|注]b  ->  |a^[注]b
-    expect(move(state, 5, false)).toBe(3);
-    expect(move(state, 3, false)).toBe(1);
+    // a|^[注]b  ->  a^[注]|b
+    expect(move(state, 2, true)).toBe(5);
+    expect(move(state, 5, false)).toBe(2);
   });
 
   it('step into and out of a ruby with one keypress each', () => {
     const state = stateOf('a{漢字|かんじ}b');
     // doc(paragraph("a", ruby("漢字"), "b"))
     expect(move(state, at(state, 'a', 1), true)).toBe(at(state, '字'));
-    expect(move(state, at(state, '字', 1), true)).toBe(at(state, 'b', 1));
+    expect(move(state, at(state, '字'), true)).toBe(at(state, 'b'));
     expect(move(state, at(state, 'b'), false)).toBe(at(state, '字'));
-    expect(move(state, at(state, '漢'), false)).toBe(at(state, 'a'));
+    expect(move(state, at(state, '字'), false)).toBe(at(state, 'a', 1));
   });
 
   it('step over a whole character', () => {
     const state = stateOf('𠮷{𠮷野家|よしのや}𠮷');
     // doc(paragraph("𠮷", ruby("𠮷野家"), "𠮷"))
     expect(move(state, 3, true)).toBe(6);
-    expect(move(state, 8, true)).toBe(11);
     expect(move(state, 9, false)).toBe(7);
-    expect(move(state, 4, false)).toBe(1);
+    expect(move(state, 6, false)).toBe(3);
   });
 
   it('step over math', () => {
     const state = stateOf('a^[$x$]b');
     // doc(paragraph("a", inlineFootnote(math), "b"))
-    expect(move(state, 2, true)).toBe(4);
-    expect(move(state, 5, false)).toBe(3);
+    expect(move(state, 2, true)).toBe(5);
+    expect(move(state, 5, false)).toBe(2);
   });
 
-  it('stop at the edge with no character beyond it', () => {
-    expect(move(stateOf('^[注]'), 3, true)).toBe(4);
-    expect(move(stateOf('^[注]'), 2, false)).toBe(1);
-    // The caret would go onto the next line.
-    expect(move(stateOf('a^[注]\\\nb'), 4, true)).toBe(5);
-    expect(move(stateOf('a^[\\\n注]b'), 2, true)).toBe(3);
+  it('step over a line break at the edge', () => {
+    // a^[|\\\n注]b  is where the caret cannot rest.
+    expect(move(stateOf('a^[\\\n注]b'), 2, true)).toBe(4);
+    expect(move(stateOf('a^[注\\\n]b'), 4, true)).toBe(6);
+  });
+
+  it('step into a node at the edge of a node', () => {
+    // a|^[{漢字|かんじ}]  ->  a^[{漢|字|かんじ}]
+    expect(move(stateOf('a^[{漢字|かんじ}]'), 2, true)).toBe(5);
+  });
+
+  it('stop outside the node with no character beyond it', () => {
+    expect(move(stateOf('^[注]'), 1, true)).toBe(4);
+    expect(move(stateOf('^[注]'), 4, false)).toBe(1);
+    expect(move(stateOf('a^[注]\\\nb'), 2, true)).toBe(5);
     // a^[注]|{漢|かん}
-    expect(move(stateOf('a^[注]{漢|かん}'), 4, true)).toBe(5);
+    expect(move(stateOf('a^[注]{漢|かん}'), 2, true)).toBe(5);
+  });
+
+  it('step out of an empty note past the character beyond it', () => {
+    // a^[|]b  ->  a^[]b|
+    expect(move(stateOf('a^[]b'), 3, true)).toBe(5);
   });
 
   it('leave text alone', () => {
@@ -145,7 +155,7 @@ describe('arrows over the edges of a note', () => {
   it('move the caret when an arrow is pressed', () => {
     let state = stateOf('a^[注]b');
     state = state.apply(
-      state.tr.setSelection(TextSelection.create(state.doc, 4)),
+      state.tr.setSelection(TextSelection.create(state.doc, 2)),
     );
     const view = {
       get state() {
@@ -163,7 +173,7 @@ describe('arrows over the edges of a note', () => {
       } as KeyboardEvent);
     expect(press('ArrowRight', true)).toBe(false);
     expect(press('ArrowRight')).toBe(true);
-    expect(state.selection.from).toBe(6);
+    expect(state.selection.from).toBe(5);
     expect(press('ArrowRight')).toBe(false);
   });
 });

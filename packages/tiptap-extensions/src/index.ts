@@ -61,6 +61,7 @@ export {
 } from './markdown/notations/vfm/attributes';
 export {
   type FoundNode,
+  findInlineAtCaret,
   findSelectedInline,
 } from './markdown/notations/vfm/commands';
 export { isWritableFootnoteLabel } from './markdown/notations/vfm/footnotes';

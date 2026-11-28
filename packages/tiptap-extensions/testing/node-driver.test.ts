@@ -81,9 +81,9 @@ describe('createNodeDriver', () => {
   it('presses a key that moves the caret when a handler takes it', async () => {
     expect(
       await outcome({
-        given: 'a‸^[b]',
+        given: 'a‸^[bd]',
         steps: [press('ArrowRight'), 'c'],
-        expect: 'a^[bc‸]',
+        expect: 'a^[bc‸d]',
       }),
     ).toEqual([]);
   });

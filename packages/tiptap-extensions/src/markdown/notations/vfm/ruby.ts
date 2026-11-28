@@ -24,7 +24,7 @@ import {
 import { defineNotation } from '../../notation';
 import { takesAttributes } from './attributes';
 import {
-  findSelectedInline,
+  findInlineAtCaret,
   insertInline,
   unwrap,
   wrapSelection,
@@ -273,7 +273,7 @@ export const Ruby = Node.create({
           if (!isWritableRubyText(rubyText)) {
             return false;
           }
-          const found = findSelectedInline(state, this.name);
+          const found = findInlineAtCaret(state, this.name);
           if (found) {
             dispatch?.(
               tr.setNodeMarkup(found.pos, undefined, {
@@ -313,7 +313,7 @@ export const Ruby = Node.create({
           if (!hasDocumentNotation(editor, this.name)) {
             return false;
           }
-          const found = findSelectedInline(state, this.name);
+          const found = findInlineAtCaret(state, this.name);
           if (!found) {
             return false;
           }

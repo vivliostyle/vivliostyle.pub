@@ -6,6 +6,7 @@ import {
   type Transaction,
 } from '@tiptap/pm/state';
 
+import { hasInlineContent } from '../../../inline-boundaries';
 import { sharedMarks, withoutMarks } from './input-rules';
 
 export interface FoundNode {
@@ -32,6 +33,32 @@ export function findSelectedInline(
       const pos = $from.before(depth);
       return $to.pos <= pos + node.nodeSize - 1 ? { pos, node } : null;
     }
+  }
+  return null;
+}
+
+/**
+ * As findSelectedInline, or the node right before or after the caret. The
+ * caret does not rest at the edges inside a node with content, so a node of
+ * one character never holds it.
+ */
+export function findInlineAtCaret(
+  state: EditorState,
+  name: string,
+): FoundNode | null {
+  const found = findSelectedInline(state, name);
+  const { selection } = state;
+  if (found || !(selection instanceof TextSelection) || !selection.$cursor) {
+    return found;
+  }
+  const { $cursor } = selection;
+  const before = $cursor.nodeBefore;
+  if (before?.type.name === name && hasInlineContent(before)) {
+    return { pos: $cursor.pos - before.nodeSize, node: before };
+  }
+  const after = $cursor.nodeAfter;
+  if (after?.type.name === name && hasInlineContent(after)) {
+    return { pos: $cursor.pos, node: after };
   }
   return null;
 }
