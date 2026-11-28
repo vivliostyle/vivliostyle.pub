@@ -220,7 +220,7 @@ export function CodeBlockPanel({ editor, close }: EditorMenuPanelProps) {
             id={listboxId}
             role="listbox"
             aria-label={m.code_block_panel_suggestions_aria()}
-            className="z-10 max-h-48 min-w-40 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            className="z-10 max-h-48 min-w-40 overflow-y-auto overscroll-none rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
             // Keeps focus, and so the caret, in the field while picking.
             onMouseDown={(event) => event.preventDefault()}
           >

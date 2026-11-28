@@ -249,7 +249,7 @@ export function TriggerMenu() {
           role="listbox"
           aria-label={m.trigger_menu_listbox_aria()}
           tabIndex={-1}
-          className="z-50 min-w-48 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          className="z-50 min-w-48 overflow-y-auto overscroll-none rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           // Keeps focus (and the IME) in the editor while clicking options.
           onMouseDown={(event) => event.preventDefault()}
         >
