@@ -583,6 +583,24 @@ describe('saving what an edit can leave in a paragraph', () => {
     );
     expect(savesAsDocument(editor)).toBe('text[\n](u)**[Se](u)te**\n');
   });
+
+  it.each([
+    ['a\\@b', '[x](a\\\\@b)'],
+    ['a\\b', '[x](a\\b)'],
+    ['?a&amp;b', '[x](?a\\&amp;b)'],
+    ['?a&b', '[x](?a&b)'],
+    ['a b\\(', '[x](<a b\\\\(>)'],
+  ])('writes the link destination %j as it reads back', (href, expected) => {
+    const editor = load('text\n');
+    const { schema } = editor.state;
+    editor.view.dispatch(
+      editor.state.tr.insert(
+        5,
+        schema.text('x', [schema.marks.link.create({ href })]),
+      ),
+    );
+    expect(savesAsDocument(editor)).toBe(`text${expected}\n`);
+  });
 });
 
 describe('what the document records', () => {

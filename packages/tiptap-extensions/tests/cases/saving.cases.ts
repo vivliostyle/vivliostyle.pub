@@ -28,6 +28,26 @@ function insertAfter(needle: string, text: string): Step {
   });
 }
 
+// A caret mark in or right after a bare URL would be read as part of it.
+function select(needle: string, caret: 'after' | 'all' = 'after'): Step {
+  return run(`select ${caret === 'all' ? '' : 'after '}${needle}`, (editor) => {
+    let from: number | undefined;
+    editor.state.doc.descendants((node, pos) => {
+      const index = node.isText ? (node.text ?? '').indexOf(needle) : -1;
+      if (from === undefined && index !== -1) {
+        from = pos + index;
+      }
+    });
+    if (from === undefined) {
+      throw new Error(`No text holds ${needle}`);
+    }
+    const to = from + needle.length;
+    editor.commands.setTextSelection(
+      caret === 'all' ? { from, to } : { from: to, to },
+    );
+  });
+}
+
 function appendParagraphs(text: string, count: number): Step {
   return run(`append ${count} paragraphs`, (editor: Editor) => {
     const { schema } = editor.state;
@@ -173,6 +193,59 @@ export const savingSuites: CaseSuite[] = [
         given: '[https://example.com](https://example.com)‸',
         steps: [' a'],
         expect: '[https://example.com](https://example.com) a‸',
+      },
+    ],
+  },
+  {
+    title: 'editing a bare URL',
+    cases: [
+      {
+        name: 'deleting a character of it edits its link',
+        given: '本文 https://example.com です‸',
+        steps: [select('https://example.com'), press('Backspace')],
+        expect: '本文 https://example.co です',
+      },
+      {
+        name: 'typing into it edits its link',
+        given: '本文 https://example.com です‸',
+        steps: [select('https://exa'), 'Z'],
+        expect: '本文 https://exaZmple.com です',
+      },
+      {
+        name: 'replacing part of it edits its link',
+        given: '本文 https://example.com です‸',
+        steps: [select('https', 'all'), 'http'],
+        expect: '本文 http://example.com です',
+      },
+      {
+        name: 'deleting a character of a www address edits its link',
+        given: '本文 www.example.com です‸',
+        steps: [select('www.example.com'), press('Backspace')],
+        expect: '本文 www.example.co です',
+      },
+      {
+        name: 'deleting a character of an email address edits its link',
+        given: '本文 a@example.com です‸',
+        steps: [select('a@example.com'), press('Backspace')],
+        expect: '本文 a@example.co です',
+      },
+      {
+        name: 'editing it into text that is no URL takes off its link',
+        given: '本文 https://example.com です‸',
+        steps: [select('https://', 'all'), press('Backspace')],
+        expect: '本文 example.com です',
+      },
+      {
+        name: 'a link to its own URL in brackets is edited the same',
+        given: '[https://example.com](https://example.com)x‸',
+        steps: [select('https://example.com'), press('Backspace')],
+        expect: '[https://example.co](https://example.co)x',
+      },
+      {
+        name: 'a link with other text keeps its URL',
+        given: '[本文](https://example.com)‸',
+        steps: [select('本文'), press('Backspace')],
+        expect: '[本](https://example.com)',
       },
     ],
   },

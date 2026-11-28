@@ -26,6 +26,7 @@ import {
   type WriteContext,
 } from '../notation';
 import { itemPrefix, quotePrefix } from '../source';
+import { autolinkHrefs, linkUrlsPlugin } from './link-urls';
 
 function withMark(
   context: ParseContext,
@@ -45,7 +46,11 @@ function delimiter(context: WriteContext, key: string, safe: string) {
 }
 
 /** A link destination, in angle brackets when it could not be read bare. */
-export function linkDestination(url: string): string {
+export function linkDestination(href: string): string {
+  // A destination reads backslash escapes and character references.
+  const url = href
+    .replace(/\\(?=[!-/:-@[-`{-~])/g, '\\\\')
+    .replace(/&(?=#?[A-Za-z0-9]+;)/g, '\\&');
   let depth = 0;
   let balanced = true;
   for (const char of url) {
@@ -632,21 +637,22 @@ export function isBareUrlLink({ node }: InlineRun): boolean {
     return false;
   }
   const [mark] = node.marks;
-  const text = node.text ?? '';
-  const href = mark.attrs.href;
-  if (mark.type.name !== 'link' || mark.attrs.title || /\s/.test(text)) {
-    return false;
-  }
   return (
-    (href === text && /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) ||
-    (href === `http://${text}` && /^www\./i.test(text)) ||
-    (href === `mailto:${text}` && /^[^@]+@[^@]+$/.test(text))
+    mark.type.name === 'link' &&
+    !mark.attrs.title &&
+    autolinkHrefs(node.text ?? '').includes(mark.attrs.href)
   );
 }
 
+const PubLink = Link.extend({
+  addProseMirrorPlugins() {
+    return [...(this.parent?.() ?? []), linkUrlsPlugin(this.type)];
+  },
+});
+
 const linkNotation = defineNotation({
   name: 'link',
-  extensions: [Link],
+  extensions: [PubLink],
   fromMarkdown: {
     link: (node, context) => {
       const marks = withMark(
