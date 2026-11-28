@@ -44,6 +44,16 @@
     text-decoration: underline wavy var(--destructive);
   }
 
+  /* Ruby text is edited in its panel, and the caret cannot go into it. */
+  & ruby > rt {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  &.ProseMirror-focused ruby[data-selected] > rt {
+    background-color: Highlight;
+    color: HighlightText;
+  }
+
   /* A note is edited where it is written, which a theme's footnote rules do
      not set apart on screen. */
   & span.footnote {

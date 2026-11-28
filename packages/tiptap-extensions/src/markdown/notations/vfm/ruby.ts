@@ -1,6 +1,7 @@
 import { Node } from '@tiptap/core';
 import { Fragment, type Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { Plugin } from '@tiptap/pm/state';
+import { type EditorState, Plugin } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Extension as FromMarkdownExtension } from 'mdast-util-from-markdown';
 import { codes } from 'micromark-util-symbol';
 import type {
@@ -339,9 +340,35 @@ export const Ruby = Node.create({
         needsContent: true,
       }),
       new Plugin({ props: { transformPastedHTML: splitRubies } }),
+      new Plugin({ props: { decorations: selectedRubies } }),
     ];
   },
 });
+
+/**
+ * Marks with `data-selected` every ruby whose whole base the selection
+ * covers. The ruby text cannot hold the browser's selection, so this is
+ * what shows it selected along with its base, as math is.
+ */
+export function selectedRubies(state: EditorState): DecorationSet {
+  const { from, to, empty } = state.selection;
+  if (empty) {
+    return DecorationSet.empty;
+  }
+  const found: Decoration[] = [];
+  state.doc.nodesBetween(from, to, (node, pos) => {
+    if (
+      node.type.name === 'ruby' &&
+      from <= pos + 1 &&
+      to >= pos + node.nodeSize - 1
+    ) {
+      found.push(
+        Decoration.node(pos, pos + node.nodeSize, { 'data-selected': '' }),
+      );
+    }
+  });
+  return DecorationSet.create(state.doc, found);
+}
 
 const rubyRules = (enabled: () => boolean) =>
   inlineSourceRules({
