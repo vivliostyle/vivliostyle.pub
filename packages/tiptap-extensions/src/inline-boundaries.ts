@@ -142,9 +142,10 @@ function isHorizontalLtr(view: EditorView): boolean {
 
 /**
  * Where the caret goes when an arrow moves it over the edge of an inline
- * node with content. Out of the node it goes one position. Into it, it goes
- * on past the first character as well: the caret looks the same on both
- * sides of the edge, so stopping there would look like no move.
+ * node with content, into it or out of it. It goes on past the character on
+ * the other side as well: the caret looks the same on both sides of the
+ * edge, so stopping there would look like no move. The edge on the other
+ * side is where an arrow coming back the other way stops.
  */
 export function crossing(state: EditorState, forward: boolean): number | null {
   const { selection } = state;
@@ -157,23 +158,32 @@ export function crossing(state: EditorState, forward: boolean): number | null {
     ? $cursor.parentOffset === parent.content.size
     : $cursor.parentOffset === 0;
   if (atEdge && hasInlineContent(parent)) {
-    return forward ? $cursor.after() : $cursor.before();
+    return stepPast(
+      state.doc,
+      forward ? $cursor.after() : $cursor.before(),
+      forward,
+    );
   }
   const next = forward ? $cursor.nodeAfter : $cursor.nodeBefore;
   if (next && hasInlineContent(next)) {
-    return stepInside(state.doc, $cursor.pos + (forward ? 1 : -1), forward);
+    return stepPast(state.doc, $cursor.pos + (forward ? 1 : -1), forward);
   }
   return null;
 }
 
-function stepInside(
+// Past a line break the caret would be on the next line.
+function stepPast(
   doc: ProseMirrorNode,
   edge: number,
   forward: boolean,
 ): number {
   const $edge = doc.resolve(edge);
   const first = forward ? $edge.nodeAfter : $edge.nodeBefore;
-  if (!first || hasInlineContent(first)) {
+  if (
+    !first ||
+    hasInlineContent(first) ||
+    first.type === doc.type.schema.linebreakReplacement
+  ) {
     return edge;
   }
   if (first.isText) {
@@ -191,7 +201,7 @@ function graphemes(text: string): string[] {
 
 /**
  * Keeps the caret right after an inline node with content out of it, and
- * lets the arrows move it into and out of the node one keypress at a time.
+ * lets one press of an arrow move it into or out of the node.
  */
 export const InlineBoundaries = Extension.create({
   name: 'inlineBoundaries',

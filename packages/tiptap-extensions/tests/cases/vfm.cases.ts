@@ -655,6 +655,20 @@ export const vfmSuites: CaseSuite[] = [
         expect: 'x^[ab‸] y',
       },
       {
+        name: 'one press of the right arrow steps out of a note',
+        given: 'x^[a‸] y',
+        steps: [press('ArrowRight'), 'b'],
+        expect: 'x^[a] b‸y',
+        only: 'browser',
+      },
+      {
+        name: 'one press of the left arrow steps out of a note',
+        given: 'x^[‸a] y',
+        steps: [press('ArrowLeft'), 'b'],
+        expect: 'b‸x^[a] y',
+        only: 'browser',
+      },
+      {
         name: 'line breaks at the end of a note',
         given: '本文^[注‸]です。',
         steps: [press('Shift-Enter'), press('Shift-Enter')],
