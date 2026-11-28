@@ -68,6 +68,11 @@ const ATTRIBUTABLE = new Set([
   'footnoteReference',
 ]);
 
+/** Whether VFM would read `{…}` right after the element as its attributes. */
+export function isAttributableMdast(node: UnknownMdastNode): boolean {
+  return ATTRIBUTABLE.has(node.type);
+}
+
 type ScanResult = 'continue' | 'close' | 'fail';
 
 interface Item {
@@ -464,7 +469,6 @@ const ATTRIBUTED_TYPES = [
 /**
  * Whether `{` written right after `before`, the markdown before an inline
  * node, would be read as the attributes of what `adjacent` says ends there.
- * `{}` then gives that element no attributes and keeps the braces apart.
  */
 export function takesAttributes(
   before: string | undefined,

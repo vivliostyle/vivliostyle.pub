@@ -294,6 +294,63 @@ export const vfmSuites: CaseSuite[] = [
   {
     title: 'VFM math',
     cases: [
+      {
+        name: 'an empty comment between math is no content',
+        given: '$x$<!---->$y$ と $$a$$<!---->$$b$$',
+        doc: 'doc(paragraph(math, math, " と ", math, math))',
+      },
+      {
+        name: 'a comment with text between math stays raw',
+        given: '$x$<!-- c -->$y$',
+        doc: 'doc(paragraph(math, rawInline("<!-- c -->"), math))',
+      },
+      {
+        name: 'an empty comment next to other content stays raw',
+        given: 'a<!---->$y$ $x$<!---->a',
+        doc: 'doc(paragraph("a", rawInline("<!---->"), math, " ", math, rawInline("<!---->"), "a"))',
+      },
+      {
+        // VFM would read the `$` of both as one.
+        name: 'math right after math is written after an empty comment',
+        given: '$x$a‸$y$',
+        steps: [press('Backspace')],
+        expect: '$x$<!---->$y$',
+        doc: 'doc(paragraph(math, math))',
+      },
+      {
+        name: 'display math right after inline math is written after an empty comment',
+        given: '$x$a‸$$y$$',
+        steps: [press('Backspace')],
+        expect: '$x$<!---->$$y$$',
+      },
+      {
+        name: 'inline math right after display math is written after an empty comment',
+        given: '$$x$$a‸$y$',
+        steps: [press('Backspace')],
+        expect: '$$x$$<!---->$y$',
+      },
+      {
+        name: 'math inserted right after math is written after an empty comment',
+        given: '$x$‸',
+        steps: [
+          run('insert math', (editor) => {
+            editor.commands.setMath({ latex: 'y', display: false });
+          }),
+        ],
+        expect: '$x$<!---->$y$',
+      },
+      {
+        name: 'the comment goes when the math before it does',
+        given: 'a‸$x$<!---->$y$',
+        steps: [press('Delete')],
+        expect: 'a‸$y$',
+      },
+      {
+        name: 'the comment stays when the text next to it is edited',
+        given: '$x$<!---->$y$ a‸',
+        steps: ['b'],
+        expect: '$x$<!---->$y$ ab‸',
+      },
       { name: 'inline math', given: '$x^2$ と' },
       { name: 'display math', given: '$$\ny=1\n$$' },
       {
@@ -703,6 +760,21 @@ export const vfmSuites: CaseSuite[] = [
         doc: 'doc(paragraph("a", footnoteReference, "{漢字|かんじ}"))',
       },
       {
+        name: 'an empty comment between an element and a ruby is no content',
+        given: '[リンク](u)<!---->{漢字|かんじ} **a**<!---->{仮名|かな}',
+        doc: 'doc(paragraph(link("リンク"), ruby("漢字"), " ", bold("a"), ruby("仮名")))',
+      },
+      {
+        name: 'empty attributes between an element and a ruby still keep them apart',
+        given: '[リンク](u){}{漢字|かんじ}',
+        doc: 'doc(paragraph(link("リンク"), ruby("漢字")))',
+      },
+      {
+        name: 'an empty comment before a ruby after text or math stays raw',
+        given: 'a<!---->{漢字|かんじ} $x$<!---->{仮名|かな}',
+        doc: 'doc(paragraph("a", rawInline("<!---->"), ruby("漢字"), " ", math, rawInline("<!---->"), ruby("仮名")))',
+      },
+      {
         name: 'ruby right after a reference',
         given: 'a[^1]‸',
         steps: [
@@ -712,7 +784,7 @@ export const vfmSuites: CaseSuite[] = [
             content: [text('漢字')],
           }),
         ],
-        expect: 'a[^1]{}{漢字|かんじ}‸',
+        expect: 'a[^1]<!---->{漢字|かんじ}‸',
       },
       {
         name: 'editing a note',
@@ -1001,7 +1073,7 @@ export const vfmSuites: CaseSuite[] = [
             content: [text('漢字')],
           }),
         ],
-        expect: '**重要**{}{漢字|かんじ}‸',
+        expect: '**重要**<!---->{漢字|かんじ}‸',
       },
       {
         name: 'strong emphasis with attributes where its delimiters cannot close',
@@ -1024,7 +1096,7 @@ export const vfmSuites: CaseSuite[] = [
           }),
           '{漢字|かんじ}',
         ],
-        expect: '[リンク](u){}{漢字|かんじ}‸',
+        expect: '[リンク](u)<!---->{漢字|かんじ}‸',
         doc: 'doc(paragraph(link("リンク"), ruby("漢字")))',
       },
       {
@@ -1032,7 +1104,7 @@ export const vfmSuites: CaseSuite[] = [
         given: '`c` ‸{漢字|かんじ}',
         steps: [press('Backspace')],
         // The selection's mark would come between them.
-        expect: '`c`{}{漢字|かんじ}',
+        expect: '`c`<!---->{漢字|かんじ}',
       },
       {
         name: 'ruby whose base ends with a backslash',

@@ -221,6 +221,18 @@ export const clipboardSuites: CaseSuite[] = [
         },
       },
       {
+        name: 'math pasted right after math is kept apart from it',
+        given: '‸$x$‸',
+        steps: [copy(), select('$x$‸'), paste()],
+        expect: '$x$<!---->$x$',
+      },
+      {
+        name: 'display math pasted right after display math is kept apart from it',
+        given: '‸$$x$$‸',
+        steps: [copy(), select('$$x$$‸'), paste()],
+        expect: '$$x$$<!---->$$x$$',
+      },
+      {
         name: 'display math is copied',
         given: '‸$$x$$‸\n\nあい',
         steps: [copy(), select('$$x$$\n\nあ‸い'), paste()],
@@ -239,7 +251,7 @@ export const clipboardSuites: CaseSuite[] = [
         name: 'a ruby pasted into code ends the code',
         given: '‸{漢字|かんじ}‸と`code`',
         steps: [copy(), select('{漢字|かんじ}と`co‸de`'), paste()],
-        expect: '{漢字|かんじ}と`co`{}{漢字|かんじ}‸`de`',
+        expect: '{漢字|かんじ}と`co`<!---->{漢字|かんじ}‸`de`',
       },
       {
         name: 'a ruby pasted into a ruby is its base',
@@ -256,7 +268,7 @@ export const clipboardSuites: CaseSuite[] = [
           paste(),
         ],
         expect:
-          '{漢字|かんじ}と[li](https://example.com){}{漢字|かんじ}‸[nk](https://example.com)',
+          '{漢字|かんじ}と[li](https://example.com)<!---->{漢字|かんじ}‸[nk](https://example.com)',
       },
       {
         name: 'a note pasted into code ends the code',
@@ -690,7 +702,7 @@ export const clipboardSuites: CaseSuite[] = [
         name: 'a ruby after an element stays a ruby',
         given: '‸',
         steps: [paste({ text: '**a**{漢字|かんじ}' })],
-        expect: '**a**{}{漢字|かんじ}‸',
+        expect: '**a**<!---->{漢字|かんじ}‸',
       },
       {
         name: 'braces stay text in a document whose definitions lack VFM',

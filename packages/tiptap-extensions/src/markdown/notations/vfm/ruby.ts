@@ -15,14 +15,13 @@ import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
   currentNode,
-  enterNode,
   isLineEnding,
   OpenDelimiters,
   syntaxPlugin,
   tokenType,
 } from '../../micromark';
 import { defineNotation } from '../../notation';
-import { takesAttributes } from './attributes';
+import { isAttributableMdast, takesAttributes } from './attributes';
 import {
   findInlineAtCaret,
   insertInline,
@@ -31,6 +30,7 @@ import {
 } from './commands';
 import { inlineSourceRules } from './input-rules';
 import { inlineNodeRules } from './normalize';
+import { enterSeparated, SEPARATOR } from './separator';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -162,8 +162,14 @@ function tokenizeRuby(
 
 const rubyFromMarkdown: FromMarkdownExtension = {
   enter: {
+    // VFM would read the ruby right after the element as its attributes.
     [types.ruby](token) {
-      enterNode(this, { type: 'ruby', rubyText: '', children: [] }, token);
+      enterSeparated(
+        this,
+        { type: 'ruby', rubyText: '', children: [] },
+        token,
+        isAttributableMdast,
+      );
     },
   },
   exit: {
@@ -444,7 +450,7 @@ export const rubyNotation = defineNotation({
   nodes: {
     ruby: (node, context) => {
       const separator = takesAttributes(context.lineBefore, context.adjacent)
-        ? '{}'
+        ? SEPARATOR
         : '';
       return `${separator}{${baseOf(context.inline(node, { singleLine: true }))}|${String(node.attrs.rubyText ?? '')}}`;
     },

@@ -249,6 +249,16 @@ const comparisons: Record<string, Comparison[]> = {
     { markdown: '$ x$ $x $ $x$1 \\$x$' },
     { markdown: '$a$b$ and $x$$y$' },
     {
+      markdown: '$x$<!---->$y$',
+      differs: {
+        vfm: '<p><span class="inline math" data-math-typeset="true">\\(x\\)</span><!----><span class="inline math" data-math-typeset="true">\\(y\\)</span></p>',
+        editor:
+          '<p><span class="inline math" data-math-typeset="true">\\(x\\)</span><span class="inline math" data-math-typeset="true">\\(y\\)</span></p>',
+        reason:
+          'An empty comment between math keeps VFM from reading the `$` of both as one. The editor reads it as no content, so it renders nothing for it.',
+      },
+    },
+    {
       markdown: '[$x$](u)',
       differs: {
         vfm: '<p><a href="u">$x$</a></p>',
@@ -354,6 +364,15 @@ const comparisons: Record<string, Comparison[]> = {
           '<p>a<a class="footnote-ref x" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>',
         reason:
           'VFM renders a reference with attributes as a link in a sup with them, unlike one without; the editor keeps its element and adds the classes.',
+      },
+    },
+    {
+      markdown: 'a[^1]<!---->{漢|かん} **b**<!---->{漢|かん}',
+      differs: {
+        vfm: '<p>a<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a><!----><ruby>漢<rt>かん</rt></ruby> <strong>b</strong><!----><ruby>漢<rt>かん</rt></ruby></p>',
+        editor:
+          '<p>a<a class="footnote-ref" href="#fn1" id="fnref1" role="doc-noteref"><sup>1</sup></a><ruby><span>漢</span><rt>かん</rt></ruby> <strong>b</strong><ruby><span>漢</span><rt>かん</rt></ruby></p>',
+        reason: `An empty comment between an element and a ruby keeps VFM from reading the ruby as the attributes of the element. The editor reads it as no content, so it renders nothing for it. ${RUBY_BASE}`,
       },
     },
     {

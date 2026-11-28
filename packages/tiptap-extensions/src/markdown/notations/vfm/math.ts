@@ -13,7 +13,6 @@ import { hasDocumentNotation } from '../../extension';
 import type { UnknownMdastNode } from '../../mdast';
 import {
   currentNode,
-  enterNode,
   isDigit,
   isJsWhitespace,
   isLineEnding,
@@ -25,6 +24,7 @@ import { defineNotation } from '../../notation';
 import { findSelectedInline, insertInline } from './commands';
 import { inlineSourceRules } from './input-rules';
 import { inlineNodeRules } from './normalize';
+import { enterSeparated, SEPARATOR } from './separator';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -241,13 +241,28 @@ const resolveMathInLinks: Resolver = (events) => {
   return events;
 };
 
+function isMathMdast(node: UnknownMdastNode): boolean {
+  return node.type === 'inlineMath' || node.type === 'displayMath';
+}
+
 const mathFromMarkdown: FromMarkdownExtension = {
   enter: {
+    // VFM would read the `$` of math right after math as one with it.
     [types.inline](token) {
-      enterNode(this, { type: 'inlineMath', value: '' }, token);
+      enterSeparated(
+        this,
+        { type: 'inlineMath', value: '' },
+        token,
+        isMathMdast,
+      );
     },
     [types.display](token) {
-      enterNode(this, { type: 'displayMath', value: '' }, token);
+      enterSeparated(
+        this,
+        { type: 'displayMath', value: '' },
+        token,
+        isMathMdast,
+      );
     },
   },
   exit: {
@@ -505,9 +520,14 @@ export const mathNotation = defineNotation({
       ),
   },
   nodes: {
-    math: (node) => {
+    math: (node, context) => {
       const fence = node.attrs.display ? '$$' : '$';
-      return `${fence}${String(node.attrs.latex ?? '')}${fence}`;
+      const separator =
+        context.adjacent?.node.type === node.type &&
+        context.lineBefore?.endsWith('$')
+          ? SEPARATOR
+          : '';
+      return `${separator}${fence}${String(node.attrs.latex ?? '')}${fence}`;
     },
   },
   escapes: [

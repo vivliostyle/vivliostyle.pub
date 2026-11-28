@@ -109,6 +109,33 @@ describe('saved markdown as VFM reads it', () => {
     expect(html(getMarkdown(editor))).toContain('\\(x^2 + \\alpha_1\\)');
   });
 
+  it('keeps math inserted right after math apart from it', () => {
+    const editor = load('$x$\n');
+    editor.view.dispatch(
+      editor.state.tr.insert(
+        2,
+        editor.state.schema.nodes.math.create({ latex: 'y', display: false }),
+      ),
+    );
+    expect(html(getMarkdown(editor))).toBe(
+      '<p><span class="math inline" data-math-typeset="true">\\(x\\)</span><!----><span class="math inline" data-math-typeset="true">\\(y\\)</span></p>',
+    );
+  });
+
+  it('keeps a ruby inserted right after a link apart from it', () => {
+    const editor = load('[a](u)\n');
+    const { ruby } = editor.state.schema.nodes;
+    editor.view.dispatch(
+      editor.state.tr.insert(
+        2,
+        ruby.create({ rubyText: 'かんじ' }, editor.state.schema.text('漢字')),
+      ),
+    );
+    expect(html(getMarkdown(editor))).toBe(
+      '<p><a href="u">a</a><!----><ruby>漢字<rt>かんじ</rt></ruby></p>',
+    );
+  });
+
   it('keeps two line breaks in a row in the paragraph', () => {
     const editor = load('ab\n');
     const { hardBreak } = editor.state.schema.nodes;
