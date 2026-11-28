@@ -2,6 +2,7 @@ import { type Editor, Extension } from '@tiptap/core';
 import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, type Transaction } from '@tiptap/pm/state';
 
+import { withoutInclusiveMark } from '../typed-marks';
 import { changedNodes, isRemote } from './changes';
 import type { NotationDefinition } from './notation';
 import {
@@ -330,9 +331,9 @@ export const PubMarkdown = Extension.create<
   },
 
   addExtensions() {
-    return this.options.notations.flatMap(
-      (notation) => notation.extensions ?? [],
-    );
+    return this.options.notations
+      .flatMap((notation) => notation.extensions ?? [])
+      .map(withoutInclusiveMark);
   },
 
   addProseMirrorPlugins() {

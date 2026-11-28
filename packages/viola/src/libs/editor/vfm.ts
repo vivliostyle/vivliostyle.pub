@@ -94,9 +94,11 @@ export function attributedMarkOf(state: EditorState): AttributedMark | null {
   if (!$from.parent.isTextblock || $from.parent.type.spec.code) {
     return null;
   }
+  // Right after an element, the caret is where its attributes are written,
+  // though text typed there would not take its mark.
   const marks =
     from === to
-      ? $from.marks()
+      ? (($from.nodeBefore ?? $from.nodeAfter)?.marks ?? [])
       : (state.doc.nodeAt(from)?.marks ?? $from.marks());
   let best: AttributedMark | null = null;
   for (const mark of marks) {

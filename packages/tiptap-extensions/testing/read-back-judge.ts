@@ -57,14 +57,25 @@ export function isEmptyParagraph(node: ProseMirrorNode): boolean {
   return true;
 }
 
-function isAutolinkText(text: string, href: unknown): boolean {
-  return (
-    typeof href === 'string' &&
-    !/\s/.test(text) &&
-    ((href === text && /^(?:https?|ftp):\/\//i.test(text)) ||
-      (href === `http://${text}` && /^www/i.test(text)) ||
-      (href === `mailto:${text}` && /^[^@\s]+@[^@\s]+$/.test(text)))
-  );
+// The bare texts GFM links to `href`. Next to a link to `href`, one reads
+// back as part of that link.
+function autolinkTexts(href: unknown): string[] {
+  if (typeof href !== 'string' || /\s/.test(href)) {
+    return [];
+  }
+  const texts: string[] = [];
+  if (/^(?:https?|ftp):\/\//i.test(href)) {
+    texts.push(href);
+  }
+  const host = href.match(/^http:\/\/([wW]{3}.*)$/)?.[1];
+  if (host) {
+    texts.push(host);
+  }
+  const address = href.match(/^mailto:([^@\s]+@[^@\s]+)$/)?.[1];
+  if (address) {
+    texts.push(address);
+  }
+  return texts;
 }
 
 function charsOf(
@@ -225,13 +236,15 @@ function compareTextblocks(
     while (j < b.length && b[j].marks.includes(link)) {
       j++;
     }
-    const text = b
-      .slice(i, j)
-      .map((char) => char.value)
-      .join('');
-    if (isAutolinkText(text, JSON.parse(link).attrs?.href)) {
-      for (let k = i; k < j; k++) {
-        autolinks.add(k);
+    const span = b.slice(i, j).map((char) => char.value);
+    for (const literal of autolinkTexts(JSON.parse(link).attrs?.href)) {
+      const values = [...literal];
+      for (let at = 0; at + values.length <= span.length; at++) {
+        if (values.every((value, k) => span[at + k] === value)) {
+          for (let k = 0; k < values.length; k++) {
+            autolinks.add(i + at + k);
+          }
+        }
       }
     }
     i = j;

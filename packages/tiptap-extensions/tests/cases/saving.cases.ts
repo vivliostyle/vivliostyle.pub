@@ -138,6 +138,12 @@ export const savingSuites: CaseSuite[] = [
         steps: [insert('www.example.com を参照')],
         expect: '詳細はwww.example.com を参照',
       },
+      {
+        name: 'a URL typed right after a link to it',
+        given: '[本文](https://a.jp)‸',
+        steps: ['https://a.jp'],
+        expect: '[本文](https://a.jp)https://a.jp‸',
+      },
     ],
   },
   {

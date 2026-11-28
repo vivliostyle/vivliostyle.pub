@@ -118,8 +118,6 @@ export function insertLink(
       text: text?.trim() || href,
       marks: [{ type: 'link', attrs: { href } }],
     })
-    // The link mark is inclusive, so text typed next would join the link.
-    .unsetMark('link')
     .run();
   return true;
 }

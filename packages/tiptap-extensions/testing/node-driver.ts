@@ -149,13 +149,30 @@ export function createNodeDriver(
 
   // What the browser does with Backspace and Delete when no keymap takes them.
   function deleteNatively(key: 'Backspace' | 'Delete'): void {
-    const { selection, tr } = editor.state;
-    if (!selection.empty) {
-      view.dispatch(tr.deleteSelection());
+    const range = nativeDeletion(key);
+    if (!range) {
       return;
     }
+    const { doc, tr } = editor.state;
+    // The view reads the deletion from the DOM and keeps what was deleted
+    // marked as it was for the text typed next.
+    const marks = doc.resolve(range.from).marksAcross(doc.resolve(range.to));
+    tr.delete(range.from, range.to);
+    if (marks) {
+      tr.ensureMarks(marks);
+    }
+    view.dispatch(tr);
+  }
+
+  function nativeDeletion(
+    key: 'Backspace' | 'Delete',
+  ): { from: number; to: number } | null {
+    const { selection } = editor.state;
+    if (!selection.empty) {
+      return { from: selection.from, to: selection.to };
+    }
     if (!(selection instanceof TextSelection) || !selection.$cursor) {
-      return;
+      return null;
     }
     const { $cursor } = selection;
     if (key === 'Backspace' && $cursor.parentOffset > 0) {
@@ -163,8 +180,9 @@ export function createNodeDriver(
       const size = before?.isText
         ? (graphemes(before.text ?? '').at(-1)?.length ?? 1)
         : (before?.nodeSize ?? 1);
-      view.dispatch(tr.delete($cursor.pos - size, $cursor.pos));
-    } else if (
+      return { from: $cursor.pos - size, to: $cursor.pos };
+    }
+    if (
       key === 'Delete' &&
       $cursor.parentOffset < $cursor.parent.content.size
     ) {
@@ -172,8 +190,9 @@ export function createNodeDriver(
       const size = after?.isText
         ? (graphemes(after.text ?? '')[0]?.length ?? 1)
         : (after?.nodeSize ?? 1);
-      view.dispatch(tr.delete($cursor.pos, $cursor.pos + size));
+      return { from: $cursor.pos, to: $cursor.pos + size };
     }
+    return null;
   }
 
   function pressKey(shortcut: string): void {

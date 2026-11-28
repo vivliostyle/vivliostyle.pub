@@ -21,6 +21,7 @@ import {
   type VfmSyntax,
   vfmNotations,
 } from './markdown/notations/vfm/notations';
+import { TypedMarks } from './typed-marks';
 
 export {
   type BlockFormat,
@@ -175,6 +176,7 @@ export const PubExtensions = Extension.create<PubExtensionConfig>({
       ChainSafeClearNodes,
       BlockFormatting,
       InlineBoundaries,
+      TypedMarks,
       FileMediaHandler.configure({
         allowedMimeTypes: IMAGE_MIME_TYPES,
         onDrop: onFileDrop,

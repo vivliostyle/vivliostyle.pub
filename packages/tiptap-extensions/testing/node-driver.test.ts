@@ -1,4 +1,8 @@
 import { Extension } from '@tiptap/core';
+import { Bold } from '@tiptap/extension-bold';
+import { Document } from '@tiptap/extension-document';
+import { Paragraph } from '@tiptap/extension-paragraph';
+import { Text } from '@tiptap/extension-text';
 import { describe, expect, it } from 'vitest';
 
 import { PubExtensions } from '../src/index';
@@ -20,6 +24,13 @@ const typeYForX = Extension.create({
         }),
     };
   },
+});
+
+const plain = (text: string) => ({ type: 'text', text });
+const bold = (text: string) => ({ ...plain(text), marks: [{ type: 'bold' }] });
+const paragraph = (...content: object[]) => ({
+  type: 'doc',
+  content: [{ type: 'paragraph', content }],
 });
 
 async function outcome(
@@ -142,5 +153,25 @@ describe('createNodeDriver', () => {
         expect: '‸b',
       }),
     ).toEqual([]);
+  });
+
+  it('keeps the marks of what it deletes for the next text, as a view does', async () => {
+    const driver = createNodeDriver([Document, Paragraph, Text, Bold]);
+    try {
+      const { editor } = driver;
+      editor.commands.setContent(paragraph(bold('a'), plain('b')));
+      editor.commands.setTextSelection(3);
+      await driver.perform(press('Backspace'));
+      expect(editor.state.storedMarks).toEqual([]);
+
+      editor.commands.setContent(paragraph(plain('a'), bold('bc')));
+      editor.commands.setTextSelection(2);
+      await driver.perform(press('Delete'));
+      expect(editor.state.storedMarks?.map((mark) => mark.type.name)).toEqual([
+        'bold',
+      ]);
+    } finally {
+      driver.destroy();
+    }
   });
 });

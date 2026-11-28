@@ -324,8 +324,8 @@ describe('saving keeps what the document means', () => {
     const md = '# A *b* _c_\n\n[ref]: http://ex.com\nSetext\n===\n\nlast _x_\n';
     const editor = load(md);
     expect(getMarkdown(editor)).toBe(md);
-    appendTo(editor, 'last', 'Z');
-    expect(getMarkdown(editor)).toBe(md.replace('last _x_', 'last _xZ_'));
+    appendTo(editor, 'last', ' Z');
+    expect(getMarkdown(editor)).toBe(md.replace('last _x_', 'last _x_ Z'));
   });
 
   it.each([
@@ -433,6 +433,26 @@ describe('saving keeps what the document means', () => {
     const editor = load(md);
     appendTo(editor, 'end', 'Z');
     expect(getMarkdown(editor)).toBe(`${md}Z`);
+  });
+
+  it.each([
+    ['https://a.jp', 'https://a.jp'],
+    ['http://www.a.jp', 'www.a.jp'],
+    ['mailto:u@a.jp', 'u@a.jp'],
+  ])('writes bare text that GFM links to %s next to a link to it', (href, text) => {
+    const editor = load('');
+    const { schema } = editor.state;
+    const link = schema.marks.link.create({ href });
+    const doc = schema.topNodeType.create(null, [
+      schema.nodes.paragraph.create(null, [
+        schema.text('a ', [link]),
+        schema.text(`${text} `),
+        schema.text('b', [link]),
+      ]),
+    ]);
+    expect(getMarkdown(editor, { doc, baseline: '' })).toBe(
+      `[a ](${href})${text} [b](${href})`,
+    );
   });
 
   it('does not save what cannot be written', () => {
@@ -730,6 +750,6 @@ describe('declared HTML elements', () => {
       'doc(sidenote(paragraph(bold("側注"))), paragraph("after"))',
     );
     appendTo(editor, '側注', '!');
-    expect(getMarkdown(editor)).toBe(markdown.replace('側注', '側注!'));
+    expect(getMarkdown(editor)).toBe(markdown.replace('**側注**', '**側注**!'));
   });
 });

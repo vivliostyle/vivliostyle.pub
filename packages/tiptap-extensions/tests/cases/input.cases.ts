@@ -90,6 +90,101 @@ export const inputSuites: CaseSuite[] = [
     ],
   },
   {
+    title: 'formatting of typed text',
+    cases: [
+      {
+        name: 'inside formatting takes it',
+        given: '**a‸b**',
+        steps: ['c'],
+        expect: '**ac‸b**',
+      },
+      {
+        name: 'at the end of formatting does not take it',
+        given: '**a**‸b',
+        steps: ['c'],
+        expect: '**a**c‸b',
+      },
+      {
+        name: 'at the end of formatting that ends the line does not take it',
+        given: '**a**‸',
+        steps: ['c'],
+        expect: '**a**c‸',
+      },
+      {
+        name: 'at the start of formatting that starts the line does not take it',
+        given: '‸**a**',
+        steps: ['c'],
+        expect: 'c‸**a**',
+      },
+      {
+        name: 'between two kinds of formatting takes neither',
+        given: '**a**‸*b*',
+        steps: ['c'],
+        expect: '**a**c‸*b*',
+      },
+      {
+        name: 'at the end of a link does not join it',
+        given: '[a](u)‸',
+        steps: ['c'],
+        expect: '[a](u)c‸',
+      },
+      {
+        name: 'at the end of inline code does not join it',
+        given: '`a`‸',
+        steps: ['c'],
+        expect: '`a`c‸',
+      },
+      {
+        name: 'at the end of strikethrough does not take it',
+        given: '~~a~~‸',
+        steps: ['c'],
+        expect: '~~a~~c‸',
+      },
+      {
+        name: 'over a selection that ends formatting does not take it',
+        given: '**a‸b**‸c',
+        steps: ['X'],
+        expect: '**a**X‸c',
+      },
+      {
+        name: 'after Backspace at the end of formatting does not take it',
+        given: '**ab**‸',
+        steps: [press('Backspace'), 'c'],
+        expect: '**a**c‸',
+      },
+      {
+        name: 'after Backspace of plain text after formatting does not take it',
+        given: '**a**b‸',
+        steps: [press('Backspace'), 'c'],
+        expect: '**a**c‸',
+      },
+      {
+        name: 'after Backspace of plain text inside formatting takes it',
+        given: '**a**b‸**c**',
+        steps: [press('Backspace'), 'd'],
+        expect: '**ad‸c**',
+      },
+      {
+        name: 'after Delete at the start of formatting does not take it',
+        given: 'a‸**bc**',
+        steps: [press('Delete'), 'd'],
+        expect: 'ad‸**c**',
+      },
+      {
+        name: 'after Mod-b at the end of formatting takes it',
+        given: '**a**‸',
+        steps: [press('Mod-b'), 'cd'],
+        expect: '**acd**‸',
+      },
+      {
+        name: 'after Mod-b inside formatting does not take it',
+        given: '**a‸b**',
+        steps: [press('Mod-b'), 'cd'],
+        expect: '**a**cd‸**b**',
+      },
+    ],
+  },
+  {
     title: 'lists',
     cases: [
       {

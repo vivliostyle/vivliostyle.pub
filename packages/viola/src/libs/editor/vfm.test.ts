@@ -92,6 +92,12 @@ describe('attributes of the selected element', () => {
     expect(attributedMarkOf(editor.state)?.mark.type.name).toBe('bold');
   });
 
+  it('are those of the element right before the caret', () => {
+    const editor = load('a **bold** c');
+    selectText(editor, ' c', 0);
+    expect(attributedMarkOf(editor.state)?.mark.type.name).toBe('bold');
+  });
+
   it('are written after the element', () => {
     const editor = load('a **bold** c');
     selectText(editor, 'old');

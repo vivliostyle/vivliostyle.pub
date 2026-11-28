@@ -60,16 +60,24 @@ export interface WrittenFormOptions {
   writeSafe?: (node: ProseMirrorNode) => string;
 }
 
-/** The text GFM autolinks to `href` when written bare, see `isBareUrlLink`. */
-function isAutolinkLiteral(text: string, href: unknown): boolean {
-  if (typeof href !== 'string' || /\s/.test(text)) {
-    return false;
+/** The texts GFM autolinks to `href` when written bare, see `isBareUrlLink`. */
+function autolinkLiterals(href: unknown): string[] {
+  if (typeof href !== 'string' || /\s/.test(href)) {
+    return [];
   }
-  return (
-    (href === text && /^(?:https?|ftp):\/\//i.test(text)) ||
-    (href === `http://${text}` && /^www/i.test(text)) ||
-    (href === `mailto:${text}` && /^[^@]+@[^@]+$/.test(text))
-  );
+  const literals: string[] = [];
+  if (/^(?:https?|ftp):\/\//i.test(href)) {
+    literals.push(href);
+  }
+  const www = href.slice('http://'.length);
+  if (href.startsWith('http://') && /^www/i.test(www)) {
+    literals.push(www);
+  }
+  const email = href.match(/^mailto:([^@]+@[^@]+)$/)?.[1];
+  if (email) {
+    literals.push(email);
+  }
+  return literals;
 }
 
 /**
@@ -299,14 +307,23 @@ export class WrittenForm {
       }
       offset += size;
     });
+    // A bare URL next to a link to it reads back as part of that link.
     for (const span of spans) {
       const href = (JSON.parse(span.key) as { attrs?: { href?: unknown } })
         .attrs?.href;
-      if (!isAutolinkLiteral(span.text, href)) {
-        continue;
-      }
-      for (let i = span.from; i < span.to && i < chars.length; i++) {
-        chars[i].autolink = span.key;
+      const text = [...span.text];
+      for (const literal of autolinkLiterals(href).map((it) => [...it])) {
+        for (let at = 0; at + literal.length <= text.length; at++) {
+          if (literal.some((char, k) => text[at + k] !== char)) {
+            continue;
+          }
+          for (let k = 0; k < literal.length; k++) {
+            const char = chars[span.from + at + k];
+            if (char) {
+              char.autolink = span.key;
+            }
+          }
+        }
       }
     }
   }
